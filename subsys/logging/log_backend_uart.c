@@ -13,6 +13,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/sys/__assert.h>
+#include <zephyr/pm/device_runtime.h>
 LOG_MODULE_REGISTER(log_uart);
 
 /* Fixed size to avoid auto-added trailing '\0'.
@@ -63,17 +64,25 @@ static int char_out(uint8_t *data, size_t length, void *ctx)
 	ARG_UNUSED(ctx);
 	int err;
 
+	if (pm_device_runtime_is_enabled(uart_dev)) {
+		if (pm_device_runtime_get(uart_dev) < 0) {
+			/* Enabling the UART instance has failed but this
+			 * function MUST return the number of bytes consumed.
+			 */
+			return length;
+		}
+	}
+
 	if (IS_ENABLED(CONFIG_LOG_BACKEND_UART_OUTPUT_DICTIONARY_HEX)) {
 		dict_char_out_hex(data, length);
-		return length;
+		goto cleanup;
 	}
 
 	if (!IS_ENABLED(CONFIG_LOG_BACKEND_UART_ASYNC) || in_panic || !use_async) {
 		for (size_t i = 0; i < length; i++) {
 			uart_poll_out(uart_dev, data[i]);
 		}
-
-		return length;
+		goto cleanup;
 	}
 
 	err = uart_tx(uart_dev, data, length, SYS_FOREVER_US);
@@ -83,6 +92,11 @@ static int char_out(uint8_t *data, size_t length, void *ctx)
 	__ASSERT_NO_MSG(err == 0);
 
 	(void)err;
+cleanup:
+	if (pm_device_runtime_is_enabled(uart_dev)) {
+		/* As errors cannot be returned, ignore the return value */
+		(void)pm_device_runtime_put(uart_dev);
+	}
 
 	return length;
 }
