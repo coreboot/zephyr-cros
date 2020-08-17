@@ -31,17 +31,21 @@
 #include <assert.h>
 #include <drivers/clock_control.h>
 #include <drivers/i2c.h>
+#include <dt-bindings/i2c/i2c.h>
 #include <soc.h>
 #include "i2c_npcx_controller.h"
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(i2c_npcx_port, LOG_LEVEL_ERR);
 
+#include "i2c-priv.h"
+
 /* Device config */
 struct i2c_npcx_port_config {
 	/* pinmux configuration */
 	const uint8_t   alts_size;
 	const struct npcx_alt *alts_list;
+	uint32_t bitrate;
 	uint8_t port;
 };
 
@@ -117,9 +121,18 @@ static int i2c_npcx_port_transfer(const struct device *dev,
 static int i2c_npcx_port_init(const struct device *dev)
 {
 	const struct i2c_npcx_port_config *const config = DRV_CONFIG(dev);
+	uint32_t i2c_config;
+	int ret;
 
 	/* Configure pin-mux for I2C device */
 	npcx_pinctrl_mux_configure(config->alts_list, config->alts_size, 1);
+
+	/* Setup initial i2c configuration */
+	i2c_config = (I2C_MODE_MASTER | i2c_map_dt_bitrate(config->bitrate));
+	ret = i2c_npcx_port_configure(dev, i2c_config);
+	if (ret != 0) {
+		return ret;
+	}
 
 	return 0;
 }
@@ -152,6 +165,7 @@ static const struct i2c_driver_api i2c_port_npcx_driver_api = {
 									       \
 	static const struct i2c_npcx_port_config i2c_npcx_port_cfg_##inst = {  \
 		.port = DT_INST_PROP(inst, port),                              \
+		.bitrate = DT_INST_PROP(inst, clock_frequency),                \
 		.alts_size = ARRAY_SIZE(i2c_port_alts##inst),                  \
 		.alts_list = i2c_port_alts##inst,                              \
 	};                                                                     \

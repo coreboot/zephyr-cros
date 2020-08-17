@@ -9,6 +9,7 @@
 #include <dt-bindings/clock/npcx_clock.h>
 #include <dt-bindings/espi/npcx_espi.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/i2c/i2c.h>
 #include <dt-bindings/pwm/pwm.h>
 
 /* NPCX7 series pinmux mapping table */

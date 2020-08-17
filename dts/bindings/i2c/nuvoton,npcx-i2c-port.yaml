@@ -25,3 +25,8 @@ properties:
         type: phandles
         required: true
         description: configurations of pinmux controllers
+
+    clock-frequency:
+        type: int
+        required: true
+        description: Initial clock frequency in Hz
