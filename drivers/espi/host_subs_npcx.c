@@ -440,7 +440,7 @@ static void host_port80_init(void)
 #if defined(CONFIG_ESPI_PERIPHERAL_UART)
 /* host uart pinmux configuration */
 static const struct npcx_alt host_uart_alts[] =
-					DT_NPCX_ALT_ITEMS_LIST(0);
+			DT_NPCX_IO_ALT_ITEMS_LIST(nuvoton_npcx_host_uart, 0);
 /* Host UART sub-device local functions */
 void host_uart_init(void)
 {

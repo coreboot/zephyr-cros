@@ -96,7 +96,7 @@
  *        'i'
  *
  * @param inst instance number for compatible defined in DT_DRV_COMPAT.
- * @param i index of pinctrl-0 prop which type is 'phandles'
+ * @param i index of 'pinctrl-0' prop which type is 'phandles'
  * @return phandle from 'pinctrl-0' prop at index 'i'
  */
 #define DT_PHANDLE_FROM_PINCTRL(inst, i) \
@@ -106,7 +106,7 @@
  * @brief Construct a npcx_alt structure from 'pinctrl-0' property at index 'i'
  *
  * @param inst instance number for compatible defined in DT_DRV_COMPAT.
- * @param i index of pinctrl-0 prop which type is 'phandles'
+ * @param i index of 'pinctrl-0' prop which type is 'phandles'
  * @return npcx_alt item from 'pinctrl-0' property at index 'i'
  */
 #define DT_NPCX_ALT_ITEM_BY_IDX(inst, i)                                       \
@@ -134,8 +134,8 @@
 #define DT_NPCX_ALT_ITEMS_FUC(child, inst) DT_NPCX_ALT_ITEM_BY_IDX(inst, child)
 
 /**
- * @brief Macro function to construct a list of npcx_alt items by UTIL_LISTIFY
- * func
+ * @brief Macro function to construct a list of npcx_alt items with compatible
+ * defined in DT_DRV_COMPAT by UTIL_LISTIFY func
  *
  * Example devicetree fragment:
  *    / {
@@ -143,8 +143,107 @@
  *			pinctrl-0 = <&alta_uart1_sl1>;
  *			...
  *		};
+ *	};
  *
- *		host_sub: lpc@400c1000 {
+ * Example usage: *
+ *      const struct npcx_alt uart_alts[] = DT_NPCX_ALT_ITEMS_LIST(inst);
+ *
+ * @param inst instance number for compatible defined in DT_DRV_COMPAT.
+ * @return an array of npcx_alt items.
+ */
+#define DT_NPCX_ALT_ITEMS_LIST(inst) {             \
+	UTIL_LISTIFY(DT_NPCX_ALT_ITEMS_LEN(inst),  \
+		     DT_NPCX_ALT_ITEMS_FUC,        \
+		     inst)                         \
+	}
+
+/**
+ * @brief Node identifier for an instance of a specific compatible
+ *
+ * @param compat specific compatible of devices in device-tree file
+ * @param inst instance number
+ * @return a node identifier for the node with "io_comp" compatible and
+ *         instance number "inst"
+ */
+#define DT_NPCX_COMP_INST(compat, inst) DT_INST(inst, compat)
+
+/**
+ * @brief Get a specific compatible instance's node identifier for a phandle in
+ * a property.
+ *
+ * @param compat specific compatible of devices in device-tree file
+ * @param inst instance number
+ * @param prop lowercase-and-underscores property name in "inst"
+ *             with type "phandle", "phandles" or "phandle-array"
+ * @param idx index into "prop"
+ * @return a node identifier for the phandle at index "idx" in "prop"
+ */
+#define DT_NPCX_COMP_INST_PHANDLE_BY_IDX(compat, inst, prop, idx) \
+	DT_PHANDLE_BY_IDX(DT_NPCX_COMP_INST(compat, inst), prop, idx)
+
+/**
+ * @brief Get phandle from 'pinctrl-0' prop which type is 'phandles' at index
+ *        'i' from io-pads device with specific compatible.
+ *
+ * @param io_comp compatible string in devicetree file for io-pads device
+ * @param inst instance number for compatible defined in io_comp.
+ * @param i index of 'pinctrl-0' prop which type is 'phandles'
+ * @return phandle from 'pinctrl-0' prop at index 'i'
+ */
+#define DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i) \
+	DT_NPCX_COMP_INST_PHANDLE_BY_IDX(io_comp, inst, pinctrl_0, i)
+
+/**
+ * @brief Construct a npcx_alt structure from 'pinctrl-0' property at index 'i'
+ *        from io-pads device with specific compatible.
+ *
+ * @param io_comp compatible string in devicetree file for io-pads device
+ * @param inst instance number for compatible defined in io_comp.
+ * @param i index of 'pinctrl_0' prop which type is 'phandles'
+ * @return npcx_alt item from 'pinctrl-0' property at index 'i'
+ */
+#define DT_NPCX_IO_ALT_ITEM_BY_IDX(io_comp, inst, i)                           \
+	{                                                                      \
+	  .group    = DT_PHA(DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i),     \
+								alts, group),  \
+	  .bit      = DT_PHA(DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i),     \
+								alts, bit),    \
+	  .inverted = DT_PHA(DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i),     \
+								alts, inv),    \
+	},
+
+/**
+ * @brief Length of npcx_alt structures in 'pinctrl-0' property of specific
+ *        compatible io-pads device
+ *
+ * @param io_comp compatible string in devicetree file for io-pads device
+ * @param inst instance number for compatible defined in io_comp.
+ * @return length of 'pinctrl-0' property which type is 'phandles'
+ */
+#define DT_NPCX_IO_ALT_ITEMS_LEN(io_comp, inst) \
+			DT_PROP_LEN(DT_NPCX_COMP_INST(io_comp, inst), pinctrl_0)
+
+/**
+ * @brief Macro function to construct npcx_alt item with specific compatible
+ *        string in UTIL_LISTIFY extension.
+ *
+ * @param child child index in UTIL_LISTIFY extension.
+ * @param inst instance number for compatible defined in io_comp.
+ * @param io_comp compatible string in devicetree file for io-pads device
+ * @return macro function to construct a npcx_alt structure.
+ */
+#define DT_NPCX_IO_ALT_ITEMS_FUC(child, inst, io_comp) \
+			DT_NPCX_IO_ALT_ITEM_BY_IDX(io_comp, inst, child)
+
+/**
+ * @brief Macro function to construct a list of npcx_alt items with specific
+ *        compatible string by UTIL_LISTIFY func
+ *
+ * Example devicetree fragment:
+ *    / {
+ *		host_uart: io_host_uart {
+ *			compatible = "nuvoton,npcx-host-uart";
+ *
  *			pinctrl-0 = <&altb_rxd_sl &altb_txd_sl
  *				   &altb_rts_sl &altb_cts_sl
  *				   &altb_ri_sl &altb_dtr_bout_sl
@@ -154,16 +253,16 @@
  *	};
  *
  * Example usage: *
- *      const struct npcx_alt uart_alts[] = DT_NPCX_ALT_ITEMS_LIST(inst);
- *      const struct npcx_alt host_uart_alts[] = DT_NPCX_ALT_ITEMS_LIST(inst);
- *
- * @param inst instance number for compatible defined in DT_DRV_COMPAT.
+ *      const struct npcx_alt host_uart_alts[] =
+ *                   DT_NPCX_IO_ALT_ITEMS_LIST(nuvoton_npcx_host_uart, 0);
+ * @param io_comp compatible string in devicetree file for io-pads device
+ * @param inst instance number for compatible defined in io_comp.
  * @return an array of npcx_alt items.
  */
-#define DT_NPCX_ALT_ITEMS_LIST(inst) {             \
-	UTIL_LISTIFY(DT_NPCX_ALT_ITEMS_LEN(inst),  \
-		     DT_NPCX_ALT_ITEMS_FUC,        \
-		     inst)                         \
+#define DT_NPCX_IO_ALT_ITEMS_LIST(io_comp, inst) {             \
+	UTIL_LISTIFY(DT_NPCX_IO_ALT_ITEMS_LEN(io_comp, inst),  \
+		     DT_NPCX_IO_ALT_ITEMS_FUC,                 \
+		     inst, io_comp)                            \
 	}
 
 /**
