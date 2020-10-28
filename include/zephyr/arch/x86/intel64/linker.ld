@@ -92,6 +92,12 @@ SECTIONS
 	__rom_region_start = .;
 	__text_region_start = .;
 	z_mapped_start = .;
+
+/* Located in generated directory. This file is populated by the
+ * zephyr_linker_sources() Cmake function.
+ */
+#include <snippets-pre-text.ld>
+
 	*(.text)
 	*(.text.*)
 
@@ -110,6 +116,12 @@ SECTIONS
 	SECTION_PROLOGUE(_RODATA_SECTION_NAME,,)
 	{
 	. = ALIGN(16);
+
+/* Located in generated directory. This file is populated by the
+ * zephyr_linker_sources() Cmake function.
+ */
+#include <snippets-pre-rodata.ld>
+
 	*(.rodata)
 	*(.rodata.*)
 
