@@ -451,7 +451,7 @@
 			interrupts = <29 0>;
 			clocks = <&ccm IMX_CCM_LPUART10_CLK 0x80 14>;
 			label = "UART_10";
-			status = "disabled";
+			status = "disabled";IEEE802154_CONFIG_ENH_ACK_HEADER_IE
 		};
 
 		lpuart11: uart@40c24000 {
