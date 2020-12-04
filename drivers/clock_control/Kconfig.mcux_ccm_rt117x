@@ -1,0 +1,10 @@
+# MCUXpresso SDK CCM
+
+# Copyright (c) 2021, NXP
+# SPDX-License-Identifier: Apache-2.0
+
+config CLOCK_CONTROL_MCUX_CCM_RT117X
+	bool "MCUX CCM RT117X driver"
+	depends on HAS_MCUX_CCM
+	help
+	  Enable support for mcux ccm rt117x driver.
