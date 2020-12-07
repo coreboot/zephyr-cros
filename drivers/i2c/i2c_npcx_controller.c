@@ -887,7 +887,7 @@ static int i2c_ctrl_init(const struct device *dev)
 	static const struct i2c_ctrl_config i2c_ctrl_cfg_##inst = {            \
 		.base = DT_INST_REG_ADDR(inst),                                \
 		.irq = DT_INST_IRQN(inst),                                     \
-		.clk_cfg = DT_NPCX_CLK_CFG_ITEM(inst),                         \
+		.clk_cfg = NPCX_DT_CLK_CFG_ITEM(inst),                         \
 	};                                                                     \
 									       \
 	static struct i2c_ctrl_data i2c_ctrl_data_##inst;                      \

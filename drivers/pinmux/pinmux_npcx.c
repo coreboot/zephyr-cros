@@ -32,7 +32,7 @@ struct npcx_pinctrl_config {
  *               };
  */
 static const struct npcx_alt def_alts[] =
-			DT_NPCX_IO_ALT_ITEMS_LIST(nuvoton_npcx_pinctrl_def, 0);
+			NPCX_DT_IO_ALT_ITEMS_LIST(nuvoton_npcx_pinctrl_def, 0);
 
 static const struct npcx_pinctrl_config npcx_pinctrl_cfg = {
 	.base_scfg = DT_INST_REG_ADDR_BY_NAME(0, scfg),

@@ -161,7 +161,7 @@ static const struct i2c_driver_api i2c_port_npcx_driver_api = {
 	NPCX_I2C_PORT_INIT_FUNC_DECL(inst);                                    \
 									       \
 	static const struct npcx_alt i2c_port_alts##inst[] =                   \
-					DT_NPCX_ALT_ITEMS_LIST(inst);          \
+					NPCX_DT_ALT_ITEMS_LIST(inst);          \
 									       \
 	static const struct i2c_npcx_port_config i2c_npcx_port_cfg_##inst = {  \
 		.port = DT_INST_PROP(inst, port),                              \
