@@ -770,12 +770,13 @@ int npcx_i2c_ctrl_transfer(const struct device *i2c_dev, struct i2c_msg *msgs,
 	int ret = 0;
 	uint8_t i;
 
-	/* Does bus need recovery? */
-	if (i2c_ctrl_bus_busy(i2c_dev) ||
-			data->oper_state == NPCX_I2C_ERROR_RECOVERY) {
-		ret = i2c_ctrl_recovery(i2c_dev);
-		if (ret) {
-			return ret;
+	if (data->oper_state != NPCX_I2C_WRITE_SUSPEND &&
+			data->oper_state != NPCX_I2C_READ_SUSPEND) {
+		if (i2c_ctrl_bus_busy(i2c_dev)) {
+			ret = i2c_ctrl_recovery(i2c_dev);
+			if (ret) {
+				return ret;
+			}
 		}
 	}
 
