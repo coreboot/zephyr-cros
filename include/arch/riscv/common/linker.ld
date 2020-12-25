@@ -132,6 +132,14 @@ SECTIONS
 		*(.gnu.linkonce.t.*)
 		*(.eh_frame)
 #include <linker/kobject-text.ld>
+#ifdef CONFIG_SOC_FLASH_RAMCODE_SECTION
+		. = ALIGN(0x1000);
+		_ram_code_start = .;
+		KEEP(*(.__ram_code))
+		__ram_code_size = . - _ram_code_start;
+		ASSERT((__ram_code_size <= 0x1000),
+			"__ram_code_size <= 4k bytes");
+#endif
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
     _image_text_end = .;
