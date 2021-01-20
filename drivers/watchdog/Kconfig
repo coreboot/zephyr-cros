@@ -54,4 +54,5 @@ source "drivers/watchdog/Kconfig.sifive"
 
 source "drivers/watchdog/Kconfig.npcx"
 
+source "drivers/watchdog/Kconfig.it8xxx2"
 endif
