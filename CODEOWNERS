@@ -328,7 +328,12 @@
 /drivers/watchdog/*gecko*                 @oanerer
 /drivers/watchdog/*sifive*                @katsuster
 /drivers/watchdog/wdt_handlers.c          @dcpleung @nashif
+<<<<<<< HEAD   (d5a1a2 python-devicetree: tox: fix mypy)
 /drivers/watchdog/*cc32xx*                @pavlohamov
+=======
+/drivers/watchdog/wdt_ite_it8xxx2.c       @RuibinChang
+/drivers/watchdog/Kconfig.it8xxx2         @RuibinChang
+>>>>>>> CHANGE (c1c3de FROMPULL: ITE driver/watchdog: add watchdog timer for it8xxx)
 /drivers/wifi/                            @jukkar @tbursztyka @pfalcon
 /drivers/wifi/esp_at/                     @mniestroj
 /drivers/wifi/eswifi/                     @loicpoulain @nandojve
