@@ -9,6 +9,7 @@
 #include <zephyr/drivers/lora.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/kernel.h>
+#include <zephyr/pm/device_runtime.h>
 
 #include <sx126x/sx126x.h>
 
@@ -298,6 +299,9 @@ void SX126xSetOperatingMode(RadioOperatingModes_t mode)
 	case MODE_SLEEP:
 		/* Additionally disable the DIO1 interrupt to save power */
 		sx126x_dio1_irq_disable(&dev_data);
+		if (pm_device_runtime_is_enabled(dev_data.spi)) {
+			pm_device_runtime_put(dev_data.spi);
+		}
 		__fallthrough;
 	default:
 		sx126x_set_rx_enable(0);
@@ -386,6 +390,10 @@ void SX126xWakeup(void)
 		.buffers = &tx_buf,
 		.count = 1,
 	};
+
+	if (pm_device_runtime_is_enabled(dev_data.spi)) {
+		pm_device_runtime_get(dev_data.spi);
+	}
 
 	LOG_DBG("Sending GET_STATUS");
 	ret = spi_write_dt(&dev_config.bus, &tx);
