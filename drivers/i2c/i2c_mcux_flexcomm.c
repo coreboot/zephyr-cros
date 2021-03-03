@@ -185,7 +185,7 @@ static int mcux_flexcomm_init(const struct device *dev)
 	i2c_master_config_t master_config;
 	int error;
 
-	k_sem_init(&data->device_sync_sem, 0, UINT_MAX);
+	k_sem_init(&data->device_sync_sem, 0, K_SEM_MAX_LIMIT);
 
 	data->dev_clock = device_get_binding(config->clock_name);
 	if (data->dev_clock == NULL) {

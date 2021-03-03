@@ -198,7 +198,7 @@ static int mcux_lpi2c_init(const struct device *dev)
 	lpi2c_master_config_t master_config;
 	int error;
 
-	k_sem_init(&data->device_sync_sem, 0, UINT_MAX);
+	k_sem_init(&data->device_sync_sem, 0, K_SEM_MAX_LIMIT);
 
 	clock_dev = device_get_binding(config->clock_name);
 	if (clock_dev == NULL) {
