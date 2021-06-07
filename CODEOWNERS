@@ -271,6 +271,7 @@
 /drivers/pwm/pwm_capture.c                @henrikbrixandersen
 /drivers/pwm/pwm_shell.c                  @henrikbrixandersen
 /drivers/pwm/*gecko*                      @sun681
+/drivers/pwm/*it8xxx2*                    @RuibinChang
 /drivers/sensor/                          @MaureenHelm
 /drivers/sensor/ams_iAQcore/              @alexanderwachter
 /drivers/sensor/ens210/                   @alexanderwachter
@@ -328,12 +329,9 @@
 /drivers/watchdog/*gecko*                 @oanerer
 /drivers/watchdog/*sifive*                @katsuster
 /drivers/watchdog/wdt_handlers.c          @dcpleung @nashif
-<<<<<<< HEAD   (d5a1a2 python-devicetree: tox: fix mypy)
 /drivers/watchdog/*cc32xx*                @pavlohamov
-=======
 /drivers/watchdog/wdt_ite_it8xxx2.c       @RuibinChang
 /drivers/watchdog/Kconfig.it8xxx2         @RuibinChang
->>>>>>> CHANGE (c1c3de FROMPULL: ITE driver/watchdog: add watchdog timer for it8xxx)
 /drivers/wifi/                            @jukkar @tbursztyka @pfalcon
 /drivers/wifi/esp_at/                     @mniestroj
 /drivers/wifi/eswifi/                     @loicpoulain @nandojve
@@ -467,6 +465,7 @@
 /include/dt-bindings/clock/kinetis_scg.h  @henrikbrixandersen
 /include/dt-bindings/dma/stm32_dma.h      @cybertale
 /include/dt-bindings/pcie/                @dcpleung
+/include/dt-bindings/pwm/*it8xxx2*        @RuibinChang
 /include/dt-bindings/usb/usb.h            @galak
 /include/drivers/emul.h                   @sjg20
 /include/fs/                              @nashif @nvlsianpu @de-nordic
