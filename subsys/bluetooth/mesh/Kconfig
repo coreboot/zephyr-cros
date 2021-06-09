@@ -59,6 +59,13 @@ config BT_MESH_PROVISIONER
 	help
 	  Enable this option to have support for provisioning remote devices.
 
+config BT_MESH_IV_UPDATE_SEQ_LIMIT
+	hex "the sequence limit to start iv update"
+	default 0x7A1200
+	range 0x000001 0xFFFFFE
+	help
+	  This option specifies the sequence number value to start iv update.
+
 config BT_MESH_CDB
 	bool "Mesh Configuration Database [EXPERIMENTAL]"
 	default y if BT_MESH_PROVISIONER
