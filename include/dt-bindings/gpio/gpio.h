@@ -74,15 +74,6 @@
 /** Enable GPIO pin pull-down. */
 #define GPIO_PULL_DOWN          (1 << 5)
 
-/* Initializes voltage for a given pin. */
-#define GPIO_VOLTAGE_POS        6
-#define GPIO_VOLTAGE_MASK       (3U << GPIO_VOLTAGE_POS)
-
-#define GPIO_VOLTAGE_DEFAULT    (0U << GPIO_VOLTAGE_POS)
-#define GPIO_VOLTAGE_1P8        (1U << GPIO_VOLTAGE_POS)
-#define GPIO_VOLTAGE_3P3        (2U << GPIO_VOLTAGE_POS)
-#define GPIO_VOLTAGE_5P0        (3U << GPIO_VOLTAGE_POS)
-
 /** @} */
 
 /**
