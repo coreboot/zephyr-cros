@@ -5,11 +5,7 @@
 #
 
 CONFIG_SOC_MIMXRT1176_CM7=y
-<<<<<<< HEAD
 CONFIG_SOC_SERIES_IMX_RT=y
-=======
-CONFIG_SOC_SERIES_IMX_RT117X=y
->>>>>>> board: arm: add board support files for mimxrt1170_evk
 CONFIG_CONSOLE=y
 CONFIG_UART_CONSOLE=y
 CONFIG_SERIAL=y

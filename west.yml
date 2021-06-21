@@ -124,7 +124,7 @@ manifest:
       revision: f49bd1354616fae4093bf36e5eaee43c51a55127
       path: tools/net-tools
     - name: nrf_hw_models
-      revision: a47e326ca772ddd14cc3b9d4ca30a9ab44ecca1
+      revision: a47e326ca772ddd14cc3b9d4ca30a9ab44ecca16
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: 6010f0523cbc75f551d9256cf782f173177acdef
