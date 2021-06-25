@@ -1,0 +1,18 @@
+/*
+ * Copyright (c) 2021 Synopsys.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&spi2 {
+	status = "okay";
+	clock-frequency = <33333333>;
+	cs-gpios = <&gpio0 16 GPIO_ACTIVE_LOW>, <&gpio0 16 GPIO_ACTIVE_LOW>;
+
+	adxl362@1 {
+		compatible = "adi,adxl362";
+		label = "ADXL362";
+		spi-max-frequency = <1000000>;
+		reg = <1>;
+	};
+};
