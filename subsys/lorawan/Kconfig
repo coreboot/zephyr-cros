@@ -19,6 +19,13 @@ module = LORAWAN
 module-str = lorawan
 source "subsys/logging/Kconfig.template.log_config"
 
+config LORAWAN_INIT_PRIORITY
+	int "LoRaWAN initialization priority"
+	default 91
+	help
+	  System initialization priority for LoRaWAN driver. Must run after
+	  LoRa initialization.
+
 config LORAWAN_SYSTEM_MAX_RX_ERROR
 	int "LoRaWAN System Max Rx Error"
 	default 20

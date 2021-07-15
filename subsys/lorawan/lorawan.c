@@ -636,4 +636,4 @@ static int lorawan_init(const struct device *dev)
 
 	return 0;
 }
-SYS_INIT(lorawan_init, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEVICE);
+SYS_INIT(lorawan_init, POST_KERNEL, CONFIG_LORAWAN_INIT_PRIORITY);
