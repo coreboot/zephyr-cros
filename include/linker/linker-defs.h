@@ -37,6 +37,12 @@
 #endif
 
 #ifdef _LINKER
+
+/**
+ * @addtogroup iterable_section_apis
+ * @{
+ */
+
 #define Z_LINK_ITERABLE(struct_type) \
 	_CONCAT(_##struct_type, _list_start) = .; \
 	KEEP(*(SORT_BY_NAME(._##struct_type.static.*))); \
@@ -135,6 +141,10 @@
 	{ \
 		Z_LINK_ITERABLE_GC_ALLOWED(struct_type); \
 	} GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
+
+/**
+ * @}
+ */ /* end of struct_section_apis */
 
 /*
  * generate a symbol to mark the start of the objects array for
