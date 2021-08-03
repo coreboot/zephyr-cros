@@ -2010,6 +2010,7 @@ PREDEFINED             = "CONFIG_ARCH_HAS_CUSTOM_BUSY_WAIT" \
                          "DEVICE_DEFINE()=" \
                          "BUILD_ASSERT_MSG()=" \
                          "BUILD_ASSERT()=" \
+                         "_LINKER" \
                          "__deprecated=" \
                          "__packed=" \
                          "__aligned(x)=" \
