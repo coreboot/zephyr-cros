@@ -152,8 +152,7 @@ uint8_t lll_scan_aux_setup(struct lll_scan *lll, struct pdu_adv *pdu,
 
 	/* No need to scan further if no aux_ptr filled */
 	aux_ptr = (void *)pri_dptr;
-	if (unlikely(!pri_hdr->aux_ptr || !aux_ptr->offs ||
-		     (aux_ptr->phy > EXT_ADV_AUX_PHY_LE_CODED))) {
+	if (unlikely(!pri_hdr->aux_ptr || !aux_ptr->offs)) {
 		return 0;
 	}
 
