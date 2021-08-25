@@ -937,6 +937,7 @@ class QEMUHandler(Handler):
                 ignore_unexpected_eof=False):
         fifo_in = fifo_fn + ".in"
         fifo_out = fifo_fn + ".out"
+        print("start qemu {}".format(os.listdir(os.path.dirname(fifo_fn))))
 
         # These in/out nodes are named from QEMU's perspective, not ours
         if os.path.exists(fifo_in):
@@ -2244,6 +2245,7 @@ class ProjectBuilder(FilterBuilder):
         # FIXME: Needs simplification
         if instance.platform.simulation == "qemu":
             instance.handler = QEMUHandler(instance, "qemu")
+            print(instance.handler.get_fifo())
             args.append("QEMU_PIPE=%s" % instance.handler.get_fifo())
             instance.handler.call_make_run = True
         elif instance.testcase.type == "unit":
