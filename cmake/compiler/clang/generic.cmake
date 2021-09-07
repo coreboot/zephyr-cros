@@ -5,6 +5,4 @@ if(DEFINED TOOLCHAIN_HOME)
 endif()
 
 find_program(CMAKE_C_COMPILER clang ${find_program_clang_args})
-find_program(CMAKE_LLVM_COV llvm-cov ${find_program_clang_args})
-set(CMAKE_GCOV "${LLVM_COV} gcov")
 

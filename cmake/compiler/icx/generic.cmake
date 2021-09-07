@@ -5,4 +5,3 @@ if(DEFINED TOOLCHAIN_HOME)
 endif()
 
 find_program(CMAKE_C_COMPILER icx ${find_program_icx_args})
-find_program(CMAKE_GCOV gcov ${find_program_icx_args})
