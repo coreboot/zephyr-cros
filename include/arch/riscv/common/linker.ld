@@ -293,4 +293,10 @@ SECTION_PROLOGUE(.last_section,(NOLOAD),)
 _image_rom_end = LOADADDR(.last_section);
 _image_rom_size = _image_rom_end - _image_rom_start;
 
+/*
+ * CHROMIUM-only: _image_rom_size renamed to __rom_region_size in v2.7.
+ * Backport this into our v2.6 tree simply by providing a second symbol name.
+ */
+__rom_region_size = _image_rom_size;
+
 }
