@@ -252,7 +252,6 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
 
     def flash(self, **kwargs):
         lines = [
-            'ExitOnError 1',  # Treat any command-error as fatal
             'r',  # Reset and halt the target
         ]
 
