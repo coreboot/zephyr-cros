@@ -329,6 +329,8 @@
 /drivers/serial/*rcar*                    @aaillet
 /drivers/serial/Kconfig.test              @str4t0m
 /drivers/serial/serial_test.c             @str4t0m
+/drivers/serial/Kconfig.it8xxx2           @GTLin08
+/drivers/serial/uart_ite_it8xxx2.c        @GTLin08
 /drivers/serial/*esp32c3*                 @uLipe
 /drivers/serial/*esp32s2*                 @glaubermaroto
 /drivers/disk/                            @jfischer-no
