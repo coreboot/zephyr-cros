@@ -852,4 +852,8 @@
 				     &pinctrl_kso17>; /* GPC5 */
 		};
 	};
+
+	/* Chromium-only: label needed by main branch */
+	ite_uart1_wrapper: ignore {
+	};
 };
