@@ -31,8 +31,7 @@ static void pin_get_and_verify(const struct device *port, unsigned int pin,
 	zassert_true(val_actual >= 0,
 		     "Test point %d: failed to get logical pin value", idx);
 	zassert_equal(val_expected, val_actual,
-			"Test point %d: invalid logical pin get value %d != %d",
-			idx, val_expected, val_actual);
+		      "Test point %d: invalid logical pin get value", idx);
 }
 
 static void pin_set_raw_and_verify(const struct device *port,
@@ -202,69 +201,6 @@ void test_gpio_pin_set_get(void)
 
 		pin_get_and_verify(port, TEST_PIN, val_expected, i);
 	}
-}
-
-/** @brief Verify gpio_pin_set, gpio_pin_get functions on 2 pins.
- *
- * - Verify that gpio_pin_get reads the same value as set by gpio_pin_set
- *   function when another gpio is also set.
- */
-void test_gpio_pin_set_get2(void)
-{
-#if DT_NODE_HAS_PROP(DT_ALIAS(led1), gpios)
-#define TEST_DEV1             DT_GPIO_LABEL(DT_ALIAS(led1), gpios)
-#define TEST_PIN1             DT_GPIO_PIN(DT_ALIAS(led1), gpios)
-#define TEST_PIN_DTS_FLAGS1   DT_GPIO_FLAGS(DT_ALIAS(led1), gpios)
-	const struct device *port0;
-	const struct device *port1;
-	int val_expected;
-	int ret;
-
-	const int test_vector[] = {
-		1, 2, 3, 0, 4, 0, 0, 0, 17, INT_MAX, INT_MIN, 0
-	};
-
-	port0 = device_get_binding(TEST_DEV);
-	zassert_not_null(port0, "device " TEST_DEV " not found");
-	port1 = device_get_binding(TEST_DEV1);
-	zassert_not_null(port1, "device " TEST_DEV1 " not found");
-
-	zassert_equal(port0, port1, "Both test pins should be on same device");
-
-	TC_PRINT("Running test on port=%s, pin=%d and pin=%d\n", TEST_DEV, TEST_PIN, TEST_PIN1);
-
-	ret = gpio_pin_configure(port0, TEST_PIN, GPIO_OUTPUT | GPIO_INPUT);
-	if (ret == -ENOTSUP) {
-		TC_PRINT("Simultaneous pin in/out mode is not supported.\n");
-		ztest_test_skip();
-		return;
-	}
-	zassert_equal(ret, 0, "Failed to configure the pin0");
-
-	ret = gpio_pin_configure(port1, TEST_PIN1, GPIO_OUTPUT | GPIO_INPUT);
-	if (ret == -ENOTSUP) {
-		TC_PRINT("Simultaneous pin in/out mode is not supported.\n");
-		ztest_test_skip();
-		return;
-	}
-	zassert_equal(ret, 0, "Failed to configure the pin1");
-
-	for (int i = 0; i < ARRAY_SIZE(test_vector); i++) {
-		for (int j = 0; j < ARRAY_SIZE(test_vector); j++) {
-			pin_set_and_verify(port0, TEST_PIN, test_vector[i], i);
-			pin_set_and_verify(port1, TEST_PIN1, test_vector[j], j);
-
-			val_expected = test_vector[i] != 0 ? 1 : 0;
-			pin_get_and_verify(port0, TEST_PIN, val_expected,
-				i * ARRAY_SIZE(test_vector) + j);
-			val_expected = test_vector[j] != 0 ? 1 : 0;
-			pin_get_and_verify(port1, TEST_PIN1, val_expected,
-				i * ARRAY_SIZE(test_vector) + j);
-		}
-	}
-#else
-		ztest_test_skip();
-#endif
 }
 
 /** @brief Verify GPIO_ACTIVE_HIGH flag.

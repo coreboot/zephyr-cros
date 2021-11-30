@@ -26,7 +26,6 @@ void test_gpio_pin_configure_single_ended(void);
 
 void test_gpio_pin_set_get_raw(void);
 void test_gpio_pin_set_get(void);
-void test_gpio_pin_set_get2(void);
 void test_gpio_pin_set_get_active_high(void);
 void test_gpio_pin_set_get_active_low(void);
 void test_gpio_pin_toggle(void);
