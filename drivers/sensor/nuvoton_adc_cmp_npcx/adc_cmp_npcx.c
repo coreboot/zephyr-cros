@@ -10,7 +10,7 @@
 
 #include <logging/log.h>
 
-LOG_MODULE_REGISTER(adc_cmp_npcx, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(adc_cmp_npcx, CONFIG_SENSOR_LOG_LEVEL);
 
 struct adc_cmp_npcx_data {
 	/* Work queue to be notified when threshold assertion happens */
@@ -126,13 +126,43 @@ init_error:
 	return ret;
 }
 
-int adc_cmp_npcx_attr_set(const struct device *dev,
+static int adc_cmp_npcx_set_threshold(const struct device *dev, bool is_upper,
+				      bool is_mv, uint32_t value)
+{
+	const struct adc_cmp_npcx_config *const config = dev->config;
+	struct adc_npcx_threshold_param param;
+	int ret;
+
+	param.type = ADC_NPCX_THRESHOLD_PARAM_THVAL;
+	if (is_mv) {
+		ret = adc_npcx_threshold_mv_to_thrval(value, &param.val);
+		if (ret) {
+			return ret;
+		}
+	}
+
+	ret = adc_npcx_threshold_ctrl_set_param(config->adc,
+						config->th_sel, &param);
+	if (ret) {
+		return ret;
+	}
+
+	param.type = ADC_NPCX_THRESHOLD_PARAM_L_H;
+	param.val = is_upper ? ADC_NPCX_THRESHOLD_PARAM_L_H_HIGHER :
+		ADC_NPCX_THRESHOLD_PARAM_L_H_LOWER;
+
+	ret = adc_npcx_threshold_ctrl_set_param(config->adc,
+						config->th_sel, &param);
+
+	return ret;
+}
+
+static int adc_cmp_npcx_attr_set(const struct device *dev,
 			  enum sensor_channel chan,
 			  enum sensor_attribute attr,
 			  const struct sensor_value *val)
 {
 	const struct adc_cmp_npcx_config *const config = dev->config;
-	struct adc_npcx_threshold_param param;
 	int ret;
 
 	if (chan != SENSOR_CHAN_VOLTAGE) {
@@ -141,55 +171,24 @@ int adc_cmp_npcx_attr_set(const struct device *dev,
 
 	switch ((uint16_t)attr) {
 	case SENSOR_ATTR_LOWER_THRESH:
+		__fallthrough;
 	case SENSOR_ATTR_UPPER_THRESH:
-		/* Set threshold value first */
-		param.type = ADC_NPCX_THRESHOLD_PARAM_THVAL;
-		param.val = val->val1;
-		ret = adc_npcx_threshold_ctrl_set_param(config->adc,
-						config->th_sel, &param);
-		if (ret) {
-			break;
-		}
-
-		/* Then set lower or higher threshold */
-		param.type = ADC_NPCX_THRESHOLD_PARAM_L_H;
-		param.val = attr == SENSOR_ATTR_UPPER_THRESH ?
-			ADC_NPCX_THRESHOLD_PARAM_L_H_HIGHER :
-			ADC_NPCX_THRESHOLD_PARAM_L_H_LOWER;
-		ret = adc_npcx_threshold_ctrl_set_param(config->adc,
-						config->th_sel, &param);
-		break;
+		__fallthrough;
 	case SENSOR_ATTR_LOWER_VOLTAGE_THRESH:
+		__fallthrough;
 	case SENSOR_ATTR_UPPER_VOLTAGE_THRESH:
-		/* Set threshold value first */
-		param.type = ADC_NPCX_THRESHOLD_PARAM_THVAL;
-		/* Convert from millivolts to ADC raw register value */
-		ret = adc_npcx_threshold_mv_to_thrval(val->val1,
-						&param.val);
-		if (ret) {
-			break;
-		}
-		ret = adc_npcx_threshold_ctrl_set_param(config->adc,
-						config->th_sel, &param);
-		if (ret) {
-			break;
-		}
-
-		/* Then set lower or higher threshold */
-		param.type = ADC_NPCX_THRESHOLD_PARAM_L_H;
-		param.val =
-			(uint16_t)attr == SENSOR_ATTR_UPPER_VOLTAGE_THRESH ?
-			ADC_NPCX_THRESHOLD_PARAM_L_H_HIGHER :
-			ADC_NPCX_THRESHOLD_PARAM_L_H_LOWER;
-
-		ret = adc_npcx_threshold_ctrl_set_param(config->adc,
-						config->th_sel, &param);
+		ret = adc_cmp_npcx_set_threshold(dev,
+			/* Is upper? */
+			attr == SENSOR_ATTR_UPPER_THRESH ||
+			(uint16_t)attr == SENSOR_ATTR_UPPER_VOLTAGE_THRESH,
+			/* Is mV? */
+			(uint16_t)attr == SENSOR_ATTR_LOWER_VOLTAGE_THRESH ||
+			(uint16_t)attr == SENSOR_ATTR_UPPER_VOLTAGE_THRESH,
+			val->val1);
 		break;
-
 	case SENSOR_ATTR_ALERT:
-		param.val = val->val1;
 		ret = adc_npcx_threshold_ctrl_enable(config->adc,
-						config->th_sel, !!param.val);
+						config->th_sel, !!val->val1);
 		break;
 	default:
 		ret = -ENOTSUP;
@@ -197,7 +196,7 @@ int adc_cmp_npcx_attr_set(const struct device *dev,
 	return ret;
 }
 
-int adc_cmp_npcx_attr_get(const struct device *dev,
+static int adc_cmp_npcx_attr_get(const struct device *dev,
 			  enum sensor_channel chan,
 			  enum sensor_attribute attr,
 			  struct sensor_value *val)
@@ -205,7 +204,7 @@ int adc_cmp_npcx_attr_get(const struct device *dev,
 	return -ENOTSUP;
 }
 
-int adc_cmp_npcx_trigger_set(const struct device *dev,
+static int adc_cmp_npcx_trigger_set(const struct device *dev,
 			     const struct sensor_trigger *trig,
 			     sensor_trigger_handler_t handler)
 {
@@ -231,13 +230,13 @@ int adc_cmp_npcx_trigger_set(const struct device *dev,
 						&param);
 }
 
-int adc_cmp_npcx_sample_fetch(const struct device *dev,
+static int adc_cmp_npcx_sample_fetch(const struct device *dev,
 			      enum sensor_channel chan)
 {
 	return -ENOTSUP;
 }
 
-int adc_cmp_npcx_channel_get(const struct device *dev,
+static int adc_cmp_npcx_channel_get(const struct device *dev,
 			     enum sensor_channel chan,
 			     struct sensor_value *val)
 {

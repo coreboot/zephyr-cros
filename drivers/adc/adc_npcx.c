@@ -445,7 +445,7 @@ int adc_npcx_threshold_ctrl_set_param(const struct device *dev,
 	adc_context_lock(&data->ctx, false, NULL);
 	switch (param->type) {
 	case ADC_NPCX_THRESHOLD_PARAM_CHNSEL:
-		if (param->val > NPCX_ADC_CH_COUNT) {
+		if (param->val >= NPCX_ADC_CH_COUNT) {
 			ret = -EINVAL;
 			break;
 		}
