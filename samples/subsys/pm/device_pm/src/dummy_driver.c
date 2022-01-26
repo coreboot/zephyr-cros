@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <pm/device.h>
 #include <pm/device_runtime.h>
 #include <sys/printk.h>
 #include "dummy_parent.h"
@@ -108,11 +109,11 @@ int dummy_init(const struct device *dev)
 		printk("parent not found\n");
 	}
 
-	pm_device_runtime_enable(dev);
-
-	return 0;
+	return pm_device_runtime_enable(dev);
 }
 
+PM_DEVICE_DEFINE(dummy_driver, dummy_device_pm_action);
+
 DEVICE_DEFINE(dummy_driver, DUMMY_DRIVER_NAME, &dummy_init,
-		    dummy_device_pm_action, NULL, NULL, APPLICATION,
+		    PM_DEVICE_GET(dummy_driver), NULL, NULL, APPLICATION,
 		    CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &funcs);

@@ -10,12 +10,14 @@
 #include <sys/byteorder.h>
 
 #include "hal/cpu.h"
+#include "hal/ccm.h"
 #include "hal/ticker.h"
 
 #include "util/util.h"
 #include "util/mem.h"
 #include "util/memq.h"
 #include "util/mayfly.h"
+#include "util/dbuf.h"
 
 #include "ticker/ticker.h"
 
@@ -30,6 +32,7 @@
 #include "lll/lll_adv_pdu.h"
 #include "lll_adv_aux.h"
 #include "lll/lll_df_types.h"
+#include "lll_conn.h"
 
 #include "ull_adv_types.h"
 

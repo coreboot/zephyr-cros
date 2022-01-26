@@ -76,14 +76,7 @@ __weak void pm_power_state_set(struct pm_state_info info)
 	case PM_STATE_SOFT_OFF:
 		set_mode_shutdown(info.substate_id);
 		break;
-	/* Following states are not supported */
-	case PM_STATE_RUNTIME_IDLE:
-		__fallthrough;
-	case PM_STATE_ACTIVE:
-		__fallthrough;
-	case PM_STATE_SUSPEND_TO_RAM:
-		__fallthrough;
-	case PM_STATE_SUSPEND_TO_DISK:
+	default:
 		LOG_DBG("Unsupported power state %u", info.state);
 		return;
 	}
@@ -150,4 +143,4 @@ static int stm32_power_init(const struct device *dev)
 	return 0;
 }
 
-SYS_INIT(stm32_power_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+SYS_INIT(stm32_power_init, PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);

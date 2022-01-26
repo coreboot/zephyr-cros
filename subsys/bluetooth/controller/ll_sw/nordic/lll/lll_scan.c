@@ -20,6 +20,7 @@
 
 #include "util/util.h"
 #include "util/memq.h"
+#include "util/dbuf.h"
 #include "util/mayfly.h"
 
 #include "ticker/ticker.h"
@@ -49,6 +50,12 @@
 
 /* Maximum primary Advertising Radio Channels to scan */
 #define ADV_CHAN_MAX 3U
+
+#if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
+#define CONN_SPACING CONFIG_BT_CTLR_SCHED_ADVANCED_CENTRAL_CONN_SPACING
+#else
+#define CONN_SPACING 0U
+#endif /* CONFIG_BT_CENTRAL && CONFIG_BT_CTLR_SCHED_ADVANCED */
 
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
@@ -287,7 +294,8 @@ void lll_scan_prepare_connect_req(struct lll_scan *lll, struct pdu_adv *pdu_tx,
 		*conn_space_us = conn_offset_us;
 		pdu_tx->connect_ind.win_offset = sys_cpu_to_le16(0);
 	} else {
-		uint32_t win_offset_us = lll->conn_win_offset_us;
+		uint32_t win_offset_us = lll->conn_win_offset_us +
+					 CONN_SPACING;
 
 		while ((win_offset_us & ((uint32_t)1 << 31)) ||
 		       (win_offset_us < conn_offset_us)) {
@@ -375,13 +383,15 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	/* TODO: if coded we use S8? */
 	radio_phy_set(lll->phy, 1);
-	radio_pkt_configure(8, PDU_AC_LEG_PAYLOAD_SIZE_MAX, (lll->phy << 1));
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, PDU_AC_LEG_PAYLOAD_SIZE_MAX,
+			    RADIO_PKT_CONF_PHY(lll->phy));
 
 	lll->is_adv_ind = 0U;
 	lll->is_aux_sched = 0U;
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
 	radio_phy_set(0, 0);
-	radio_pkt_configure(8, PDU_AC_LEG_PAYLOAD_SIZE_MAX, 0);
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, PDU_AC_LEG_PAYLOAD_SIZE_MAX,
+			    RADIO_PKT_CONF_PHY(RADIO_PKT_CONF_PHY_LEGACY));
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
 	node_rx = ull_pdu_rx_alloc_peek(1);
@@ -391,8 +401,8 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 
 	aa = sys_cpu_to_le32(PDU_AC_ACCESS_ADDR);
 	radio_aa_set((uint8_t *)&aa);
-	radio_crc_configure(((0x5bUL) | ((0x06UL) << 8) | ((0x00UL) << 16)),
-			    0x555555);
+	radio_crc_configure(PDU_CRC_POLYNOMIAL,
+					PDU_AC_CRC_IV);
 
 	lll_chan_set(37 + lll->chan);
 
@@ -459,14 +469,14 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 	/* scanner always measures RSSI */
 	radio_rssi_measure();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(remainder_us +
 				 radio_rx_ready_delay_get(0, 0) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#else /* !CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#else /* !HAL_RADIO_GPIO_HAVE_LNA_PIN */
 	ARG_UNUSED(remainder_us);
-#endif /* !CONFIG_BT_CTLR_GPIO_LNA_PIN */
+#endif /* !HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
@@ -782,12 +792,12 @@ static void isr_tx(void *param)
 
 	radio_rssi_measure();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + EVENT_IFS_US - 4 -
 				 radio_tx_chain_delay_get(0, 0) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 	radio_isr_set(isr_rx, param);
 }
@@ -849,16 +859,16 @@ static void isr_done(void *param)
 {
 	isr_common_done(param);
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	uint32_t start_us = radio_tmr_start_now(0);
 
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(start_us +
 				 radio_rx_ready_delay_get(0, 0) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#else /* !CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#else /* !HAL_RADIO_GPIO_HAVE_LNA_PIN */
 	radio_rx_enable();
-#endif /* !CONFIG_BT_CTLR_GPIO_LNA_PIN */
+#endif /* !HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 	/* capture end of Rx-ed PDU, for initiator to calculate first
 	 * central event.
@@ -912,14 +922,14 @@ static void isr_window(void *param)
 	 */
 	radio_tmr_end_capture();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(remainder_us +
 				 radio_rx_ready_delay_get(0, 0) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#else /* !CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#else /* !HAL_RADIO_GPIO_HAVE_LNA_PIN */
 	ARG_UNUSED(remainder_us);
-#endif /* !CONFIG_BT_CTLR_GPIO_LNA_PIN */
+#endif /* !HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 #if defined(CONFIG_BT_CENTRAL)
 	if (is_sched_advanced) {
@@ -1181,7 +1191,7 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 
 		radio_isr_set(isr_cleanup, lll);
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			/* PA/LNA enable is overwriting packet end
 			 * used in ISR profiling, hence back it up
@@ -1193,8 +1203,8 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 		radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() +
 					 EVENT_IFS_US -
 					 radio_rx_chain_delay_get(0, 0) -
-					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
+					 HAL_RADIO_GPIO_PA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 		if (rssi_ready) {
@@ -1316,7 +1326,7 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 		/* capture end of Tx-ed PDU, used to calculate HCTO. */
 		radio_tmr_end_capture();
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			/* PA/LNA enable is overwriting packet end
 			 * used in ISR profiling, hence back it up
@@ -1329,8 +1339,8 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 		radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() +
 					 EVENT_IFS_US -
 					 radio_rx_chain_delay_get(0, 0) -
-					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
+					 HAL_RADIO_GPIO_PA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 		/* switch scanner state to active */
 		lll->state = 1U;

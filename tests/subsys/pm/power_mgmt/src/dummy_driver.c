@@ -6,6 +6,7 @@
 
 #include <sys/printk.h>
 #include <zephyr/types.h>
+#include <pm/device.h>
 #include <pm/device_runtime.h>
 #include "dummy_driver.h"
 
@@ -32,10 +33,11 @@ static const struct dummy_driver_api funcs = {
 
 int dummy_init(const struct device *dev)
 {
-	pm_device_runtime_enable(dev);
-	return 0;
+	return pm_device_runtime_enable(dev);
 }
 
+PM_DEVICE_DEFINE(dummy_driver, dummy_device_pm_action);
+
 DEVICE_DEFINE(dummy_driver, DUMMY_DRIVER_NAME, &dummy_init,
-		    dummy_device_pm_action, NULL, NULL, APPLICATION,
-		    CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &funcs);
+	      PM_DEVICE_GET(dummy_driver), NULL, NULL, APPLICATION,
+	      CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, &funcs);

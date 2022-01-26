@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 The Chromium OS Authors
  * Copyright (c) 2021 Linaro Limited
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -199,11 +200,10 @@
 			};
 		};
 
-		iwdg1: watchdog@40003000 {
+		iwdg: watchdog@40003000 {
 			compatible = "st,stm32-watchdog";
 			reg = <0x40003000 0x400>;
-			interrupts = <27 7>;
-			label = "IWDG_1";
+			label = "IWDG";
 			status = "disabled";
 		};
 
@@ -346,6 +346,7 @@
 			reg = <0x420c0800 0x400>;
 			clocks = <&rcc STM32_CLOCK_BUS_AHB2 0x00040000>;
 			interrupts = <94 0>;
+			health-test-config = <0x9aae>;
 			status = "disabled";
 			label = "RNG";
 		};
@@ -377,6 +378,15 @@
 			status = "disabled";
 			label = "ADC_4";
 			#io-channel-cells = <1>;
+		};
+
+		ucpd1: ucpd@4000dc00 {
+			compatible = "st,stm32-ucpd";
+			reg = <0x4000dc00 0x400>;
+			clocks = <&rcc STM32_CLOCK_BUS_APB1 0x00800000>;
+			interrupts = <106 0>;
+			status = "disabled";
+			label = "UCPD_1";
 		};
 	};
 };

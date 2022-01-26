@@ -11,6 +11,7 @@
 #include <kernel.h>
 #include <drivers/sensor.h>
 #include <logging/log.h>
+#include <pm/device.h>
 #include <sys/byteorder.h>
 
 #include "ina219.h"
@@ -302,9 +303,11 @@ static const struct sensor_driver_api ina219_api = {
 		.mode = INA219_MODE_NORMAL			\
 	};							\
 								\
+	PM_DEVICE_DT_INST_DEFINE(n, ina219_pm_action);		\
+								\
 	DEVICE_DT_INST_DEFINE(n,				\
 			      ina219_init,			\
-			      ina219_pm_action,			\
+			      PM_DEVICE_DT_INST_GET(n),		\
 			      &ina219_data_##n,			\
 			      &ina219_config_##n,		\
 			      POST_KERNEL,			\

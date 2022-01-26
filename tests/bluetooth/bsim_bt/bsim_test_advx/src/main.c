@@ -701,7 +701,7 @@ static void test_advx_main(void)
 	}
 
 	printk("enabling periodic...");
-	err = ll_adv_sync_enable(handle, 1);
+	err = ll_adv_sync_enable(handle, BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE);
 	if (err) {
 		goto exit;
 	}
@@ -795,7 +795,9 @@ static void test_advx_main(void)
 	k_sleep(K_MSEC(1000));
 
 	printk("enabling periodic...");
-	err = ll_adv_sync_enable(handle, 1);
+	err = ll_adv_sync_enable(handle,
+				 (BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE |
+				  BT_HCI_LE_SET_PER_ADV_ENABLE_ADI));
 	if (err) {
 		goto exit;
 	}
@@ -972,7 +974,7 @@ static void test_advx_main(void)
 	printk("success.\n");
 
 	printk("enabling periodic...");
-	err = ll_adv_sync_enable(handle, 1);
+	err = ll_adv_sync_enable(handle, BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE);
 	if (err) {
 		goto exit;
 	}
@@ -1495,6 +1497,14 @@ static void test_scanx_main(void)
 	}
 	printk("success.\n");
 
+	printk("Check duplicate Periodic Advertising Sync create before sync "
+	       "established event...");
+	err = bt_le_per_adv_sync_create(&sync_create_param, &sync);
+	if (!err) {
+		goto exit;
+	}
+	printk("success.\n");
+
 	printk("Start scanning...");
 	err = bt_le_scan_start(&scan_param, scan_cb);
 	if (err) {
@@ -1562,6 +1572,14 @@ static void test_scanx_main(void)
 		k_sleep(K_MSEC(100));
 	}
 	printk("done.\n");
+
+	printk("Check duplicate Periodic Advertising Sync create after sync "
+	       "established event...");
+	err = bt_le_per_adv_sync_create(&sync_create_param, &sync);
+	if (!err) {
+		goto exit;
+	}
+	printk("success.\n");
 
 	printk("Deleting Periodic Advertising Sync 2...");
 	err = bt_le_per_adv_sync_delete(sync);

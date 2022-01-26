@@ -60,8 +60,6 @@ int arch_irq_is_enabled(unsigned int irq)
  * The priority is verified if ASSERT_ON is enabled. The maximum number
  * of priority levels is a little complex, as there are some hardware
  * priority levels which are reserved.
- *
- * @return N/A
  */
 void z_arm_irq_priority_set(unsigned int irq, unsigned int prio, uint32_t flags)
 {
@@ -131,8 +129,6 @@ int arch_irq_is_enabled(unsigned int irq)
  * of priority levels is a little complex, as there are some hardware
  * priority levels which are reserved: three for various types of exceptions,
  * and possibly one additional to support zero latency interrupts.
- *
- * @return N/A
  */
 void z_arm_irq_priority_set(unsigned int irq, unsigned int prio, uint32_t flags)
 {
@@ -151,7 +147,6 @@ void z_arm_fatal_error(unsigned int reason, const z_arch_esf_t *esf);
  * Installed in all _sw_isr_table slots at boot time. Throws an error if
  * called.
  *
- * @return N/A
  */
 void z_irq_spurious(const void *unused)
 {
@@ -181,10 +176,8 @@ void _arch_isr_direct_pm(void)
 #endif /* CONFIG_ARMV6_M_ARMV8_M_BASELINE */
 
 	if (_kernel.idle) {
-		int32_t idle_val = _kernel.idle;
-
 		_kernel.idle = 0;
-		z_pm_save_idle_exit(idle_val);
+		z_pm_save_idle_exit();
 	}
 
 #if defined(CONFIG_ARMV6_M_ARMV8_M_BASELINE) \
@@ -272,7 +265,6 @@ int irq_target_state_is_secure(unsigned int irq)
  * - Bits corresponding to un-implemented interrupts are RES0, so writes
  *   will be ignored.
  *
- * @return N/A
 */
 void irq_target_state_set_all_non_secure(void)
 {

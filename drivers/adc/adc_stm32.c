@@ -3,6 +3,7 @@
  * Copyright (c) 2019 Song Qiang <songqiang1304521@gmail.com>
  * Copyright (c) 2019 Endre Karlson
  * Copyright (c) 2020 Teslabs Engineering S.L.
+ * Copyright (c) 2021 Marius Scholtz, RIC Electronics
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -12,6 +13,7 @@
 #include <errno.h>
 
 #include <drivers/adc.h>
+#include <drivers/pinctrl.h>
 #include <device.h>
 #include <kernel.h>
 #include <init.h>
@@ -29,7 +31,6 @@
 LOG_MODULE_REGISTER(adc_stm32);
 
 #include <drivers/clock_control/stm32_clock_control.h>
-#include <pinmux/pinmux_stm32.h>
 
 #if defined(CONFIG_SOC_SERIES_STM32F3X)
 #if defined(ADC1_V2_5)
@@ -259,9 +260,12 @@ struct adc_stm32_cfg {
 	ADC_TypeDef *base;
 	void (*irq_cfg_func)(void);
 	struct stm32_pclken pclken;
-	const struct soc_gpio_pinctrl *pinctrl;
-	size_t pinctrl_len;
+	const struct pinctrl_dev_config *pcfg;
 };
+
+#ifdef CONFIG_ADC_STM32_SHARED_IRQS
+static bool init_irq = true;
+#endif
 
 static int check_buffer_size(const struct adc_sequence *sequence,
 			     uint8_t active_channels)
@@ -403,6 +407,49 @@ static void adc_stm32_oversampling(ADC_TypeDef *adc, uint8_t ratio, uint32_t shi
 }
 #endif /* CONFIG_SOC_SERIES_STM32xxx */
 
+/*
+ * Enable ADC peripheral, and wait until ready if required by SOC.
+ */
+static int adc_stm32_enable(ADC_TypeDef *adc)
+{
+#if defined(CONFIG_SOC_SERIES_STM32L4X) || \
+	defined(CONFIG_SOC_SERIES_STM32L5X) || \
+	defined(CONFIG_SOC_SERIES_STM32WBX) || \
+	defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32G4X) || \
+	defined(CONFIG_SOC_SERIES_STM32H7X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
+
+	if (LL_ADC_IsEnabled(adc) == 1UL) {
+		return 0;
+	}
+
+	LL_ADC_ClearFlag_ADRDY(adc);
+	LL_ADC_Enable(adc);
+
+	/*
+	 * Enabling ADC modules in L4, WB, G0 and G4 series may fail if they are
+	 * still not stabilized, this will wait for a short time to ensure ADC
+	 * modules are properly enabled.
+	 */
+	uint32_t count_timeout = 0;
+
+	while (LL_ADC_IsActiveFlag_ADRDY(adc) == 0) {
+		if (LL_ADC_IsEnabled(adc) == 0UL) {
+			LL_ADC_Enable(adc);
+			count_timeout++;
+			if (count_timeout == 10) {
+				return -ETIMEDOUT;
+			}
+		}
+	}
+#else
+	LL_ADC_Enable(adc);
+#endif
+
+	return 0;
+}
+
 static int start_read(const struct device *dev,
 		      const struct adc_sequence *sequence)
 {
@@ -497,9 +544,10 @@ static int start_read(const struct device *dev,
 		return err;
 	}
 
-#if defined(CONFIG_SOC_SERIES_STM32G0X)
+#if defined(CONFIG_SOC_SERIES_STM32G0X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	/*
-	 * Errata: Writing ADC_CFGR1 register while ADEN bit is set
+	 * Writing ADC_CFGR1 register while ADEN bit is set
 	 * resets RES[1:0] bitfield. We need to disable and enable adc.
 	 */
 	if (LL_ADC_IsEnabled(adc) == 1UL) {
@@ -508,15 +556,14 @@ static int start_read(const struct device *dev,
 	while (LL_ADC_IsEnabled(adc) == 1UL) {
 	}
 	LL_ADC_SetResolution(adc, resolution);
-	LL_ADC_Enable(adc);
-	while (LL_ADC_IsActiveFlag_ADRDY(adc) != 1UL) {
-	}
+	adc_stm32_enable(adc);
 #elif !defined(CONFIG_SOC_SERIES_STM32F1X) && \
 	!defined(STM32F3X_ADC_V2_5)
 	LL_ADC_SetResolution(adc, resolution);
 #endif
 
-#ifdef CONFIG_SOC_SERIES_STM32L0X
+#if defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32WLX)
 	/*
 	 * setting OVS bits is conditioned to ADC state: ADC must be disabled
 	 * or enabled without conversion on going : disable it, it will stop
@@ -524,7 +571,8 @@ static int start_read(const struct device *dev,
 	LL_ADC_Disable(adc);
 	while (LL_ADC_IsEnabled(adc) == 1UL) {
 	}
-#endif /* CONFIG_SOC_SERIES_STM32L0X */
+#endif
+
 #if defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X) || \
 	defined(CONFIG_SOC_SERIES_STM32H7X) || \
@@ -574,11 +622,11 @@ static int start_read(const struct device *dev,
 #endif /* CONFIG_SOC_SERIES_STM32H7X */
 	default:
 		LOG_ERR("Invalid oversampling");
-		LL_ADC_Enable(adc);
+		adc_stm32_enable(adc);
 		return -EINVAL;
 	}
 	/* re-enable ADC after changing the OVS */
-	LL_ADC_Enable(adc);
+	adc_stm32_enable(adc);
 #else
 	if (sequence->oversampling) {
 		LOG_ERR("Oversampling not supported");
@@ -593,7 +641,14 @@ static int start_read(const struct device *dev,
 	!defined(CONFIG_SOC_SERIES_STM32F1X) && \
 	!defined(STM32F3X_ADC_V2_5) && \
 	!defined(CONFIG_SOC_SERIES_STM32L1X)
+
+		/* we cannot calibrate the ADC while the ADC is enabled */
+		LL_ADC_Disable(adc);
+		while (LL_ADC_IsEnabled(adc) == 1UL) {
+		}
 		adc_stm32_calib(dev);
+		/* re-enable ADC after calibration */
+		adc_stm32_enable(adc);
 #else
 		LOG_ERR("Calibration not supported");
 		return -ENOTSUP;
@@ -615,7 +670,7 @@ static int start_read(const struct device *dev,
 #elif defined(CONFIG_SOC_SERIES_STM32F1X)
 	LL_ADC_EnableIT_EOS(adc);
 #elif defined(STM32F3X_ADC_V2_5)
-	LL_ADC_Enable(adc);
+	adc_stm32_enable(adc);
 	LL_ADC_EnableIT_EOS(adc);
 #else
 	LL_ADC_EnableIT_EOCS(adc);
@@ -649,7 +704,7 @@ static void adc_context_update_buffer_pointer(struct adc_context *ctx,
 
 static void adc_stm32_isr(const struct device *dev)
 {
-	struct adc_stm32_data *data = (struct adc_stm32_data *)dev->data;
+	struct adc_stm32_data *data = dev->data;
 	const struct adc_stm32_cfg *config =
 		(const struct adc_stm32_cfg *)dev->config;
 	ADC_TypeDef *adc = config->base;
@@ -658,7 +713,7 @@ static void adc_stm32_isr(const struct device *dev)
 
 	adc_context_on_sampling_done(&data->ctx, dev);
 
-	LOG_DBG("ISR triggered.");
+	LOG_DBG("%s ISR triggered.", dev->name);
 }
 
 static int adc_stm32_read(const struct device *dev,
@@ -838,9 +893,7 @@ static int adc_stm32_init(const struct device *dev)
 	}
 
 	/* Configure dt provided device signals when available */
-	err = stm32_dt_pinctrl_configure(config->pinctrl,
-					 config->pinctrl_len,
-					 (uint32_t)config->base);
+	err = pinctrl_apply_state(config->pcfg, PINCTRL_STATE_DEFAULT);
 	if (err < 0) {
 		LOG_ERR("ADC pinctrl setup failed (%d)", err);
 		return err;
@@ -964,32 +1017,10 @@ static int adc_stm32_init(const struct device *dev)
 	}
 #endif
 
-	LL_ADC_Enable(adc);
-
-#if defined(CONFIG_SOC_SERIES_STM32L4X) || \
-	defined(CONFIG_SOC_SERIES_STM32L5X) || \
-	defined(CONFIG_SOC_SERIES_STM32WBX) || \
-	defined(CONFIG_SOC_SERIES_STM32G0X) || \
-	defined(CONFIG_SOC_SERIES_STM32G4X) || \
-	defined(CONFIG_SOC_SERIES_STM32H7X) || \
-	defined(CONFIG_SOC_SERIES_STM32WLX)
-	/*
-	 * Enabling ADC modules in L4, WB, G0 and G4 series may fail if they are
-	 * still not stabilized, this will wait for a short time to ensure ADC
-	 * modules are properly enabled.
-	 */
-	uint32_t countTimeout = 0;
-
-	while (LL_ADC_IsActiveFlag_ADRDY(adc) == 0) {
-		if (LL_ADC_IsEnabled(adc) == 0UL) {
-			LL_ADC_Enable(adc);
-			countTimeout++;
-			if (countTimeout == 10) {
-				return -ETIMEDOUT;
-			}
-		}
+	err = adc_stm32_enable(adc);
+	if (err < 0) {
+		return err;
 	}
-#endif
 
 	config->irq_cfg_func();
 
@@ -1042,12 +1073,60 @@ static const struct adc_driver_api api_stm32_driver_api = {
 #endif
 };
 
-#define STM32_ADC_INIT(index)						\
-									\
-static void adc_stm32_cfg_func_##index(void);				\
-									\
-static const struct soc_gpio_pinctrl adc_pins_##index[] =		\
-	ST_STM32_DT_INST_PINCTRL(index, 0);				\
+#ifdef CONFIG_ADC_STM32_SHARED_IRQS
+
+bool adc_stm32_is_irq_active(ADC_TypeDef *adc)
+{
+	return LL_ADC_IsActiveFlag_EOCS(adc) ||
+	       LL_ADC_IsActiveFlag_OVR(adc) ||
+	       LL_ADC_IsActiveFlag_JEOS(adc) ||
+	       LL_ADC_IsActiveFlag_AWD1(adc);
+}
+
+#define HANDLE_IRQS(index)							\
+	static const struct device *dev_##index = DEVICE_DT_INST_GET(index);	\
+	const struct adc_stm32_cfg *cfg_##index = dev_##index->config;		\
+	ADC_TypeDef *adc_##index = (ADC_TypeDef *)(cfg_##index->base);		\
+										\
+	if (adc_stm32_is_irq_active(adc_##index)) {				\
+		adc_stm32_isr(dev_##index);					\
+	}
+
+static void adc_stm32_shared_irq_handler(void)
+{
+	DT_INST_FOREACH_STATUS_OKAY(HANDLE_IRQS);
+}
+
+static void adc_stm32_irq_init(void)
+{
+	if (init_irq) {
+		init_irq = false;
+		IRQ_CONNECT(DT_INST_IRQN(0),
+			DT_INST_IRQ(0, priority),
+			adc_stm32_shared_irq_handler, NULL, 0);
+		irq_enable(DT_INST_IRQN(0));
+	}
+}
+
+#define ADC_STM32_CONFIG(index)						\
+static const struct adc_stm32_cfg adc_stm32_cfg_##index = {		\
+	.base = (ADC_TypeDef *)DT_INST_REG_ADDR(index),			\
+	.irq_cfg_func = adc_stm32_irq_init,				\
+	.pclken = {							\
+		.enr = DT_INST_CLOCKS_CELL(index, bits),		\
+		.bus = DT_INST_CLOCKS_CELL(index, bus),			\
+	},								\
+	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(index),			\
+};
+#else
+#define ADC_STM32_CONFIG(index)						\
+static void adc_stm32_cfg_func_##index(void)				\
+{									\
+	IRQ_CONNECT(DT_INST_IRQN(index),				\
+		    DT_INST_IRQ(index, priority),			\
+		    adc_stm32_isr, DEVICE_DT_INST_GET(index), 0);	\
+	irq_enable(DT_INST_IRQN(index));				\
+}									\
 									\
 static const struct adc_stm32_cfg adc_stm32_cfg_##index = {		\
 	.base = (ADC_TypeDef *)DT_INST_REG_ADDR(index),			\
@@ -1056,9 +1135,16 @@ static const struct adc_stm32_cfg adc_stm32_cfg_##index = {		\
 		.enr = DT_INST_CLOCKS_CELL(index, bits),		\
 		.bus = DT_INST_CLOCKS_CELL(index, bus),			\
 	},								\
-	.pinctrl = adc_pins_##index,					\
-	.pinctrl_len = ARRAY_SIZE(adc_pins_##index),			\
-};									\
+	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(index),			\
+};
+#endif /* CONFIG_ADC_STM32_SHARED_IRQS */
+
+#define STM32_ADC_INIT(index)						\
+									\
+PINCTRL_DT_INST_DEFINE(index);						\
+									\
+ADC_STM32_CONFIG(index)							\
+									\
 static struct adc_stm32_data adc_stm32_data_##index = {			\
 	ADC_CONTEXT_INIT_TIMER(adc_stm32_data_##index, ctx),		\
 	ADC_CONTEXT_INIT_LOCK(adc_stm32_data_##index, ctx),		\
@@ -1069,14 +1155,6 @@ DEVICE_DT_INST_DEFINE(index,						\
 		    &adc_stm32_init, NULL,				\
 		    &adc_stm32_data_##index, &adc_stm32_cfg_##index,	\
 		    POST_KERNEL, CONFIG_ADC_INIT_PRIORITY,		\
-		    &api_stm32_driver_api);				\
-									\
-static void adc_stm32_cfg_func_##index(void)				\
-{									\
-	IRQ_CONNECT(DT_INST_IRQN(index),				\
-		    DT_INST_IRQ(index, priority),			\
-		    adc_stm32_isr, DEVICE_DT_INST_GET(index), 0);	\
-	irq_enable(DT_INST_IRQN(index));				\
-}
+		    &api_stm32_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(STM32_ADC_INIT)

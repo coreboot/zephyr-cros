@@ -33,6 +33,7 @@ LOG_MODULE_REGISTER(spi_dw);
 #include <soc.h>
 #include <device.h>
 #include <init.h>
+#include <pm/device.h>
 
 #include <sys/sys_io.h>
 #include <sys/util.h>
@@ -207,6 +208,11 @@ static int spi_dw_configure(const struct spi_dw_config *info,
 		return 0;
 	}
 
+	if (config->operation & SPI_HALF_DUPLEX) {
+		LOG_ERR("Half-duplex not supported");
+		return -ENOTSUP;
+	}
+
 	/* Verify if requested op mode is relevant to this controller */
 	if (config->operation & SPI_OP_MODE_SLAVE) {
 		if (!(info->op_modes & SPI_CTX_RUNTIME_OP_MODE_SLAVE)) {
@@ -220,8 +226,10 @@ static int spi_dw_configure(const struct spi_dw_config *info,
 		}
 	}
 
-	if (config->operation & (SPI_TRANSFER_LSB |
-				 SPI_LINES_DUAL | SPI_LINES_QUAD)) {
+	if ((config->operation & SPI_TRANSFER_LSB) ||
+	    (IS_ENABLED(CONFIG_SPI_EXTENDED_MODES) &&
+	     (config->operation & (SPI_LINES_DUAL |
+				   SPI_LINES_QUAD | SPI_LINES_OCTAL)))) {
 		LOG_ERR("Unsupported configuration");
 		return -EINVAL;
 	}

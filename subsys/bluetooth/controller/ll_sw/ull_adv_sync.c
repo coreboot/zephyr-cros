@@ -10,12 +10,14 @@
 #include <sys/byteorder.h>
 
 #include "hal/cpu.h"
+#include "hal/ccm.h"
 #include "hal/ticker.h"
 
 #include "util/util.h"
 #include "util/mem.h"
 #include "util/memq.h"
 #include "util/mayfly.h"
+#include "util/dbuf.h"
 
 #include "ticker/ticker.h"
 
@@ -29,6 +31,7 @@
 #include "lll/lll_adv_pdu.h"
 #include "lll_adv_sync.h"
 #include "lll/lll_df_types.h"
+#include "lll_conn.h"
 #include "lll_chan.h"
 
 #include "ull_adv_types.h"
@@ -89,9 +92,10 @@ void ull_adv_sync_pdu_init(struct pdu_adv *pdu, uint8_t ext_hdr_flags)
 	*(uint8_t *)ext_hdr = ext_hdr_flags;
 	dptr = ext_hdr->data;
 
-	LL_ASSERT(!(ext_hdr_flags & (ULL_ADV_PDU_HDR_FIELD_ADVA |
-				     ULL_ADV_PDU_HDR_FIELD_TARGETA |
+	LL_ASSERT(!(ext_hdr_flags & (ULL_ADV_PDU_HDR_FIELD_ADVA | ULL_ADV_PDU_HDR_FIELD_TARGETA |
+#if !defined(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT)
 				     ULL_ADV_PDU_HDR_FIELD_ADI |
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT */
 				     ULL_ADV_PDU_HDR_FIELD_SYNC_INFO)));
 
 	if (ext_hdr_flags & ULL_ADV_PDU_HDR_FIELD_CTE_INFO) {
@@ -102,6 +106,10 @@ void ull_adv_sync_pdu_init(struct pdu_adv *pdu, uint8_t ext_hdr_flags)
 	}
 	if (ext_hdr_flags & ULL_ADV_PDU_HDR_FIELD_TX_POWER) {
 		dptr += sizeof(uint8_t);
+	}
+	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) &&
+	    (ext_hdr_flags & ULL_ADV_PDU_HDR_FIELD_ADI)) {
+		dptr += sizeof(struct pdu_adv_adi);
 	}
 
 	/* Calc tertiary PDU len */
@@ -151,7 +159,8 @@ static uint8_t adv_sync_pdu_init_from_prev_pdu(struct pdu_adv *pdu,
 
 	LL_ASSERT(!ext_hdr->adv_addr);
 	LL_ASSERT(!ext_hdr->tgt_addr);
-	LL_ASSERT(!ext_hdr->adi);
+	LL_ASSERT(IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) ||
+		  !ext_hdr->adi);
 	LL_ASSERT(!ext_hdr->sync_info);
 
 	dptr = ext_hdr->data;
@@ -164,12 +173,22 @@ static uint8_t adv_sync_pdu_init_from_prev_pdu(struct pdu_adv *pdu,
 	/* Copy CTEInfo, if applicable */
 	if (ext_hdr->cte_info) {
 		if (ext_hdr_prev->cte_info) {
-			memcpy(dptr, dptr_prev, sizeof(struct pdu_cte_info));
+			(void)memcpy(dptr, dptr_prev, sizeof(struct pdu_cte_info));
 		}
 		dptr += sizeof(struct pdu_cte_info);
 	}
 	if (ext_hdr_prev->cte_info) {
 		dptr_prev += sizeof(struct pdu_cte_info);
+	}
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) && ext_hdr->adi != 0) {
+		if (ext_hdr_prev->adi) {
+			memcpy(dptr, dptr_prev, sizeof(struct pdu_adv_adi));
+		}
+		dptr += sizeof(struct pdu_adv_adi);
+	}
+	if (ext_hdr_prev->adi) {
+		dptr_prev += sizeof(struct pdu_adv_adi);
 	}
 
 	/* Add AuxPtr, if applicable. Do not copy since it will be updated later
@@ -397,7 +416,7 @@ uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 #if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
 	if (extra_data) {
 		ull_adv_sync_extra_data_set_clear(extra_data_prev, extra_data,
-						  0, 0, NULL);
+						  0U, 0U, NULL);
 	}
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
 
@@ -454,7 +473,7 @@ uint8_t ll_adv_sync_ad_data_set(uint8_t handle, uint8_t op, uint8_t len,
 #if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
 	if (extra_data) {
 		ull_adv_sync_extra_data_set_clear(extra_data_prev, extra_data,
-						  ULL_ADV_PDU_HDR_FIELD_AD_DATA, 0, NULL);
+						  0U, 0U, NULL);
 	}
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
 
@@ -497,11 +516,14 @@ uint8_t ll_adv_sync_ad_data_set(uint8_t handle, uint8_t op, uint8_t len,
 
 uint8_t ll_adv_sync_enable(uint8_t handle, uint8_t enable)
 {
+	void *extra_data_prev, *extra_data;
+	struct pdu_adv *pdu_prev, *pdu;
 	struct lll_adv_sync *lll_sync;
 	struct ll_adv_sync_set *sync;
 	uint8_t sync_got_enabled;
 	struct ll_adv_set *adv;
 	uint8_t pri_idx;
+	uint8_t ter_idx;
 	uint8_t err;
 
 	adv = ull_adv_is_created_get(handle);
@@ -514,14 +536,16 @@ uint8_t ll_adv_sync_enable(uint8_t handle, uint8_t enable)
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
-	/* TODO: Add Periodic Advertising ADI Support feature */
-	if (enable > 1U) {
+	if ((enable > (BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE |
+		       BT_HCI_LE_SET_PER_ADV_ENABLE_ADI)) ||
+	    (!IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) &&
+	     (enable > BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE))) {
 		return BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
 	}
 
 	sync = HDR_LLL2ULL(lll_sync);
 
-	if (!enable) {
+	if (!(enable & BT_HCI_LE_SET_PER_ADV_ENABLE_ENABLE)) {
 		if (!sync->is_enabled) {
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
@@ -547,6 +571,42 @@ uint8_t ll_adv_sync_enable(uint8_t handle, uint8_t enable)
 		 */
 	} else {
 		sync_got_enabled = 1U;
+	}
+
+	/* Add/Remove ADI */
+	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT)) {
+		uint16_t hdr_add_fields;
+		uint16_t hdr_rem_fields;
+
+		if (enable & BT_HCI_LE_SET_PER_ADV_ENABLE_ADI) {
+			hdr_add_fields = ULL_ADV_PDU_HDR_FIELD_ADI;
+			hdr_rem_fields = 0U;
+		} else {
+			hdr_add_fields = 0U;
+			hdr_rem_fields = ULL_ADV_PDU_HDR_FIELD_ADI;
+		}
+
+		err = ull_adv_sync_pdu_alloc(adv, ULL_ADV_PDU_EXTRA_DATA_ALLOC_IF_EXIST,
+					     &pdu_prev, &pdu, &extra_data_prev,
+					     &extra_data, &ter_idx);
+		if (err) {
+			return err;
+		}
+
+#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
+		if (extra_data) {
+			ull_adv_sync_extra_data_set_clear(extra_data_prev,
+							  extra_data, 0U, 0U,
+							  NULL);
+		}
+#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
+
+		err = ull_adv_sync_pdu_set_clear(lll_sync, pdu_prev, pdu,
+						 hdr_add_fields, hdr_rem_fields,
+						 NULL);
+		if (err) {
+			return err;
+		}
 	}
 
 	if (adv->is_enabled && !sync->is_started) {
@@ -625,6 +685,10 @@ uint8_t ll_adv_sync_enable(uint8_t handle, uint8_t enable)
 
 			aux->is_started = 1U;
 		}
+	}
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT)) {
+		lll_adv_sync_data_enqueue(lll_sync, ter_idx);
 	}
 
 	if (sync_got_enabled) {
@@ -711,6 +775,7 @@ uint32_t ull_adv_sync_start(struct ll_adv_set *adv,
 {
 	struct lll_adv_sync *lll_sync;
 	uint32_t ticks_slot_overhead;
+	uint32_t ticks_slot_offset;
 	uint32_t volatile ret_cb;
 	struct pdu_adv *ter_pdu;
 	uint32_t interval_us;
@@ -727,19 +792,21 @@ uint32_t ull_adv_sync_start(struct ll_adv_set *adv,
 	time_us = sync_time_get(sync, ter_pdu);
 
 	/* TODO: active_to_start feature port */
-	sync->ull.ticks_active_to_start = 0;
+	sync->ull.ticks_active_to_start = 0U;
 	sync->ull.ticks_prepare_to_start =
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_XTAL_US);
 	sync->ull.ticks_preempt_to_start =
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_PREEMPT_MIN_US);
 	sync->ull.ticks_slot = HAL_TICKER_US_TO_TICKS(time_us);
 
+	ticks_slot_offset = MAX(sync->ull.ticks_active_to_start,
+				sync->ull.ticks_prepare_to_start);
 	if (IS_ENABLED(CONFIG_BT_CTLR_LOW_LAT)) {
-		ticks_slot_overhead = MAX(sync->ull.ticks_active_to_start,
-					  sync->ull.ticks_prepare_to_start);
+		ticks_slot_overhead = ticks_slot_offset;
 	} else {
-		ticks_slot_overhead = 0;
+		ticks_slot_overhead = 0U;
 	}
+	ticks_slot_offset += HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US);
 
 	interval_us = (uint32_t)sync->interval * CONN_INT_UNIT_US;
 
@@ -748,7 +815,7 @@ uint32_t ull_adv_sync_start(struct ll_adv_set *adv,
 	ret_cb = TICKER_STATUS_BUSY;
 	ret = ticker_start(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_THREAD,
 			   (TICKER_ID_ADV_SYNC_BASE + sync_handle),
-			   ticks_anchor, 0,
+			   (ticks_anchor - ticks_slot_offset), 0U,
 			   HAL_TICKER_US_TO_TICKS(interval_us),
 			   HAL_TICKER_REMAINDER(interval_us), TICKER_NULL_LAZY,
 			   (sync->ull.ticks_slot + ticks_slot_overhead),
@@ -864,8 +931,10 @@ void ull_adv_sync_chm_complete(struct node_rx_hdr *rx)
 		     sizeof(acad));
 	ad = acad;
 	do {
-		ad_len = ad[0];
-		if (ad_len && (ad[1] == BT_DATA_CHANNEL_MAP_UPDATE_IND)) {
+		ad_len = ad[PDU_ADV_DATA_HEADER_LEN_OFFSET];
+		if (ad_len &&
+		    (ad[PDU_ADV_DATA_HEADER_TYPE_OFFSET] ==
+		     BT_DATA_CHANNEL_MAP_UPDATE_IND)) {
 			break;
 		}
 
@@ -1090,11 +1159,17 @@ uint8_t ull_adv_sync_pdu_set_clear(struct lll_adv_sync *lll_sync,
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT)) {
+		if ((hdr_add_fields & ULL_ADV_PDU_HDR_FIELD_ADI) ||
+		    (!(hdr_rem_fields & ULL_ADV_PDU_HDR_FIELD_ADI) &&
+		     ter_hdr_prev.adi)) {
+			ter_hdr.adi = 1U;
+		}
+		if (ter_hdr.adi) {
+			ter_dptr += sizeof(struct pdu_adv_adi);
+		}
 		if (ter_hdr_prev.adi) {
 			ter_dptr_prev += sizeof(struct pdu_adv_adi);
 		}
-		ter_hdr.adi = 1U;
-		ter_dptr += sizeof(struct pdu_adv_adi);
 	}
 
 	/* AuxPtr - will be added if AUX_CHAIN_IND is required */
@@ -1174,11 +1249,10 @@ uint8_t ull_adv_sync_pdu_set_clear(struct lll_adv_sync *lll_sync,
 
 	/* Get Adv data from function parameters */
 	if (hdr_add_fields & ULL_ADV_PDU_HDR_FIELD_AD_DATA) {
-		ad_data = hdr_data;
-		ad_len = *ad_data;
-		++ad_data;
+		ad_len = *(uint8_t *)hdr_data;
+		hdr_data = (uint8_t *)hdr_data + sizeof(ad_len);
 
-		ad_data = (void *)sys_get_le32(ad_data);
+		(void)memcpy(&ad_data, hdr_data, sizeof(ad_data));
 	} else if (!(hdr_rem_fields & ULL_ADV_PDU_HDR_FIELD_AD_DATA)) {
 		ad_len = ter_pdu_prev->len - ter_len_prev;
 		ad_data = ter_dptr_prev;
@@ -1240,25 +1314,27 @@ uint8_t ull_adv_sync_pdu_set_clear(struct lll_adv_sync *lll_sync,
 	}
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT)) {
-		struct pdu_adv_adi *adi;
-		struct ll_adv_set *adv;
-		uint16_t did;
-
 		if (ter_hdr_prev.adi) {
 			ter_dptr_prev -= sizeof(struct pdu_adv_adi);
 		}
 
-		ter_dptr -= sizeof(struct pdu_adv_adi);
-		adi = (void *)ter_dptr;
+		if (ter_hdr.adi) {
+			struct pdu_adv_adi *adi;
+			struct ll_adv_set *adv;
+			uint16_t did;
 
-		adv = HDR_LLL2ULL(lll_sync->adv);
+			ter_dptr -= sizeof(struct pdu_adv_adi);
+			adi = (void *)ter_dptr;
 
-		adi->sid = adv->sid;
+			adv = HDR_LLL2ULL(lll_sync->adv);
 
-		/* The DID for a specific SID shall be unique.
-		 */
-		did = ull_adv_aux_did_next_unique_get(adv->sid);
-		adi->did = sys_cpu_to_le16(did);
+			adi->sid = adv->sid;
+
+			/* The DID for a specific SID shall be unique.
+			 */
+			did = ull_adv_aux_did_next_unique_get(adv->sid);
+			adi->did = sys_cpu_to_le16(did);
+		}
 	}
 
 #if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
@@ -1467,11 +1543,11 @@ static uint8_t sync_chm_update(uint8_t handle)
 	(void)memcpy(&acad, &hdr_data[ULL_ADV_HDR_DATA_ACAD_PTR_OFFSET],
 		     sizeof(acad));
 	acad += acad_len_prev;
-	acad[0] = sizeof(*chm_upd_ind) + 1U;
-	acad[1] = BT_DATA_CHANNEL_MAP_UPDATE_IND;
+	acad[PDU_ADV_DATA_HEADER_LEN_OFFSET] = sizeof(*chm_upd_ind) + 1U;
+	acad[PDU_ADV_DATA_HEADER_TYPE_OFFSET] = BT_DATA_CHANNEL_MAP_UPDATE_IND;
 
 	/* Populate the Channel Map Indication structure */
-	chm_upd_ind = (void *)&acad[2];
+	chm_upd_ind = (void *)&acad[PDU_ADV_DATA_HEADER_DATA_OFFSET];
 	(void)ull_chan_map_get(chm_upd_ind->chm);
 	instant = lll_sync->event_counter + 6U;
 	chm_upd_ind->instant = sys_cpu_to_le16(instant);
@@ -1660,10 +1736,11 @@ static inline void sync_info_offset_fill(struct pdu_adv_sync_info *si,
 	offs = HAL_TICKER_TICKS_TO_US(ticks_offset) - start_us;
 	offs = offs / OFFS_UNIT_30_US;
 	if (!!(offs >> OFFS_UNIT_BITS)) {
-		si->offs = offs / (OFFS_UNIT_300_US / OFFS_UNIT_30_US);
+		si->offs = sys_cpu_to_le16(offs / (OFFS_UNIT_300_US /
+						   OFFS_UNIT_30_US));
 		si->offs_units = OFFS_UNIT_VALUE_300_US;
 	} else {
-		si->offs = offs;
+		si->offs = sys_cpu_to_le16(offs);
 		si->offs_units = OFFS_UNIT_VALUE_30_US;
 	}
 }
@@ -1700,6 +1777,12 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 	ret = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH,
 			     TICKER_USER_ID_LLL, 0, &mfy);
 	LL_ASSERT(!ret);
+
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+	if (lll->iso) {
+		ull_adv_iso_offset_get(sync);
+	}
+#endif /* CONFIG_BT_CTLR_ADV_ISO */
 
 	DEBUG_RADIO_PREPARE_A(1);
 }

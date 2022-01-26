@@ -29,8 +29,6 @@ LOG_MODULE_REGISTER(spi_gecko);
 
 #define SPI_WORD_SIZE 8
 
-#define DEV_DATA(dev) ((struct spi_gecko_data *) ((dev)->data))
-
 /* Structure Declarations */
 
 struct spi_gecko_data {
@@ -55,7 +53,12 @@ static int spi_config(const struct device *dev,
 		      uint16_t *control)
 {
 	const struct spi_gecko_config *gecko_config = dev->config;
-	struct spi_gecko_data *data = DEV_DATA(dev);
+	struct spi_gecko_data *data = dev->data;
+
+	if (config->operation & SPI_HALF_DUPLEX) {
+		LOG_ERR("Half-duplex not supported");
+		return -ENOTSUP;
+	}
 
 	if (SPI_WORD_SIZE_GET(config->operation) != SPI_WORD_SIZE) {
 		LOG_ERR("Word size must be %d", SPI_WORD_SIZE);
@@ -72,7 +75,8 @@ static int spi_config(const struct device *dev,
 		return -ENOTSUP;
 	}
 
-	if ((config->operation & SPI_LINES_MASK) != SPI_LINES_SINGLE) {
+	if (IS_ENABLED(CONFIG_SPI_EXTENDED_MODES) &&
+	    (config->operation & SPI_LINES_MASK) != SPI_LINES_SINGLE) {
 		LOG_ERR("Only supports single mode");
 		return -ENOTSUP;
 	}
@@ -166,9 +170,10 @@ static void spi_gecko_xfer(const struct device *dev,
 			   const struct spi_config *config)
 {
 	int ret;
-	struct spi_context *ctx = &DEV_DATA(dev)->ctx;
+	struct spi_gecko_data *data = dev->data;
+	struct spi_context *ctx = &data->ctx;
 	const struct spi_gecko_config *gecko_config = dev->config;
-	struct spi_gecko_data *data = DEV_DATA(dev);
+	struct spi_gecko_data *data = dev->data;
 
 	spi_context_cs_control(ctx, true);
 
@@ -253,10 +258,11 @@ static int spi_gecko_transceive(const struct device *dev,
 				const struct spi_buf_set *tx_bufs,
 				const struct spi_buf_set *rx_bufs)
 {
+	struct spi_gecko_data *data = dev->data;
 	uint16_t control = 0;
 
 	spi_config(dev, config, &control);
-	spi_context_buffers_setup(&DEV_DATA(dev)->ctx, tx_bufs, rx_bufs, 1);
+	spi_context_buffers_setup(&data->ctx, tx_bufs, rx_bufs, 1);
 	spi_gecko_xfer(dev, config);
 	return 0;
 }

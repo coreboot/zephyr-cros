@@ -119,16 +119,16 @@ K_MEM_SLAB_DEFINE(tx_pkts, sizeof(struct net_pkt), CONFIG_NET_PKT_TX_COUNT, 4);
 #if defined(CONFIG_NET_BUF_FIXED_DATA_SIZE)
 
 NET_BUF_POOL_FIXED_DEFINE(rx_bufs, CONFIG_NET_BUF_RX_COUNT,
-			  CONFIG_NET_BUF_DATA_SIZE, NULL);
+			  CONFIG_NET_BUF_DATA_SIZE, 4, NULL);
 NET_BUF_POOL_FIXED_DEFINE(tx_bufs, CONFIG_NET_BUF_TX_COUNT,
-			  CONFIG_NET_BUF_DATA_SIZE, NULL);
+			  CONFIG_NET_BUF_DATA_SIZE, 4, NULL);
 
 #else /* !CONFIG_NET_BUF_FIXED_DATA_SIZE */
 
 NET_BUF_POOL_VAR_DEFINE(rx_bufs, CONFIG_NET_BUF_RX_COUNT,
-			CONFIG_NET_BUF_DATA_POOL_SIZE, NULL);
+			CONFIG_NET_BUF_DATA_POOL_SIZE, 4, NULL);
 NET_BUF_POOL_VAR_DEFINE(tx_bufs, CONFIG_NET_BUF_TX_COUNT,
-			CONFIG_NET_BUF_DATA_POOL_SIZE, NULL);
+			CONFIG_NET_BUF_DATA_POOL_SIZE, 4, NULL);
 
 #endif /* CONFIG_NET_BUF_FIXED_DATA_SIZE */
 
@@ -538,7 +538,7 @@ void net_pkt_unref(struct net_pkt *pkt)
 
 #if NET_LOG_LEVEL >= LOG_LEVEL_DBG
 #if CONFIG_NET_PKT_LOG_LEVEL >= LOG_LEVEL_DBG
-	NET_DBG("%s [%d] pkt %p ref %d frags %p (%s():%d)",
+	NET_DBG("%s [%d] pkt %p ref %ld frags %p (%s():%d)",
 		slab2str(pkt->slab), k_mem_slab_num_free_get(pkt->slab),
 		pkt, ref - 1, pkt->frags, caller, line);
 #endif
@@ -619,7 +619,7 @@ struct net_pkt *net_pkt_ref(struct net_pkt *pkt)
 	} while (!atomic_cas(&pkt->atomic_ref, ref, ref + 1));
 
 #if CONFIG_NET_PKT_LOG_LEVEL >= LOG_LEVEL_DBG
-	NET_DBG("%s [%d] pkt %p ref %d (%s():%d)",
+	NET_DBG("%s [%d] pkt %p ref %ld (%s():%d)",
 		slab2str(pkt->slab), k_mem_slab_num_free_get(pkt->slab),
 		pkt, ref + 1, caller, line);
 #endif

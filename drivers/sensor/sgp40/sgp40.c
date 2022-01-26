@@ -11,6 +11,7 @@
 #include <kernel.h>
 #include <drivers/sensor.h>
 #include <logging/log.h>
+#include <pm/device.h>
 #include <sys/byteorder.h>
 #include <sys/crc.h>
 
@@ -255,9 +256,11 @@ static const struct sensor_driver_api sgp40_api = {
 		.selftest = DT_INST_PROP(n, enable_selftest),	\
 	};							\
 								\
+	PM_DEVICE_DT_INST_DEFINE(n, sgp40_pm_action);		\
+								\
 	DEVICE_DT_INST_DEFINE(n,				\
 			      sgp40_init,			\
-			      sgp40_pm_action,			\
+			      PM_DEVICE_DT_INST_GET(n),	\
 			      &sgp40_data_##n,			\
 			      &sgp40_config_##n,		\
 			      POST_KERNEL,			\

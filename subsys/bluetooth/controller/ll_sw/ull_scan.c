@@ -18,6 +18,7 @@
 #include "util/mem.h"
 #include "util/memq.h"
 #include "util/mayfly.h"
+#include "util/dbuf.h"
 
 #include "ticker/ticker.h"
 
@@ -34,11 +35,11 @@
 #include "lll_filter.h"
 
 #include "ull_adv_types.h"
-#include "ull_scan_types.h"
 #include "ull_filter.h"
 
 #include "ull_internal.h"
 #include "ull_adv_internal.h"
+#include "ull_scan_types.h"
 #include "ull_scan_internal.h"
 #include "ull_sched_internal.h"
 

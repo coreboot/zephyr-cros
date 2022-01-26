@@ -18,6 +18,7 @@
 #include "util/mem.h"
 #include "util/memq.h"
 #include "util/mayfly.h"
+#include "util/dbuf.h"
 
 #include "pdu.h"
 
@@ -29,6 +30,10 @@
 #include "lll/lll_df_types.h"
 #include "lll_conn.h"
 #include "lll_filter.h"
+
+#if (!defined(CONFIG_BT_LL_SW_LLCP_LEGACY))
+#include "ll_sw/ull_tx_queue.h"
+#endif
 
 #include "ull_adv_types.h"
 #include "ull_scan_types.h"

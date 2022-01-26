@@ -7,6 +7,7 @@
 #include "test_driver.h"
 
 #include <kernel.h>
+#include <pm/device.h>
 
 struct test_driver_data {
 	bool ongoing;
@@ -61,8 +62,10 @@ int test_driver_init(const struct device *dev)
 	return 0;
 }
 
+PM_DEVICE_DEFINE(test_driver, test_driver_action);
+
 static struct test_driver_data data;
 
 DEVICE_DEFINE(test_driver, "test_driver", &test_driver_init,
-	      test_driver_action, &data, NULL, POST_KERNEL,
+	      PM_DEVICE_GET(test_driver), &data, NULL, POST_KERNEL,
 	      CONFIG_KERNEL_INIT_PRIORITY_DEVICE, NULL);

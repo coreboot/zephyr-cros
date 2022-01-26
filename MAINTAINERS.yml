@@ -151,7 +151,6 @@ ARM64 arch:
         - carlocaione
     collaborators:
         - npitre
-        - ioannisg
         - povergoing
     files:
         - arch/arm64/
@@ -168,7 +167,7 @@ Bluetooth:
     maintainers:
         - jhedberg
     collaborators:
-        - joerchan
+        - alwa-nordic
         - Vudentz
         - Thalley
         - asbjornsabo
@@ -186,6 +185,11 @@ Bluetooth:
         - subsys/bluetooth/shell/
         - subsys/bluetooth/audio/
         - tests/bluetooth/
+    files-exclude:
+        - include/bluetooth/mesh/
+        - subsys/bluetooth/controller/
+        - subsys/bluetooth/mesh/
+        - samples/bluetooth/mesh/
     labels:
         - "area: Bluetooth"
 
@@ -197,10 +201,14 @@ Bluetooth controller:
         - carlescufi
         - thoh-ot
         - kruithofa
+        - ppryga
+        - mtpr-ot
+        - wopu-ot
     files:
         - subsys/bluetooth/controller/
     labels:
         - "area: Bluetooth Controller"
+        - "area: Bluetooth"
 
 Bluetooth Mesh:
     status: maintained
@@ -208,18 +216,23 @@ Bluetooth Mesh:
         - trond-snekvik
     collaborators:
         - jhedberg
+        - LingaoM
+        - alxelax
+        - PavelVPV
     files:
         - subsys/bluetooth/mesh/
         - include/bluetooth/mesh/
         - tests/bluetooth/mesh*/
     labels:
         - "area: Bluetooth Mesh"
+        - "area: Bluetooth"
 
 Build system:
     status: maintained
     maintainers:
         - tejlmand
     collaborators:
+        - jeremybettis
         - nashif
         - SebastianBoe
     files:
@@ -278,7 +291,6 @@ CMSIS-DSP integration:
         - stephanosio
     collaborators:
         - galak
-        - ioannisg
     files:
         - modules/Kconfig.cmsis_dsp
         - tests/benchmarks/cmsis_dsp/
@@ -438,6 +450,7 @@ Documentation:
         - lgirdwood
         - mengxianglinx
         - marc-hb
+        - kv2019i
     files:
         - drivers/audio/
         - include/audio/
@@ -466,7 +479,7 @@ Documentation:
         - samples/drivers/can/
         - tests/drivers/can/
         - samples/subsys/canbus/
-        - doc/reference/networking/can_api.rst
+        - doc/reference/canbus/
         - modules/canopennode/
         - samples/modules/canopennode/
     labels:
@@ -530,7 +543,9 @@ Documentation:
         - "area: DAC"
 
 "Drivers: DMA":
-    status: orphaned
+    status: maintained
+    maintainers:
+        - teburd
     files:
         - drivers/dma/
         - tests/drivers/dma/
@@ -567,7 +582,7 @@ Documentation:
       - albertofloyd
     collaborators:
       - VenkatKotakonda
-      - scottwcpg
+      - jvasanth1
     files:
         - drivers/espi/
         - include/drivers/espi.h
@@ -626,7 +641,9 @@ Documentation:
         - "area: HWINFO"
 
 "Drivers: I2C":
-    status: orphaned
+    status: maintained
+    maintainers:
+        - teburd
     files:
         - drivers/i2c/
         - dts/bindings/i2c/
@@ -837,6 +854,7 @@ Documentation:
         - include/drivers/uart.h
         - include/drivers/uart/
         - dts/bindings/serial/
+        - samples/drivers/uart/
         - tests/drivers/uart/
     labels:
         - "area: UART"
@@ -1049,7 +1067,6 @@ MAINTAINERS file:
     maintainers:
         - MaureenHelm
     collaborators:
-        - ioannisg
         - nashif
     files:
         - MAINTAINERS.yml
@@ -1302,6 +1319,7 @@ Twister:
         - PerMac
         - enjiamai
         - hakehuang
+        - gopiotr
     files:
         - scripts/twister
         - scripts/pylib/twister/
@@ -1370,6 +1388,31 @@ State machine framework:
         - tests/lib/smf/
     labels:
         - "area: State Machine Framework"
+
+GD32 Platforms:
+    status: maintained
+    maintainers:
+        - nandojve
+        - gmarull
+    collaborators:
+        - soburi
+    files:
+        - boards/arm/gd32*/
+        - boards/riscv/gd32*/
+        - boards/riscv/longan_nano/
+        - drivers/*/*gd32*/
+        - drivers/*/*gd32*
+        - dts/*/gigadevice/
+        - dts/bindings/*/*gd32*
+        - modules/hal_gigadevice/
+        - soc/arm/gigadevice/
+        - soc/riscv/riscv-privilege/gd32vf103/
+        - scripts/west_commands/*/*gd32*
+    labels:
+        - "platform: GD32"
+    description: >-
+        GigaDevice GD32 SOCs, dts files and related drivers. Starter and eval
+        boards.
 
 Synopsys Platforms:
     status: maintained
@@ -1456,6 +1499,11 @@ Intel Platforms (Xtensa):
     collaborators:
         - andyross
         - dcpleung
+        - lyakh
+        - lgirdwood
+        - mengxianglinx
+        - marc-hb
+        - kv2019i
     files:
         - boards/xtensa/intel_*/
         - soc/xtensa/intel_*/
@@ -1469,6 +1517,7 @@ NXP Platforms:
     - dleach02
   collaborators:
     - mmahadevan108
+    - danieldegrasse
   files:
     - boards/arm/mimx*/
     - boards/arm/frdm_k*/
@@ -1486,7 +1535,7 @@ NXP Platforms:
 Microchip Platforms:
   status: maintained
   maintainers:
-    - scottwcpg
+    - jvasanth1
   collaborators:
     - VenkatKotakonda
     - albertofloyd
@@ -1501,7 +1550,7 @@ Microchip Platforms:
 nRF Platforms:
     status: maintained
     maintainers:
-        - ioannisg
+        - anangl
     files:
         - boards/arm/*nrf*/
         - drivers/*/*nrfx*.c
@@ -1542,7 +1591,7 @@ Espressif Platforms:
     maintainers:
         - sylvioalves
         - glaubermaroto
-        - ulipe
+        - uLipe
     files:
         - drivers/*/*esp32*.c
         - boards/xtensa/esp32*/
@@ -1573,7 +1622,8 @@ ITE Platforms:
         - sjg20
     files:
         - boards/riscv/it8xxx2_evb/
-        - drivers/*/*it8xxx2*
+        - drivers/*/*/*it8xxx2*.c
+        - drivers/*/*it8xxx2*.c
         - dts/bindings/*/*ite*
         - dts/riscv/*it8xxx2*
         - soc/riscv/riscv-ite/
@@ -1607,7 +1657,7 @@ TF-M Integration:
     maintainers:
         - microbuilder
     collaborators:
-        - ioannisg
+        - SebastianBoe
     files:
         - samples/tfm_integration/
         - modules/trusted-firmware-m/
@@ -1620,6 +1670,7 @@ Tracing:
         - nashif
     collaborators:
         - teburd
+        - tleksell-pe
     files:
         - subsys/tracing/
         - include/tracing/
@@ -1650,7 +1701,6 @@ Userspace:
     maintainers:
         - dcpleung
     collaborators:
-        - ioannisg
         - enjiamai
     files:
         - doc/reference/usermode/kernelobjects.rst
@@ -1740,7 +1790,6 @@ CI:
         - galak
     files:
         - .github/
-        - .buildkite/
         - scripts/ci/
         - .checkpatch.conf
         - scripts/gitlint/
@@ -1751,6 +1800,8 @@ ZTest:
     status: maintained
     maintainers:
         - nashif
+    collaborators:
+        - jeremybettis
     files:
         - subsys/testsuite/
         - tests/ztest/

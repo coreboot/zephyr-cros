@@ -4,11 +4,51 @@
 config ZEPHYR_HAL_GIGADEVICE_MODULE
 	bool
 
+config GD32_HAS_AF_PINMUX
+	bool
+	help
+	  This option should be selected if the series use an AF pinmux model.
+
+config GD32_HAS_AFIO_PINMUX
+	bool
+	help
+	  This option should be selected if the series use an AFIO pinmux model.
+
 config HAS_GD32_HAL
 	bool
 	select HAS_CMSIS_CORE if SOC_FAMILY_GD32_ARM
 
 if HAS_GD32_HAL
+
+choice GD32_HXTAL_FREQUENCY
+	prompt "High speed external oscillator clock frequency"
+	default GD32_HXTAL_FIRMWARE_DEFINED if !SOC_SERIES_GD32VF103
+	default GD32_HXTAL_25MHZ if SOC_SERIES_GD32VF103
+	help
+	  Define value of high speed crystal oscillator (HXTAL) in Hz
+	  This value sets the frequency of the oscillator.
+
+config GD32_HXTAL_FIRMWARE_DEFINED
+	bool "Firmware defined"
+	depends on !SOC_SERIES_GD32VF103
+	help
+	  Use default frequency defined in firmware for HXTAL
+	  This is using for SoCs (e.g. gd32f4xx, gd32f3x0, etc ...)
+	  that have default HXTAL definitions in firmware.
+
+config GD32_HXTAL_8MHZ
+	bool "8MHz"
+	depends on SOC_SERIES_GD32VF103
+	help
+	  Use 8MHz oscillator for HXTAL
+
+config GD32_HXTAL_25MHZ
+	bool "25MHz"
+	depends on SOC_SERIES_GD32VF103
+	help
+	  Use 25MHz oscillator for HXTAL
+
+endchoice
 
 config USE_GD32_ADC
 	bool
@@ -24,6 +64,11 @@ config USE_GD32_CAN
 	bool
 	help
 	  Enable GD32 Controller Area Network (CAN) HAL module driver
+
+config USE_GD32_CEC
+	bool
+	help
+	  Enable GD32 Consumer Electronics Control (CEC) HAL module driver
 
 config USE_GD32_CMP
 	bool
@@ -51,16 +96,15 @@ config USE_GD32_DBG
 	help
 	  Enable GD32 Debug (DBG) HAL module driver
 
+config USE_GD32_DCI
+	bool
+	help
+		Enable GD32 Digital Camera Interface (DCI) HAL module driver
+
 config USE_GD32_DMA
 	bool
 	help
 	  Enable GD32 Direct Memory Access controller (DMA) HAL module driver
-
-config USE_GD32_ECLIC
-	bool
-	help
-	  Enable GD32 Enhancement Core-Local Interrupt Controller (ECLIC) HAL
-	  module driver
 
 config USE_GD32_ENET
 	bool
@@ -98,6 +142,16 @@ config USE_GD32_I2C
 	bool
 	help
 	  Enable GD32 Inter-Integrated Circuit Interface (I2C) HAL module driver
+
+config USE_GD32_IPA
+	bool
+	help
+	  Enable GD32 Image Processing Accelerator (IPA) HAL module driver
+
+config USE_GD32_IREF
+	bool
+	help
+	  Enable GD32 Programmable Current Reference (IREF) HAL module driver
 
 config USE_GD32_MISC
 	bool
@@ -141,15 +195,35 @@ config USE_GD32_SHRTIMER
 	help
 	  Enable GD32 Super High-Resolution Timer (SHRTIMER) HAL module driver
 
+config USE_GD32_SYSCFG
+	bool
+	help
+	  Enable GD32 System Configuration (SYSCFG) HAL module driver
+
 config USE_GD32_TIMER
 	bool
 	help
 	  Enable GD32 Timer (TIMER) HAL module driver
 
+config USE_GD32_TLI
+	bool
+	help
+	  Enable GD32 TFT-LCD Interface (TLI) HAL module driver
+
 config USE_GD32_TMU
 	bool
 	help
 	  Enable GD32 Trigonometric Math Unit (TMU) HAL module driver
+
+config USE_GD32_TRNG
+	bool
+	help
+	  Enable GD32 True Random Number Generator (TRNG) HAL module driver
+
+config USE_GD32_TSI
+	bool
+	help
+	  Enable GD32 Touch Sensing Interface (TSI) HAL module driver
 
 config USE_GD32_USART
 	bool

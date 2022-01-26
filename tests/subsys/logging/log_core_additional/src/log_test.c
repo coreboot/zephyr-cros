@@ -66,6 +66,10 @@ static void process(const struct log_backend *const backend,
 	uint32_t flags;
 	struct backend_cb *cb = (struct backend_cb *)backend->cb->ctx;
 
+	if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
+		cb->sync++;
+	}
+
 	if (cb->check_domain_id) {
 		zassert_equal(log_msg2_get_domain(&(msg->log)), CONFIG_LOG_DOMAIN_ID,
 				"Unexpected domain id");
@@ -158,10 +162,10 @@ static void sync_hexdump(const struct log_backend *const backend,
 
 const struct log_backend_api log_backend_test_api = {
 	.process = IS_ENABLED(CONFIG_LOG2) ? process : NULL,
-	.put = IS_ENABLED(CONFIG_LOG_MODE_DEFERRED) ? put : NULL,
-	.put_sync_string = IS_ENABLED(CONFIG_LOG_IMMEDIATE) ?
+	.put = IS_ENABLED(CONFIG_LOG1_DEFERRED) ? put : NULL,
+	.put_sync_string = IS_ENABLED(CONFIG_LOG1_IMMEDIATE) ?
 			sync_string : NULL,
-	.put_sync_hexdump = IS_ENABLED(CONFIG_LOG_IMMEDIATE) ?
+	.put_sync_hexdump = IS_ENABLED(CONFIG_LOG1_IMMEDIATE) ?
 			sync_hexdump : NULL,
 };
 
@@ -226,7 +230,7 @@ static bool log_test_process(bool bypass)
  * @addtogroup logging
  */
 
-static void test_log_domain_id(void)
+void test_log_domain_id(void)
 {
 	log_setup(false);
 
@@ -245,17 +249,17 @@ static void test_log_domain_id(void)
 /**
  * @brief Synchronous processing of logging messages.
  *
- * @details if CONFIG_LOG_IMMEDIATE is enabled, log message is
+ * @details if CONFIG_LOG_MODE_IMMEDIATE is enabled, log message is
  *          handled immediately
  *
  * @addtogroup logging
  */
 
-static void test_log_sync(void)
+void test_log_sync(void)
 {
 	TC_PRINT("Logging synchronousely\n");
 
-	if (IS_ENABLED(CONFIG_LOG_IMMEDIATE)) {
+	if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
 		log_setup(false);
 		LOG_INF("Log immediately");
 		LOG_INF("Log immediately");
@@ -276,9 +280,9 @@ static void test_log_sync(void)
  * @addtogroup logging
  */
 
-static void test_log_early_logging(void)
+void test_log_early_logging(void)
 {
-	if (IS_ENABLED(CONFIG_LOG_IMMEDIATE)) {
+	if (IS_ENABLED(CONFIG_LOG_MODE_IMMEDIATE)) {
 		ztest_test_skip();
 	} else {
 		log_init();
@@ -322,7 +326,7 @@ static void test_log_early_logging(void)
  * @addtogroup logging
  */
 
-static void test_log_severity(void)
+void test_log_severity(void)
 {
 	log_setup(false);
 
@@ -351,7 +355,7 @@ static void test_log_severity(void)
  * @addtogroup logging
  */
 
-static void test_log_timestamping(void)
+void test_log_timestamping(void)
 {
 	stamp = 0U;
 
@@ -402,7 +406,7 @@ static void test_log_timestamping(void)
  */
 
 #define UART_BACKEND "log_backend_uart"
-static void test_multiple_backends(void)
+void test_multiple_backends(void)
 {
 	TC_PRINT("Test multiple backends");
 	/* enable both backend1 and backend2 */
@@ -431,7 +435,7 @@ static void test_multiple_backends(void)
  */
 
 #ifdef CONFIG_LOG_PROCESS_THREAD
-static void test_log_thread(void)
+void test_log_thread(void)
 {
 	uint32_t slabs_free, used, max;
 
@@ -465,7 +469,7 @@ static void test_log_thread(void)
 	zassert_equal(log_msg_mem_get_used(), 0, NULL);
 }
 #else
-static void test_log_thread(void)
+void test_log_thread(void)
 {
 	ztest_test_skip();
 }
@@ -505,7 +509,7 @@ void test_log_generic(void)
 void test_log_msg2_create(void)
 {
 	log_setup(false);
-	if (IS_ENABLED(CONFIG_LOG2)) {
+	if (!IS_ENABLED(CONFIG_LOG1) && IS_ENABLED(CONFIG_LOG_MODE_DEFERRED)) {
 		int mode;
 
 		domain = 3;
@@ -563,13 +567,30 @@ void promote_log_thread(const struct k_thread *thread, void *user_data)
 	}
 }
 
+extern void test_log_from_user(void);
+extern void test_log_hexdump_from_user(void);
+extern void test_log_generic_user(void);
+extern void test_log_filter_set(void);
+extern void test_log_panic(void);
+
 /*test case main entry*/
 void test_main(void)
 {
 #ifdef CONFIG_LOG_PROCESS_THREAD
 	k_thread_foreach(promote_log_thread, NULL);
 #endif
-	ztest_test_suite(test_log_list,
+
+#ifdef CONFIG_USERSPACE
+	ztest_test_suite(test_log_core_additional,
+			 ztest_user_unit_test(test_log_from_user),
+			 ztest_user_unit_test(test_log_hexdump_from_user),
+			 ztest_user_unit_test(test_log_generic_user),
+			 ztest_user_unit_test(test_log_filter_set),
+			 ztest_user_unit_test(test_log_panic),
+			 ztest_user_unit_test(test_log_msg2_create_user));
+	ztest_run_test_suite(test_log_core_additional);
+#else
+	ztest_test_suite(test_log_core_additional,
 			 ztest_unit_test(test_multiple_backends),
 			 ztest_unit_test(test_log_generic),
 			 ztest_unit_test(test_log_domain_id),
@@ -578,8 +599,8 @@ void test_main(void)
 			 ztest_unit_test(test_log_early_logging),
 			 ztest_unit_test(test_log_sync),
 			 ztest_unit_test(test_log_thread),
-			 ztest_unit_test(test_log_msg2_create),
-			 ztest_user_unit_test(test_log_msg2_create_user)
+			 ztest_unit_test(test_log_msg2_create)
 			 );
-	ztest_run_test_suite(test_log_list);
+	ztest_run_test_suite(test_log_core_additional);
+#endif
 }

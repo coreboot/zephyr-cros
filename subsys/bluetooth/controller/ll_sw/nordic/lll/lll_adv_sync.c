@@ -8,6 +8,8 @@
 
 #include <soc.h>
 
+#include <sys/byteorder.h>
+
 #include "hal/cpu.h"
 #include "hal/ccm.h"
 #include "hal/radio.h"
@@ -17,6 +19,7 @@
 #include "util/util.h"
 #include "util/mem.h"
 #include "util/memq.h"
+#include "util/dbuf.h"
 
 #include "pdu.h"
 
@@ -51,7 +54,6 @@ static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 static void isr_done(void *param);
-static void switch_radio_complete_and_phy_end_disable(const struct lll_adv_sync *lll);
 
 #if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
 static void isr_tx(void *param);
@@ -161,7 +163,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 	/* Start setting up of Radio h/w */
 	radio_reset();
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
-	radio_tx_power_set(lll->tx_pwr_lvl);
+	radio_tx_power_set(lll->adv->tx_pwr_lvl);
 #else
 	radio_tx_power_set(RADIO_TXP_DEFAULT);
 #endif
@@ -170,12 +172,11 @@ static int prepare_cb(struct lll_prepare_param *p)
 
 	/* TODO: if coded we use S8? */
 	radio_phy_set(phy_s, lll->adv->phy_flags);
-	radio_pkt_configure(8, PDU_AC_PAYLOAD_SIZE_MAX, (phy_s << 1));
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, PDU_AC_PAYLOAD_SIZE_MAX,
+			    RADIO_PKT_CONF_PHY(phy_s));
 	radio_aa_set(lll->access_addr);
-	radio_crc_configure(((0x5bUL) | ((0x06UL) << 8) | ((0x00UL) << 16)),
-			    (((uint32_t)lll->crc_init[2] << 16) |
-			     ((uint32_t)lll->crc_init[1] << 8) |
-			     ((uint32_t)lll->crc_init[0])));
+	radio_crc_configure(PDU_CRC_POLYNOMIAL,
+				sys_get_le24(lll->crc_init));
 	lll_chan_set(data_chan_use);
 
 	upd = 0U;
@@ -203,13 +204,13 @@ static int prepare_cb(struct lll_prepare_param *p)
 		lll->last_pdu = pdu;
 
 		radio_isr_set(isr_tx, lll);
-		radio_tmr_tifs_set(ADV_SYNC_PDU_B2B_AFS + cte_len_us);
+		radio_tmr_tifs_set(ADV_SYNC_PDU_B2B_AFS);
 		switch_radio_complete_and_b2b_tx(lll, phy_s);
 	} else
 #endif /* CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK */
 	{
 		radio_isr_set(isr_done, lll);
-		switch_radio_complete_and_phy_end_disable(lll);
+		radio_switch_complete_and_disable();
 	}
 
 	ticks_at_event = p->ticks_at_expire;
@@ -222,14 +223,14 @@ static int prepare_cb(struct lll_prepare_param *p)
 	remainder = p->remainder;
 	start_us = radio_tmr_start(1, ticks_at_start, remainder);
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 	radio_gpio_pa_setup();
 
 	radio_gpio_pa_lna_enable(start_us + radio_tx_ready_delay_get(phy_s, 1) -
-				 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#else /* !CONFIG_BT_CTLR_GPIO_PA_PIN */
+				 HAL_RADIO_GPIO_PA_OFFSET);
+#else /* !HAL_RADIO_GPIO_HAVE_PA_PIN */
 	ARG_UNUSED(start_us);
-#endif /* !CONFIG_BT_CTLR_GPIO_PA_PIN */
+#endif /* !HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
@@ -349,12 +350,12 @@ static void isr_tx(void *param)
 
 	/* setup tIFS switching */
 	if (pdu->adv_ext_ind.ext_hdr_len && pdu->adv_ext_ind.ext_hdr.aux_ptr) {
-		radio_tmr_tifs_set(ADV_SYNC_PDU_B2B_AFS + cte_len_us);
+		radio_tmr_tifs_set(ADV_SYNC_PDU_B2B_AFS);
 		radio_isr_set(isr_tx, lll_sync);
 		switch_radio_complete_and_b2b_tx(lll_sync, lll->phy_s);
 	} else {
-		radio_isr_set(isr_done, lll);
-		switch_radio_complete_and_phy_end_disable(lll_sync);
+		radio_isr_set(isr_done, lll_sync);
+		radio_switch_complete_and_disable();
 	}
 
 	radio_pkt_tx_set(pdu);
@@ -371,7 +372,7 @@ static void isr_tx(void *param)
 	 */
 	radio_tmr_end_capture();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		/* PA/LNA enable is overwriting packet end used in ISR
 		 * profiling, hence back it up for later use.
@@ -382,8 +383,8 @@ static void isr_tx(void *param)
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + ADV_SYNC_PDU_B2B_AFS - 4 + cte_len_us -
 				 radio_tx_chain_delay_get(lll->phy_s, 0) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		lll_prof_send();
@@ -424,7 +425,11 @@ static void pdu_b2b_aux_ptr_update(struct pdu_adv *pdu, uint8_t phy, uint8_t fla
 		dptr++;
 	}
 
-	LL_ASSERT(!hdr->adi);
+	if (IS_ENABLED(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT) && hdr->adi != 0) {
+		dptr += sizeof(struct pdu_adv_adi);
+	} else {
+		LL_ASSERT(!hdr->adi);
+	}
 
 	/* Update AuxPtr */
 	aux_ptr = (void *)dptr;
@@ -461,15 +466,3 @@ static void switch_radio_complete_and_b2b_tx(const struct lll_adv_sync *lll, uin
 	}
 }
 #endif /* CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK */
-
-static void switch_radio_complete_and_phy_end_disable(const struct lll_adv_sync *lll)
-{
-#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
-	if (lll->cte_started) {
-		radio_switch_complete_and_phy_end_disable();
-	} else
-#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
-	{
-		radio_switch_complete_and_disable();
-	}
-}

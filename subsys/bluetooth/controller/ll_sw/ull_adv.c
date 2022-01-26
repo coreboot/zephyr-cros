@@ -22,6 +22,7 @@
 #include "util/mem.h"
 #include "util/memq.h"
 #include "util/mayfly.h"
+#include "util/dbuf.h"
 
 #include "ticker/ticker.h"
 
@@ -34,9 +35,13 @@
 #include "lll_adv.h"
 #include "lll/lll_adv_pdu.h"
 #include "lll_scan.h"
+#include "lll/lll_df_types.h"
 #include "lll_conn.h"
 #include "lll_filter.h"
-#include "lll/lll_df_types.h"
+
+#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
+#include "ll_sw/ull_tx_queue.h"
+#endif /* !CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #include "ull_adv_types.h"
 #include "ull_scan_types.h"
@@ -51,6 +56,10 @@
 #include "ll.h"
 #include "ll_feat.h"
 #include "ll_settings.h"
+
+#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
+#include "ll_sw/ull_llcp.h"
+#endif /* !CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
 #define LOG_MODULE_NAME bt_ctlr_ull_adv
@@ -938,6 +947,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 		conn_lll->nesn = 0;
 		conn_lll->empty = 0;
 
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 		conn_lll->max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
 		conn_lll->max_rx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
@@ -957,7 +967,17 @@ uint8_t ll_adv_enable(uint8_t enable)
 							  lll->phy_s));
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* CONFIG_BT_CTLR_PHY */
+#endif
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
+#if defined(CONFIG_BT_CTLR_PHY) && defined(CONFIG_BT_CTLR_ADV_EXT)
+		const uint8_t phy = lll->phy_s;
+#else
+		const uint8_t phy = PHY_1M;
+#endif
+		ull_dle_init(conn, phy);
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 #if defined(CONFIG_BT_CTLR_PHY)
 		conn_lll->phy_flags = 0;
@@ -1005,7 +1025,14 @@ uint8_t ll_adv_enable(uint8_t enable)
 #if defined(CONFIG_BT_CTLR_CONN_META)
 		memset(&conn_lll->conn_meta, 0, sizeof(conn_lll->conn_meta));
 #endif /* CONFIG_BT_CTLR_CONN_META */
-
+#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX)
+		conn_lll->df_rx_cfg.is_initialized = 0U;
+		conn_lll->df_rx_cfg.hdr.elem_size = sizeof(struct lll_df_conn_rx_params);
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RX */
+#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
+		conn_lll->df_tx_cfg.is_initialized = 0U;
+		conn_lll->df_tx_cfg.cte_rsp_en = 0U;
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_TX */
 		conn->connect_expire = 6;
 		conn->supervision_expire = 0;
 		conn->procedure_expire = 0;
@@ -1024,6 +1051,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 			     sizeof(conn->peer_id_addr));
 #endif /* CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN */
 
+#if defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
 		conn->common.fex_valid = 0;
 		conn->common.txn_lock = 0;
 		conn->periph.latency_cancel = 0;
@@ -1063,7 +1091,6 @@ uint8_t ll_adv_enable(uint8_t enable)
 		conn->llcp_length.disabled = 0U;
 		conn->llcp_length.cache.tx_octets = 0U;
 		conn->default_tx_octets = ull_conn_default_tx_octets_get();
-
 #if defined(CONFIG_BT_CTLR_PHY)
 		conn->default_tx_time = ull_conn_default_tx_time_get();
 #endif /* CONFIG_BT_CTLR_PHY */
@@ -1079,6 +1106,24 @@ uint8_t ll_adv_enable(uint8_t enable)
 
 		conn->tx_head = conn->tx_ctrl = conn->tx_ctrl_last =
 		conn->tx_data = conn->tx_data_last = 0;
+#else /* CONFIG_BT_LL_SW_LLCP_LEGACY */
+		/* Re-initialize the control procedure data structures */
+		ull_llcp_init(conn);
+
+		conn->llcp_terminate.reason_final = 0;
+		/* NOTE: use allocated link for generating dedicated
+		 * terminate ind rx node
+		 */
+		conn->llcp_terminate.node_rx.hdr.link = link;
+
+#if defined(CONFIG_BT_CTLR_PHY)
+		conn->phy_pref_tx = ull_conn_default_phy_tx_get();
+		conn->phy_pref_rx = ull_conn_default_phy_rx_get();
+#endif /* CONFIG_BT_CTLR_PHY */
+
+		/* Re-initialize the Tx Q */
+		ull_tx_q_init(&conn->tx_q);
+#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
 
 		/* NOTE: using same link as supplied for terminate ind */
 		adv->link_cc_free = link;
@@ -1184,9 +1229,8 @@ uint8_t ll_adv_enable(uint8_t enable)
 		interval_min_us = time_us +
 				  (scan_delay + scan_window) * USEC_PER_MSEC;
 		if ((interval * SCAN_INT_UNIT_US) < interval_min_us) {
-			interval = (interval_min_us +
-				(SCAN_INT_UNIT_US - 1)) /
-				SCAN_INT_UNIT_US;
+			interval = ceiling_fraction(interval_min_us,
+						    SCAN_INT_UNIT_US);
 		}
 
 		/* passive scanning */
@@ -2021,6 +2065,13 @@ static int init_reset(void)
 	for (handle = 0U; handle < BT_CTLR_ADV_SET; handle++) {
 		lll_adv_data_init(&ll_adv[handle].lll.adv_data);
 		lll_adv_data_init(&ll_adv[handle].lll.scan_rsp);
+#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
+		/* Pointer to DF configuration must be cleared on reset. In other case it will point
+		 * to a memory pool address that should be released. It may be used by the pool
+		 * itself. In such situation it may cause error.
+		 */
+		ll_adv[handle].df_cfg = NULL;
+#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
 	}
 
 	/* Make sure that set #0 is initialized with empty legacy PDUs. This is
@@ -2455,7 +2506,8 @@ static void ext_disabled_cb(void *param)
 	struct node_rx_hdr *rx_hdr = (void *)lll->node_rx_adv_term;
 
 	/* Under race condition, if a connection has been established then
-	 * node_rx is already utilized to send terminate event on connection */
+	 * node_rx is already utilized to send terminate event on connection
+	 */
 	if (!rx_hdr) {
 		return;
 	}

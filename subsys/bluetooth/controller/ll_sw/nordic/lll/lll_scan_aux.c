@@ -18,6 +18,7 @@
 
 #include "util/util.h"
 #include "util/memq.h"
+#include "util/dbuf.h"
 #include "util/mayfly.h"
 
 #include "pdu.h"
@@ -47,6 +48,7 @@
 #define LOG_MODULE_NAME bt_ctlr_lll_scan_aux
 #include "common/log.h"
 #include <soc.h>
+#include <ull_scan_types.h>
 #include "hal/debug.h"
 
 static int init_reset(void);
@@ -277,7 +279,8 @@ void lll_scan_aux_isr_aux_setup(void *param)
 
 	/* Setup radio for auxiliary PDU scan */
 	radio_phy_set(phy_aux, PHY_FLAGS_S8);
-	radio_pkt_configure(8, LL_EXT_OCTETS_RX_MAX, (phy_aux << 1));
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, LL_EXT_OCTETS_RX_MAX,
+			    RADIO_PKT_CONF_PHY(phy_aux));
 	lll_chan_set(aux_ptr->chan_idx);
 
 	radio_pkt_rx_set(node_rx->pdu);
@@ -344,13 +347,13 @@ void lll_scan_aux_isr_aux_setup(void *param)
 	/* scanner always measures RSSI */
 	radio_rssi_measure();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 
 	radio_gpio_pa_lna_enable(aux_start_us +
 				 radio_rx_ready_delay_get(phy_aux, 1) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 }
 
 bool lll_scan_aux_addr_match_get(const struct lll_scan *lll,
@@ -421,12 +424,6 @@ static int prepare_cb(struct lll_prepare_param *p)
 	lll_aux = p->param;
 	lll = ull_scan_aux_lll_parent_get(lll_aux, &is_lll_scan);
 
-	/* Initialize scanning state */
-	lll_aux->state = 0U;
-
-	/* Reset Tx/rx count */
-	trx_cnt = 0U;
-
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 	/* Check if this aux scan is for periodic advertising train */
 	if (!is_lll_scan) {
@@ -453,17 +450,24 @@ static int prepare_cb(struct lll_prepare_param *p)
 	}
 #endif /* CONFIG_BT_CENTRAL */
 
+	/* Initialize scanning state */
+	lll_aux->state = 0U;
+
+	/* Reset Tx/rx count */
+	trx_cnt = 0U;
+
 	/* Start setting up Radio h/w */
 	radio_reset();
 
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
-	radio_tx_power_set(lll_aux->tx_pwr_lvl);
+	radio_tx_power_set(lll->tx_pwr_lvl);
 #else
 	radio_tx_power_set(RADIO_TXP_DEFAULT);
 #endif
 
 	radio_phy_set(lll_aux->phy, PHY_FLAGS_S8);
-	radio_pkt_configure(8, LL_EXT_OCTETS_RX_MAX, (lll_aux->phy << 1));
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, LL_EXT_OCTETS_RX_MAX,
+			    RADIO_PKT_CONF_PHY(lll_aux->phy));
 
 	node_rx = ull_pdu_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
@@ -472,8 +476,8 @@ static int prepare_cb(struct lll_prepare_param *p)
 
 	aa = sys_cpu_to_le32(PDU_AC_ACCESS_ADDR);
 	radio_aa_set((uint8_t *)&aa);
-	radio_crc_configure(((0x5bUL) | ((0x06UL) << 8) | ((0x00UL) << 16)),
-			    0x555555);
+	radio_crc_configure(PDU_CRC_POLYNOMIAL,
+				PDU_AC_CRC_IV);
 
 	lll_chan_set(lll_aux->chan);
 
@@ -538,13 +542,13 @@ sync_aux_prepare_done:
 	/* scanner always measures RSSI */
 	radio_rssi_measure();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 
 	radio_gpio_pa_lna_enable(remainder_us +
 				 radio_rx_ready_delay_get(lll_aux->phy, 1) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
@@ -925,7 +929,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		radio_switch_complete_and_rx(phy_aux);
 		radio_isr_set(isr_tx_connect_req, lll_aux_to_use);
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			/* PA/LNA enable is overwriting packet end
 			 * used in ISR profiling, hence back it up
@@ -938,8 +942,8 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 					 EVENT_IFS_US -
 					 radio_rx_chain_delay_get(phy_aux,
 						phy_aux_flags_rx) -
-					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
+					 HAL_RADIO_GPIO_PA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 		if (rssi_ready) {
@@ -1073,7 +1077,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		/* capture end of Tx-ed PDU, used to calculate HCTO. */
 		radio_tmr_end_capture();
 
-#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			/* PA/LNA enable is overwriting packet end
 			 * used in ISR profiling, hence back it up
@@ -1087,8 +1091,8 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 					 EVENT_IFS_US -
 					 radio_rx_chain_delay_get(phy_aux,
 						phy_aux_flags_rx) -
-					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
+					 HAL_RADIO_GPIO_PA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 		(void)ull_pdu_rx_alloc();
 
@@ -1265,7 +1269,7 @@ static void isr_tx(struct lll_scan_aux *lll_aux, void *pdu_rx,
 	/* scanner always measures RSSI */
 	radio_rssi_measure();
 
-#if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 		/* PA/LNA enable is overwriting packet end used in ISR
 		 * profiling, hence back it up for later use.
@@ -1276,8 +1280,8 @@ static void isr_tx(struct lll_scan_aux *lll_aux, void *pdu_rx,
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + EVENT_IFS_US - 4 -
 				 radio_tx_chain_delay_get(lll_aux->phy, 1) -
-				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
-#endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+				 HAL_RADIO_GPIO_LNA_OFFSET);
+#endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 	radio_isr_set(isr, param);
 

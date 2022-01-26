@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <drivers/flash.h>
 #include <init.h>
+#include <pm/device.h>
 #include <string.h>
 #include <logging/log.h>
 LOG_MODULE_REGISTER(qspi_nor, CONFIG_FLASH_LOG_LEVEL);
@@ -66,7 +67,7 @@ BUILD_ASSERT(DT_INST_PROP(0, cpol) == DT_INST_PROP(0, cpha),
 	     "Invalid combination of \"cpol\" and \"cpha\" properties.");
 
 /* for accessing devicetree properties of the bus node */
-#define QSPI_NODE DT_BUS(DT_DRV_INST(0))
+#define QSPI_NODE DT_INST_BUS(0)
 #define QSPI_PROP_AT(prop, idx) DT_PROP_BY_IDX(QSPI_NODE, prop, idx)
 #define QSPI_PROP_LEN(prop) DT_PROP_LEN(QSPI_NODE, prop)
 
@@ -608,11 +609,13 @@ static int qspi_sfdp_read(const struct device *dev, off_t offset,
 		.io3_level = true,
 	};
 
-	int res = ANOMALY_122_INIT(dev);
+	int ret = ANOMALY_122_INIT(dev);
+	nrfx_err_t res = NRFX_SUCCESS;
 
-	if (res != NRFX_SUCCESS) {
-		LOG_DBG("ANOMALY_122_INIT: %x", res);
-		goto out;
+	if (ret != 0) {
+		LOG_DBG("ANOMALY_122_INIT: %d", ret);
+		ANOMALY_122_UNINIT(dev);
+		return ret;
 	}
 
 	qspi_lock(dev);
@@ -807,8 +810,6 @@ static inline nrfx_err_t write_sub_word(const struct device *dev, off_t addr,
 BUILD_ASSERT((CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE % 4) == 0,
 	     "NOR stack buffer must be multiple of 4 bytes");
 
-#define NVMC_WRITE_OK (CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE > 0)
-
 /* If enabled write using a stack-allocated aligned SRAM buffer as
  * required for DMA transfers by QSPI peripheral.
  *
@@ -817,28 +818,28 @@ BUILD_ASSERT((CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE % 4) == 0,
 static inline nrfx_err_t write_from_nvmc(const struct device *dev, off_t addr,
 					 const void *sptr, size_t slen)
 {
-#if NVMC_WRITE_OK
-	uint8_t __aligned(4) buf[CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE];
-	const uint8_t *sp = sptr;
 	nrfx_err_t res = NRFX_SUCCESS;
 
-	while ((slen > 0) && (res == NRFX_SUCCESS)) {
-		size_t len = MIN(slen, sizeof(buf));
+	if (CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE > 0) {
+		uint8_t __aligned(4) buf[CONFIG_NORDIC_QSPI_NOR_STACK_WRITE_BUFFER_SIZE];
+		const uint8_t *sp = sptr;
 
-		memcpy(buf, sp, len);
-		res = nrfx_qspi_write(buf, sizeof(buf),
-				      addr);
-		qspi_wait_for_completion(dev, res);
+		while ((slen > 0) && (res == NRFX_SUCCESS)) {
+			size_t len = MIN(slen, sizeof(buf));
 
-		if (res == NRFX_SUCCESS) {
-			slen -= len;
-			sp += len;
-			addr += len;
+			memcpy(buf, sp, len);
+			res = nrfx_qspi_write(buf, sizeof(buf), addr);
+			qspi_wait_for_completion(dev, res);
+
+			if (res == NRFX_SUCCESS) {
+				slen -= len;
+				sp += len;
+				addr += len;
+			}
 		}
+	} else {
+		res = NRFX_ERROR_INVALID_ADDR;
 	}
-#else /* NVMC_WRITE_OK */
-	nrfx_err_t res = NRFX_ERROR_INVALID_ADDR;
-#endif /* NVMC_WRITE_OK */
 	return res;
 }
 
@@ -1139,8 +1140,6 @@ static int qspi_nor_pm_action(const struct device *dev,
 
 	return 0;
 }
-#else
-#define qspi_nor_pm_action NULL
 #endif /* CONFIG_PM_DEVICE */
 
 static struct qspi_nor_data qspi_nor_dev_data = {
@@ -1196,7 +1195,9 @@ static const struct qspi_nor_config qspi_nor_dev_config = {
 	.id = DT_INST_PROP(0, jedec_id),
 };
 
-DEVICE_DT_INST_DEFINE(0, qspi_nor_init, qspi_nor_pm_action,
+PM_DEVICE_DT_INST_DEFINE(0, qspi_nor_pm_action);
+
+DEVICE_DT_INST_DEFINE(0, qspi_nor_init, PM_DEVICE_DT_INST_GET(0),
 		      &qspi_nor_dev_data, &qspi_nor_dev_config,
 		      POST_KERNEL, CONFIG_NORDIC_QSPI_NOR_INIT_PRIORITY,
 		      &qspi_nor_api);

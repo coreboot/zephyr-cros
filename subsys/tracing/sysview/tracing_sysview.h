@@ -520,6 +520,10 @@ void sys_trace_thread_info(struct k_thread *thread);
 #define sys_port_trace_k_pipe_cleanup_exit(pipe, ret)
 #define sys_port_trace_k_pipe_alloc_init_enter(pipe)
 #define sys_port_trace_k_pipe_alloc_init_exit(pipe, ret)
+#define sys_port_trace_k_pipe_flush_enter(pipe)
+#define sys_port_trace_k_pipe_flush_exit(pipe)
+#define sys_port_trace_k_pipe_buffer_flush_enter(pipe)
+#define sys_port_trace_k_pipe_buffer_flush_exit(pipe)
 #define sys_port_trace_k_pipe_put_enter(pipe, timeout)
 #define sys_port_trace_k_pipe_put_blocking(pipe, timeout)
 #define sys_port_trace_k_pipe_put_exit(pipe, timeout, ret)
@@ -555,8 +559,8 @@ void sys_trace_thread_info(struct k_thread *thread);
 #define sys_port_trace_k_heap_sys_k_aligned_alloc_exit(heap, ret)
 #define sys_port_trace_k_heap_sys_k_malloc_enter(heap)
 #define sys_port_trace_k_heap_sys_k_malloc_exit(heap, ret)
-#define sys_port_trace_k_heap_sys_k_free_enter(heap)
-#define sys_port_trace_k_heap_sys_k_free_exit(heap)
+#define sys_port_trace_k_heap_sys_k_free_enter(heap, heap_ref)
+#define sys_port_trace_k_heap_sys_k_free_exit(heap, heap_ref)
 #define sys_port_trace_k_heap_sys_k_calloc_enter(heap)
 #define sys_port_trace_k_heap_sys_k_calloc_exit(heap, ret)
 
@@ -639,8 +643,9 @@ void sys_trace_k_thread_info(struct k_thread *thread);
 #define sys_port_trace_pm_device_runtime_enable_enter(dev)		       \
 	SEGGER_SYSVIEW_RecordU32(TID_PM_DEVICE_RUNTIME_ENABLE,		       \
 				 (uint32_t)(uintptr_t)dev)
-#define sys_port_trace_pm_device_runtime_enable_exit(dev) \
-	SEGGER_SYSVIEW_RecordEndCall(TID_PM_DEVICE_RUNTIME_ENABLE)
+#define sys_port_trace_pm_device_runtime_enable_exit(dev, ret)		       \
+	SEGGER_SYSVIEW_RecordEndCall(TID_PM_DEVICE_RUNTIME_ENABLE,	       \
+				     (uint32_t)ret)
 #define sys_port_trace_pm_device_runtime_disable_enter(dev)		       \
 	SEGGER_SYSVIEW_RecordU32(TID_PM_DEVICE_RUNTIME_DISABLE,		       \
 				 (uint32_t)(uintptr_t)dev)

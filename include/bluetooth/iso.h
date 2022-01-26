@@ -98,6 +98,14 @@ enum {
 	BT_ISO_DISCONNECT,
 };
 
+
+enum bt_iso_chan_type {
+	BT_ISO_CHAN_TYPE_NONE,
+	BT_ISO_CHAN_TYPE_CONNECTED,
+	BT_ISO_CHAN_TYPE_BROADCASTER,
+	BT_ISO_CHAN_TYPE_SYNC_RECEIVER
+};
+
 /** @brief ISO Channel structure. */
 struct bt_iso_chan {
 	/** Channel connection reference */
@@ -108,6 +116,8 @@ struct bt_iso_chan {
 	struct bt_iso_chan_qos		*qos;
 	uint8_t				state;
 	bt_security_t			required_sec_level;
+	/** Node used internally by the stack */
+	sys_snode_t node;
 };
 
 /** @brief ISO Channel IO QoS structure. */
@@ -197,11 +207,8 @@ struct bt_iso_recv_info {
 /** Opaque type representing an Connected Isochronous Group (CIG). */
 struct bt_iso_cig;
 
-struct bt_iso_cig_create_param {
-	/** @brief Array of pointers to CIS channels
-	 *
-	 * This array shall remain valid for the duration of the CIG.
-	 */
+struct bt_iso_cig_param {
+	/** @brief Array of pointers to CIS channels */
 	struct bt_iso_chan **cis_channels;
 
 	/** @brief Number channels in @p cis_channels
@@ -258,10 +265,7 @@ struct bt_iso_connect_param {
 struct bt_iso_big;
 
 struct bt_iso_big_create_param {
-	/** Array of pointers to BIS channels
-	 *
-	 * This array shall remain valid for the duration of the BIG.
-	 */
+	/** Array of pointers to BIS channels */
 	struct bt_iso_chan **bis_channels;
 
 	/** @brief Number channels in @p bis_channels
@@ -420,7 +424,7 @@ struct bt_iso_chan_ops {
 	 *  rejected.
 	 *
 	 *  @param chan   The channel that has been Disconnected
-	 *  @param reason HCI reason for the disconnection.
+	 *  @param reason BT_HCI_ERR_* reason for the disconnection.
 	 */
 	void (*disconnected)(struct bt_iso_chan *chan, uint8_t reason);
 
@@ -519,8 +523,30 @@ int bt_iso_server_register(struct bt_iso_server *server);
  *
  *  @return 0 in case of success or negative value in case of error.
  */
-int bt_iso_cig_create(const struct bt_iso_cig_create_param *param,
+int bt_iso_cig_create(const struct bt_iso_cig_param *param,
 		      struct bt_iso_cig **out_cig);
+
+/** @brief Reconfigure a CIG as a central
+ *
+ *  This function can be used to update a CIG. It will update the group specific
+ *  parameters, and, if supplied, change the QoS parameters of the individual
+ *  CIS. If the cis_channels in @p param contains CIS that was not originally
+ *  in the call to bt_iso_cig_create(), these will be added to the group.
+ *  It is not possible to remove any CIS from the group after creation.
+ *
+ *  This can be called at any time before connecting an ISO to a remote device.
+ *  Once any CIS in the group has connected, the group cannot be changed.
+ *
+ *  Once a CIG is created, the channels supplied in the @p param can be
+ *  connected using bt_iso_chan_connect.
+ *
+ *  @param cig       Connected Isochronous Group object.
+ *  @param param     The parameters used to reconfigure the CIG.
+ *
+ *  @return 0 in case of success or negative value in case of error.
+ */
+int bt_iso_cig_reconfigure(struct bt_iso_cig *cig,
+			   const struct bt_iso_cig_param *param);
 
 /** @brief Terminates a CIG as a central
  *
@@ -580,6 +606,31 @@ int bt_iso_chan_disconnect(struct bt_iso_chan *chan);
  *  @return Bytes sent in case of success or negative value in case of error.
  */
 int bt_iso_chan_send(struct bt_iso_chan *chan, struct net_buf *buf);
+
+/** ISO channel Info Structure */
+struct bt_iso_info {
+	/** Channel Type. */
+	enum bt_iso_chan_type type;
+};
+
+/** @brief Get ISO channel info
+ *
+ *  @param chan Channel object.
+ *  @param info Channel info object.
+ *
+ *  @return Zero on success or (negative) error code on failure.
+ */
+int bt_iso_chan_get_info(const struct bt_iso_chan *chan,
+			 struct bt_iso_info *info);
+
+/** @brief Get the type of an ISO channel
+ *
+ * @param chan Channel object.
+ *
+ * @return enum bt_iso_chan_type The type of the channel. If @p is NULL this
+ *                               will be BT_ISO_CHAN_TYPE_NONE.
+ */
+enum bt_iso_chan_type bt_iso_chan_get_type(const struct bt_iso_chan *chan);
 
 /** @brief Creates a BIG as a broadcaster
  *

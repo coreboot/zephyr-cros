@@ -25,6 +25,7 @@
 #include "hci_core.h"
 #include "conn_internal.h"
 #include "l2cap_internal.h"
+#include "keys.h"
 
 #define LE_CHAN_RTX(_w) CONTAINER_OF(_w, struct bt_l2cap_le_chan, chan.rtx_work)
 #define CHAN_RX(_w) CONTAINER_OF(_w, struct bt_l2cap_le_chan, rx_work)
@@ -58,7 +59,7 @@ NET_BUF_POOL_FIXED_DEFINE(disc_pool, 1,
 			  BT_L2CAP_BUF_SIZE(
 				sizeof(struct bt_l2cap_sig_hdr) +
 				sizeof(struct bt_l2cap_disconn_req)),
-			  NULL);
+			  8, NULL);
 
 #define L2CAP_ECRED_CHAN_MAX	5
 
@@ -1032,14 +1033,44 @@ static uint16_t l2cap_chan_accept(struct bt_conn *conn,
 	return BT_L2CAP_LE_SUCCESS;
 }
 
-static bool l2cap_check_security(struct bt_conn *conn,
+static uint16_t l2cap_check_security(struct bt_conn *conn,
 				 struct bt_l2cap_server *server)
 {
+	const struct bt_keys *keys = bt_keys_find_addr(conn->id, &conn->le.dst);
+	bool ltk_present;
+
 	if (IS_ENABLED(CONFIG_BT_CONN_DISABLE_SECURITY)) {
-		return true;
+		return BT_L2CAP_LE_SUCCESS;
 	}
 
-	return conn->sec_level >= server->sec_level;
+	if (conn->sec_level >= server->sec_level) {
+		return BT_L2CAP_LE_SUCCESS;
+	}
+
+	if (conn->sec_level > BT_SECURITY_L1) {
+		return BT_L2CAP_LE_ERR_AUTHENTICATION;
+	}
+
+	if (keys) {
+		if (conn->role == BT_HCI_ROLE_CENTRAL) {
+			ltk_present = keys->id & (BT_KEYS_LTK_P256 | BT_KEYS_PERIPH_LTK);
+		} else {
+			ltk_present = keys->id & (BT_KEYS_LTK_P256 | BT_KEYS_LTK);
+		}
+	} else {
+		ltk_present = false;
+	}
+
+	/* If an LTK or an STK is available and encryption is required
+	 * (LE security mode 1) but encryption is not enabled, the
+	 * service request shall be rejected with the error code
+	 * "Insufficient Encryption".
+	 */
+	if (ltk_present) {
+		return BT_L2CAP_LE_ERR_ENCRYPTION;
+	}
+
+	return BT_L2CAP_LE_ERR_AUTHENTICATION;
 }
 
 static void le_conn_req(struct bt_l2cap *l2cap, uint8_t ident,
@@ -1090,8 +1121,9 @@ static void le_conn_req(struct bt_l2cap *l2cap, uint8_t ident,
 	}
 
 	/* Check if connection has minimum required security level */
-	if (!l2cap_check_security(conn, server)) {
-		rsp->result = sys_cpu_to_le16(BT_L2CAP_LE_ERR_AUTHENTICATION);
+	result = l2cap_check_security(conn, server);
+	if (result != BT_L2CAP_LE_SUCCESS) {
+		rsp->result = sys_cpu_to_le16(result);
 		goto rsp;
 	}
 
@@ -1170,8 +1202,8 @@ static void le_ecred_conn_req(struct bt_l2cap *l2cap, uint8_t ident,
 	}
 
 	/* Check if connection has minimum required security level */
-	if (!l2cap_check_security(conn, server)) {
-		result = BT_L2CAP_LE_ERR_AUTHENTICATION;
+	result = l2cap_check_security(conn, server);
+	if (result != BT_L2CAP_LE_SUCCESS) {
 		goto response;
 	}
 
@@ -1823,7 +1855,7 @@ static int l2cap_chan_le_send(struct bt_l2cap_le_chan *ch,
 		return -EAGAIN;
 	}
 
-	BT_DBG("ch %p cid 0x%04x len %u credits %u", ch, ch->tx.cid,
+	BT_DBG("ch %p cid 0x%04x len %u credits %lu", ch, ch->tx.cid,
 	       seg->len, atomic_get(&ch->tx.credits));
 
 	len = seg->len - sdu_hdr_len;
@@ -1966,7 +1998,7 @@ static void le_credits(struct bt_l2cap *l2cap, uint8_t ident,
 
 	l2cap_chan_tx_give_credits(ch, credits);
 
-	BT_DBG("chan %p total credits %u", ch, atomic_get(&ch->tx.credits));
+	BT_DBG("chan %p total credits %lu", ch, atomic_get(&ch->tx.credits));
 
 	l2cap_chan_tx_resume(ch);
 }
@@ -2140,7 +2172,7 @@ static void l2cap_chan_send_credits(struct bt_l2cap_le_chan *chan,
 
 	l2cap_send(chan->chan.conn, BT_L2CAP_CID_LE_SIG, buf);
 
-	BT_DBG("chan %p credits %u", chan, atomic_get(&chan->rx.credits));
+	BT_DBG("chan %p credits %lu", chan, atomic_get(&chan->rx.credits));
 }
 
 static void l2cap_chan_update_credits(struct bt_l2cap_le_chan *chan,
@@ -2327,7 +2359,7 @@ static void l2cap_chan_le_recv(struct bt_l2cap_le_chan *chan,
 	}
 
 	err = chan->chan.ops->recv(&chan->chan, buf);
-	if (err) {
+	if (err < 0) {
 		if (err != -EINPROGRESS) {
 			BT_ERR("err %d", err);
 			bt_l2cap_chan_disconnect(&chan->chan);

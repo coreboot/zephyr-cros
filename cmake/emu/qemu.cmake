@@ -2,6 +2,12 @@
 
 if("${ARCH}" STREQUAL "x86")
   set_ifndef(QEMU_binary_suffix i386)
+elseif("${ARCH}" STREQUAL "mips")
+  if(CONFIG_BIG_ENDIAN)
+    set_ifndef(QEMU_binary_suffix mips)
+  else()
+    set_ifndef(QEMU_binary_suffix mipsel)
+  endif()
 elseif(DEFINED QEMU_ARCH)
   set_ifndef(QEMU_binary_suffix ${QEMU_ARCH})
 else()
@@ -37,8 +43,8 @@ if(CONFIG_QEMU_UEFI_BOOT)
 endif()
 
 set(qemu_targets
-  run
-  debugserver
+  run_qemu
+  debugserver_qemu
   )
 
 set(QEMU_FLAGS -pidfile)
@@ -340,7 +346,7 @@ set(env_qemu $ENV{QEMU_EXTRA_FLAGS})
 separate_arguments(env_qemu)
 list(APPEND QEMU_EXTRA_FLAGS ${env_qemu})
 
-list(APPEND MORE_FLAGS_FOR_debugserver -s -S)
+list(APPEND MORE_FLAGS_FOR_debugserver_qemu -s -S)
 
 # Architectures can define QEMU_KERNEL_FILE to use a specific output
 # file to pass to qemu (and a "qemu_kernel_target" target to generate

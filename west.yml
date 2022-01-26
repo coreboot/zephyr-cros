@@ -37,12 +37,12 @@ manifest:
       groups:
         - hal
     - name: edtt
-      revision: 31badfbbd04f2948e3df6ebf329f930317550961
+      revision: c94f63865a803b18a2ab9eca70d2a9ab881130f6
       path: tools/edtt
       groups:
         - tools
     - name: fatfs
-      revision: 94fcd6bfb3801ac0a5e12ea2f52187e0a688b90e
+      revision: 09a9d913c61dccbb8ff92d8943b452c614ac5292
       path: modules/fs/fatfs
       groups:
         - fs
@@ -67,13 +67,13 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: 5c2062876f86fbf3aa30f3e2539a88b56b8fd461
+      revision: bcd7565ffa390d5774dc2fbe71a002faa9a7d082
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
         - hal
     - name: hal_gigadevice
-      revision: ce323de9655972a545cbdddda813c1576d85d5d1
+      revision: 242a7f4be7a3136606c7a65169775f7ef85ad444
       path: modules/hal/gigadevice
       groups:
         - hal
@@ -88,7 +88,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: cad21db72a61b8dde0aabf95301dfd9dee119018
+      revision: a42b016d7c7610489f5f8c79773fedc05ba352ee
       path: modules/hal/nordic
       groups:
         - hal
@@ -98,7 +98,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: fd8b79c40172e8aab808a3957978d49f46b01d87
+      revision: aee8eaa8cf4264321c2a816a6d165a3351d1c434
       path: modules/hal/nxp
       groups:
         - hal
@@ -124,7 +124,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 5c8275071ec1cf160bfe8c18bbd9330a7d714dc8
+      revision: 91531028be0bfa554ae1dd9e2b5d3ed6fd7287c3
       path: modules/hal/stm32
       groups:
         - hal
@@ -144,7 +144,7 @@ manifest:
       groups:
         - hal
     - name: libmetal
-      revision: 39d049d4ae68e6f6d595fce7de1dcfc1024fb4eb
+      revision: f237c9d420a51cc43bc37d744e41191ad613f348
       path: modules/hal/libmetal
       groups:
         - hal
@@ -152,7 +152,7 @@ manifest:
       path: modules/fs/littlefs
       groups:
         - fs
-      revision: 9e4498d1c73009acd84bb36036ee5e2869112a6c
+      revision: 33509ed9c3d369cdb9d909cd40c5eea8f64a902c
     - name: loramac-node
       revision: 12019623bbad9eb54fe51066847a7cbd4b4eac57
       path: modules/lib/loramac-node
@@ -163,21 +163,18 @@ manifest:
       revision: 8e303c264fc21c2116dc612658003a22e933124d
       path: modules/lib/lz4
     - name: mbedtls
-      revision: 711fd5ea13a5e018cebe1ac1f79c22d897e8b34d
+      revision: 3e3e58a92de76069730c63e0d524f40fea948a61
       path: modules/crypto/mbedtls
       groups:
         - crypto
     - name: mcuboot
-      revision: 225b02468bf77806bdd5f503725256cb345970d2
+      revision: 399720d1cabd26c4356445d351f263b31e942961
       path: bootloader/mcuboot
-    - name: mcumgr
-      revision: c854c85ec75d624c47058bc4ac0ab9b12e2dd0e7
-      path: modules/lib/mcumgr
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
       groups:
         - debug
-      revision: 75e671550ac1acb502f315fe4952514dc73f7bfb
+      revision: d9da086b11cda494d85f4d8a9829f505c2d5e380
     - name: nanopb
       revision: d148bd26718e4c10414f07a7eb1bd24c62e56c5d
       path: modules/lib/nanopb
@@ -187,13 +184,13 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: a47e326ca772ddd14cc3b9d4ca30a9ab44ecca16
+      revision: b8cea37dbdc8fc58cc14b4e19fa850877a9da520
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
-      revision: 6010f0523cbc75f551d9256cf782f173177acdef
+      revision: cfd050ff38a9d028dc211690b2ec35971128e45e
       path: modules/lib/open-amp
     - name: openthread
-      revision: 15d9f0401eb458b35c82e327299969b8b745231f
+      revision: b7aa7686d3f4e326bd25abc234b209159977c26d
       path: modules/lib/openthread
     - name: segger
       revision: 3a52ab222133193802d3c3b4d21730b9b1f1d2f6
@@ -201,7 +198,7 @@ manifest:
       groups:
         - debug
     - name: sof
-      revision: b039018d0adcfe347119094ac29f0fc12b671187
+      revision: 500d77e0ac84ac2c969e0d4b2142cca192e893bc
       path: modules/audio/sof
     - name: tflite-micro
       revision: 9156d050927012da87079064db59d07f03b8baf6
@@ -221,17 +218,17 @@ manifest:
       groups:
         - debug
     - name: trusted-firmware-m
-      revision: 400f58ff53eb1dea5234925e96c5279154515cc7
+      revision: c8134809a9439571c54d36ef39210270dbee8f67
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee
     - name: tf-m-tests
-      revision: 93dad5cb3cfc2e2d82de61d1b2781f84881ce839
+      revision: 52814181f0fde6d1422fac204d42cde30c62e40e
       path: modules/tee/tf-m/tf-m-tests
       groups:
         - tee
     - name: psa-arch-tests
-      revision: 077b8e5cd5fe9e27718a499b004e79bfca2d2e89
+      revision: 186cba2543dff73d0cda5509d26f02a0b39ee66e
       path: modules/tee/tf-m/psa-arch-tests
       groups:
         - tee

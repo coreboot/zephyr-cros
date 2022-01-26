@@ -39,7 +39,7 @@ int mqtt_client_tls_connect(struct mqtt_client *client)
 				 &client->transport.proxy.addr,
 				 client->transport.proxy.addrlen);
 		if (ret < 0) {
-			return -errno;
+			goto error;
 		}
 	}
 #endif
@@ -73,6 +73,15 @@ int mqtt_client_tls_connect(struct mqtt_client *client)
 		ret = zsock_setsockopt(client->transport.tls.sock, SOL_TLS,
 				       TLS_HOSTNAME, tls_config->hostname,
 				       strlen(tls_config->hostname));
+		if (ret < 0) {
+			goto error;
+		}
+	}
+
+	if (tls_config->cert_nocopy != TLS_CERT_NOCOPY_NONE) {
+		ret = zsock_setsockopt(client->transport.tls.sock, SOL_TLS,
+				       TLS_CERT_NOCOPY, &tls_config->cert_nocopy,
+				       sizeof(tls_config->cert_nocopy));
 		if (ret < 0) {
 			goto error;
 		}

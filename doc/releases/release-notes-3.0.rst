@@ -38,12 +38,50 @@ Changes in this release
 
 * Added function for getting status of USB device remote wakeup feature.
 
-==========================
+* Added ``ranges`` and ``dma-ranges`` as invalid property to be used with DT_PROP_LEN()
+  along ``reg`` and ``interrupts``.
 
-Removed APIs in this release
+Changes in this release
+=======================
 
+Removed APIs in this release:
 
-============================
+* The following Kconfig options related to radio front-end modules (FEMs) were
+  removed:
+
+  * ``CONFIG_BT_CTLR_GPIO_PA``
+  * ``CONFIG_BT_CTLR_GPIO_PA_PIN``
+  * ``CONFIG_BT_CTLR_GPIO_PA_POL_INV``
+  * ``CONFIG_BT_CTLR_GPIO_PA_OFFSET``
+  * ``CONFIG_BT_CTLR_GPIO_LNA``
+  * ``CONFIG_BT_CTLR_GPIO_LNA_PIN``
+  * ``CONFIG_BT_CTLR_GPIO_LNA_POL_INV``
+  * ``CONFIG_BT_CTLR_GPIO_LNA_OFFSET``
+  * ``CONFIG_BT_CTLR_FEM_NRF21540``
+  * ``CONFIG_BT_CTLR_GPIO_PDN_PIN``
+  * ``CONFIG_BT_CTLR_GPIO_PDN_POL_INV``
+  * ``CONFIG_BT_CTLR_GPIO_CSN_PIN``
+  * ``CONFIG_BT_CTLR_GPIO_CSN_POL_INV``
+  * ``CONFIG_BT_CTLR_GPIO_PDN_CSN_OFFSET``
+
+  This FEM configuration is hardware description, and was therefore moved to
+  :ref:`devicetree <dt-guide>`. See the :dtcompatible:`nordic,nrf-radio`
+  devicetree binding's ``fem`` property for information on what to do instead
+  on the Nordic open source controller.
+
+* Removed Kconfig option ``CONFIG_USB_UART_CONSOLE``.
+  Option ``CONFIG_USB_UART_CONSOLE`` was only relevant for console driver
+  when CDC ACM UART is used as backend. Since the behavior of the CDC ACM UART
+  is changed so that it more closely mimics the real UART controller,
+  option is no longer necessary.
+
+* Removed Kconfig option ``CONFIG_OPENOCD_SUPPORT`` in favor of
+  ``CONFIG_DEBUG_THREAD_INFO``.
+
+Deprecated in this release:
+
+* :c:macro:`USBD_CFG_DATA_DEFINE` is deprecated in favor of utilizing
+  :c:macro:`USBD_DEFINE_CFG_DATA`
 
 Stable API changes in this release
 ==================================
@@ -75,6 +113,9 @@ Bluetooth
 * Audio
 
 * Host
+
+  * The :kconfig:`CONFIG_BT_SETTINGS_CCC_STORE_ON_WRITE` is enabled by default.
+    Storing CCC right after it's written reduces risk of inconsistency of CCC values between bonded peers.
 
 * Mesh
 
@@ -257,9 +298,26 @@ USB
 Build and Infrastructure
 ************************
 
+* Build system
+
+  * New CMake extension functions:
+
+    * ``dt_alias()``
+    * ``target_sources_if_dt_node()``
+
+  * The following CMake extension functions now handle devicetree aliases:
+
+    * ``dt_node_exists()``
+    * ``dt_node_has_status()``
+    * ``dt_prop()``
+    * ``dt_num_regs()``
+    * ``dt_reg_addr()``
+    * ``dt_reg_size()``
 
 * Devicetree
 
+  * Support for the devicetree compatible ``ti,ina23x`` has been removed.
+    Instead, use :dtcompatible:`ti,ina230` or :dtcompatible:`ti,ina237`.
 
 * West (extensions)
 
@@ -272,6 +330,8 @@ Libraries / Subsystems
 
 * Management
 
+  * Fixed the mcumgr SMP protocol over serial not adding the length of the CRC16 to packet length.
+  * Kconfig option OS_MGMT_TASKSTAT is now disabled by default.
 
 * CMSIS subsystem
 
@@ -302,6 +362,21 @@ Libraries / Subsystems
 HALs
 ****
 
+MCUboot
+*******
+
+* Fixed serial recovery skipping on nrf5340.
+* Fixed issue which caused that progressive's erase feature was off although was selected by Kconfig (introduced by #42c985cead).
+* Added check of reset address in incoming image validation phase, see ``CONFIG_MCUBOOT_VERIFY_IMG_ADDRESS``.
+* Allow image header bigger than 1 KB for encrypted images.
+* Support Mbed TLS 3.0.
+* stm32: watchdog support.
+* many documentation improvements.
+* Fixed deadlock on cryptolib selectors in Kconfig.
+* Fixed support for single application slot with serial recovery.
+* Added various hooks to be able to change how image data is accessed, see ``CONFIG_BOOT_IMAGE_ACCESS_HOOKS``.
+* Added custom commands support in serila recovery (PERUSER_MGMT_GROUP): storage erase ``CONFIG_BOOT_MGMT_CUSTOM_STORAGE_ERASE``, custo image status ``CONFIG_BOOT_MGMT_CUSTOM_IMG_LIST``.
+* Added support for direct image upload, see ``CONFIG_MCUBOOT_SERIAL_DIRECT_IMAGE_UPLOAD`` in serial recovery.
 
 Trusted Firmware-m
 ******************

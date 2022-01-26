@@ -866,7 +866,7 @@ static int sock_get_pkt_src_addr(struct net_pkt *pkt,
 			goto error;
 		}
 
-		net_ipaddr_copy(&addr4->sin_addr, &ipv4_hdr->src);
+		net_ipv4_addr_copy_raw((uint8_t *)&addr4->sin_addr, ipv4_hdr->src);
 		port = &addr4->sin_port;
 	} else if (IS_ENABLED(CONFIG_NET_IPV6) &&
 		   net_pkt_family(pkt) == AF_INET6) {
@@ -889,7 +889,7 @@ static int sock_get_pkt_src_addr(struct net_pkt *pkt,
 			goto error;
 		}
 
-		net_ipaddr_copy(&addr6->sin6_addr, &ipv6_hdr->src);
+		net_ipv6_addr_copy_raw((uint8_t *)&addr6->sin6_addr, ipv6_hdr->src);
 		port = &addr6->sin6_port;
 	} else {
 		ret = -ENOTSUP;
@@ -1991,26 +1991,7 @@ int zsock_getsockname_ctx(struct net_context *ctx, struct sockaddr *addr,
 int z_impl_zsock_getsockname(int sock, struct sockaddr *addr,
 			     socklen_t *addrlen)
 {
-	const struct socket_op_vtable *vtable;
-	struct k_mutex *lock;
-	void *ctx;
-	int ret;
-
-	ctx = get_sock_vtable(sock, &vtable, &lock);
-	if (ctx == NULL) {
-		errno = EBADF;
-		return -1;
-	}
-
-	NET_DBG("getsockname: ctx=%p, fd=%d", ctx, sock);
-
-	(void)k_mutex_lock(lock, K_FOREVER);
-
-	ret = vtable->getsockname(ctx, addr, addrlen);
-
-	k_mutex_unlock(lock);
-
-	return ret;
+	VTABLE_CALL(getsockname, sock, addr, addrlen);
 }
 
 #ifdef CONFIG_USERSPACE

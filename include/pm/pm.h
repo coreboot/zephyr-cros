@@ -69,14 +69,15 @@ struct pm_notifier {
  * @brief Force usage of given power state.
  *
  * This function overrides decision made by PM policy forcing
- * usage of given power state immediately.
+ * usage of given power state upon next entry of the idle thread.
  *
  * @note This function can only run in thread context
  *
+ * @param cpu CPU index.
  * @param info Power state which should be used in the ongoing
  *	suspend operation.
  */
-void pm_power_state_force(struct pm_state_info info);
+bool pm_power_state_force(uint8_t cpu, struct pm_state_info info);
 
 /**
  * @brief Register a power management notifier
@@ -100,6 +101,17 @@ void pm_notifier_register(struct pm_notifier *notifier);
  * otherwise.
  */
 int pm_notifier_unregister(struct pm_notifier *notifier);
+
+/**
+ * @brief Gets the next power state that will be used.
+ *
+ * This function returns the next power state that will be used by the
+ * SoC.
+ *
+ * @param cpu CPU index.
+ * @return next pm_state_info that will be used
+ */
+struct pm_state_info pm_power_state_next_get(uint8_t cpu);
 
 /**
  * @}
@@ -173,17 +185,6 @@ bool pm_constraint_get(enum pm_state state);
 void pm_power_state_set(struct pm_state_info info);
 
 /**
- * @brief Gets the next power state that will be used.
- *
- * This function returns the next power state that will be used by the
- * SoC.
- *
- * @param cpu CPU index.
- * @return next pm_state_info that will be used
- */
-const struct pm_state_info pm_power_state_next_get(uint8_t cpu);
-
-/**
  * @brief Do any SoC or architecture specific post ops after sleep state exits.
  *
  * This function is a place holder to do any operations that may
@@ -215,7 +216,7 @@ void pm_power_state_exit_post_ops(struct pm_state_info info);
 
 #endif /* CONFIG_PM */
 
-void z_pm_save_idle_exit(int32_t ticks);
+void z_pm_save_idle_exit(void);
 
 #ifdef __cplusplus
 }

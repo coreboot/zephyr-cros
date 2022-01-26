@@ -50,7 +50,7 @@ current :ref:`stability level <api_lifecycle>`.
    * - :ref:`can_api`
      - Unstable
      - 1.14
-     - 2.6
+     - 3.0
 
    * - :ref:`counter_api`
      - Unstable
@@ -242,7 +242,7 @@ current :ref:`stability level <api_lifecycle>`.
      - 1.0
      - 1.11
 
-   * - :ref:`power_management_api`
+   * - :ref:`pm_api`
      - Experimental
      - 1.2
      - 2.2
