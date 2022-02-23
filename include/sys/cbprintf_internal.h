@@ -86,25 +86,34 @@ extern "C" {
  */
 #ifdef __cplusplus
 #define Z_CBPRINTF_IS_PCHAR(x, flags) \
-	z_cbprintf_cxx_is_pchar(x, flags & CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR)
+	z_cbprintf_cxx_is_pchar(x, (flags) & CBPRINTF_PACKAGE_CONST_CHAR_RO)
 #else
 #define Z_CBPRINTF_IS_PCHAR(x, flags) \
 	_Generic((x) + 0, \
 		char * : 1, \
-		const char * : (flags & CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR) ? 0 : 1, \
+		const char * : ((flags) & CBPRINTF_PACKAGE_CONST_CHAR_RO) ? 0 : 1, \
 		volatile char * : 1, \
 		const volatile char * : 1, \
 		wchar_t * : 1, \
-		const wchar_t * : (flags & CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR) ? 0 : 1, \
+		const wchar_t * : ((flags) & CBPRINTF_PACKAGE_CONST_CHAR_RO) ? 0 : 1, \
 		volatile wchar_t * : 1, \
 		const volatile wchar_t * : 1, \
 		default : \
 			0)
 #endif
 
+/* @brief Check if argument is a certain type of char pointer. What exectly is checked
+ * depends on @p flags. If flags is 0 then 1 is returned if @p x is a char pointer.
+ *
+ * @param idx Argument index.
+ * @param x Argument.
+ * @param flags Flags. See @p CBPRINTF_PACKAGE_FLAGS.
+ *
+ * @retval 1 if @p x is char pointer meeting criteria identified by @p flags.
+ * @retval 0 otherwise.
+ */
 #define Z_CBPRINTF_IS_X_PCHAR(idx, x, flags) \
-	(((flags & CBPRINTF_PACKAGE_CONST_CHAR_RO) && \
-	  idx < Z_CBPRINTF_PACKAGE_FIRST_RO_STR_CNT_GET(flags)) ? \
+	  (idx < Z_CBPRINTF_PACKAGE_FIRST_RO_STR_CNT_GET(flags) ? \
 		0 : Z_CBPRINTF_IS_PCHAR(x, flags))
 
 /** @brief Calculate number of char * or wchar_t * arguments in the arguments.
@@ -119,7 +128,6 @@ extern "C" {
 	(FOR_EACH_IDX_FIXED_ARG(Z_CBPRINTF_IS_X_PCHAR, (+), flags, __VA_ARGS__))
 
 #define Z_CBPRINTF_PCHAR_COUNT(flags, ...) \
-	((flags & CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR) ? 0 : 1) + \
 	COND_CODE_0(NUM_VA_ARGS_LESS_1(__VA_ARGS__), \
 		    (0), \
 		    (Z_CBPRINTF_HAS_PCHAR_ARGS(flags, __VA_ARGS__)))
@@ -127,25 +135,26 @@ extern "C" {
 /**
  * @brief Check if formatted string must be packaged in runtime.
  *
- * @param skip number of char/wchar_t pointers in the argument list which are
- * accepted for static packaging.
- *
  * @param ... String with arguments (fmt, ...).
  *
  * @retval 1 if string must be packaged at runtime.
  * @retval 0 if string can be statically packaged.
  */
 #if Z_C_GENERIC
-#define Z_CBPRINTF_MUST_RUNTIME_PACKAGE(skip, flags, ...) ({\
+#define Z_CBPRINTF_MUST_RUNTIME_PACKAGE(flags, ...) ({\
 	_Pragma("GCC diagnostic push") \
 	_Pragma("GCC diagnostic ignored \"-Wpointer-arith\"") \
-	int _rv = Z_CBPRINTF_PCHAR_COUNT(flags, __VA_ARGS__) - \
-		(flags & CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR ? 0 : (skip + 1)) > 0; \
+	int _rv; \
+	if ((flags) & CBPRINTF_PACKAGE_ADD_RW_STR_POS) { \
+		_rv = 0; \
+	} else { \
+		_rv = Z_CBPRINTF_PCHAR_COUNT(flags, __VA_ARGS__) > 0 ? 1 : 0; \
+	} \
 	_Pragma("GCC diagnostic pop")\
 	_rv; \
 })
 #else
-#define Z_CBPRINTF_MUST_RUNTIME_PACKAGE(skip, flags, ...) 1
+#define Z_CBPRINTF_MUST_RUNTIME_PACKAGE(flags, ...) 1
 #endif
 
 /** @brief Get storage size for given argument.
@@ -282,7 +291,7 @@ do { \
 	} \
 	uint32_t _arg_size = Z_CBPRINTF_ARG_SIZE(_arg); \
 	uint32_t _loc = _idx / sizeof(int); \
-	if (arg_idx < _fros_cnt) { \
+	if (arg_idx < 1 + _fros_cnt) { \
 		if (_ros_pos_en) { \
 			_ros_pos_buf[_ros_pos_idx++] = _loc; \
 		} \
@@ -385,13 +394,13 @@ do { \
 	uint8_t *_pbuf = buf; \
 	uint8_t _rws_pos_idx = 0; \
 	uint8_t _ros_pos_idx = 0; \
-	/* Variable holds count of all string pointers. */ \
+	/* Variable holds count of all string pointer arguments. */ \
 	uint8_t _alls_cnt = Z_CBPRINTF_PCHAR_COUNT(0, __VA_ARGS__); \
-	uint8_t _fros_cnt = 1 + Z_CBPRINTF_PACKAGE_FIRST_RO_STR_CNT_GET(_flags); \
+	uint8_t _fros_cnt = Z_CBPRINTF_PACKAGE_FIRST_RO_STR_CNT_GET(_flags); \
 	/* Variable holds count of non const string pointers. */ \
 	uint8_t _rws_cnt = _cros_en ? \
 		Z_CBPRINTF_PCHAR_COUNT(_flags, __VA_ARGS__) : _alls_cnt - _fros_cnt; \
-	uint8_t _ros_cnt = _alls_cnt - _rws_cnt; \
+	uint8_t _ros_cnt = 1 + _alls_cnt - _rws_cnt; \
 	uint8_t _ros_pos_buf[_ros_pos_en ? _ros_cnt : 0]; \
 	uint8_t _rws_buffer[_rws_cnt]; \
 	size_t _pmax = (buf != NULL) ? _inlen : INT32_MAX; \

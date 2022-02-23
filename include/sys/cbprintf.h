@@ -141,21 +141,6 @@ extern "C" {
 #define CBPRINTF_PACKAGE_COPY_RW_STR BIT(1)
 /**@} */
 
-/**@defgroup CBPRINTF_MUST_RUNTIME_PACKAGE_FLAGS Package flags.
- * @{
- */
-
-/** @brief Consider constant string pointers as pointing to fixed strings.
- *
- * When flag is set then const (w)char pointers arguments in the string does
- * not trigger runtime packaging.
- */
-#define CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR BIT(0)
-
-BUILD_ASSERT(CBPRINTF_PACKAGE_CONST_CHAR_RO == CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR,
-		"Flags must match as they are used interchangeably");
-/**@} */
-
 /** @brief Signature for a cbprintf callback function.
  *
  * This function expects two parameters:
@@ -205,20 +190,16 @@ typedef int (*cbvprintf_exteral_formatter_func)(cbprintf_cb out, void *ctx,
  *
  * @note By default any char pointers are considered to be pointing at transient
  * strings. This can be narrowed down to non const pointers by using
- * @ref CBPRINTF_MUST_RUNTIME_PACKAGE_CONST_CHAR.
- *
- * @param skip number of read only string arguments in the parameter list. It
- * shall be non-zero if there are known read only string arguments present
- * in the string (e.g. function name prefix in the log message).
+ * @ref CBPRINTF_PACKAGE_CONST_CHAR_RO.
  *
  * @param ... String with arguments.
- * @param flags option flags. See @ref CBPRINTF_MUST_RUNTIME_PACKAGE_FLAGS.
+ * @param flags option flags. See @ref CBPRINTF_PACKAGE_FLAGS.
  *
  * @retval 1 if string must be packaged in run time.
  * @retval 0 string can be statically packaged.
  */
-#define CBPRINTF_MUST_RUNTIME_PACKAGE(skip, flags, ... /* fmt, ... */) \
-	Z_CBPRINTF_MUST_RUNTIME_PACKAGE(skip, flags, __VA_ARGS__)
+#define CBPRINTF_MUST_RUNTIME_PACKAGE(flags, ... /* fmt, ... */) \
+	Z_CBPRINTF_MUST_RUNTIME_PACKAGE(flags, __VA_ARGS__)
 
 /** @brief Statically package string.
  *
