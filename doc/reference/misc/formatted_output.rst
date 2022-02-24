@@ -49,14 +49,30 @@ Typically, strings are formatted synchronously when a function from ``printf``
 family is called. However, there are cases when it is beneficial that formatting
 is deferred. In that case, a state (format string and arguments) must be captured.
 Such state forms a self-contained package which contains format string and
-arguments. Additionally, package contains copies of all strings which are
-part of a format string (format string or any ``%s`` argument) and are identifed
-as the one located in the read write memory. Package primary content resembles
-va_list stack frame thus standard formatting functions are used to process a
-package. Since package contains data which is processed as va_list frame,
-strict alignment must be maintained. Due to required padding, size of the
-package depends on alignment. When package is copied, it should be copied to a
-memory block with the same alignment as origin.
+arguments. Additionally, package may contain copies of strings which are
+part of a format string (format string or any ``%s`` argument). Package primary
+content resembles va_list stack frame thus standard formatting functions are
+used to process a package. Since package contains data which is processed as
+va_list frame, strict alignment must be maintained. Due to required padding,
+size of the package depends on alignment. When package is copied, it should be
+copied to a memory block with the same alignment as origin.
+
+Package can have following variants:
+
+* **Self-contained** - non read-only strings appended to the package. String can be
+  formatted from such package as long as there is access to read-only string
+  locations. Package may contain information where read-only strings are located
+  within the package. That information can be used to convert packet to fully
+  self-contained package.
+* **Fully self-contained** - all strings are appended to the package. String can be
+  formatted from such package without any external data.
+* **Transient**- only arguments are stored. Package contain information
+  where pointers to non read-only strings are located within the package. Optionally,
+  it may contain read-only string location information. String can be formatted
+  from such package as long as non read-only strings are still valid and read-only
+  strings are accessible. Alternatively, package can be converted to **self-contained**
+  package or **fully self-contained** if information about read-only string
+  locations is present in the package.
 
 Package can be created using two methods:
 
@@ -95,9 +111,11 @@ formatting since address changes whenever package is copied.
 +------------------+-------------------------------------------------------------------------+
 | Header           | 1 byte: Argument list size including header and *fmt* (in 32 bit words) |
 |                  +-------------------------------------------------------------------------+
-| | sizeof(void \*)| 1 byte: Number of appended strings in writable memory                   |
+| sizeof(void \*)  | 1 byte: Number of strings appended to the package                       |
 |                  +-------------------------------------------------------------------------+
-|                  | 1 byte: Number of appended strings in read-only memory                  |
+|                  | 1 byte: Number of read-only string argument locations                   |
+|                  +-------------------------------------------------------------------------+
+|                  | 1 byte: Number of transient string argument locations                   |
 |                  +-------------------------------------------------------------------------+
 |                  | platform specific padding to sizeof(void \*)                            |
 +------------------+-------------------------------------------------------------------------+
@@ -113,9 +131,13 @@ formatting since address changes whenever package is copied.
 |                  +-------------------------------------------------------------------------+
 |                  | ...                                                                     |
 +------------------+-------------------------------------------------------------------------+
+| String location  | Indexes of words within the package were read-only strings are located  |
+| information      +-------------------------------------------------------------------------+
+| (optional)       | Indexes of words within the package were transient strings are located  |
++------------------+-------------------------------------------------------------------------+
 | Appended         | 1 byte: Index within the package to the location of associated argument |
-|                  +-------------------------------------------------------------------------+
-| strings          | Null terminated string                                                  |
+| strings          +-------------------------------------------------------------------------+
+| (optional)       | Null terminated string                                                  |
 |                  +-------------------------------------------------------------------------+
 |                  | ...                                                                     |
 +------------------+-------------------------------------------------------------------------+
