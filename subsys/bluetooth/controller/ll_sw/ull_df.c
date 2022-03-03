@@ -1160,8 +1160,7 @@ uint8_t ll_df_set_conn_cte_req_enable(uint16_t handle, uint8_t enable,
 	}
 
 	if (!enable) {
-		conn->llcp.cte_req.is_enabled = false;
-		conn->llcp.cte_req.req_interval = 0U;
+		ull_cp_cte_req_set_disable(conn);
 
 		if (conn->llcp.cte_req.is_active) {
 			struct k_sem sem;
@@ -1186,10 +1185,8 @@ uint8_t ll_df_set_conn_cte_req_enable(uint16_t handle, uint8_t enable,
 		}
 
 #if defined(CONFIG_BT_CTLR_PHY)
-		/* Phy may be changed to CODED only if PHY update procedure is supproted. In other
-		 * case the mandatory PHY1M is used (that supports CTE).
-		 */
-		if (conn->lll.phy_tx == PHY_CODED) {
+		/* CTE request may be enabled only in case the receiver PHY is not CODED */
+		if (conn->lll.phy_rx == PHY_CODED) {
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
 #endif /* CONFIG_BT_CTLR_PHY */
@@ -1221,7 +1218,7 @@ uint8_t ll_df_set_conn_cte_req_enable(uint16_t handle, uint8_t enable,
 			return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
 		}
 
-		conn->llcp.cte_req.is_enabled = 0U;
+		conn->llcp.cte_req.is_enabled = 1U;
 		conn->llcp.cte_req.req_interval = cte_request_interval;
 		conn->llcp.cte_req.cte_type = requested_cte_type;
 		conn->llcp.cte_req.min_cte_len = requested_cte_length;

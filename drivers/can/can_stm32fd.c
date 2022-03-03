@@ -9,10 +9,11 @@
 #include <kernel.h>
 #include <soc.h>
 #include <stm32_ll_rcc.h>
+#include <logging/log.h>
+
 #include "can_stm32fd.h"
 
-#include <logging/log.h>
-LOG_MODULE_DECLARE(can_driver, CONFIG_CAN_LOG_LEVEL);
+LOG_MODULE_REGISTER(can_stm32fd, CONFIG_CAN_LOG_LEVEL);
 
 #if CONFIG_CAN_STM32_CLOCK_DIVISOR != 1 && CONFIG_CAN_STM32_CLOCK_DIVISOR & 0x01
 #error CAN_STM32_CLOCK_DIVISOR invalid.\
@@ -90,13 +91,13 @@ static int can_stm32fd_init(const struct device *dev)
 	return ret;
 }
 
-static enum can_state can_stm32fd_get_state(const struct device *dev,
-					    struct can_bus_err_cnt *err_cnt)
+static int can_stm32fd_get_state(const struct device *dev, enum can_state *state,
+				 struct can_bus_err_cnt *err_cnt)
 {
 	const struct can_stm32fd_config *cfg = dev->config;
 	const struct can_mcan_config *mcan_cfg = &cfg->mcan_cfg;
 
-	return can_mcan_get_state(mcan_cfg, err_cnt);
+	return can_mcan_get_state(mcan_cfg, state, err_cnt);
 }
 
 static int can_stm32fd_send(const struct device *dev, const struct zcan_frame *frame,

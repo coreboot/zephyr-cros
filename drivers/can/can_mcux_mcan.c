@@ -11,7 +11,7 @@
 
 #include "can_mcan.h"
 
-LOG_MODULE_REGISTER(mcux_mcan, CONFIG_CAN_LOG_LEVEL);
+LOG_MODULE_REGISTER(can_mcux_mcan, CONFIG_CAN_LOG_LEVEL);
 
 #define DT_DRV_COMPAT nxp_lpc_mcan
 
@@ -72,12 +72,12 @@ static void mcux_mcan_remove_rx_filter(const struct device *dev, int filter_id)
 	can_mcan_remove_rx_filter(&data->mcan, &data->msg_ram, filter_id);
 }
 
-static enum can_state mcux_mcan_get_state(const struct device *dev,
-					  struct can_bus_err_cnt *err_cnt)
+static int mcux_mcan_get_state(const struct device *dev, enum can_state *state,
+			       struct can_bus_err_cnt *err_cnt)
 {
 	const struct mcux_mcan_config *config = dev->config;
 
-	return can_mcan_get_state(&config->mcan, err_cnt);
+	return can_mcan_get_state(&config->mcan, state, err_cnt);
 }
 
 static void mcux_mcan_set_state_change_callback(const struct device *dev,

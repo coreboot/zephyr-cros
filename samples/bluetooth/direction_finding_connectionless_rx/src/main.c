@@ -33,6 +33,8 @@ static struct bt_le_per_adv_sync *sync;
 static bt_addr_le_t per_addr;
 static bool per_adv_found;
 static bool scan_enabled;
+static bool sync_wait;
+static bool sync_terminated;
 static uint8_t per_sid;
 static uint32_t sync_create_timeout_ms;
 
@@ -40,10 +42,10 @@ static K_SEM_DEFINE(sem_per_adv, 0, 1);
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
 static K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 
-#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_RX)
+#if defined(CONFIG_BT_DF_CTE_RX_AOA)
 const static uint8_t ant_patterns[] = { 0x1, 0x2, 0x3, 0x4, 0x5,
 					0x6, 0x7, 0x8, 0x9, 0xA };
-#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_RX */
+#endif /* CONFIG_BT_DF_CTE_RX_AOA */
 
 static bool data_cb(struct bt_data *data, void *user_data);
 static void create_sync(void);
@@ -154,7 +156,12 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
 	printk("PER_ADV_SYNC[%u]: [DEVICE]: %s sync terminated\n",
 	       bt_le_per_adv_sync_get_index(sync), le_addr);
 
-	k_sem_give(&sem_per_sync_lost);
+	if (sync_wait) {
+		sync_terminated = true;
+		k_sem_give(&sem_per_sync);
+	} else {
+		k_sem_give(&sem_per_sync_lost);
+	}
 }
 
 static void recv_cb(struct bt_le_per_adv_sync *sync,
@@ -257,14 +264,14 @@ static void enable_cte_rx(void)
 
 	const struct bt_df_per_adv_sync_cte_rx_param cte_rx_params = {
 		.max_cte_count = 5,
-#if defined(CONFIG_BT_CTLR_DF_ANT_SWITCH_RX)
+#if defined(CONFIG_BT_DF_CTE_RX_AOA)
 		.cte_types = BT_DF_CTE_TYPE_ALL,
 		.slot_durations = 0x2,
 		.num_ant_ids = ARRAY_SIZE(ant_patterns),
 		.ant_ids = ant_patterns,
 #else
 		.cte_types = BT_DF_CTE_TYPE_AOD_1US | BT_DF_CTE_TYPE_AOD_2US,
-#endif /* CONFIG_BT_CTLR_DF_ANT_SWITCH_RX */
+#endif /* CONFIG_BT_DF_CTE_RX_AOA */
 	};
 
 	printk("Enable receiving of CTE...\n");
@@ -356,19 +363,31 @@ void main(void)
 		}
 		printk("success. Found periodic advertising.\n");
 
+		sync_wait = true;
+		sync_terminated = false;
+
 		create_sync();
 
 		printk("Waiting for periodic sync...\n");
 		err = k_sem_take(&sem_per_sync, K_MSEC(sync_create_timeout_ms));
-		if (err != 0) {
-			printk("failed (err %d)\n", err);
+		if (err != 0 || sync_terminated) {
+			if (err != 0) {
+				printk("failed (err %d)\n", err);
+			} else {
+				printk("terminated\n");
+			}
+
+			sync_wait = false;
+
 			err = delete_sync();
 			if (err != 0) {
 				return;
 			}
+
 			continue;
 		}
 		printk("success. Periodic sync established.\n");
+		sync_wait = false;
 
 		enable_cte_rx();
 

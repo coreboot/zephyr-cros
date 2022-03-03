@@ -508,7 +508,7 @@ uint8_t ll_chm_get(uint16_t handle, uint8_t *chm)
 	 * for the specified Connection_Handle. The returned value indicates the state of
 	 * the Channel_Map specified by the last transmitted or received Channel_Map
 	 * (in a CONNECT_IND or LL_CHANNEL_MAP_IND message) for the specified
-	 * Connection_Handle, regardless of whether the Master has received an
+	 * Connection_Handle, regardless of whether the Central has received an
 	 * acknowledgment
 	 */
 	const uint8_t *pending_chm;
@@ -1654,9 +1654,24 @@ void ull_conn_done(struct node_rx_event_done *done)
 		if (conn->llcp.cte_req.req_expire > elapsed_event) {
 			conn->llcp.cte_req.req_expire -= elapsed_event;
 		} else {
+			uint8_t err;
+
 			conn->llcp.cte_req.req_expire = 0U;
-			ull_cp_cte_req(conn, conn->llcp.cte_req.min_cte_len,
-				       conn->llcp.cte_req.cte_type);
+
+			err = ull_cp_cte_req(conn, conn->llcp.cte_req.min_cte_len,
+					     conn->llcp.cte_req.cte_type);
+
+			if (err == BT_HCI_ERR_CMD_DISALLOWED) {
+				/* Conditions has changed e.g. PHY was changed to CODED.
+				 * New CTE REQ is not possible. Disable the periodic requests.
+				 *
+				 * If the CTE REQ is in active state, let it complete and disable
+				 * in regular control procedure way.
+				 */
+				if (!conn->llcp.cte_req.is_active) {
+					ull_cp_cte_req_set_disable(conn);
+				}
+			}
 		}
 	}
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
@@ -2065,14 +2080,14 @@ uint16_t ull_conn_lll_max_tx_octets_get(struct lll_conn *lll)
 /**
  * @brief Initialize pdu_data members that are read only in lower link layer.
  *
- * @param pdu_tx Pointer to pdu_data object to be initialized
+ * @param pdu Pointer to pdu_data object to be initialized
  */
-void ull_pdu_data_init(struct pdu_data *pdu_tx)
+void ull_pdu_data_init(struct pdu_data *pdu)
 {
-#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
-	pdu_tx->cp = 0U;
-	pdu_tx->resv = 0U;
-#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_TX */
+#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX) || defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX)
+	pdu->cp = 0U;
+	pdu->resv = 0U;
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_TX || CONFIG_BT_CTLR_DF_CONN_CTE_RX */
 }
 
 static int init_reset(void)
@@ -2229,6 +2244,15 @@ static void conn_setup_adv_scan_disabled_cb(void *param)
 	ftr = &(rx->rx_ftr);
 	lll = *((struct lll_conn **)((uint8_t *)ftr->param +
 				     sizeof(struct lll_hdr)));
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_JIT_SCHEDULING)) {
+		struct ull_hdr *hdr;
+
+		/* Prevent fast ADV re-scheduling from re-triggering */
+		hdr = HDR_LLL2ULL(ftr->param);
+		hdr->disabled_cb = NULL;
+	}
+
 	switch (lll->role) {
 #if defined(CONFIG_BT_CENTRAL)
 	case 0:

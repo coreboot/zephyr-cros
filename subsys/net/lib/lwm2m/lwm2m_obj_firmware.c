@@ -97,7 +97,7 @@ uint8_t lwm2m_firmware_get_update_state(void)
 void lwm2m_firmware_set_update_state_inst(uint16_t obj_inst_id, uint8_t state)
 {
 	bool error = false;
-	char path[sizeof("5/65535/5")];
+	char path[sizeof("5/65535/3")];
 
 	/* Check LWM2M SPEC appendix E.6.1 */
 	switch (state) {
@@ -129,7 +129,7 @@ void lwm2m_firmware_set_update_state_inst(uint16_t obj_inst_id, uint8_t state)
 			update_state[obj_inst_id], state);
 	}
 
-	snprintf(path, sizeof(path), "5/%" PRIu16 "/3", obj_inst_id);
+	snprintk(path, sizeof(path), "5/%" PRIu16 "/3", obj_inst_id);
 
 	lwm2m_engine_set_u8(path, state);
 
@@ -211,7 +211,7 @@ void lwm2m_firmware_set_update_result_inst(uint16_t obj_inst_id, uint8_t result)
 			result, state);
 	}
 
-	snprintf(path, sizeof(path), "5/%" PRIu16 "/3", obj_inst_id);
+	snprintk(path, sizeof(path), "5/%" PRIu16 "/5", obj_inst_id);
 
 	lwm2m_engine_set_u8(path, result);
 
@@ -395,6 +395,8 @@ static struct lwm2m_engine_obj_inst *firmware_create(uint16_t obj_inst_id)
 			     res_inst[obj_inst_id], j);
 	INIT_OBJ_RES_OPTDATA(FIRMWARE_PACKAGE_VERSION_ID, res[obj_inst_id], i,
 			     res_inst[obj_inst_id], j);
+	INIT_OBJ_RES_MULTI_OPTDATA(FIRMWARE_UPDATE_PROTO_SUPPORT_ID, res[obj_inst_id], i,
+				 res_inst[obj_inst_id], j, 1, false);
 	INIT_OBJ_RES_DATA(FIRMWARE_UPDATE_DELIV_METHOD_ID, res[obj_inst_id], i,
 			  res_inst[obj_inst_id], j, &(delivery_method[obj_inst_id]),
 			  sizeof(delivery_method[obj_inst_id]));

@@ -3939,12 +3939,16 @@ struct k_work_user {
  * INTERNAL_HIDDEN @endcond
  */
 
+#if defined(__cplusplus) && ((__cplusplus - 0) < 202002L)
+#define Z_WORK_USER_INITIALIZER(work_handler) { NULL, work_handler, 0 }
+#else
 #define Z_WORK_USER_INITIALIZER(work_handler) \
 	{ \
 	._reserved = NULL, \
 	.handler = work_handler, \
 	.flags = 0 \
 	}
+#endif
 
 /**
  * @brief Initialize a statically-defined user work item.
@@ -4835,8 +4839,6 @@ __syscall size_t k_pipe_write_avail(struct k_pipe *pipe);
  * writers that were previously pended become unpended.
  *
  * @param pipe Address of the pipe.
- *
- * @return N/A
  */
 __syscall void k_pipe_flush(struct k_pipe *pipe);
 
@@ -4850,8 +4852,6 @@ __syscall void k_pipe_flush(struct k_pipe *pipe);
  * up the pipe's emptied buffer.
  *
  * @param pipe Address of the pipe.
- *
- * @return N/A
  */
 __syscall void k_pipe_buffer_flush(struct k_pipe *pipe);
 
@@ -5849,8 +5849,6 @@ extern int k_thread_runtime_stats_disable(k_tid_t thread);
  * This routine enables the gathering of system runtime statistics. Note that
  * it does not affect the gathering of similar statistics for individual
  * threads.
- *
- * @return N/A
  */
 extern void k_sys_runtime_stats_enable(void);
 
@@ -5860,8 +5858,6 @@ extern void k_sys_runtime_stats_enable(void);
  * This routine disables the gathering of system runtime statistics. Note that
  * it does not affect the gathering of similar statistics for individual
  * threads.
- *
- * @return N/A
  */
 extern void k_sys_runtime_stats_disable(void);
 

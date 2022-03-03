@@ -103,14 +103,15 @@ extern struct ztest_suite_node _ztest_suite_node_list_end[];
  * @param after_fn The function to call after each unit test in this suite
  * @param teardown_fn The function to call after running all the tests in this suite
  */
-#define ZTEST_SUITE(SUITE_NAME, PREDICATE, setup_fn, before_fn, after_fn, teardown_fn)		\
-	static STRUCT_SECTION_ITERABLE(ztest_suite_node, z_ztest_test_node_ ## SUITE_NAME) = {	\
-		.name = STRINGIFY(SUITE_NAME),							\
-		.setup = (setup_fn),								\
-		.before = (before_fn),								\
-		.after = (after_fn),								\
-		.teardown = (teardown_fn),							\
-		.predicate = PREDICATE,								\
+#define ZTEST_SUITE(SUITE_NAME, PREDICATE, setup_fn, before_fn, after_fn, teardown_fn)	\
+	static STRUCT_SECTION_ITERABLE(ztest_suite_node,				\
+				       UTIL_CAT(z_ztest_test_node_, SUITE_NAME)) = {	\
+		.name = STRINGIFY(SUITE_NAME),						\
+		.setup = (setup_fn),							\
+		.before = (before_fn),							\
+		.after = (after_fn),							\
+		.teardown = (teardown_fn),						\
+		.predicate = PREDICATE,							\
 	}
 
 /**
@@ -253,6 +254,15 @@ static inline void unit_test_noop(void)
  */
 #define ZTEST_USER_F(suite, fn) Z_ZTEST_F(suite, fn, COND_CODE_1(CONFIG_USERSPACE, (K_USER), (0)))
 
+/**
+ * @brief Test rule callback function signature
+ *
+ * The function signature that can be used to register a test rule's before/after callback. This
+ * provides access to the test and the fixture data (if provided).
+ *
+ * @param test Pointer to the unit test in context
+ * @param data Pointer to the test's fixture data (may be NULL)
+ */
 typedef void (*ztest_rule_cb)(const struct ztest_unit_test *test, void *data);
 
 struct ztest_test_rule {
@@ -260,6 +270,18 @@ struct ztest_test_rule {
 	ztest_rule_cb after_each;
 };
 
+/**
+ * @brief Define a test rule that will run before/after each unit test.
+ *
+ * Functions defined here will run before/after each unit test for every test suite. Along with the
+ * callback, the test functions are provided a pointer to the test being run, and the data. This
+ * provides a mechanism for tests to perform custom operations depending on the specific test or
+ * the data (for example logging may use the test's name).
+ *
+ * @param name The name for the test rule (must be unique within the compilational unit)
+ * @param before_each_fn The callback function to call before each test (may be NULL)
+ * @param after_each_fn The callback function to call after each test (may be NULL)
+ */
 #define ZTEST_RULE(name, before_each_fn, after_each_fn)                                            \
 	static STRUCT_SECTION_ITERABLE(ztest_test_rule, z_ztest_test_rule_##name) = {              \
 		.before_each = (before_each_fn),                                                   \

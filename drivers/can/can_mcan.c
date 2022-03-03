@@ -10,9 +10,9 @@
 #include <drivers/can.h>
 #include "can_mcan.h"
 #include "can_mcan_int.h"
-
 #include <logging/log.h>
-LOG_MODULE_DECLARE(can_driver, CONFIG_CAN_LOG_LEVEL);
+
+LOG_MODULE_REGISTER(can_mcan, CONFIG_CAN_LOG_LEVEL);
 
 #define CAN_INIT_TIMEOUT (100)
 #define CAN_DIV_CEIL(val, div) (((val) + (div) - 1) / (div))
@@ -193,6 +193,9 @@ int can_mcan_set_timing(const struct can_mcan_config *cfg,
 		return -EIO;
 	}
 
+	/* Configuration Change Enable */
+	can->cccr |= CAN_MCAN_CCCR_CCE;
+
 	can_mcan_configure_timing(can, timing, timing_data);
 
 	ret = can_leave_init_mode(can, K_MSEC(CAN_INIT_TIMEOUT));
@@ -317,7 +320,8 @@ int can_mcan_init(const struct device *dev, const struct can_mcan_config *cfg,
 	can->txefc = (((uint32_t)msg_ram->tx_event_fifo - mrba) & CAN_MCAN_TXEFC_EFSA_MSK) |
 		(ARRAY_SIZE(msg_ram->tx_event_fifo) << CAN_MCAN_TXEFC_EFS_POS);
 	can->txbc = (((uint32_t)msg_ram->tx_buffer - mrba) & CAN_MCAN_TXBC_TBSA) |
-		(ARRAY_SIZE(msg_ram->tx_buffer) << CAN_MCAN_TXBC_TFQS_POS);
+		(ARRAY_SIZE(msg_ram->tx_buffer) << CAN_MCAN_TXBC_TFQS_POS) |
+		CAN_MCAN_TXBC_TFQM;
 
 	if (sizeof(msg_ram->tx_buffer[0].data) <= 24) {
 		can->txesc = (sizeof(msg_ram->tx_buffer[0].data) - 8) / 4;
@@ -451,7 +455,7 @@ static void can_mcan_state_change_handler(const struct can_mcan_config *cfg,
 	const can_state_change_callback_t cb = data->state_change_cb;
 	void *cb_data = data->state_change_cb_data;
 
-	state = can_mcan_get_state(cfg, &err_cnt);
+	(void)can_mcan_get_state(cfg, &state, &err_cnt);
 
 	if (cb != NULL) {
 		cb(state, err_cnt, cb_data);
@@ -642,30 +646,32 @@ void can_mcan_line_1_isr(const struct can_mcan_config *cfg,
 			    CAN_MCAN_IR_RF0L | CAN_MCAN_IR_RF1L));
 }
 
-enum can_state can_mcan_get_state(const struct can_mcan_config *cfg,
-				  struct can_bus_err_cnt *err_cnt)
+int can_mcan_get_state(const struct can_mcan_config *cfg, enum can_state *state,
+		       struct can_bus_err_cnt *err_cnt)
 {
 	struct can_mcan_reg *can = cfg->can;
 
-	err_cnt->rx_err_cnt = (can->ecr & CAN_MCAN_ECR_TEC_MSK) <<
-			      CAN_MCAN_ECR_TEC_POS;
-
-	err_cnt->tx_err_cnt = (can->ecr & CAN_MCAN_ECR_REC_MSK) <<
-			      CAN_MCAN_ECR_REC_POS;
-
-	if (can->psr & CAN_MCAN_PSR_BO) {
-		return CAN_BUS_OFF;
+	if (state != NULL) {
+		if (can->psr & CAN_MCAN_PSR_BO) {
+			*state = CAN_BUS_OFF;
+		} else if (can->psr & CAN_MCAN_PSR_EP) {
+			*state = CAN_ERROR_PASSIVE;
+		} else if (can->psr & CAN_MCAN_PSR_EW) {
+			*state = CAN_ERROR_WARNING;
+		} else {
+			*state = CAN_ERROR_ACTIVE;
+		}
 	}
 
-	if (can->psr & CAN_MCAN_PSR_EP) {
-		return CAN_ERROR_PASSIVE;
+	if (err_cnt != NULL) {
+		err_cnt->rx_err_cnt = (can->ecr & CAN_MCAN_ECR_TEC_MSK) <<
+				      CAN_MCAN_ECR_TEC_POS;
+
+		err_cnt->tx_err_cnt = (can->ecr & CAN_MCAN_ECR_REC_MSK) <<
+				      CAN_MCAN_ECR_REC_POS;
 	}
 
-	if (can->psr & CAN_MCAN_PSR_EW) {
-		return CAN_ERROR_WARNING;
-	}
-
-	return CAN_ERROR_ACTIVE;
+	return 0;
 }
 
 #ifndef CONFIG_CAN_AUTO_BUS_OFF_RECOVERY

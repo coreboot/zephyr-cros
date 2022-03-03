@@ -14,10 +14,11 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <drivers/can.h>
+#include <logging/log.h>
+
 #include "can_stm32.h"
 
-#include <logging/log.h>
-LOG_MODULE_DECLARE(can_driver, CONFIG_CAN_LOG_LEVEL);
+LOG_MODULE_REGISTER(can_stm32, CONFIG_CAN_LOG_LEVEL);
 
 #define CAN_INIT_TIMEOUT  (10 * sys_clock_hw_cycles_per_sec() / MSEC_PER_SEC)
 
@@ -481,11 +482,8 @@ static int can_stm32_init(const struct device *dev)
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(can2), okay)
 	master_can->FMR &= ~CAN_FMR_CAN2SB; /* Assign all filters to CAN2 */
 #endif
-
-	/* Set TX priority to chronological order */
-	can->MCR |= CAN_MCR_TXFP;
 	can->MCR &= ~CAN_MCR_TTCM & ~CAN_MCR_ABOM & ~CAN_MCR_AWUM &
-		    ~CAN_MCR_NART & ~CAN_MCR_RFLM;
+		    ~CAN_MCR_NART & ~CAN_MCR_RFLM & ~CAN_MCR_TXFP;
 #ifdef CONFIG_CAN_RX_TIMESTAMP
 	can->MCR |= CAN_MCR_TTCM;
 #endif
@@ -551,33 +549,32 @@ static void can_stm32_set_state_change_callback(const struct device *dev,
 	}
 }
 
-static enum can_state can_stm32_get_state(const struct device *dev,
-					  struct can_bus_err_cnt *err_cnt)
+static int can_stm32_get_state(const struct device *dev, enum can_state *state,
+			       struct can_bus_err_cnt *err_cnt)
 {
 	const struct can_stm32_config *cfg = dev->config;
 	CAN_TypeDef *can = cfg->can;
 
-	if (err_cnt) {
+	if (state != NULL) {
+		if (can->ESR & CAN_ESR_BOFF) {
+			*state = CAN_BUS_OFF;
+		} else if (can->ESR & CAN_ESR_EPVF) {
+			*state = CAN_ERROR_PASSIVE;
+		} else if (can->ESR & CAN_ESR_EWGF) {
+			*state = CAN_ERROR_WARNING;
+		} else {
+			*state = CAN_ERROR_ACTIVE;
+		}
+	}
+
+	if (err_cnt != NULL) {
 		err_cnt->tx_err_cnt =
 			((can->ESR & CAN_ESR_TEC) >> CAN_ESR_TEC_Pos);
 		err_cnt->rx_err_cnt =
 			((can->ESR & CAN_ESR_REC) >> CAN_ESR_REC_Pos);
 	}
 
-	if (can->ESR & CAN_ESR_BOFF) {
-		return CAN_BUS_OFF;
-	}
-
-	if (can->ESR & CAN_ESR_EPVF) {
-		return CAN_ERROR_PASSIVE;
-	}
-
-	if (can->ESR & CAN_ESR_EWGF) {
-		return CAN_ERROR_WARNING;
-	}
-
-	return CAN_ERROR_ACTIVE;
-
+	return 0;
 }
 
 #ifndef CONFIG_CAN_AUTO_BUS_OFF_RECOVERY

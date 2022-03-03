@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <string.h>
+#include <linker/utils.h>
 #include <sys/cbprintf.h>
 #include <sys/types.h>
 #include <sys/util.h>
@@ -27,27 +28,10 @@ static inline bool ptr_in_rodata(const char *addr)
 	/* Unit test is X86 (or other host) but not using Zephyr
 	 * linker scripts.
 	 */
-#define RO_START 0
-#define RO_END 0
-#elif defined(CONFIG_ARC) || defined(CONFIG_ARM) || defined(CONFIG_X86) \
-	|| defined(CONFIG_RISCV) || defined(CONFIG_ARM64) \
-	|| defined(CONFIG_NIOS2) || defined(CONFIG_MIPS)
-	extern char __rodata_region_start[];
-	extern char __rodata_region_end[];
-#define RO_START __rodata_region_start
-#define RO_END __rodata_region_end
-#elif defined(CONFIG_XTENSA)
-	extern char _rodata_start[];
-	extern char _rodata_end[];
-#define RO_START _rodata_start
-#define RO_END _rodata_end
+	return false;
 #else
-#define RO_START 0
-#define RO_END 0
+	return linker_is_in_rodata(addr);
 #endif
-
-	return ((addr >= (const char *)RO_START) &&
-		(addr < (const char *)RO_END));
 }
 
 /*
@@ -72,7 +56,9 @@ struct __va_list {
 BUILD_ASSERT(sizeof(va_list) == sizeof(struct __va_list),
 	     "architecture specific support is wrong");
 
-static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
+static int cbprintf_via_va_list(cbprintf_cb out,
+				cbvprintf_exteral_formatter_func formatter,
+				void *ctx,
 				const char *fmt, void *buf)
 {
 	union {
@@ -87,7 +73,7 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 	u.__ap.__gr_offs = 0;
 	u.__ap.__vr_offs = 0;
 
-	return cbvprintf(out, ctx, fmt, u.ap);
+	return formatter(out, ctx, fmt, u.ap);
 }
 
 #elif defined(__x86_64__)
@@ -108,7 +94,9 @@ struct __va_list {
 BUILD_ASSERT(sizeof(va_list) == sizeof(struct __va_list),
 	     "architecture specific support is wrong");
 
-static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
+static int cbprintf_via_va_list(cbprintf_cb out,
+				cbvprintf_exteral_formatter_func formatter,
+				void *ctx,
 				const char *fmt, void *buf)
 {
 	union {
@@ -122,7 +110,7 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 	u.__ap.gp_offset = (6 * 8);
 	u.__ap.fp_offset = (6 * 8 + 16 * 16);
 
-	return cbvprintf(out, ctx, fmt, u.ap);
+	return formatter(out, ctx, fmt, u.ap);
 }
 
 #elif defined(__xtensa__)
@@ -143,7 +131,9 @@ struct __va_list {
 BUILD_ASSERT(sizeof(va_list) == sizeof(struct __va_list),
 	     "architecture specific support is wrong");
 
-static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
+static int cbprintf_via_va_list(cbprintf_cb out,
+				cbvprintf_exteral_formatter_func formatter,
+				void *ctx,
 				const char *fmt, void *buf)
 {
 	union {
@@ -156,7 +146,7 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 	u.__ap.__va_reg = NULL;
 	u.__ap.__va_ndx = (6 + 2) * 4;
 
-	return cbvprintf(out, ctx, fmt, u.ap);
+	return formatter(out, ctx, fmt, u.ap);
 }
 
 #else
@@ -170,7 +160,9 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 BUILD_ASSERT(sizeof(va_list) == sizeof(void *),
 	     "architecture specific support is needed");
 
-static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
+static int cbprintf_via_va_list(cbprintf_cb out,
+				cbvprintf_exteral_formatter_func formatter,
+				void *ctx,
 				const char *fmt, void *buf)
 {
 	union {
@@ -180,7 +172,7 @@ static int cbprintf_via_va_list(cbprintf_cb out, void *ctx,
 
 	u.ptr = buf;
 
-	return cbvprintf(out, ctx, fmt, u.ap);
+	return formatter(out, ctx, fmt, u.ap);
 }
 
 #endif
@@ -599,7 +591,9 @@ int cbprintf_package(void *packaged, size_t len, uint32_t flags,
 	return ret;
 }
 
-int cbpprintf(cbprintf_cb out, void *ctx, void *packaged)
+int cbpprintf_external(cbprintf_cb out,
+		       cbvprintf_exteral_formatter_func formatter,
+		       void *ctx, void *packaged)
 {
 	uint8_t *buf = packaged;
 	char *fmt, *s, **ps;
@@ -637,7 +631,7 @@ int cbpprintf(cbprintf_cb out, void *ctx, void *packaged)
 	buf += sizeof(char *) * 2;
 
 	/* Turn this into a va_list and  print it */
-	return cbprintf_via_va_list(out, ctx, fmt, buf);
+	return cbprintf_via_va_list(out, formatter, ctx, fmt, buf);
 }
 
 int cbprintf_fsc_package(void *in_packaged,

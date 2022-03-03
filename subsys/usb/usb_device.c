@@ -249,7 +249,7 @@ static void usb_data_to_host(void)
 		 * last chunk is wMaxPacketSize long, to indicate the last
 		 * packet.
 		 */
-		if (!usb_dev.data_buf_residue &&
+		if (!usb_dev.data_buf_residue && chunk &&
 		    usb_dev.setup.wLength > usb_dev.data_buf_len) {
 			/* Send less data as requested during the Setup stage */
 			if (!(usb_dev.data_buf_len % USB_MAX_CTRL_MPS)) {
@@ -1184,10 +1184,10 @@ static void forward_status_cb(enum usb_dc_status_code status, const uint8_t *par
 		usb_reset_alt_setting();
 	}
 
-	if (status == USB_DC_DISCONNECTED || status == USB_DC_SUSPEND) {
+	if (status == USB_DC_DISCONNECTED || status == USB_DC_SUSPEND || status == USB_DC_RESET) {
 		if (usb_dev.configured) {
 			usb_cancel_transfers();
-			if (status == USB_DC_DISCONNECTED) {
+			if (status == USB_DC_DISCONNECTED || status == USB_DC_RESET) {
 				foreach_ep(disable_interface_ep);
 				usb_dev.configured = false;
 			}
@@ -1529,7 +1529,8 @@ int usb_enable(usb_dc_status_callback status_cb)
 	k_mutex_lock(&usb_enable_lock, K_FOREVER);
 
 	if (usb_dev.enabled == true) {
-		ret = 0;
+		LOG_WRN("USB device support already enabled");
+		ret = -EALREADY;
 		goto out;
 	}
 
@@ -1616,7 +1617,7 @@ static int usb_device_init(const struct device *dev)
 	uint8_t *device_descriptor;
 
 	if (usb_dev.enabled == true) {
-		return 0;
+		return -EALREADY;
 	}
 
 	/* register device descriptor */
@@ -1628,7 +1629,11 @@ static int usb_device_init(const struct device *dev)
 
 	usb_set_config(device_descriptor);
 
+	if (IS_ENABLED(CONFIG_USB_DEVICE_INITIALIZE_AT_BOOT)) {
+		return usb_enable(NULL);
+	}
+
 	return 0;
 }
 
-SYS_INIT(usb_device_init, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE);
+SYS_INIT(usb_device_init, POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY);

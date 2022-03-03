@@ -7,6 +7,8 @@
 #include <zephyr.h>
 #include <logging/log.h>
 #include <sys/printk.h>
+#include <logging/log_ctrl.h>
+#include <logging/log_output.h>
 
 #define DATA_MAX_DLEN 8
 #define LOG_MODULE_NAME syst
@@ -29,7 +31,7 @@ struct test_frame {
 	};
 } __packed;
 
-void main(void)
+void log_msgs(void)
 {
 	struct test_frame frame = { 0 };
 	const uint8_t data[DATA_MAX_DLEN] = { 0x01, 0x02, 0x03, 0x04,
@@ -42,6 +44,11 @@ void main(void)
 	};
 #endif
 
+	char c = '!';
+	char *s = "static str";
+	char vs0[32];
+	char vs1[32];
+
 	/* standard print */
 	LOG_ERR("Error message example.");
 	LOG_WRN("Warning message example.");
@@ -52,6 +59,27 @@ void main(void)
 	LOG_DBG("Debug message example, %d, %d", 1, 2);
 	LOG_DBG("Debug message example, %d, %d, %d", 1, 2, 3);
 	LOG_DBG("Debug message example, %d, %d, %d, 0x%x", 1, 2, 3, 4);
+
+	memset(vs0, 0, sizeof(vs0));
+	snprintk(&vs0[0], sizeof(vs0), "%s", "dynamic str");
+
+	memset(vs1, 0, sizeof(vs1));
+	snprintk(&vs1[0], sizeof(vs1), "%s", "another dynamic str");
+
+	LOG_DBG("char %c", c);
+	LOG_DBG("s str %s", s);
+
+#ifdef CONFIG_LOG1
+	LOG_DBG("d str %s", log_strdup(vs0));
+	LOG_DBG("mixed str %s %s %s %s %s %s %s",
+		log_strdup(vs0), "---",	log_strdup(vs0), "---",
+		log_strdup(vs1), "---",	log_strdup(vs1));
+	LOG_DBG("mixed c/s %c %s %s %s %c", c, s, log_strdup(vs0), s, c);
+#else
+	LOG_DBG("d str %s", vs0);
+	LOG_DBG("mixed str %s %s %s %s %s %s %s", vs0, "---", vs0, "---", vs1, "---", vs1);
+	LOG_DBG("mixed c/s %c %s %s %s %c", c, s, vs0, s, c);
+#endif
 
 #ifdef CONFIG_LOG2
 	LOG_DBG("Debug message example, %f", 3.14159265359);
@@ -75,6 +103,26 @@ void main(void)
 #ifndef CONFIG_LOG2
 	/* log output string */
 	log_string_sync(src_level, "%s", "log string sync");
+#endif
+
+}
+
+void main(void)
+{
+	log_msgs();
+
+#ifndef CONFIG_LOG1
+
+	uint32_t log_type = LOG_OUTPUT_TEXT;
+
+	log_backend_format_set(log_backend_get_by_name("log_backend_uart"), log_type);
+
+	log_msgs();
+
+	log_type = LOG_OUTPUT_SYST;
+	log_backend_format_set(log_backend_get_by_name("log_backend_uart"), log_type);
+
+	log_msgs();
 #endif
 
 }

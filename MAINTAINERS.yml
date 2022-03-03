@@ -129,7 +129,7 @@ ARC arch:
 ARM arch:
     status: maintained
     maintainers:
-        - ioannisg
+        - microbuilder
     collaborators:
         - carlocaione
         - galak
@@ -234,7 +234,6 @@ Build system:
     collaborators:
         - jeremybettis
         - nashif
-        - SebastianBoe
     files:
         - cmake/
         - CMakeLists.txt
@@ -363,9 +362,9 @@ DFU:
 Devicetree:
     status: maintained
     maintainers:
-        - galak
-    collaborators:
         - mbolivar-nordic
+    collaborators:
+        - galak
     files:
         - scripts/dts/
         - dts/bindings/
@@ -390,9 +389,7 @@ Disk:
         - "area: Disk Access"
 
 Display drivers:
-    status: maintained
-    maintainers:
-        - vanwinkeljan
+    status: orphaned
     collaborators:
         - jfischer-no
         - gmarull
@@ -402,7 +399,6 @@ Display drivers:
         - include/drivers/display.h
         - include/display/
         - include/drivers/display.h
-        - lib/gui/
         - subsys/fb/
         - samples/subsys/display/
     labels:
@@ -795,6 +791,18 @@ Documentation:
     labels:
         - "area: PECI"
 
+"Drivers: Pin Control":
+    status: maintained
+    maintainers:
+        - gmarull
+    files:
+        - doc/reference/pinctrl/
+        - include/drivers/pinctrl/
+        - include/drivers/pinctrl.h
+        - drivers/pinctrl/
+    labels:
+        - "area: Pinctrl"
+
 "Drivers: Pinmux":
     status: maintained
     maintainers:
@@ -957,7 +965,6 @@ Filesystems:
         - de-nordic
         - Laczen
         - nashif
-        - vanwinkeljan
     files:
         - include/fs/
         - samples/subsys/fs/
@@ -1123,6 +1130,18 @@ hawkBit:
     labels:
         - "area: hawkBit"
 
+"mgmt: updatehub":
+    status: maintained
+    maintainers:
+        - nandojve
+    files:
+        - subsys/mgmt/updatehub/
+        - samples/subsys/mgmt/updatehub/
+    labels:
+        - "area: updatehub"
+    description: >-
+        UpdateHub embedded Firmware Over-The-Air (FOTA) upgrade agent
+
 Native POSIX and POSIX arch:
     status: maintained
     maintainers:
@@ -1209,6 +1228,8 @@ Networking:
     status: maintained
     maintainers:
         - rlubos
+    collaborators:
+        - SeppoTakalo
     files:
         - samples/net/lwm2m_client/
         - subsys/net/lib/lwm2m/
@@ -1657,7 +1678,7 @@ TF-M Integration:
     maintainers:
         - microbuilder
     collaborators:
-        - SebastianBoe
+        - joerchan
     files:
         - samples/tfm_integration/
         - modules/trusted-firmware-m/

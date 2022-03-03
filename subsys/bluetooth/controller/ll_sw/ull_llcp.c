@@ -188,10 +188,15 @@ void llcp_tx_alloc_unpeek(struct proc_ctx *ctx)
 
 struct node_tx *llcp_tx_alloc(struct ll_conn *conn, struct proc_ctx *ctx)
 {
+	struct pdu_data *pdu;
 	struct node_tx *tx;
 
 	ARG_UNUSED(conn);
 	tx = (struct node_tx *)mem_acquire(&mem_tx.free);
+
+	pdu = (struct pdu_data *)tx->pdu;
+	ull_pdu_data_init(pdu);
+
 	return tx;
 }
 #endif /* LLCP_TX_CTRL_BUF_QUEUE_ENABLE */
@@ -903,19 +908,36 @@ uint8_t ull_cp_cte_req(struct ll_conn *conn, uint8_t min_cte_len, uint8_t cte_ty
 {
 	struct proc_ctx *ctx;
 
-	ctx = llcp_create_local_procedure(PROC_CTE_REQ);
-	if (!ctx) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+	/* The request may be started by periodic CTE request procedure, so it skips earlier
+	 * verification of PHY. In case the PHY has changed to CODE the request should be stopped.
+	 */
+#if defined(CONFIG_BT_CTLR_PHY)
+	if (conn->lll.phy_rx != PHY_CODED) {
+#else
+	if (1) {
+#endif /* CONFIG_BT_CTLR_PHY */
+		ctx = llcp_create_local_procedure(PROC_CTE_REQ);
+		if (!ctx) {
+			return BT_HCI_ERR_CMD_DISALLOWED;
+		}
+
+		ctx->data.cte_req.min_len = min_cte_len;
+		ctx->data.cte_req.type = cte_type;
+
+		conn->llcp.cte_req.is_active = 1U;
+
+		llcp_lr_enqueue(conn, ctx);
+
+		return BT_HCI_ERR_SUCCESS;
 	}
 
-	ctx->data.cte_req.min_len = min_cte_len;
-	ctx->data.cte_req.type = cte_type;
+	return BT_HCI_ERR_CMD_DISALLOWED;
+}
 
-	conn->llcp.cte_req.is_active = 1U;
-
-	llcp_lr_enqueue(conn, ctx);
-
-	return BT_HCI_ERR_SUCCESS;
+void ull_cp_cte_req_set_disable(struct ll_conn *conn)
+{
+	conn->llcp.cte_req.is_enabled = 0U;
+	conn->llcp.cte_req.req_interval = 0U;
 }
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
 

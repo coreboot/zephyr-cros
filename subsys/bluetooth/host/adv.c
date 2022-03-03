@@ -134,7 +134,9 @@ static uint8_t ad_stream_read(struct ad_stream *stream, uint8_t *buf, uint8_t bu
 			stream->current_ltv_offset++;
 			read_len++;
 		} else {
-			const size_t size_to_copy = MIN(buf_len, current_ltv->data_len);
+			const size_t remaining_data_len =
+					current_ltv->data_len - stream->current_ltv_offset + 2;
+			const size_t size_to_copy = MIN(buf_len - read_len, remaining_data_len);
 
 			(void)memcpy(&buf[read_len],
 				&current_ltv->data[stream->current_ltv_offset - 2],
@@ -1617,6 +1619,13 @@ int bt_le_ext_adv_set_data(struct bt_le_ext_adv *adv,
 
 	ext_adv = atomic_test_bit(adv->flags, BT_ADV_EXT_ADV);
 	scannable = atomic_test_bit(adv->flags, BT_ADV_SCANNABLE);
+
+	if (ext_adv) {
+		if ((scannable && ad_len) ||
+		    (!scannable && sd_len)) {
+			return -ENOTSUP;
+		}
+	}
 
 	return le_adv_update(adv, ad, ad_len, sd, sd_len, ext_adv, scannable,
 			     get_adv_name_type(adv));

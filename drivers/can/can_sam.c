@@ -9,9 +9,10 @@
 #include <drivers/can.h>
 #include <soc.h>
 #include <kernel.h>
-
 #include <logging/log.h>
-LOG_MODULE_DECLARE(can_driver, CONFIG_CAN_LOG_LEVEL);
+
+LOG_MODULE_REGISTER(can_sam, CONFIG_CAN_LOG_LEVEL);
+
 #define DT_DRV_COMPAT atmel_sam_can
 
 struct can_sam_config {
@@ -71,12 +72,13 @@ static int can_sam_init(const struct device *dev)
 	return ret;
 }
 
-static enum can_state can_sam_get_state(const struct device *dev, struct can_bus_err_cnt *err_cnt)
+static int can_sam_get_state(const struct device *dev, enum can_state *state,
+			     struct can_bus_err_cnt *err_cnt)
 {
 	const struct can_sam_config *cfg = dev->config;
 	const struct can_mcan_config *mcan_cfg = &cfg->mcan_cfg;
 
-	return can_mcan_get_state(mcan_cfg, err_cnt);
+	return can_mcan_get_state(mcan_cfg, state, err_cnt);
 }
 
 static int can_sam_send(const struct device *dev, const struct zcan_frame *frame,

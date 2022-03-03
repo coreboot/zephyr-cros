@@ -1530,7 +1530,8 @@ static struct bt_conn *conn_lookup_iso(struct bt_conn *conn)
 
 static void deferred_work(struct k_work *work)
 {
-	struct bt_conn *conn = CONTAINER_OF(work, struct bt_conn, deferred_work);
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct bt_conn *conn = CONTAINER_OF(dwork, struct bt_conn, deferred_work);
 	const struct bt_le_conn_param *param;
 
 	BT_DBG("conn %p", conn);
@@ -2392,11 +2393,6 @@ int bt_conn_le_data_len_update(struct bt_conn *conn,
 		return -EALREADY;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_AUTO_DATA_LEN_UPDATE) &&
-	    !atomic_test_bit(conn->flags, BT_CONN_AUTO_DATA_LEN_COMPLETE)) {
-		return -EAGAIN;
-	}
-
 	return bt_le_set_data_len(conn, param->tx_max_len, param->tx_max_time);
 }
 #endif /* CONFIG_BT_USER_DATA_LEN_UPDATE */
@@ -2406,11 +2402,6 @@ int bt_conn_le_phy_update(struct bt_conn *conn,
 			  const struct bt_conn_le_phy_param *param)
 {
 	uint8_t phy_opts, all_phys;
-
-	if (IS_ENABLED(CONFIG_BT_AUTO_PHY_UPDATE) &&
-	    !atomic_test_bit(conn->flags, BT_CONN_AUTO_PHY_COMPLETE)) {
-		return -EAGAIN;
-	}
 
 	if ((param->options & BT_CONN_LE_PHY_OPT_CODED_S2) &&
 	    (param->options & BT_CONN_LE_PHY_OPT_CODED_S8)) {

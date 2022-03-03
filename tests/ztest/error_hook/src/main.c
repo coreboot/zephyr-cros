@@ -9,7 +9,7 @@
 #include <syscall_handler.h>
 #include <ztest_error_hook.h>
 
-#define STACK_SIZE (1024 + CONFIG_TEST_EXTRA_STACKSIZE)
+#define STACK_SIZE (1024 + CONFIG_TEST_EXTRA_STACK_SIZE)
 #define THREAD_TEST_PRIORITY 5
 
 static K_THREAD_STACK_DEFINE(tstack, STACK_SIZE);
@@ -66,7 +66,7 @@ __no_optimization static void trigger_fault_access(void)
 	 * address instead to trigger exception. See issue #31419.
 	 */
 	void *a = (void *)0xFFFFFFFF;
-#elif defined(CONFIG_CPU_CORTEX_M) || defined(CONFIG_CPU_CORTEX_R) || \
+#elif defined(CONFIG_CPU_CORTEX_M) || defined(CONFIG_CPU_AARCH32_CORTEX_R) || \
 	defined(CONFIG_CPU_AARCH64_CORTEX_R)
 	/* As this test case only runs when User Mode is enabled,
 	 * accessing _current always triggers a memory access fault,

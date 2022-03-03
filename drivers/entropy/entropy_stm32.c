@@ -18,6 +18,7 @@
 #include <sys/util.h>
 #include <errno.h>
 #include <soc.h>
+#include <pm/pm.h>
 #include <stm32_ll_bus.h>
 #include <stm32_ll_rcc.h>
 #include <stm32_ll_rng.h>
@@ -243,7 +244,9 @@ static uint16_t rng_pool_get(struct rng_pool *rngp, uint8_t *buf, uint16_t len)
 
 	len = dst - buf;
 	available = available - len;
-	if (available <= rngp->threshold) {
+	if ((available <= rngp->threshold)
+		&& !LL_RNG_IsEnabledIT(entropy_stm32_rng_data.rng)) {
+		pm_constraint_set(PM_STATE_SUSPEND_TO_IDLE);
 		LL_RNG_EnableIT(entropy_stm32_rng_data.rng);
 	}
 
@@ -297,6 +300,7 @@ static void stm32_rng_isr(const void *arg)
 				byte);
 		if (ret < 0) {
 			LL_RNG_DisableIT(entropy_stm32_rng_data.rng);
+			pm_constraint_release(PM_STATE_SUSPEND_TO_IDLE);
 		}
 
 		k_sem_give(&entropy_stm32_rng_data.sem_sync);
@@ -481,16 +485,22 @@ static int entropy_stm32_rng_init(const struct device *dev)
 	__ASSERT_NO_MSG(res == 0);
 
 
-#if DT_INST_NODE_HAS_PROP(0, health-test-config)
-#if DT_INST_NODE_HAS_PROP(0, health-test-magic)
+#if DT_INST_NODE_HAS_PROP(0, health_test_config)
+#if DT_INST_NODE_HAS_PROP(0, health_test_magic)
 	/* Write Magic number before writing configuration
 	 * Not all stm32 series have a Magic number
 	 */
-	LL_RNG_SetHealthConfig(dev_data->rng, DT_INST_PROP(0, health-test-magic));
+	LL_RNG_SetHealthConfig(dev_data->rng, DT_INST_PROP(0, health_test_magic));
 #endif
 	/* Write RNG HTCR configuration */
-	LL_RNG_SetHealthConfig(dev_data->rng, DT_INST_PROP(0, health-test-config));
+	LL_RNG_SetHealthConfig(dev_data->rng, DT_INST_PROP(0, health_test_config));
 #endif
+
+	/* Prevent the clocks to be stopped during the duration the
+	 * rng pool is being populated. The ISR will release the constraint again
+	 * when the rng pool is filled.
+	 */
+	pm_constraint_set(PM_STATE_SUSPEND_TO_IDLE);
 
 	LL_RNG_EnableIT(dev_data->rng);
 

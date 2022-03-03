@@ -208,6 +208,23 @@ static void lp_comm_ntf_length_change(struct ll_conn *conn, struct proc_ctx *ctx
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
+
+static void lp_comm_complete_cte_req_finalize(struct ll_conn *conn)
+{
+	llcp_rr_set_paused_cmd(conn, PROC_NONE);
+	llcp_lr_complete(conn);
+
+	conn->llcp.cte_req.is_active = 0U;
+
+	/* If disable_cb is not NULL then there is waiting CTE REQ disable request
+	 * from host. Execute the callback to notify waiting thread that the
+	 * procedure is inactive.
+	 */
+	if (conn->llcp.cte_req.disable_cb) {
+		conn->llcp.cte_req.disable_cb(conn->llcp.cte_req.disable_param);
+	}
+}
+
 static void lp_comm_ntf_cte_req(struct ll_conn *conn, struct proc_ctx *ctx, struct pdu_data *pdu)
 {
 	switch (ctx->response_opcode) {
@@ -352,28 +369,36 @@ static void lp_comm_complete(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 			if (ctx->data.cte_remote_rsp.has_cte &&
 			    conn->llcp.cte_req.req_interval != 0U) {
 				conn->llcp.cte_req.req_expire = conn->llcp.cte_req.req_interval;
-			} else {
-				conn->llcp.cte_req.is_enabled = 0U;
+				ctx->state = LP_COMMON_STATE_IDLE;
+			} else if (llcp_ntf_alloc_is_available()) {
 				lp_comm_ntf(conn, ctx);
+				ull_cp_cte_req_set_disable(conn);
+				ctx->state = LP_COMMON_STATE_IDLE;
+			} else {
+				ctx->state = LP_COMMON_STATE_WAIT_NTF;
 			}
 		} else if (ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND &&
 			   ctx->reject_ext_ind.reject_opcode == PDU_DATA_LLCTRL_TYPE_CTE_REQ) {
-			lp_comm_ntf(conn, ctx);
-			conn->llcp.cte_req.is_enabled = 0U;
+			if (llcp_ntf_alloc_is_available()) {
+				lp_comm_ntf(conn, ctx);
+				ull_cp_cte_req_set_disable(conn);
+				ctx->state = LP_COMMON_STATE_IDLE;
+			} else {
+				ctx->state = LP_COMMON_STATE_WAIT_NTF;
+			}
+		} else if (ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_UNUSED) {
+			/* This path is related with handling disable the CTE REQ when PHY
+			 * has been changed to CODED PHY. BT 5.3 Core Vol 4 Part E 7.8.85
+			 * says CTE REQ has to be automatically disabled as if it had been requested
+			 * by Host. There is no notification send to Host.
+			 */
+			ull_cp_cte_req_set_disable(conn);
+			ctx->state = LP_COMMON_STATE_IDLE;
 		}
-
-		ctx->state = LP_COMMON_STATE_IDLE;
 
 		if (ctx->state == LP_COMMON_STATE_IDLE) {
-			llcp_rr_set_paused_cmd(conn, PROC_NONE);
-			llcp_lr_complete(conn);
+			lp_comm_complete_cte_req_finalize(conn);
 		}
-
-		conn->llcp.cte_req.is_active = 0U;
-		if (conn->llcp.cte_req.disable_cb) {
-			conn->llcp.cte_req.disable_cb(conn->llcp.cte_req.disable_param);
-		}
-
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
 	default:
@@ -465,12 +490,30 @@ static void lp_comm_send_req(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
-		if (ctx->pause || !llcp_tx_alloc_peek(conn, ctx) ||
-		    (llcp_rr_get_paused_cmd(conn) == PROC_CTE_REQ)) {
-			ctx->state = LP_COMMON_STATE_WAIT_TX;
+#if defined(CONFIG_BT_CTLR_PHY)
+		if (conn->lll.phy_rx != PHY_CODED) {
+#else
+		if (1) {
+#endif /* CONFIG_BT_CTLR_PHY */
+			if (ctx->pause || !llcp_tx_alloc_peek(conn, ctx) ||
+			    (llcp_rr_get_paused_cmd(conn) == PROC_CTE_REQ)) {
+				ctx->state = LP_COMMON_STATE_WAIT_TX;
+			} else {
+				lp_comm_tx(conn, ctx);
+				ctx->state = LP_COMMON_STATE_WAIT_RX;
+			}
 		} else {
-			lp_comm_tx(conn, ctx);
-			ctx->state = LP_COMMON_STATE_WAIT_RX;
+			/* The PHY was changed to CODED when the request was waiting in a local
+			 * request queue.
+			 *
+			 * Use of pair: proc PROC_CTE_REQ and rx_opcode PDU_DATA_LLCTRL_TYPE_UNUSED
+			 * to complete the procedure before sending a request to peer.
+			 * This is a special complete execution path to disable the procedure
+			 * due to change of RX PHY to CODED.
+			 */
+			ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
+			ctx->state = LP_COMMON_STATE_IDLE;
+			llcp_lr_complete(conn);
 		}
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
@@ -614,6 +657,15 @@ static void lp_comm_st_wait_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint
 				ctx->state = LP_COMMON_STATE_IDLE;
 			}
 			break;
+#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
+		case PROC_CTE_REQ:
+			if (llcp_ntf_alloc_is_available()) {
+				lp_comm_ntf(conn, ctx);
+				ctx->state = LP_COMMON_STATE_IDLE;
+				lp_comm_complete_cte_req_finalize(conn);
+			}
+			break;
+#endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
 		default:
 			break;
 		}
