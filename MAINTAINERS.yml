@@ -183,13 +183,15 @@ Bluetooth:
         - subsys/bluetooth/host/
         - subsys/bluetooth/services/
         - subsys/bluetooth/shell/
-        - subsys/bluetooth/audio/
         - tests/bluetooth/
     files-exclude:
         - include/bluetooth/mesh/
         - subsys/bluetooth/controller/
         - subsys/bluetooth/mesh/
         - samples/bluetooth/mesh/
+        - subsys/bluetooth/audio/
+        - include/bluetooth/audio/
+        - tests/bluetooth/bsim_bt/bsim_test_audio/
     labels:
         - "area: Bluetooth"
 
@@ -225,6 +227,25 @@ Bluetooth Mesh:
         - tests/bluetooth/mesh*/
     labels:
         - "area: Bluetooth Mesh"
+        - "area: Bluetooth"
+
+Bluetooth Audio:
+    status: maintained
+    maintainers:
+        - Thalley
+        - asbjornsabo
+    collaborators:
+        - Vudentz
+        - jhedberg
+        - Casper-Bonde-Bose
+        - MariuszSkamra
+        - rymanluk
+    files:
+        - subsys/bluetooth/audio/
+        - include/bluetooth/audio/
+        - tests/bluetooth/bsim_bt/bsim_test_audio/
+    labels:
+        - "area: Bluetooth Audio"
         - "area: Bluetooth"
 
 Build system:
@@ -380,6 +401,8 @@ Disk:
     status: maintained
     maintainers:
         - jfischer-no
+    collaborators:
+        - danieldegrasse
     files:
         - include/storage/disk_access.h
         - include/drivers/disk.h
@@ -517,7 +540,9 @@ Documentation:
         - "area: Counter"
 
 "Drivers: Crypto":
-    status: orphaned
+    status: maintained
+    maintainers:
+        - ceolin
     files:
         - drivers/crypto/
         - dts/bindings/crypto/
@@ -1580,6 +1605,24 @@ nRF Platforms:
         - dts/arm/nordic/
     labels:
         - "platform: nRF"
+
+Renesas R-Car Platforms:
+    status: maintained
+    maintainers:
+        - aaillet
+    collaborators:
+        - pmarzin
+    files:
+        - boards/arm/rcar_*/
+        - drivers/*/*rcar*
+        - dts/arm/renesas/
+        - dts/bindings/*/*rcar*
+        - soc/arm/renesas_rcar/
+    labels:
+        - "platform: Renesas R-Car"
+    description: >-
+        Renesas R-Car SOCs, dts files and related drivers. Renesas boards based
+        on R-Car SOCs.
 
 STM32 Platforms:
     status: maintained
