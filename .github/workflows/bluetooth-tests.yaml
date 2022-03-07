@@ -3,6 +3,7 @@ name: Bluetooth Tests
 on:
   pull_request:
     paths:
+      - ".github/workflows/bluetooth-test*.yaml"
       - "west.yml"
       - "subsys/bluetooth/**"
       - "tests/bluetooth/bsim_bt/**"
@@ -39,6 +40,8 @@ jobs:
 
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       - name: west setup
         env:
