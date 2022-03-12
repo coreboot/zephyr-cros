@@ -26,3 +26,13 @@ properties:
 
         The device will be notified when the power domain it belongs to is either
         suspended or resumed.
+
+    pm-device-runtime-auto:
+      required: false
+      type: boolean
+      description: |
+        Automatically configure the device for runtime power management after the
+        init function runs. Based on the value of pm_device->state, the device
+        will be automatically transitioned to the lowest power mode possible.
+        For devices on a power-domain, this will be PM_DEVICE_STATE_OFF, otherwise
+        PM_DEVICE_STATE_SUSPENDED.
