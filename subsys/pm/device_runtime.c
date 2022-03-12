@@ -335,6 +335,13 @@ unlock:
 	return ret;
 }
 
+bool pm_device_runtime_auto_is_enabled(const struct device *dev)
+{
+	struct pm_device *pm = dev->pm;
+
+	return atomic_test_bit(&pm->flags, PM_DEVICE_FLAG_RUNTIME_AUTO);
+}
+
 bool pm_device_runtime_is_enabled(const struct device *dev)
 {
 	struct pm_device *pm = dev->pm;
