@@ -8,6 +8,7 @@
 #include <zephyr/device.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/syscall_handler.h>
+#include <zephyr/pm/device_runtime.h>
 
 extern const struct init_entry __init_start[];
 extern const struct init_entry __init_PRE_KERNEL_1_start[];
@@ -84,6 +85,8 @@ void z_sys_init_run_level(int32_t level)
 				dev->state->init_res = rc;
 			}
 			dev->state->initialized = true;
+			/* Run automatic device runtime enablement */
+			pm_device_runtime_auto_enable(dev);
 		}
 	}
 }
