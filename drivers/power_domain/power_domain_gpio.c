@@ -82,7 +82,6 @@ static int pd_gpio_init(const struct device *dev)
 {
 	const struct pd_gpio_config *cfg = dev->config;
 	struct pd_gpio_data *data = dev->data;
-	int rc;
 
 	if (!device_is_ready(cfg->enable.port)) {
 		LOG_ERR("GPIO port %s is not ready", cfg->enable.port->name);
@@ -91,16 +90,20 @@ static int pd_gpio_init(const struct device *dev)
 	/* We can't know how long the domain has been off for before boot */
 	data->next_boot = K_TIMEOUT_ABS_US(cfg->off_on_delay_us);
 
-	if (pm_device_on_power_domain(dev)) {
-		/* Device is unpowered */
+	if (pm_device_runtime_auto_is_enabled(dev) ||
+	    !pm_device_is_powered(dev)) {
+		/* We are either powered down, in which case we don't need to do anything,
+		 * or pm_device_runtime will be automatically enabled, which will automatically
+		 * transition us to our lowest power state.
+		 */
 		pm_device_init_off(dev);
-		rc = gpio_pin_configure_dt(&cfg->enable, GPIO_DISCONNECTED);
 	} else {
-		pm_device_init_suspended(dev);
-		rc = gpio_pin_configure_dt(&cfg->enable, GPIO_OUTPUT_INACTIVE);
+		/* We are powered, move to active mode by default */
+		k_sleep(data->next_boot);
+		gpio_pin_configure_dt(&cfg->enable, GPIO_OUTPUT_ACTIVE);
+		k_sleep(K_USEC(cfg->startup_delay_us));
 	}
-
-	return rc;
+	return 0;
 }
 
 #define POWER_DOMAIN_DEVICE(id)						   \
