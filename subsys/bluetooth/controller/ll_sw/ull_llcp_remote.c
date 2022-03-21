@@ -480,6 +480,7 @@ static void rr_st_disconnect(struct ll_conn *conn, uint8_t evt, void *param)
 static void rr_st_idle(struct ll_conn *conn, uint8_t evt, void *param)
 {
 	struct proc_ctx *ctx;
+	struct proc_ctx *ctx_local;
 
 	switch (evt) {
 	case RR_EVT_PREPARE:
@@ -541,20 +542,21 @@ static void rr_st_idle(struct ll_conn *conn, uint8_t evt, void *param)
 
 				conn->llcp.remote.reject_opcode = pdu->llctrl.opcode;
 				rr_act_reject(conn);
-			} else if (!with_instant && central && incompat == INCOMPAT_RESOLVABLE) {
-				/* No collision with procedure without instant
-				 * => Run procedure
-				 */
-				rr_act_run(conn);
-				rr_set_state(conn, RR_STATE_ACTIVE);
 			} else if (with_instant && incompat == INCOMPAT_RESERVED) {
 				/* Protocol violation.
 				 * => Disconnect
-				 *
+				 * See Bluetooth Core Specification Version 5.3 Vol 6, Part B
+				 * section 5.3 (page 2879) for error codes
 				 */
 
-				/* TODO */
-				LL_ASSERT(0);
+				ctx_local = llcp_lr_peek(conn);
+
+				if (ctx_local->proc == ctx->proc ||
+				    (ctx->proc == PROC_CONN_UPDATE && ctx_local->proc == PROC_CONN_PARAM_REQ)) {
+					conn->llcp_terminate.reason_final = BT_HCI_ERR_LL_PROC_COLLISION;
+				} else {
+					conn->llcp_terminate.reason_final = BT_HCI_ERR_DIFF_TRANS_COLLISION;
+				}
 			}
 		}
 		break;
