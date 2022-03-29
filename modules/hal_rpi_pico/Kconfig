@@ -23,3 +23,14 @@ config PICOSDK_USE_PWM
 	bool
 	help
 	  Use the PWM driver from pico-sdk
+
+config PICOSDK_USE_PIO
+	bool
+	select PICOSDK_USE_CLAIM
+	help
+	  Use the PIO driver from pico-sdk
+
+config PICOSDK_USE_CLAIM
+	bool
+	help
+	  Use the "claim" driver from pico-sdk
