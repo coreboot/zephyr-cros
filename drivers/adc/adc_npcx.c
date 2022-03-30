@@ -234,6 +234,9 @@ static void adc_npcx_start_scan(const struct device *dev)
 	/* Stop conversion for scan conversion mode */
 	inst->ADCCNF |= BIT(NPCX_ADCCNF_STOP);
 
+	/* Clear end of cyclic conversion event status flag */
+	inst->ADCSTS |= BIT(NPCX_ADCSTS_EOCCEV);
+
 	/* Update selected channels in scan mode by channels mask */
 	inst->ADCCS |= data->channels;
 
@@ -243,9 +246,6 @@ static void adc_npcx_start_scan(const struct device *dev)
 
 	/* Enable end of cyclic conversion event interrupt */
 	inst->ADCCNF |= BIT(NPCX_ADCCNF_INTECCEN);
-
-	/* Clear end of cyclic conversion event status flag */
-	inst->ADCSTS |= BIT(NPCX_ADCSTS_EOCCEV);
 
 	/* Start conversion */
 	inst->ADCCNF |= BIT(NPCX_ADCCNF_START);
