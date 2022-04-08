@@ -16,6 +16,12 @@ properties:
       type: phandle-array
       required: false
 
+    external-reset:
+      type: boolean
+      required: false
+      description:
+        Modem has been reset by an external device.
+
     target-speed:
       type: int
       required: false

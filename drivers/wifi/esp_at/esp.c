@@ -1061,6 +1061,14 @@ static int esp_reset(const struct device *dev)
 	k_sleep(K_MSEC(100));
 	gpio_pin_set_dt(&config->reset, 0);
 #else
+
+#if DT_INST_NODE_HAS_PROP(0, external_reset)
+	/* Wait to see if the interface comes up by itself */
+	if (k_sem_take(&dev->sem_if_ready, K_MSEC(CONFIG_WIFI_ESP_AT_RESET_TIMEOUT)) == 0) {
+		return 0;
+	}
+#endif
+
 	int ret;
 	int retries = 3;
 
