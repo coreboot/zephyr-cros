@@ -385,3 +385,26 @@ bool pm_device_is_powered(const struct device *dev)
 	return true;
 #endif
 }
+
+int pm_device_driver_init(const struct device *dev,
+			  pm_device_action_cb_t action_cb)
+{
+	int rc = 0;
+
+	/* Work only needs to be performed if the device is powered */
+	if (pm_device_is_powered(dev)) {
+		/* Run power-up logic */
+		rc = action_cb(dev, PM_DEVICE_ACTION_TURN_ON);
+		if (IS_ENABLED(CONFIG_PM_DEVICE)) {
+			/* Start in suspend mode if power management is enabled */
+			pm_device_init_suspended(dev);
+		} else if (rc == 0) {
+			/* Start in active mode if power management is disabled */
+			rc = action_cb(dev, PM_DEVICE_ACTION_RESUME);
+		}
+	} else {
+		/* Start in off mode */
+		pm_device_init_off(dev);
+	}
+	return rc;
+}

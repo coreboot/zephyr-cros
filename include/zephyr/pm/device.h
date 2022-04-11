@@ -578,6 +578,22 @@ int pm_device_power_domain_remove(const struct device *dev,
  * @retval false If device is not currently powered
  */
 bool pm_device_is_powered(const struct device *dev);
+
+/**
+ * @brief Setup a device driver into the lowest valid power mode
+ *
+ * This helper function is intended to be called at the end of a driver
+ * init function to automatically setup the device into the lowest power
+ * mode. It assumes that the device has been configured as if it is in
+ * @ref PM_DEVICE_STATE_OFF.
+ *
+ * @param dev Device instance.
+ * @param action_cb Device PM control callback function.
+ * @retval 0 On success.
+ * @retval -errno Error code from @a action_cb on failure.
+ */
+int pm_device_driver_init(const struct device *dev, pm_device_action_cb_t action_cb);
+
 #else
 static inline int pm_device_state_get(const struct device *dev,
 				      enum pm_device_state *state)
@@ -664,6 +680,14 @@ static inline bool pm_device_is_powered(const struct device *dev)
 	ARG_UNUSED(dev);
 	return true;
 }
+
+static inline int pm_device_driver_init(const struct device *dev, pm_device_action_cb_t action_cb)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(action_cb);
+	return -ENOSYS;
+}
+
 #endif /* CONFIG_PM_DEVICE */
 
 /** @} */
