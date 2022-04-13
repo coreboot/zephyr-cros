@@ -8,6 +8,7 @@ if(CONFIG_WIFI_ESP_AT)
 
   zephyr_library_sources(
     esp.c
+    esp_management.c
     esp_socket.c
     esp_offload.c
   )

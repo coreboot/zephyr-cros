@@ -229,6 +229,9 @@ struct esp_data {
 	struct sockaddr_in dns_addresses[ESP_MAX_DNS];
 #endif
 
+	/* modem version */
+	uint8_t at_version[4];
+
 	/* modem context */
 	struct modem_context mctx;
 
