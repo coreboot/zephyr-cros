@@ -50,3 +50,14 @@ int esp_firmware_at_version(const struct device *dev, uint8_t at_version[4])
 	memcpy(at_version, data->at_version, 4);
 	return err;
 }
+
+int esp_firmware_ota_update(const struct device *dev, bool https, char *version)
+{
+	struct esp_data *data = dev->data;
+	char cmd[32];
+
+	snprintk(cmd, sizeof(cmd), "AT+CIUPDATE=%d,%s",
+		 https ? 1 : 0,
+		 version ? version : "");
+	return esp_cmd_send(data, NULL, 0, cmd, ESP_OTA_TIMEOUT);
+}

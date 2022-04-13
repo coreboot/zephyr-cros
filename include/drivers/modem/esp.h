@@ -33,6 +33,26 @@ extern "C" {
  */
 int esp_firmware_at_version(const struct device *dev, uint8_t version[4]);
 
+/**
+ * @brief Upgrade modem firmware through Wi-Fi
+ *
+ * Trigger a blocking OTA upgrade of the ESP Modem. See the documentation for
+ * AT+CIUPDATE for more complete information on behaviour.
+ *
+ * @note This function updates from Espressif's official release server.
+ *
+ * @note The functionality of this API has changed over ESP-AT releases, therefore
+ *       only the common functionality set is implemented.
+ *
+ * @param dev Modem to upgrade.
+ * @param https OTA via HTTPS when true, HTTP otherwise.
+ * @param version Explicit AT version string (Optional).
+ *
+ * @retval 0 On success.
+ * @retval -errno Negative error code on failure.
+ */
+int esp_firmware_ota_update(const struct device *dev, bool https, char *version);
+
 #ifdef __cplusplus
 }
 #endif
