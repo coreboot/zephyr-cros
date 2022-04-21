@@ -199,7 +199,7 @@ static int simplelink_dummy_get(sa_family_t family,
 	return -1;
 }
 
-/* Placeholders, until Zepyr IP stack updated to handle a NULL net_offload */
+/* Placeholders, until Zephyr IP stack updated to handle a NULL net_offload */
 static struct net_offload simplelink_offload = {
 	.get	       = simplelink_dummy_get,
 	.bind	       = NULL,
@@ -258,6 +258,8 @@ static void simplelink_iface_init(struct net_if *iface)
 	/* Direct socket offload: */
 	socket_offload_dns_register(&simplelink_dns_ops);
 	simplelink_sockets_init();
+
+	net_if_socket_offload_set(iface, simplelink_socket_create);
 #endif
 
 }
