@@ -16,10 +16,25 @@
 
 LOG_MODULE_REGISTER(can_stm32fd, CONFIG_CAN_LOG_LEVEL);
 
-#if CONFIG_CAN_STM32_CLOCK_DIVISOR != 1 && CONFIG_CAN_STM32_CLOCK_DIVISOR & 0x01
-#error CAN_STM32_CLOCK_DIVISOR invalid.\
-Allowed values are 1 or 2 * n, where n <= 15
+#if defined(CONFIG_CAN_STM32FD_CLOCK_SOURCE_HSE)
+#define CAN_STM32FD_CLOCK_SOURCE LL_RCC_FDCAN_CLKSOURCE_HSE
+#elif defined(CONFIG_CAN_STM32FD_CLOCK_SOURCE_PLL)
+#define CAN_STM32FD_CLOCK_SOURCE LL_RCC_FDCAN_CLKSOURCE_PLL
+#elif defined(CONFIG_CAN_STM32FD_CLOCK_SOURCE_PCLK1)
+#define CAN_STM32FD_CLOCK_SOURCE LL_RCC_FDCAN_CLKSOURCE_PCLK1
+#else
+#error "Unsupported FDCAN clock source"
 #endif
+
+#ifdef CONFIG_CAN_STM32FD_CLOCK_DIVISOR
+#if CONFIG_CAN_STM32FD_CLOCK_DIVISOR != 1 && CONFIG_CAN_STM32FD_CLOCK_DIVISOR & 0x01
+#error CAN_STM32FD_CLOCK_DIVISOR invalid. Allowed values are 1 or 2 * n, where n <= 15.
+#else
+#define CAN_STM32FD_CLOCK_DIVISOR CONFIG_CAN_STM32FD_CLOCK_DIVISOR
+#endif /* CONFIG_CAN_STM32FD_CLOCK_DIVISOR */
+#else
+#define CAN_STM32FD_CLOCK_DIVISOR 1U
+#endif /* CONFIG_CAN_STM32FD_CLOCK_DIVISOR*/
 
 #define DT_DRV_COMPAT st_stm32_fdcan
 
@@ -33,17 +48,17 @@ static int can_stm32fd_get_core_clock(const struct device *dev, uint32_t *rate)
 		return -EIO;
 	}
 
-	*rate = rate_tmp / CONFIG_CAN_STM32_CLOCK_DIVISOR;
+	*rate = rate_tmp / CAN_STM32FD_CLOCK_DIVISOR;
 
 	return 0;
 }
 
 static void can_stm32fd_clock_enable(void)
 {
-	LL_RCC_SetFDCANClockSource(LL_RCC_FDCAN_CLKSOURCE_PCLK1);
+	LL_RCC_SetFDCANClockSource(CAN_STM32FD_CLOCK_SOURCE);
 	__HAL_RCC_FDCAN_CLK_ENABLE();
 
-	FDCAN_CONFIG->CKDIV = CONFIG_CAN_STM32_CLOCK_DIVISOR >> 1;
+	FDCAN_CONFIG->CKDIV = CAN_STM32FD_CLOCK_DIVISOR >> 1;
 }
 
 static void can_stm32fd_set_state_change_callback(const struct device *dev,

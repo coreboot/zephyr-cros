@@ -237,7 +237,7 @@ BSS.
 
 .. code-block:: c
 
-    #include <app_memory/app_memdomain.h>
+    #include <zephyr/app_memory/app_memdomain.h>
 
     /* Declare a k_mem_partition "my_partition" that is read-write to
      * user mode. Note that we do not specify a base address or size.
@@ -439,6 +439,6 @@ Related configuration options:
 API Reference
 *************
 
-The following memory domain APIs are provided by :zephyr_file:`include/kernel.h`:
+The following memory domain APIs are provided by :zephyr_file:`include/zephyr/kernel.h`:
 
 .. doxygengroup:: mem_domain_apis
