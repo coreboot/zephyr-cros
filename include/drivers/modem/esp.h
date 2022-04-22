@@ -23,6 +23,19 @@ extern "C" {
 #endif
 
 /**
+ * @brief Query the currently connected WiFi network parameters
+ *
+ * @param dev Modem to query.
+ * @param channel WiFi channel used by the network.
+ *                If UINT8_MAX no network is connected.
+ * @param rssi Current RSSI of the network in dBm.
+ *
+ * @retval 0 On success.
+ * @retval -errno Negative error code on failure.
+ */
+int esp_network_parameters(const struct device *dev, uint8_t *channel, int8_t *rssi);
+
+/**
  * @brief Query modem AT version information
  *
  * @param dev Modem to query.

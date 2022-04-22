@@ -12,6 +12,36 @@
 
 LOG_MODULE_REGISTER(wifi_esp_mgmt, CONFIG_WIFI_LOG_LEVEL);
 
+MODEM_CMD_DEFINE(on_cmd_cwjap){
+	struct esp_data *dev = CONTAINER_OF(data, struct esp_data,
+					    cmd_handler_data);
+
+	dev->channel = strtol(argv[2], NULL, 10);
+	dev->rssi = strtol(argv[3], NULL, 10);
+	return 0;
+}
+
+int esp_network_parameters(const struct device *dev, uint8_t *channel, int8_t *rssi)
+{
+	struct esp_data *data = dev->data;
+	char cmd[] = "AT+CWJAP?";
+	int err;
+
+	static const struct modem_cmd cmds[] = {
+		MODEM_CMD("+CWJAP:", on_cmd_cwjap, 9U, ",")
+	};
+
+	*channel = UINT8_MAX;
+	*rssi = 0;
+
+	err = esp_cmd_send(data, cmds, ARRAY_SIZE(cmds), cmd, ESP_CMD_TIMEOUT);
+	if (err == 0) {
+		*channel = data->channel;
+		*rssi = data->rssi;
+	}
+	return err;
+}
+
 MODEM_CMD_DEFINE(on_cmd_gmr_at){
 	struct esp_data *dev = CONTAINER_OF(data, struct esp_data,
 					    cmd_handler_data);

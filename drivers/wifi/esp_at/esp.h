@@ -244,6 +244,10 @@ struct esp_data {
 	struct modem_cmd_handler_data cmd_handler_data;
 	uint8_t cmd_match_buf[MDM_RECV_BUF_SIZE];
 
+	/* network parameters */
+	uint8_t channel;
+	int8_t rssi;
+
 	/* socket data */
 	struct esp_socket sockets[ESP_MAX_SOCKETS];
 	struct esp_socket *rx_sock;
