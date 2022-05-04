@@ -313,16 +313,16 @@ done:
 	regs->CONFIG = cfgval;
 }
 
-static int pwm_xec_pin_set(const struct device *dev, uint32_t pwm,
-			   uint32_t period_cycles, uint32_t pulse_cycles,
-			   pwm_flags_t flags)
+static int pwm_xec_set_cycles(const struct device *dev, uint32_t channel,
+			      uint32_t period_cycles, uint32_t pulse_cycles,
+			      pwm_flags_t flags)
 {
 	const struct pwm_xec_config * const cfg = dev->config;
 	struct pwm_regs * const regs = cfg->regs;
 	uint32_t target_freq;
 	uint32_t on, off;
 
-	if (pwm > 0) {
+	if (channel > 0) {
 		return -EIO;
 	}
 
@@ -355,12 +355,12 @@ static int pwm_xec_pin_set(const struct device *dev, uint32_t pwm,
 	return 0;
 }
 
-static int pwm_xec_get_cycles_per_sec(const struct device *dev, uint32_t pwm,
-				      uint64_t *cycles)
+static int pwm_xec_get_cycles_per_sec(const struct device *dev,
+				      uint32_t channel, uint64_t *cycles)
 {
 	ARG_UNUSED(dev);
 
-	if (pwm > 0) {
+	if (channel > 0) {
 		return -EIO;
 	}
 
@@ -375,7 +375,7 @@ static int pwm_xec_get_cycles_per_sec(const struct device *dev, uint32_t pwm,
 }
 
 static const struct pwm_driver_api pwm_xec_driver_api = {
-	.pin_set = pwm_xec_pin_set,
+	.set_cycles = pwm_xec_set_cycles,
 	.get_cycles_per_sec = pwm_xec_get_cycles_per_sec,
 };
 

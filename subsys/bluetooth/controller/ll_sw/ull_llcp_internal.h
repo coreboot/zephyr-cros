@@ -134,6 +134,9 @@ struct proc_ctx {
 	/* Expected opcode to be received next */
 	enum pdu_data_llctrl_type rx_opcode;
 
+	/* Greedy RX (used for central encryption) */
+	uint8_t rx_greedy;
+
 	/* Last transmitted opcode used for unknown/reject */
 	enum pdu_data_llctrl_type tx_opcode;
 
@@ -190,7 +193,6 @@ struct proc_ctx {
 		} pu;
 #endif /* CONFIG_BT_CTLR_PHY */
 
-		/* TODO(tosk): leave out some params below if !CONFIG_BT_CTLR_CONN_PARAM_REQ */
 		/* Connection Update & Connection Parameter Request */
 		struct {
 			uint8_t error;
@@ -202,6 +204,7 @@ struct proc_ctx {
 			uint16_t interval_max;
 			uint16_t latency;
 			uint16_t timeout;
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 			uint8_t  preferred_periodicity;
 			uint16_t reference_conn_event_count;
 			uint16_t offset0;
@@ -210,6 +213,7 @@ struct proc_ctx {
 			uint16_t offset3;
 			uint16_t offset4;
 			uint16_t offset5;
+#endif /* defined(CONFIG_BT_CTLR_CONN_PARAM_REQ) */
 		} cu;
 
 		/* Use by ACL Termination Procedure */
@@ -349,7 +353,14 @@ void llcp_proc_ctx_release(struct proc_ctx *ctx);
 void llcp_tx_enqueue(struct ll_conn *conn, struct node_tx *tx);
 void llcp_tx_pause_data(struct ll_conn *conn, enum llcp_tx_q_pause_data_mask pause_mask);
 void llcp_tx_resume_data(struct ll_conn *conn, enum llcp_tx_q_pause_data_mask resume_mask);
-void llcp_tx_flush(struct ll_conn *conn);
+
+/*
+ * LLCP Procedure Response Timeout
+ */
+void llcp_lr_prt_restart(struct ll_conn *conn);
+void llcp_lr_prt_stop(struct ll_conn *conn);
+void llcp_rr_prt_restart(struct ll_conn *conn);
+void llcp_rr_prt_stop(struct ll_conn *conn);
 
 /*
  * LLCP Local Procedure Common
@@ -382,7 +393,9 @@ void llcp_rp_enc_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_p
 void llcp_rp_enc_init_proc(struct proc_ctx *ctx);
 void llcp_rp_enc_ltk_req_reply(struct ll_conn *conn, struct proc_ctx *ctx);
 void llcp_rp_enc_ltk_req_neg_reply(struct ll_conn *conn, struct proc_ctx *ctx);
+bool llcp_rp_enc_ltk_req_reply_allowed(struct ll_conn *conn, struct proc_ctx *ctx);
 void llcp_rp_enc_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 
 #if defined(CONFIG_BT_CTLR_PHY)
@@ -405,6 +418,7 @@ void llcp_lp_cu_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
 /*
  * LLCP Local Channel Map Update
  */
+void llcp_lp_chmu_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
 void llcp_lp_chmu_init_proc(struct proc_ctx *ctx);
 void llcp_lp_chmu_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
 
@@ -470,7 +484,7 @@ void llcp_rr_run(struct ll_conn *conn);
 void llcp_rr_complete(struct ll_conn *conn);
 void llcp_rr_connect(struct ll_conn *conn);
 void llcp_rr_disconnect(struct ll_conn *conn);
-void llcp_rr_new(struct ll_conn *conn, struct node_rx_pdu *rx);
+void llcp_rr_new(struct ll_conn *conn, struct node_rx_pdu *rx, bool valid_pdu);
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
 /*

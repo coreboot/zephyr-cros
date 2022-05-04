@@ -133,13 +133,15 @@ void ascs_ep_set_state(struct bt_audio_ep *ep, uint8_t state)
 				ops->disabled(stream);
 			}
 			break;
+		case BT_AUDIO_EP_STATE_RELEASING:
+			break; /* no-op*/
 		default:
 			BT_ERR("Invalid state: %u", state);
 			break;
 		}
 	}
 
-	if (state == BT_AUDIO_EP_STATE_IDLE) {
+	if (state == BT_AUDIO_EP_STATE_RELEASING) {
 		bt_audio_stream_detach(ep->stream);
 	}
 }
@@ -753,6 +755,8 @@ static void ase_process(struct k_work *work)
 	struct bt_ascs_ase *ase = CONTAINER_OF(work, struct bt_ascs_ase, work);
 	struct bt_gatt_attr attr;
 
+	BT_DBG("ase %p, ep %p, ep.stream %p", ase, &ase->ep, ase->ep.stream);
+
 	ascs_ep_get_status(&ase->ep, &ase_buf);
 
 	memset(&attr, 0, sizeof(attr));
@@ -764,10 +768,6 @@ static void ase_process(struct k_work *work)
 	if (ase->ep.status.state == BT_AUDIO_EP_STATE_RELEASING &&
 	    ase->ep.stream == NULL) {
 		ascs_ep_set_state(&ase->ep, BT_AUDIO_EP_STATE_IDLE);
-	}
-
-	if (ase->ep.status.state == BT_AUDIO_EP_STATE_IDLE) {
-		return;
 	}
 }
 

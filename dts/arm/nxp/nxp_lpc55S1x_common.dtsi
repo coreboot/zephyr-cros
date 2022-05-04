@@ -113,6 +113,9 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges = <0x0 0x1000 0x100>;
+		pinctrl: pinctrl {
+			compatible = "nxp,lpc-iocon-pinctrl";
+		};
 		pio0: pio0@0 {
 			compatible = "nxp,lpc-iocon-pio";
 			reg = <0x0 0x80>;
@@ -218,6 +221,7 @@
 	can0: can@9d000 {
 		compatible = "nxp,lpc-mcan";
 		reg = <0x9d000 0x1000>;
+		reg-names = "m_can";
 		interrupts = <43 0>, <44 0>;
 		clocks = <&syscon MCUX_MCAN_CLK>;
 		label = "CAN_0";

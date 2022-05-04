@@ -121,73 +121,14 @@ SECTIONS
     *(.rodata_desc .rodata_desc.*)
     *(.rodata_custom_desc .rodata_custom_desc.*)
 
-#ifdef CONFIG_USERSPACE
-    Z_LINK_ITERABLE_ALIGNED(z_object_assignment, 4);
-#endif
-
-#if defined(CONFIG_NET_SOCKETS)
-    Z_LINK_ITERABLE_ALIGNED(net_socket_register, 4);
-#endif
-
-#if defined(CONFIG_NET_L2_PPP)
-    Z_LINK_ITERABLE_ALIGNED(ppp_protocol_handler, 4);
-#endif
-
-    Z_LINK_ITERABLE_ALIGNED(bt_l2cap_fixed_chan, 4);
-
-#if defined(CONFIG_BT_BREDR)
-    Z_LINK_ITERABLE_ALIGNED(bt_l2cap_br_fixed_chan, 4);
-#endif
-
-#if defined(CONFIG_BT_CONN)
-    Z_LINK_ITERABLE_ALIGNED(bt_conn_cb, 4)
-#endif
-
-    Z_LINK_ITERABLE_ALIGNED(bt_gatt_service_static, 4);
-
-#if defined(CONFIG_BT_MESH)
-    Z_LINK_ITERABLE_ALIGNED(bt_mesh_subnet_cb, 4);
-    Z_LINK_ITERABLE_ALIGNED(bt_mesh_app_key_cb, 4);
-    Z_LINK_ITERABLE_ALIGNED(bt_mesh_hb_cb, 4);
-#endif
-
-#if defined(CONFIG_BT_MESH_FRIEND)
-    Z_LINK_ITERABLE_ALIGNED(bt_mesh_friend_cb, 4);
-#endif
-
-#if defined(CONFIG_BT_MESH_LOW_POWER)
-    Z_LINK_ITERABLE_ALIGNED(bt_mesh_lpn_cb, 4);
-#endif
-
-#if defined(CONFIG_BT_MESH_PROXY)
-    Z_LINK_ITERABLE_ALIGNED(bt_mesh_proxy_cb, 4);
-#endif
-
-#if defined(CONFIG_EC_HOST_CMD)
-    Z_LINK_ITERABLE_ALIGNED(ec_host_cmd_handler, 4);
-#endif
-
-#if defined(CONFIG_SETTINGS)
-    Z_LINK_ITERABLE_ALIGNED(settings_handler_static, 4);
-#endif
-
-    Z_LINK_ITERABLE_ALIGNED(k_p4wq_initparam, 4);
-
-    Z_LINK_ITERABLE_ALIGNED(shell, 4);
-
-    Z_LINK_ITERABLE_ALIGNED(tracing_backend, 4)
-
     __rodata_region_start = .;
-    __esp_shell_root_cmds_start = .;
-    KEEP(*(SORT(.shell_root_cmd_*)));
-    __esp_shell_root_cmds_end = .;
 
     . = ALIGN(4);
     #include <snippets-rodata.ld>
 
     . = ALIGN(4);
-    *(EXCLUDE_FILE (*libkernel.a:fatal.* *libkernel.a:init.* *libzephyr.a:cbprintf_complete* *libzephyr.a:log_core.* *libzephyr.a:log_backend_uart.* *libzephyr.a:log_output.* *libzephyr.a:loader.* *libdrivers__flash.a:flash_esp32.* *libdrivers__serial.a:uart_esp32.*) .rodata)
-    *(EXCLUDE_FILE (*libkernel.a:fatal.* *libkernel.a:init.* *libzephyr.a:cbprintf_complete* *libzephyr.a:log_core.* *libzephyr.a:log_backend_uart.* *libzephyr.a:log_output.* *libzephyr.a:loader.* *libdrivers__flash.a:flash_esp32.* *libdrivers__serial.a:uart_esp32.*) .rodata.*)
+    *(EXCLUDE_FILE (*libarch__xtensa__core.a:* *libkernel.a:fatal.* *libkernel.a:init.* *libzephyr.a:cbprintf_complete* *libzephyr.a:log_core.* *libzephyr.a:log_backend_uart.* *libdrivers__flash.a:esp32_mp.* *libzephyr.a:log_output.* *libzephyr.a:loader.* *libdrivers__flash.a:flash_esp32.* *libdrivers__serial.a:uart_esp32.* *libdrivers__flash.a:spi_flash_rom_patch.*) .rodata)
+    *(EXCLUDE_FILE (*libarch__xtensa__core.a:* *libkernel.a:fatal.* *libkernel.a:init.* *libzephyr.a:cbprintf_complete* *libzephyr.a:log_core.* *libzephyr.a:log_backend_uart.* *libdrivers__flash.a:esp32_mp.* *libzephyr.a:log_output.* *libzephyr.a:loader.* *libdrivers__flash.a:flash_esp32.* *libdrivers__serial.a:uart_esp32.* *libdrivers__flash.a:spi_flash_rom_patch.*) .rodata.*)
 
     *(.irom1.text) /* catch stray ICACHE_RODATA_ATTR */
     *(.gnu.linkonce.r.*)
@@ -254,6 +195,19 @@ SECTIONS
     . = ALIGN(4);
   } GROUP_DATA_LINK_IN(RODATA_REGION, ROMABLE_REGION)
 
+  /* Flash segments (rodata and text) should be mapped in virtual address space by providing VMA.
+   * Executing directly from LMA is not possible. */
+  #pragma push_macro("GROUP_ROM_LINK_IN")
+  #undef GROUP_ROM_LINK_IN
+  #define GROUP_ROM_LINK_IN(vregion, lregion) > RODATA_REGION AT > lregion
+  #include "linker/common-rom/common-rom-kernel-devices.ld"
+  #include "linker/common-rom/common-rom-cpp.ld"
+  #include "linker/common-rom/common-rom-net.ld"
+  #include "linker/common-rom/common-rom-bt.ld"
+  #include "linker/common-rom/common-rom-debug.ld"
+  #include "linker/common-rom/common-rom-misc.ld"
+  #pragma pop_macro("GROUP_ROM_LINK_IN")
+
   .iram0.text : ALIGN(4)
   {
     /* Vectors go to IRAM */
@@ -286,6 +240,7 @@ SECTIONS
     *libkernel.a:(.literal .text .literal.* .text.*)
     *libgcc.a:lib2funcs.*(.literal .text .literal.* .text.*)
     *libdrivers__flash.a:flash_esp32.*(.literal .text .literal.* .text.*)
+    *libzephyr.a:spi_flash_rom_patch.*(.literal .text .literal.* .text.*)
     *libzephyr.a:log_noos.*(.literal .text .literal.* .text.*)
     *libdrivers__timer.a:esp32c3_sys_timer.*(.literal .text .literal.* .text.*)
     *libzephyr.a:log_core.*(.literal .text .literal.* .text.*)
@@ -387,28 +342,24 @@ SECTIONS
     *libzephyr.a:loader.*(.rodata .rodata.*)
     *libdrivers__flash.a:flash_esp32.*(.rodata  .rodata.*)
     *libdrivers__serial.a:uart_esp32.*(.rodata .rodata.*)
+    *libdrivers__flash.a:spi_flash_rom_patch.*(.rodata  .rodata.*)
+
 
     KEEP(*(.jcr))
     *(.dram1 .dram1.*)
     . = ALIGN(4);
   } GROUP_DATA_LINK_IN(RAMABLE_REGION, ROMABLE_REGION)
 
-  #pragma push_macro("GROUP_ROM_LINK_IN")
-  #pragma push_macro("ITERABLE_SECTION_ROM")
-  #undef GROUP_ROM_LINK_IN
-  #undef ITERABLE_SECTION_ROM
-  #define GROUP_ROM_LINK_IN GROUP_DATA_LINK_IN
-  #define ITERABLE_SECTION_ROM(x,y)
-  #include <linker/common-rom.ld>
-  #pragma pop_macro("GROUP_ROM_LINK_IN")
-  #pragma pop_macro("ITERABLE_SECTION_ROM")
-
   #include <snippets-data-sections.ld>
   #include <linker/common-ram.ld>
   #include <snippets-ram-sections.ld>
 
-  __shell_root_cmds_start = __esp_shell_root_cmds_start;
-  __shell_root_cmds_end = __esp_shell_root_cmds_end;
+  /* logging sections should be placed in RAM area to avoid flash cache disabled issues */
+  #pragma push_macro("GROUP_ROM_LINK_IN")
+  #undef GROUP_ROM_LINK_IN
+  #define GROUP_ROM_LINK_IN GROUP_DATA_LINK_IN
+  #include "linker/common-rom/common-rom-logging.ld"
+  #pragma pop_macro("GROUP_ROM_LINK_IN")
 
   .dummy.dram.data :
   {

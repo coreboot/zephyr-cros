@@ -269,6 +269,25 @@ static ALWAYS_INLINE void dequeue_thread(struct k_thread *thread)
 	}
 }
 
+static void signal_pending_ipi(void)
+{
+	/* Synchronization note: you might think we need to lock these
+	 * two steps, but an IPI is idempotent.  It's OK if we do it
+	 * twice.  All we require is that if a CPU sees the flag true,
+	 * it is guaranteed to send the IPI, and if a core sets
+	 * pending_ipi, the IPI will be sent the next time through
+	 * this code.
+	 */
+#if defined(CONFIG_SMP) && defined(CONFIG_SCHED_IPI_SUPPORTED)
+	if (CONFIG_MP_NUM_CPUS > 1) {
+		if (_kernel.pending_ipi) {
+			_kernel.pending_ipi = false;
+			arch_sched_ipi();
+		}
+	}
+#endif
+}
+
 #ifdef CONFIG_SMP
 /* Called out of z_swap() when CONFIG_SMP.  The current thread can
  * never live in the run queue until we are inexorably on the context
@@ -281,6 +300,7 @@ void z_requeue_current(struct k_thread *curr)
 	if (z_is_thread_queued(curr)) {
 		runq_add(curr);
 	}
+	signal_pending_ipi();
 }
 
 static inline bool is_aborting(struct k_thread *thread)
@@ -583,6 +603,15 @@ static bool thread_active_elsewhere(struct k_thread *thread)
 	return false;
 }
 
+static void flag_ipi(void)
+{
+#if defined(CONFIG_SMP) && defined(CONFIG_SCHED_IPI_SUPPORTED)
+	if (CONFIG_MP_NUM_CPUS > 1) {
+		_kernel.pending_ipi = true;
+	}
+#endif
+}
+
 static void ready_thread(struct k_thread *thread)
 {
 #ifdef CONFIG_KERNEL_COHERENCE
@@ -597,9 +626,7 @@ static void ready_thread(struct k_thread *thread)
 
 		queue_thread(thread);
 		update_cache(0);
-#if defined(CONFIG_SMP) &&  defined(CONFIG_SCHED_IPI_SUPPORTED)
-		arch_sched_ipi();
-#endif
+		flag_ipi();
 	}
 }
 
@@ -886,9 +913,7 @@ void z_thread_priority_set(struct k_thread *thread, int prio)
 {
 	bool need_sched = z_set_prio(thread, prio);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_SCHED_IPI_SUPPORTED)
-	arch_sched_ipi();
-#endif
+	flag_ipi();
 
 	if (need_sched && _current->base.sched_locked == 0U) {
 		z_reschedule_unlocked();
@@ -928,6 +953,7 @@ void z_reschedule(struct k_spinlock *lock, k_spinlock_key_t key)
 		z_swap(lock, key);
 	} else {
 		k_spin_unlock(lock, key);
+		signal_pending_ipi();
 	}
 }
 
@@ -937,6 +963,7 @@ void z_reschedule_irqlock(uint32_t key)
 		z_swap_irqlock(key);
 	} else {
 		irq_unlock(key);
+		signal_pending_ipi();
 	}
 }
 
@@ -970,7 +997,16 @@ void k_sched_unlock(void)
 struct k_thread *z_swap_next_thread(void)
 {
 #ifdef CONFIG_SMP
-	return next_up();
+	struct k_thread *ret = next_up();
+
+	if (ret == _current) {
+		/* When not swapping, have to signal IPIs here.  In
+		 * the context switch case it must happen later, after
+		 * _current gets requeued.
+		 */
+		signal_pending_ipi();
+	}
+	return ret;
 #else
 	return _kernel.ready_q.cache;
 #endif
@@ -1070,6 +1106,7 @@ void *z_get_next_switch_handle(void *interrupted)
 			new_thread->switch_handle = NULL;
 		}
 	}
+	signal_pending_ipi();
 	return ret;
 #else
 	z_sched_usage_switch(_kernel.ready_q.cache);
@@ -1475,9 +1512,7 @@ void z_impl_k_wakeup(k_tid_t thread)
 	z_mark_thread_as_not_suspended(thread);
 	z_ready_thread(thread);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_SCHED_IPI_SUPPORTED)
-	arch_sched_ipi();
-#endif
+	flag_ipi();
 
 	if (!arch_is_in_isr()) {
 		z_reschedule_unlocked();
@@ -1683,6 +1718,9 @@ void z_thread_abort(struct k_thread *thread)
 		/* It's running somewhere else, flag and poke */
 		thread->base.thread_state |= _THREAD_ABORTING;
 
+		/* We're going to spin, so need a true synchronous IPI
+		 * here, not deferred!
+		 */
 #ifdef CONFIG_SCHED_IPI_SUPPORTED
 		arch_sched_ipi();
 #endif

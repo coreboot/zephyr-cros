@@ -9,6 +9,7 @@
 #include <dt-bindings/clock/imx_ccm.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/i2c/i2c.h>
+#include <dt-bindings/pwm/pwm.h>
 
 / {
 	chosen {
@@ -449,7 +450,7 @@
 				index = <0>;
 				label = "FLEXPWM1_PWM0";
 				interrupts = <102 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -459,7 +460,7 @@
 				index = <1>;
 				label = "FLEXPWM1_PWM1";
 				interrupts = <103 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -469,7 +470,7 @@
 				index = <2>;
 				label = "FLEXPWM1_PWM2";
 				interrupts = <104 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -479,7 +480,7 @@
 				index = <3>;
 				label = "FLEXPWM1_PWM3";
 				interrupts = <105 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -495,7 +496,7 @@
 				index = <0>;
 				label = "FLEXPWM2_PWM0";
 				interrupts = <137 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -505,7 +506,7 @@
 				index = <1>;
 				label = "FLEXPWM2_PWM1";
 				interrupts = <138 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -515,7 +516,7 @@
 				index = <2>;
 				label = "FLEXPWM2_PWM2";
 				interrupts = <139 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -525,7 +526,7 @@
 				index = <3>;
 				label = "FLEXPWM2_PWM3";
 				interrupts = <140 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -541,7 +542,7 @@
 				index = <0>;
 				label = "FLEXPWM3_PWM0";
 				interrupts = <142 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -551,7 +552,7 @@
 				index = <1>;
 				label = "FLEXPWM3_PWM1";
 				interrupts = <143 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -561,7 +562,7 @@
 				index = <2>;
 				label = "FLEXPWM3_PWM2";
 				interrupts = <144 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -571,7 +572,7 @@
 				index = <3>;
 				label = "FLEXPWM3_PWM3";
 				interrupts = <145 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -587,7 +588,7 @@
 				index = <0>;
 				label = "FLEXPWM4_PWM0";
 				interrupts = <147 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -597,7 +598,7 @@
 				index = <1>;
 				label = "FLEXPWM4_PWM1";
 				interrupts = <148 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -607,7 +608,7 @@
 				index = <2>;
 				label = "FLEXPWM4_PWM2";
 				interrupts = <149 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -617,7 +618,7 @@
 				index = <3>;
 				label = "FLEXPWM4_PWM3";
 				interrupts = <150 0>;
-				#pwm-cells = <1>;
+				#pwm-cells = <2>;
 				clocks = <&ccm IMX_CCM_PWM_CLK 0 0>;
 				status = "disabled";
 			};
@@ -684,7 +685,11 @@
 			status = "disabled";
 			interrupts = <110 0>;
 			clocks = <&ccm IMX_CCM_USDHC1_CLK 0 0>;
-			label = "USDHC_1";
+			label = "SDHC_0";
+			max-current-330 = <1020>;
+			max-current-180 = <1020>;
+			max-bus-freq = <208000000>;
+			min-bus-freq = <400000>;
 		};
 
 		usdhc2: usdhc@402c4000 {
@@ -693,7 +698,11 @@
 			status = "disabled";
 			interrupts = <111 0>;
 			clocks = <&ccm IMX_CCM_USDHC2_CLK 0 0>;
-			label = "USDHC_2";
+			label = "SDHC_1";
+			max-current-330 = <120>;
+			max-current-180 = <45>;
+			max-bus-freq = <198000000>;
+			min-bus-freq = <400000>;
 		};
 
 		csi: csi@402bc000 {

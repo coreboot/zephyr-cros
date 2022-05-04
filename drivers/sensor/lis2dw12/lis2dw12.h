@@ -68,6 +68,11 @@ struct lis2dw12_device_config {
 	} stmemsc_cfg;
 	lis2dw12_mode_t pm;
 	uint8_t range;
+	uint8_t bw_filt;
+	bool low_noise;
+	bool hp_filter_path;
+	bool hp_ref_mode;
+	bool drdy_pulsed;
 #ifdef CONFIG_LIS2DW12_TRIGGER
 	struct gpio_dt_spec gpio_int;
 	uint8_t int_pin;
@@ -97,6 +102,9 @@ struct lis2dw12_data {
 	sensor_trigger_handler_t tap_handler;
 	sensor_trigger_handler_t double_tap_handler;
 #endif /* CONFIG_LIS2DW12_TAP */
+#ifdef CONFIG_LIS2DW12_THRESHOLD
+	sensor_trigger_handler_t threshold_handler;
+#endif /* CONFIG_LIS2DW12_THRESHOLD */
 #if defined(CONFIG_LIS2DW12_TRIGGER_OWN_THREAD)
 	K_KERNEL_STACK_MEMBER(thread_stack, CONFIG_LIS2DW12_THREAD_STACK_SIZE);
 	struct k_thread thread;

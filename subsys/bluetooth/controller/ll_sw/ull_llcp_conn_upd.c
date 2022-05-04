@@ -212,6 +212,7 @@ static void lp_cu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 		break;
 #endif /* CONFIG_BT_CENTRAL */
 	default:
+		/* Unknown opcode */
 		LL_ASSERT(0);
 		break;
 	}
@@ -220,6 +221,13 @@ static void lp_cu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 
 	/* Enqueue LL Control PDU towards LLL */
 	llcp_tx_enqueue(conn, tx);
+
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
+	if (ctx->proc == PROC_CONN_PARAM_REQ) {
+		/* Restart procedure response timeout timer */
+		llcp_lr_prt_restart(conn);
+	}
+#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 }
 
 static void lp_cu_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
@@ -486,6 +494,14 @@ static void lp_cu_check_instant(struct ll_conn *conn, struct proc_ctx *ctx, uint
 		 */
 		llcp_rr_set_incompat(conn, INCOMPAT_NO_COLLISION);
 		cu_update_conn_parameters(conn, ctx);
+
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
+		if (ctx->proc == PROC_CONN_PARAM_REQ) {
+			/* Stop procedure response timeout timer */
+			llcp_lr_prt_stop(conn);
+		}
+#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
+
 		notify = cu_should_notify_host(ctx);
 		if (notify) {
 			ctx->data.cu.error = BT_HCI_ERR_SUCCESS;
@@ -586,8 +602,11 @@ void llcp_lp_cu_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pd
 		lp_cu_execute_fsm(conn, ctx, LP_CU_EVT_REJECT, pdu);
 		break;
 	default:
-		/* Unknown opcode */
-		LL_ASSERT(0);
+		/* Invalid behaviour */
+		/* Invalid PDU received so terminate connection */
+		conn->llcp_terminate.reason_final = BT_HCI_ERR_LMP_PDU_NOT_ALLOWED;
+		llcp_lr_complete(conn);
+		ctx->state = LP_CU_STATE_IDLE;
 		break;
 	}
 }
@@ -637,6 +656,7 @@ static void rp_cu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 		llcp_pdu_encode_unknown_rsp(ctx, pdu);
 		break;
 	default:
+		/* Unknown opcode */
 		LL_ASSERT(0);
 		break;
 	}
@@ -645,6 +665,13 @@ static void rp_cu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 
 	/* Enqueue LL Control PDU towards LLL */
 	llcp_tx_enqueue(conn, tx);
+
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
+	if (ctx->proc == PROC_CONN_PARAM_REQ) {
+		/* Restart procedure response timeout timer */
+		llcp_rr_prt_restart(conn);
+	}
+#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 }
 
 static void rp_cu_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
@@ -917,35 +944,6 @@ static void rp_cu_st_wait_tx_conn_update_ind(struct ll_conn *conn, struct proc_c
 	}
 }
 
-static void rp_cu_st_wait_rx_conn_update_ind(struct ll_conn *conn, struct proc_ctx *ctx,
-					     uint8_t evt, void *param)
-{
-	switch (evt) {
-	case RP_CU_EVT_CONN_UPDATE_IND:
-		switch (conn->lll.role) {
-		case BT_HCI_ROLE_CENTRAL:
-			ctx->unknown_response.type = PDU_DATA_LLCTRL_TYPE_CONN_UPDATE_IND;
-			rp_cu_send_unknown_rsp(conn, ctx, evt, param);
-			break;
-		case BT_HCI_ROLE_PERIPHERAL:
-			llcp_pdu_decode_conn_update_ind(ctx, param);
-			/* TODO(tosk): skip/terminate if instant passed? */
-#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
-			/* conn param req procedure, if any, is complete */
-			ull_conn_prt_clear(conn);
-#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
-			ctx->state = RP_CU_STATE_WAIT_INSTANT;
-			break;
-		default:
-			/* Unknown role */
-			LL_ASSERT(0);
-		}
-	default:
-		/* Ignore other evts */
-		break;
-	}
-}
-
 static void rp_cu_check_instant(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t evt,
 				void *param)
 {
@@ -958,6 +956,14 @@ static void rp_cu_check_instant(struct ll_conn *conn, struct proc_ctx *ctx, uint
 		 * new connection event parameters have been applied.
 		 */
 		cu_update_conn_parameters(conn, ctx);
+
+#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
+		if (ctx->proc == PROC_CONN_PARAM_REQ) {
+			/* Stop procedure response timeout timer */
+			llcp_rr_prt_stop(conn);
+		}
+#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
+
 		notify = cu_should_notify_host(ctx);
 		if (notify) {
 			ctx->data.cu.error = BT_HCI_ERR_SUCCESS;
@@ -966,6 +972,32 @@ static void rp_cu_check_instant(struct ll_conn *conn, struct proc_ctx *ctx, uint
 			llcp_rr_complete(conn);
 			ctx->state = RP_CU_STATE_IDLE;
 		}
+	}
+}
+
+static void rp_cu_st_wait_rx_conn_update_ind(struct ll_conn *conn, struct proc_ctx *ctx,
+					     uint8_t evt, void *param)
+{
+	switch (evt) {
+	case RP_CU_EVT_CONN_UPDATE_IND:
+		switch (conn->lll.role) {
+		case BT_HCI_ROLE_CENTRAL:
+			ctx->unknown_response.type = PDU_DATA_LLCTRL_TYPE_CONN_UPDATE_IND;
+			rp_cu_send_unknown_rsp(conn, ctx, evt, param);
+			break;
+		case BT_HCI_ROLE_PERIPHERAL:
+			llcp_pdu_decode_conn_update_ind(ctx, param);
+			ctx->state = RP_CU_STATE_WAIT_INSTANT;
+			/* In case we only just received it in time */
+			rp_cu_check_instant(conn, ctx, evt, param);
+			break;
+		default:
+			/* Unknown role */
+			LL_ASSERT(0);
+		}
+	default:
+		/* Ignore other evts */
+		break;
 	}
 }
 
@@ -1053,8 +1085,11 @@ void llcp_rp_cu_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pd
 		rp_cu_execute_fsm(conn, ctx, RP_CU_EVT_CONN_UPDATE_IND, pdu);
 		break;
 	default:
-		/* Unknown opcode */
-		LL_ASSERT(0);
+		/* Invalid behaviour */
+		/* Invalid PDU received so terminate connection */
+		conn->llcp_terminate.reason_final = BT_HCI_ERR_LMP_PDU_NOT_ALLOWED;
+		llcp_rr_complete(conn);
+		ctx->state = RP_CU_STATE_IDLE;
 		break;
 	}
 }

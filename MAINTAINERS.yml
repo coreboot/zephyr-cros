@@ -322,6 +322,18 @@ CMSIS-DSP integration:
     labels:
         - "area: CMSIS-DSP"
 
+CMSIS-NN integration:
+    status: maintained
+    maintainers:
+        - JordanYates
+    collaborators:
+        - stephanosio
+    files:
+        - modules/Kconfig.cmsis_nn
+        - tests/lib/cmsis_nn/
+    labels:
+        - "area: CMSIS-NN"
+
 Common Architecture Interface:
     status: odd fixes
     collaborators:
@@ -404,9 +416,9 @@ Devicetree:
 Disk:
     status: maintained
     maintainers:
-        - jfischer-no
-    collaborators:
         - danieldegrasse
+    collaborators:
+        - jfischer-no
     files:
         - include/zephyr/storage/disk_access.h
         - include/zephyr/drivers/disk.h
@@ -488,9 +500,7 @@ Documentation:
     collaborators:
         - alexanderwachter
         - karstenkoenig
-        - nixward
         - martinjaeger
-        - legoabram
     files:
         - doc/hardware/peripherals/canbus/
         - drivers/can/
@@ -1776,6 +1786,20 @@ TF-M Integration:
         - modules/trusted-firmware-m/
     labels:
         - "area: TF-M"
+
+Toolchain Integration:
+    status: maintained
+    maintainers:
+        - tejlmand
+    collaborators:
+        - stephanosio
+    files:
+        - cmake/bintools/
+        - cmake/compiler/
+        - cmake/linker/
+        - cmake/toolchain/
+    labels:
+        - "area: Toolchains"
 
 Tracing:
     status: maintained

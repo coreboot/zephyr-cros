@@ -304,6 +304,20 @@ static inline void pu_combine_phys(struct ll_conn *conn, struct proc_ctx *ctx, u
 	}
 }
 
+#if defined(CONFIG_BT_CENTRAL)
+static void pu_prepare_instant(struct ll_conn *conn, struct proc_ctx *ctx)
+{
+	/* Set instance only in case there is actual PHY change. Otherwise the instant should be
+	 * set to 0.
+	 */
+	if (ctx->data.pu.tx != 0 && ctx->data.pu.rx != 0) {
+		ctx->data.pu.instant = ull_conn_event_counter(conn) + PHY_UPDATE_INSTANT_DELTA;
+	} else {
+		ctx->data.pu.instant = 0;
+	}
+}
+#endif /* CONFIG_BT_CENTRAL */
+
 /*
  * LLCP Local Procedure PHY Update FSM
  */
@@ -342,8 +356,8 @@ static void lp_pu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 	/* Enqueue LL Control PDU towards LLL */
 	llcp_tx_enqueue(conn, tx);
 
-	/* Update procedure timeout */
-	ull_conn_prt_reload(conn, conn->procedure_reload);
+	/* Restart procedure response timeout timer */
+	llcp_lr_prt_restart(conn);
 }
 
 static void pu_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
@@ -459,7 +473,7 @@ static void lp_pu_send_phy_update_ind(struct ll_conn *conn, struct proc_ctx *ctx
 	if (llcp_lr_ispaused(conn) || !llcp_tx_alloc_peek(conn, ctx)) {
 		ctx->state = LP_PU_STATE_WAIT_TX_PHY_UPDATE_IND;
 	} else {
-		ctx->data.pu.instant = ull_conn_event_counter(conn) + PHY_UPDATE_INSTANT_DELTA;
+		pu_prepare_instant(conn, ctx);
 		lp_pu_tx(conn, ctx, PDU_DATA_LLCTRL_TYPE_PHY_UPD_IND);
 		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
 		ctx->state = LP_PU_STATE_WAIT_TX_ACK_PHY_UPDATE_IND;
@@ -587,8 +601,10 @@ static void lp_pu_st_wait_tx_ack_phy_update_ind(struct ll_conn *conn, struct pro
 				pu_set_timing_restrict(conn, ctx->data.pu.c_to_p_phy);
 			}
 
-			/* Since at least one phy will change we clear procedure response timeout */
-			ull_conn_prt_clear(conn);
+			/* Since at least one phy will change,
+			 * stop the procedure response timeout
+			 */
+			llcp_lr_prt_stop(conn);
 
 			/* Now we should wait for instant */
 			ctx->state = LP_PU_STATE_WAIT_INSTANT;
@@ -623,8 +639,10 @@ static void lp_pu_st_wait_rx_phy_update_ind(struct ll_conn *conn, struct proc_ct
 				pu_set_timing_restrict(conn, ctx->data.pu.p_to_c_phy);
 			}
 
-			/* Since at least one phy will change we clear procedure response timeout */
-			ull_conn_prt_clear(conn);
+			/* Since at least one phy will change,
+			 * stop the procedure response timeout
+			 */
+			llcp_lr_prt_stop(conn);
 
 			ctx->state = LP_PU_STATE_WAIT_INSTANT;
 		} else {
@@ -749,8 +767,12 @@ void llcp_lp_pu_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pd
 		lp_pu_execute_fsm(conn, ctx, LP_PU_EVT_REJECT, pdu);
 		break;
 	default:
-		/* Unknown opcode */
-		LL_ASSERT(0);
+		/* Invalid behaviour */
+		/* Invalid PDU received so terminate connection */
+		conn->llcp_terminate.reason_final = BT_HCI_ERR_LMP_PDU_NOT_ALLOWED;
+		llcp_lr_complete(conn);
+		ctx->state = LP_PU_STATE_IDLE;
+		break;
 	}
 }
 
@@ -805,6 +827,9 @@ static void rp_pu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 
 	/* Enqueue LL Control PDU towards LLL */
 	llcp_tx_enqueue(conn, tx);
+
+	/* Restart procedure response timeout timer */
+	llcp_rr_prt_restart(conn);
 }
 
 static void rp_pu_complete(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t evt, void *param)
@@ -861,8 +886,9 @@ static void rp_pu_send_phy_update_ind(struct ll_conn *conn, struct proc_ctx *ctx
 		ctx->state = RP_PU_STATE_WAIT_TX_PHY_UPDATE_IND;
 	} else {
 		llcp_rr_set_paused_cmd(conn, PROC_CTE_REQ);
-		ctx->data.pu.instant = ull_conn_event_counter(conn) + PHY_UPDATE_INSTANT_DELTA;
+		pu_prepare_instant(conn, ctx);
 		rp_pu_tx(conn, ctx, PDU_DATA_LLCTRL_TYPE_PHY_UPD_IND);
+
 		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
 		ctx->state = RP_PU_STATE_WAIT_TX_ACK_PHY_UPDATE_IND;
 	}
@@ -1010,8 +1036,10 @@ static void rp_pu_st_wait_rx_phy_update_ind(struct ll_conn *conn, struct proc_ct
 		const uint8_t end_procedure = pu_check_update_ind(conn, ctx);
 
 		if (!end_procedure) {
-			/* Since at least one phy will change we clear procedure response timeout */
-			ull_conn_prt_clear(conn);
+			/* Since at least one phy will change,
+			 * stop the procedure response timeout
+			 */
+			llcp_rr_prt_stop(conn);
 
 			ctx->state = LP_PU_STATE_WAIT_INSTANT;
 		} else {
@@ -1121,8 +1149,12 @@ void llcp_rp_pu_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pd
 		break;
 #endif /* CONFIG_BT_PERIPHERAL */
 	default:
-		/* Unknown opcode */
-		LL_ASSERT(0);
+		/* Invalid behaviour */
+		/* Invalid PDU received so terminate connection */
+		conn->llcp_terminate.reason_final = BT_HCI_ERR_LMP_PDU_NOT_ALLOWED;
+		llcp_rr_complete(conn);
+		ctx->state = RP_PU_STATE_IDLE;
+		break;
 	}
 }
 
