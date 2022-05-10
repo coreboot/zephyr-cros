@@ -14,12 +14,12 @@
 #define ZEPHYR_INCLUDE_KERNEL_H_
 
 #if !defined(_ASMLANGUAGE)
-#include <kernel_includes.h>
+#include <zephyr/kernel_includes.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
-#include <toolchain.h>
-#include <tracing/tracing_macros.h>
+#include <zephyr/toolchain.h>
+#include <zephyr/tracing/tracing_macros.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -463,6 +463,19 @@ __syscall int32_t k_usleep(int32_t us);
  * clock tolerances.
  */
 __syscall void k_busy_wait(uint32_t usec_to_wait);
+
+/**
+ * @brief Check whether it is possible to yield in the current context.
+ *
+ * This routine checks whether the kernel is in a state where it is possible to
+ * yield or call blocking API's. It should be used by code that needs to yield
+ * to perform correctly, but can feasibly be called from contexts where that
+ * is not possible. For example in the PRE_KERNEL initialization step, or when
+ * being run from the idle thread.
+ *
+ * @return True if it is possible to yield in the current context, false otherwise.
+ */
+bool k_can_yield(void);
 
 /**
  * @brief Yield the current thread.
@@ -5922,7 +5935,7 @@ extern void k_sys_runtime_stats_disable(void);
 }
 #endif
 
-#include <tracing/tracing.h>
+#include <zephyr/tracing/tracing.h>
 #include <syscalls/kernel.h>
 
 #endif /* !_ASMLANGUAGE */

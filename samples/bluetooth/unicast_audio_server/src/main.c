@@ -7,14 +7,14 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <errno.h>
-#include <zephyr.h>
-#include <sys/printk.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/sys/printk.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/audio/audio.h>
-#include <bluetooth/audio/capabilities.h>
-#include <sys/byteorder.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/audio/audio.h>
+#include <zephyr/bluetooth/audio/capabilities.h>
+#include <zephyr/sys/byteorder.h>
 
 #define MAX_PAC 1
 
@@ -36,10 +36,8 @@ static struct bt_codec lc3_codec =
 		     1u, (BT_AUDIO_CONTEXT_TYPE_CONVERSATIONAL | BT_AUDIO_CONTEXT_TYPE_MEDIA),
 		     BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED);
 
-NET_BUF_POOL_FIXED_DEFINE(tx_pool, 1, CONFIG_BT_ISO_TX_MTU, 8, NULL);
 static struct bt_conn *default_conn;
 static struct bt_audio_stream streams[MAX_PAC];
-
 
 static uint8_t unicast_server_addata[] = {
 	BT_UUID_16_ENCODE(BT_UUID_ASCS_VAL), /* ASCS UUID */

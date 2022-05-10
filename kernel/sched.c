@@ -3,21 +3,21 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <kernel.h>
+#include <zephyr/kernel.h>
 #include <ksched.h>
-#include <spinlock.h>
-#include <kernel/sched_priq.h>
-#include <wait_q.h>
+#include <zephyr/spinlock.h>
+#include <zephyr/kernel/sched_priq.h>
+#include <zephyr/wait_q.h>
 #include <kswap.h>
 #include <kernel_arch_func.h>
-#include <syscall_handler.h>
-#include <drivers/timer/system_timer.h>
+#include <zephyr/syscall_handler.h>
+#include <zephyr/drivers/timer/system_timer.h>
 #include <stdbool.h>
 #include <kernel_internal.h>
-#include <logging/log.h>
-#include <sys/atomic.h>
-#include <sys/math_extras.h>
-#include <timing/timing.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/math_extras.h>
+#include <zephyr/timing/timing.h>
 
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
@@ -1362,6 +1362,12 @@ static inline void z_vrfy_k_thread_deadline_set(k_tid_t tid, int deadline)
 #endif
 #endif
 
+bool k_can_yield(void)
+{
+	return !(k_is_pre_kernel() || k_is_in_isr() ||
+		 z_is_idle_thread_object(_current));
+}
+
 void z_impl_k_yield(void)
 {
 	__ASSERT(!arch_is_in_isr(), "");
@@ -1593,6 +1599,11 @@ BUILD_ASSERT(CONFIG_MP_NUM_CPUS <= 8, "Too many CPUs for mask word");
 static int cpu_mask_mod(k_tid_t thread, uint32_t enable_mask, uint32_t disable_mask)
 {
 	int ret = 0;
+
+#ifdef CONFIG_SCHED_CPU_MASK_PIN_ONLY
+	__ASSERT((thread->base.thread_state != _THREAD_PRESTART),
+		 "Only PRESTARTED threads can change CPU pin");
+#endif
 
 	LOCKED(&sched_spinlock) {
 		if (z_is_thread_prevented_from_running(thread)) {

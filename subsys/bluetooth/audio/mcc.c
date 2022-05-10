@@ -8,19 +8,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <zephyr/types.h>
-#include <sys/byteorder.h>
-#include <sys/check.h>
-#include <device.h>
-#include <init.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/check.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/gatt.h>
-#include <bluetooth/audio/mcc.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/audio/mcc.h>
 
-#include <bluetooth/services/ots.h>
+#include <zephyr/bluetooth/services/ots.h>
 #include "../services/ots/ots_client_internal.h"
 
 /* TODO: Temporarily copied here from media_proxy_internal.h - clean up */
@@ -40,9 +40,6 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_MCC)
 #define LOG_MODULE_NAME bt_mcc
 #include "common/log.h"
-
-#define FIRST_HANDLE			0x0001
-#define LAST_HANDLE			0xFFFF
 
 struct mcs_instance_t {
 	uint16_t start_handle;
@@ -1494,8 +1491,8 @@ int bt_mcc_discover_mcs(struct bt_conn *conn, bool subscribe)
 	discover_params.func = discover_primary_func;
 	discover_params.uuid = &uuid.uuid;
 	discover_params.type = BT_GATT_DISCOVER_PRIMARY;
-	discover_params.start_handle = FIRST_HANDLE;
-	discover_params.end_handle = LAST_HANDLE;
+	discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
+	discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 
 	BT_DBG("start discovery of GMCS primary service");
 	return bt_gatt_discover(conn, &discover_params);

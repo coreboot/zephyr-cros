@@ -21,14 +21,14 @@
 #define ZEPHYR_KERNEL_INCLUDE_KERNEL_STRUCTS_H_
 
 #if !defined(_ASMLANGUAGE)
-#include <sys/atomic.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/types.h>
-#include <kernel/sched_priq.h>
-#include <sys/dlist.h>
-#include <sys/util.h>
-#include <sys/sys_heap.h>
-#include <arch/structs.h>
-#include <kernel/stats.h>
+#include <zephyr/kernel/sched_priq.h>
+#include <zephyr/sys/dlist.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/sys_heap.h>
+#include <zephyr/arch/structs.h>
+#include <zephyr/kernel/stats.h>
 #endif
 
 #ifdef __cplusplus
@@ -125,6 +125,10 @@ struct _cpu {
 #endif
 
 	uint8_t id;
+
+#if defined(CONFIG_FPU_SHARING)
+	void *fp_ctx;
+#endif
 
 #ifdef CONFIG_SMP
 	/* True when _current is allowed to context switch */

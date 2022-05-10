@@ -18,12 +18,12 @@
  */
 
 #include <stddef.h>
-#include <sys/slist.h>
+#include <zephyr/sys/slist.h>
 #include <sys/types.h>
-#include <sys/util.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/att.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/att.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -1175,12 +1175,13 @@ int bt_gatt_indicate(struct bt_conn *conn,
  *
  *  @param conn Connection object.
  *  @param attr Attribute object.
- *  @param ccc_value The subscription type, either notifications or indications.
+ *  @param ccc_type The subscription type, @ref BT_GATT_CCC_NOTIFY and/or
+ *                  @ref BT_GATT_CCC_INDICATE.
  *
  *  @return true if the attribute object has been subscribed.
  */
 bool bt_gatt_is_subscribed(struct bt_conn *conn,
-			   const struct bt_gatt_attr *attr, uint16_t ccc_value);
+			   const struct bt_gatt_attr *attr, uint16_t ccc_type);
 
 /** @brief Get ATT MTU for a connection
  *

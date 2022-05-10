@@ -7,13 +7,13 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <errno.h>
-#include <zephyr.h>
-#include <sys/printk.h>
+#include <zephyr/zephyr.h>
+#include <zephyr/sys/printk.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/audio/audio.h>
-#include <sys/byteorder.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/audio/audio.h>
+#include <zephyr/sys/byteorder.h>
 
 static void start_scan(void);
 
@@ -642,7 +642,7 @@ static int create_group(struct bt_audio_stream *stream)
 {
 	int err;
 
-	err = bt_audio_unicast_group_create(stream, 1, &unicast_group);
+	err = bt_audio_unicast_group_create(&stream, 1, &unicast_group);
 	if (err != 0) {
 		printk("Could not create unicast group (err %d)\n", err);
 		return err;

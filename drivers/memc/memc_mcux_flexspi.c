@@ -6,10 +6,10 @@
 
 #define DT_DRV_COMPAT	nxp_imx_flexspi
 
-#include <logging/log.h>
-#include <sys/util.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 #ifdef CONFIG_PINCTRL
-#include <drivers/pinctrl.h>
+#include <zephyr/drivers/pinctrl.h>
 #endif
 
 #include "memc_mcux_flexspi.h"
@@ -143,8 +143,11 @@ static int memc_flexspi_init(const struct device *dev)
 		return 0;
 	}
 
-	/* Apply pinctrl state */
-#ifdef CONFIG_PINCTRL
+	/*
+	 * SOCs such as the RT1064 and RT1024 have internal flash, and no pinmux
+	 * settings, so skip pin control state.
+	 */
+#if defined(CONFIG_PINCTRL) && !(defined(CONFIG_SOC_MIMXRT1064) || defined(CONFIG_SOC_MIMXRT1024))
 	int ret;
 
 	ret = pinctrl_apply_state(data->pincfg, PINCTRL_STATE_DEFAULT);

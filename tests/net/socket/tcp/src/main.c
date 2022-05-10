@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(net_test, CONFIG_NET_SOCKETS_LOG_LEVEL);
 
 #include <ztest_assert.h>
 #include <fcntl.h>
-#include <net/socket.h>
-#include <net/loopback.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/net/loopback.h>
 
 #include "../../socket_helpers.h"
 
@@ -709,18 +709,66 @@ void test_open_close_immediately(void)
 	zassert_not_equal(connect(c_sock, (struct sockaddr *)&s_saddr,
 				  sizeof(s_saddr)),
 			  0, "connect succeed");
+
 	test_close(c_sock);
+
+	/* Allow for the close communication to finish,
+	 * this makes the test success, no longer scheduling dependent
+	 */
+	k_sleep(K_MSEC(CONFIG_NET_TCP_INIT_RETRANSMISSION_TIMEOUT / 2));
 
 	/* After the client socket closing, the context count should be 1 */
 	net_context_foreach(calc_net_context, &count_after);
 
 	test_close(s_sock);
 
+	/* Although closing a server socket does not require communication,
+	 * wait a little to make the test robust to scheduling order
+	 */
+	k_sleep(K_MSEC(CONFIG_NET_TCP_INIT_RETRANSMISSION_TIMEOUT / 2));
+
 	zassert_equal(count_before - 1, count_after,
 		      "net_context still in use (before %d vs after %d)",
 		      count_before - 1, count_after);
 
-	k_sleep(TCP_TEARDOWN_TIMEOUT);
+	/* No need to wait here, as the test success depends on the socket being closed */
+}
+
+void test_connect_timeout(void)
+{
+	/* Test if socket connect fails when there is not communication
+	 * possible.
+	 */
+	int count_after = 0;
+	struct sockaddr_in c_saddr;
+	struct sockaddr_in s_saddr;
+	int c_sock;
+	int rv;
+
+	prepare_sock_tcp_v4(CONFIG_NET_CONFIG_MY_IPV4_ADDR, ANY_PORT,
+			    &c_sock, &c_saddr);
+
+	s_saddr.sin_family = AF_INET;
+	s_saddr.sin_port = htons(SERVER_PORT);
+	rv = zsock_inet_pton(AF_INET, CONFIG_NET_CONFIG_MY_IPV4_ADDR, &s_saddr.sin_addr);
+	zassert_equal(rv, 1, "inet_pton failed");
+
+	loopback_set_packet_drop_ratio(1.0f);
+
+	zassert_equal(connect(c_sock, (struct sockaddr *)&s_saddr,
+			    sizeof(s_saddr)),
+			    -1, "connect succeed");
+
+	zassert_equal(errno, ETIMEDOUT,
+			    "connect should be timed out, got %i", errno);
+
+	test_close(c_sock);
+
+	/* After the client socket closing, the context count should be 0 */
+	net_context_foreach(calc_net_context, &count_after);
+
+	zassert_equal(count_after, 0,
+			    "net_context still in use");
 }
 
 void test_v4_accept_timeout(void)
@@ -1119,6 +1167,8 @@ void test_v4_msg_waitall(void)
 	test_close(new_sock);
 	test_close(s_sock);
 	test_close(c_sock);
+
+	k_sleep(TCP_TEARDOWN_TIMEOUT);
 }
 
 void test_v6_msg_waitall(void)
@@ -1193,6 +1243,8 @@ void test_v6_msg_waitall(void)
 	test_close(new_sock);
 	test_close(s_sock);
 	test_close(c_sock);
+
+	k_sleep(TCP_TEARDOWN_TIMEOUT);
 }
 
 #ifdef CONFIG_USERSPACE
@@ -1282,6 +1334,8 @@ void test_main(void)
 		ztest_user_unit_test(test_shutdown_rd_synchronous),
 		ztest_unit_test(test_shutdown_rd_while_recv),
 		ztest_unit_test(test_open_close_immediately),
+		ztest_unit_test_setup_teardown(test_connect_timeout,
+		 restore_packet_loss_ratio, restore_packet_loss_ratio),
 		ztest_user_unit_test(test_v4_accept_timeout),
 		ztest_unit_test(test_so_type),
 		ztest_unit_test(test_so_protocol),

@@ -45,7 +45,7 @@
 #define LOG_MODULE_NAME net_lwm2m_rd_client
 #define LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
 
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <zephyr/types.h>
@@ -53,8 +53,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <init.h>
-#include <sys/printk.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/printk.h>
 
 #include "lwm2m_object.h"
 #include "lwm2m_engine.h"
@@ -552,6 +552,7 @@ static int sm_select_server_inst(int sec_obj_inst, int *srv_obj_inst,
 		return -EINVAL;
 	}
 
+	sm_update_lifetime(obj_inst_id, lifetime);
 	*srv_obj_inst = obj_inst_id;
 
 	return 0;
@@ -1127,7 +1128,7 @@ static void lwm2m_rd_client_service(struct k_work *work)
 	k_mutex_unlock(&client.mutex);
 }
 
-void lwm2m_rd_client_start(struct lwm2m_ctx *client_ctx, const char *ep_name,
+int lwm2m_rd_client_start(struct lwm2m_ctx *client_ctx, const char *ep_name,
 			   uint32_t flags, lwm2m_ctx_event_cb_t event_cb,
 			   lwm2m_observe_cb_t observe_cb)
 {
@@ -1139,7 +1140,15 @@ void lwm2m_rd_client_start(struct lwm2m_ctx *client_ctx, const char *ep_name,
 			"CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP.");
 
 		k_mutex_unlock(&client.mutex);
-		return;
+		return -ENOTSUP;
+	}
+
+	/* Check client idle state or socket is still active */
+
+	if (client.ctx && (client.engine_state != ENGINE_IDLE || client.ctx->sock_fd != -1)) {
+		LOG_WRN("Client is already running. state %d ", client.engine_state);
+		k_mutex_unlock(&client.mutex);
+		return -EINPROGRESS;
 	}
 
 	client.ctx = client_ctx;
@@ -1155,14 +1164,20 @@ void lwm2m_rd_client_start(struct lwm2m_ctx *client_ctx, const char *ep_name,
 	LOG_INF("Start LWM2M Client: %s", log_strdup(client.ep_name));
 
 	k_mutex_unlock(&client.mutex);
+	return 0;
 }
 
-void lwm2m_rd_client_stop(struct lwm2m_ctx *client_ctx,
+int lwm2m_rd_client_stop(struct lwm2m_ctx *client_ctx,
 			   lwm2m_ctx_event_cb_t event_cb, bool deregister)
 {
 	k_mutex_lock(&client.mutex, K_FOREVER);
 
-	client.ctx = client_ctx;
+	if (client.ctx != client_ctx) {
+		k_mutex_unlock(&client.mutex);
+		LOG_WRN("Cannot stop. Wrong context");
+		return -EPERM;
+	}
+
 	client.event_cb = event_cb;
 
 	if (sm_is_registered() && deregister) {
@@ -1178,6 +1193,7 @@ void lwm2m_rd_client_stop(struct lwm2m_ctx *client_ctx,
 	while (get_sm_state() != ENGINE_IDLE) {
 		k_sleep(K_MSEC(STATE_MACHINE_UPDATE_INTERVAL_MS / 2));
 	}
+	return 0;
 }
 
 void lwm2m_rd_client_update(void)
@@ -1219,8 +1235,34 @@ int lwm2m_rd_client_connection_resume(struct lwm2m_ctx *client_ctx)
 }
 #endif
 
+int lwm2m_rd_client_timeout(struct lwm2m_ctx *client_ctx)
+{
+	if (client.ctx != client_ctx) {
+		return -EPERM;
+	}
+
+	if (!sm_is_registered()) {
+		return 0;
+	}
+
+	LOG_WRN("Confirmable Timeout -> Re-connect and register");
+	client.engine_state = ENGINE_DO_REGISTRATION;
+	return 0;
+}
+
+bool lwm2m_rd_client_is_registred(struct lwm2m_ctx *client_ctx)
+{
+	if (client.ctx != client_ctx || !sm_is_registered()) {
+		return false;
+	}
+
+	return true;
+}
+
 static int lwm2m_rd_client_init(const struct device *dev)
 {
+	client.ctx = NULL;
+	client.engine_state = ENGINE_IDLE;
 	k_mutex_init(&client.mutex);
 
 	return lwm2m_engine_add_service(lwm2m_rd_client_service,

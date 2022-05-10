@@ -136,6 +136,11 @@ config HAS_MCUX_GPT
 	help
 	  Set if the general purpose timer (GPT) module is present in the SoC.
 
+config HAS_MCUX_QTMR
+	bool
+	help
+	  Set if the quad timer (QTMR) module is present in the SoC.
+
 config HAS_MCUX_GPC
 	bool
 	help
@@ -201,6 +206,12 @@ config HAS_MCUX_SRC
 	help
 	  Set if the system reset controller (SRC) module is present in the
 	  SoC.
+
+config HAS_MCUX_SRC_V2
+	bool
+	help
+	  Set if version 2 of the system reset controller (SRC) module is
+	  present in the SoC.
 
 config HAS_MCUX_TRNG
 	bool

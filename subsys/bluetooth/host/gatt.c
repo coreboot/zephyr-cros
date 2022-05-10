@@ -6,16 +6,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <sys/atomic.h>
-#include <sys/byteorder.h>
-#include <sys/util.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/util.h>
 
-#include <settings/settings.h>
+#include <zephyr/settings/settings.h>
 
 #if defined(CONFIG_BT_GATT_CACHING)
 #include <tinycrypt/constants.h>
@@ -25,12 +25,12 @@
 #include <tinycrypt/ccm_mode.h>
 #endif /* CONFIG_BT_GATT_CACHING */
 
-#include <bluetooth/hci.h>
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/gatt.h>
-#include <drivers/bluetooth/hci_driver.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/drivers/bluetooth/hci_driver.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_GATT)
 #define LOG_MODULE_NAME bt_gatt
@@ -2063,17 +2063,6 @@ struct notify_data {
 
 #if defined(CONFIG_BT_GATT_NOTIFY_MULTIPLE)
 
-struct nfy_mult_data {
-	bt_gatt_complete_func_t func;
-	void *user_data;
-};
-
-#define nfy_mult_user_data(buf) \
-	((struct nfy_mult_data *)net_buf_user_data(buf))
-#define nfy_mult_data_match(buf, _func, _user_data) \
-	((nfy_mult_user_data(buf)->func == _func) && \
-	(nfy_mult_user_data(buf)->user_data == _user_data))
-
 static struct net_buf *nfy_mult[CONFIG_BT_MAX_CONN];
 
 static int gatt_notify_mult_send(struct bt_conn *conn, struct net_buf **buf)
@@ -2883,7 +2872,7 @@ static uint8_t disconnected_cb(const struct bt_gatt_attr *attr, uint16_t handle,
 }
 
 bool bt_gatt_is_subscribed(struct bt_conn *conn,
-			   const struct bt_gatt_attr *attr, uint16_t ccc_value)
+			   const struct bt_gatt_attr *attr, uint16_t ccc_type)
 {
 	const struct _bt_gatt_ccc *ccc;
 
@@ -2924,7 +2913,7 @@ bool bt_gatt_is_subscribed(struct bt_conn *conn,
 		const struct bt_gatt_ccc_cfg *cfg = &ccc->cfg[i];
 
 		if (bt_conn_is_peer_addr_le(conn, cfg->id, &cfg->peer) &&
-		    (ccc_value & ccc->cfg[i].value)) {
+		    (ccc_type & ccc->cfg[i].value)) {
 			return true;
 		}
 	}

@@ -18,7 +18,7 @@
 #if defined(CONFIG_CPU_CORTEX_M)
 #include <zephyr/devicetree.h>
 
-#include <arch/arm/aarch32/cortex_m/nvic.h>
+#include <zephyr/arch/arm/aarch32/cortex_m/nvic.h>
 
 /* for assembler, only works with constants */
 #define Z_EXC_PRIO(pri) (((pri) << (8 - NUM_IRQ_PRIO_BITS)) & 0xff)
@@ -69,6 +69,14 @@ GTEXT(z_arm_exc_exit);
 extern "C" {
 #endif
 
+#if defined(CONFIG_FPU) && defined(CONFIG_FPU_SHARING)
+struct __fpu_sf {
+	float s[16];
+	uint32_t fpscr;
+	uint32_t undefined;
+};
+#endif
+
 /* Additional register state that is not stacked by hardware on exception
  * entry.
  *
@@ -83,6 +91,8 @@ struct __extra_esf_info {
 };
 #endif /* CONFIG_EXTRA_EXCEPTION_INFO */
 
+#if defined(CONFIG_CPU_CORTEX_M)
+
 struct __esf {
 	struct __basic_sf {
 		sys_define_gpr_with_alias(a1, r0);
@@ -95,14 +105,35 @@ struct __esf {
 		uint32_t xpsr;
 	} basic;
 #if defined(CONFIG_FPU) && defined(CONFIG_FPU_SHARING)
-	float s[16];
-	uint32_t fpscr;
-	uint32_t undefined;
+	struct __fpu_sf fpu;
 #endif
 #if defined(CONFIG_EXTRA_EXCEPTION_INFO)
 	struct __extra_esf_info extra_info;
 #endif
 };
+
+#else
+
+struct __esf {
+#if defined(CONFIG_EXTRA_EXCEPTION_INFO)
+	struct __extra_esf_info extra_info;
+#endif
+#if defined(CONFIG_FPU) && defined(CONFIG_FPU_SHARING)
+	struct __fpu_sf fpu;
+#endif
+	struct __basic_sf {
+		sys_define_gpr_with_alias(a1, r0);
+		sys_define_gpr_with_alias(a2, r1);
+		sys_define_gpr_with_alias(a3, r2);
+		sys_define_gpr_with_alias(a4, r3);
+		sys_define_gpr_with_alias(ip, r12);
+		sys_define_gpr_with_alias(lr, r14);
+		sys_define_gpr_with_alias(pc, r15);
+		uint32_t xpsr;
+	} basic;
+};
+
+#endif
 
 extern uint32_t z_arm_coredump_fault_sp;
 

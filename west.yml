@@ -35,7 +35,7 @@ manifest:
       revision: 094aeb41bb93e9199d24d665ee43e9e05d6d7b1c
       path: modules/lib/civetweb
     - name: cmsis
-      revision: ed63b704bbfaceb71220557b658304c5ea3d5b88
+      revision: 5f86244bad4ad5a590e084f0e72ba7a1416c2edf
       path: modules/hal/cmsis
       groups:
         - hal
@@ -91,7 +91,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 4464a6f96b4a6a1b7ac5ca1b8c3caf6a81d25e57
+      revision: a85bb3676d61d1ae202088e0d3fec556056b2c9e
       path: modules/hal/nordic
       groups:
         - hal
@@ -101,7 +101,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: c412e594ced8d2e997aea316396955a6e81d474d
+      revision: d287347745db7ccc85d267fddf3ce4f89a98ec1f
       path: modules/hal/nxp
       groups:
         - hal
@@ -132,7 +132,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 5945d50882a5133e6cab918d1214c3be373b2c6a
+      revision: e31e840271efc9939c8650598e169aa314208bdd
       path: modules/hal/stm32
       groups:
         - hal
@@ -142,7 +142,7 @@ manifest:
       groups:
         - hal
     - name: hal_ti
-      revision: a29a32b806a0a6380b785b950cb18229025ed699
+      revision: 0e06d96feaa114de9660cc1d3bdbbcf5892aa1c3
       path: modules/hal/ti
       groups:
         - hal
@@ -168,7 +168,7 @@ manifest:
       revision: 12019623bbad9eb54fe51066847a7cbd4b4eac57
       path: modules/lib/loramac-node
     - name: lvgl
-      revision: f6541c6015662715d331a5cf71216707122e4e22
+      revision: 9955c3e1e4f361884e938dc016da5a715a4527fe
       path: modules/lib/gui/lvgl
     - name: lz4
       revision: 8e303c264fc21c2116dc612658003a22e933124d

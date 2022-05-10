@@ -18,19 +18,19 @@
  * 10) Unlock all members
  */
 
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <zephyr/types.h>
 
-#include <device.h>
-#include <init.h>
-#include <sys/check.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/check.h>
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/conn.h>
-#include <bluetooth/gatt.h>
-#include <bluetooth/buf.h>
-#include <sys/byteorder.h>
-#include <bluetooth/audio/csis.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/buf.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/bluetooth/audio/csis.h>
 #include "csis_crypto.h"
 #include "csis_internal.h"
 #include "../host/conn_internal.h"
@@ -38,9 +38,6 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_CSIS_CLIENT)
 #define LOG_MODULE_NAME bt_csis_client
 #include "common/log.h"
-
-#define FIRST_HANDLE                    0x0001
-#define LAST_HANDLE                     0xFFFF
 
 static uint8_t gatt_write_buf[1];
 static struct bt_gatt_write_params write_params;
@@ -1321,8 +1318,8 @@ int bt_csis_client_discover(struct bt_csis_client_set_member *member)
 	discover_params.func = primary_discover_func;
 	discover_params.uuid = &uuid.uuid;
 	discover_params.type = BT_GATT_DISCOVER_PRIMARY;
-	discover_params.start_handle = FIRST_HANDLE;
-	discover_params.end_handle = LAST_HANDLE;
+	discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
+	discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 
 	err = bt_gatt_discover(member->conn, &discover_params);
 	if (err == 0) {

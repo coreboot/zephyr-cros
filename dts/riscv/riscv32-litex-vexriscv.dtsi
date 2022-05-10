@@ -45,8 +45,23 @@
 			compatible = "litex,uart0";
 			interrupt-parent = <&intc0>;
 			interrupts = <2 10>;
-			reg = <0xe0001800 0x18>;
-			reg-names = "control";
+			reg = <0xe0001800 0x4
+				0xe0001804 0x4
+				0xe0001808 0x4
+				0xe000180c 0x4
+				0xe0001810 0x4
+				0xe0001814 0x4
+				0xe0001818 0x4
+				0xe000181c 0x4>;
+			reg-names =
+				"rxtx",
+				"txfull",
+				"rxempty",
+				"ev_status",
+				"ev_pending",
+				"ev_enable",
+				"txempty",
+				"rxfull";
 			label = "uart0";
 			status = "disabled";
 		};
@@ -65,8 +80,23 @@
 			compatible = "litex,timer0";
 			interrupt-parent = <&intc0>;
 			interrupts = <1 0>;
-			reg = <0xe0002800 0x40>;
-			reg-names = "control";
+			reg = <0xe0002800 0x10
+				0xe0002810 0x10
+				0xe0002820 0x4
+				0xe0002824 0x4
+				0xe0002828 0x10
+				0xe0002838 0x4
+				0xe000283c 0x4
+				0xe0002840 0x4>;
+			reg-names =
+				"load",
+				"reload",
+				"en",
+				"update_value",
+				"value",
+				"ev_status",
+				"ev_pending",
+				"ev_enable";
 			label = "timer0";
 			status = "disabled";
 		};
@@ -74,9 +104,28 @@
 			compatible = "litex,eth0";
 			interrupt-parent = <&intc0>;
 			interrupts = <3 0>;
-			reg = <0xe0009800 0x6b 0xb0000000 0x2000>;
+			reg = <0xe0009800 0x4
+				0xe0009804 0x8
+				0xe0009828 0x4
+				0xe000982c 0x4
+				0xe0009830 0x4
+				0xe0009834 0x4
+				0xe000983c 0x4
+				0xe0009840 0x8
+				0xe000984c 0x4
+				0xb0000000 0x2000>;
 			local-mac-address = [10 e2 d5 00 00 02];
-			reg-names = "control", "buffers";
+			reg-names =
+				"rx_slot",
+				"rx_length",
+				"rx_ev_pending",
+				"rx_ev_enable",
+				"tx_start",
+				"tx_ready",
+				"tx_slot",
+				"tx_length",
+				"tx_ev_pending",
+				"buffers";
 			label = "eth0";
 			status = "disabled";
 		};

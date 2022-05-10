@@ -6,20 +6,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <sys/atomic.h>
-#include <sys/byteorder.h>
-#include <sys/util.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/util.h>
 
-#include <bluetooth/hci.h>
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/uuid.h>
-#include <bluetooth/att.h>
-#include <bluetooth/gatt.h>
-#include <drivers/bluetooth/hci_driver.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/att.h>
+#include <zephyr/bluetooth/gatt.h>
+#include <zephyr/drivers/bluetooth/hci_driver.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_ATT)
 #define LOG_MODULE_NAME bt_att
@@ -3039,6 +3039,17 @@ static void bt_att_released(struct bt_l2cap_chan *ch)
 	k_mem_slab_free(&chan_slab, (void **)&chan);
 }
 
+#if defined(CONFIG_BT_EATT)
+static void bt_att_reconfigured(struct bt_l2cap_chan *l2cap_chan)
+{
+	struct bt_att_chan *att_chan = ATT_CHAN(l2cap_chan);
+
+	BT_DBG("chan %p", att_chan);
+
+	att_chan_mtu_updated(att_chan);
+}
+#endif /* CONFIG_BT_EATT */
+
 static struct bt_att_chan *att_chan_new(struct bt_att *att, atomic_val_t flags)
 {
 	int quota = 0;
@@ -3052,6 +3063,9 @@ static struct bt_att_chan *att_chan_new(struct bt_att *att, atomic_val_t flags)
 		.encrypt_change = bt_att_encrypt_change,
 	#endif /* CONFIG_BT_SMP */
 		.released = bt_att_released,
+	#if defined(CONFIG_BT_EATT)
+		.reconfigured = bt_att_reconfigured,
+	#endif /* CONFIG_BT_EATT */
 	};
 	struct bt_att_chan *chan;
 
@@ -3325,6 +3339,37 @@ int bt_eatt_disconnect_one(struct bt_conn *conn)
 	}
 
 	return err;
+}
+
+int bt_eatt_reconfigure(struct bt_conn *conn, uint16_t mtu)
+{
+	struct bt_att_chan *att_chan = att_get_fixed_chan(conn);
+	struct bt_att *att = att_chan->att;
+	struct bt_l2cap_chan *chans[CONFIG_BT_EATT_MAX + 1] = {};
+	size_t offset = 0;
+	size_t i = 0;
+	int err;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&att->chans, att_chan, node) {
+		if (atomic_test_bit(att_chan->flags, ATT_ENHANCED)) {
+			chans[i] = &att_chan->chan.chan;
+			i++;
+		}
+	}
+
+	while (offset < i) {
+		/* bt_l2cap_ecred_chan_reconfigure() uses the first L2CAP_ECRED_CHAN_MAX_PER_REQ
+		 * elements of the array or until a null-terminator is reached.
+		 */
+		err = bt_l2cap_ecred_chan_reconfigure(&chans[offset], mtu);
+		if (err < 0) {
+			return err;
+		}
+
+		offset += L2CAP_ECRED_CHAN_MAX_PER_REQ;
+	}
+
+	return 0;
 }
 #endif /* CONFIG_BT_TESTING */
 #endif /* CONFIG_BT_EATT */
