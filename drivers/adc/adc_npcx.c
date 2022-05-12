@@ -38,11 +38,10 @@ LOG_MODULE_REGISTER(adc_npcx, CONFIG_ADC_LOG_LEVEL);
 #define NPCX_ADC_CHN_CONVERSION_MODE	0
 #define NPCX_ADC_SCAN_CONVERSION_MODE	1
 
-/* ADC threshold detector number */
-#define NPCX_ADC_THRESHOLD_COUNT   DT_INST_PROP(0, threshold_count)
-
 #define ADC_NPCX_THRVAL_RESOLUTION	10
 #define ADC_NPCX_THRVAL_MAX		BIT_MASK(ADC_NPCX_THRVAL_RESOLUTION)
+
+#define THRCTL(dev, ctl_no) (*((volatile uint16_t *) npcx_thrctl_reg(dev, ctl_no)))
 
 /* Device config */
 struct adc_npcx_config {
@@ -52,6 +51,10 @@ struct adc_npcx_config {
 	struct npcx_clk_cfg clk_cfg;
 	/* pinmux configuration */
 	const struct npcx_alt *alts_list;
+	/* amount of thresholds supported */
+	const uint8_t threshold_count;
+	/* threshold control register offset */
+	const uint16_t threshold_reg_offset;
 };
 
 struct adc_npcx_threshold_control {
@@ -91,7 +94,8 @@ struct adc_npcx_threshold_data {
 	 */
 	uint8_t active_thresholds;
 	/* This array holds current configuration for each threshold. */
-	struct adc_npcx_threshold_control control[NPCX_ADC_THRESHOLD_COUNT];
+	struct adc_npcx_threshold_control
+			control[DT_INST_PROP(0, threshold_count)];
 };
 
 /* Driver data */
@@ -119,6 +123,14 @@ struct adc_npcx_data {
 #define HAL_INSTANCE(dev) ((struct adc_reg *)((const struct adc_npcx_config *)(dev)->config)->base)
 
 /* ADC local functions */
+static inline uint32_t npcx_thrctl_reg(const struct device *dev,
+				       uint32_t ctl_no)
+{
+	const struct adc_npcx_config *config = dev->config;
+
+	return (config->base + config->threshold_reg_offset) + (ctl_no - 1) * 2;
+}
+
 static void adc_npcx_isr(const struct device *dev)
 {
 	const struct adc_npcx_config *config = dev->config;
@@ -177,12 +189,12 @@ static void adc_npcx_isr(const struct device *dev)
 	}
 	uint16_t thrcts;
 
-	for (uint8_t i = 0; i < NPCX_ADC_THRESHOLD_COUNT; i++) {
+	for (uint8_t i = 0; i < config->threshold_count; i++) {
 		if (IS_BIT_SET(inst->THRCTS, i) && IS_BIT_SET(inst->THRCTS,
 		    (NPCX_THRCTS_THR1_IEN + i))) {
 			/* Avoid clearing other threshold status */
 			thrcts = inst->THRCTS &
-				 ~GENMASK(NPCX_ADC_THRESHOLD_COUNT - 1, 0);
+				 ~GENMASK(config->threshold_count - 1, 0);
 			/* Clear threshold status */
 			thrcts |= BIT(i);
 			inst->THRCTS = thrcts;
@@ -428,6 +440,7 @@ int adc_npcx_threshold_ctrl_set_param(const struct device *dev,
 				      const struct adc_npcx_threshold_param
 				      *param)
 {
+	const struct adc_npcx_config *config = dev->config;
 	struct adc_npcx_data *const data = dev->data;
 	struct adc_npcx_threshold_data *const t_data = data->threshold_data;
 	struct adc_npcx_threshold_control *const t_ctrl =
@@ -438,7 +451,7 @@ int adc_npcx_threshold_ctrl_set_param(const struct device *dev,
 		return -EOPNOTSUPP;
 	}
 
-	if (!param || th_sel >= NPCX_ADC_THRESHOLD_COUNT) {
+	if (!param || th_sel >= config->threshold_count) {
 		return -EINVAL;
 	}
 
@@ -487,7 +500,7 @@ static int adc_npcx_threshold_ctrl_setup(const struct device *dev,
 	struct adc_npcx_threshold_control *const t_ctrl =
 					&t_data->control[th_sel];
 
-	if (th_sel >= NPCX_ADC_THRESHOLD_COUNT) {
+	if (th_sel >= config->threshold_count) {
 		return -EINVAL;
 	}
 
@@ -508,16 +521,16 @@ static int adc_npcx_threshold_ctrl_setup(const struct device *dev,
 		return -EINVAL;
 	}
 
-	SET_FIELD(THRCTL(config->base, (th_sel + 1)),
+	SET_FIELD(THRCTL(dev, (th_sel + 1)),
 		  NPCX_THRCTL_CHNSEL, t_ctrl->chnsel);
 
 	if (t_ctrl->l_h) {
-		THRCTL(config->base, (th_sel + 1)) |= BIT(NPCX_THRCTL_L_H);
+		THRCTL(dev, (th_sel + 1)) |= BIT(NPCX_THRCTL_L_H);
 	} else {
-		THRCTL(config->base, (th_sel + 1)) &= ~BIT(NPCX_THRCTL_L_H);
+		THRCTL(dev, (th_sel + 1)) &= ~BIT(NPCX_THRCTL_L_H);
 	}
 	/* Set the threshold value. */
-	SET_FIELD(THRCTL(config->base, (th_sel + 1)), NPCX_THRCTL_THRVAL,
+	SET_FIELD(THRCTL(dev, (th_sel + 1)), NPCX_THRCTL_THRVAL,
 		  t_ctrl->thrval);
 
 	adc_context_release(&data->ctx, 0);
@@ -535,7 +548,7 @@ static int adc_npcx_threshold_enable_irq(const struct device *dev,
 					&t_data->control[th_sel];
 	uint16_t thrcts;
 
-	if (th_sel >= NPCX_ADC_THRESHOLD_COUNT) {
+	if (th_sel >= config->threshold_count) {
 		LOG_ERR("Invalid ADC threshold selection! (%d)", th_sel);
 		return -EINVAL;
 	}
@@ -553,10 +566,10 @@ static int adc_npcx_threshold_enable_irq(const struct device *dev,
 	t_data->active_thresholds |= BIT(th_sel);
 
 	/* avoid clearing other threshold status */
-	thrcts = inst->THRCTS & ~GENMASK(NPCX_ADC_THRESHOLD_COUNT - 1, 0);
+	thrcts = inst->THRCTS & ~GENMASK(config->threshold_count - 1, 0);
 
 	/* Enable threshold detection */
-	THRCTL(config->base, (th_sel + 1)) |= BIT(NPCX_THRCTL_THEN);
+	THRCTL(dev, (th_sel + 1)) |= BIT(NPCX_THRCTL_THEN);
 
 	/* clear threshold status */
 	thrcts |= BIT(th_sel);
@@ -585,7 +598,7 @@ int adc_npcx_threshold_disable_irq(const struct device *dev,
 		return -EOPNOTSUPP;
 	}
 
-	if (th_sel >= NPCX_ADC_THRESHOLD_COUNT) {
+	if (th_sel >= config->threshold_count) {
 		LOG_ERR("Invalid ADC threshold selection! (%d)", th_sel);
 		return -EINVAL;
 	}
@@ -597,14 +610,14 @@ int adc_npcx_threshold_disable_irq(const struct device *dev,
 		return -ENODEV;
 	}
 	/* avoid clearing other threshold status */
-	thrcts = inst->THRCTS & ~GENMASK(NPCX_ADC_THRESHOLD_COUNT - 1, 0);
+	thrcts = inst->THRCTS & ~GENMASK(config->threshold_count - 1, 0);
 
 	/* set enable threshold status */
 	thrcts &= ~BIT(NPCX_THRCTS_THR1_IEN + th_sel);
 	inst->THRCTS = thrcts;
 
 	/* Disable threshold detection */
-	THRCTL(config->base, (th_sel + 1)) &= ~BIT(NPCX_THRCTL_THEN);
+	THRCTL(dev, (th_sel + 1)) &= ~BIT(NPCX_THRCTL_THEN);
 
 	/* Update active threshold */
 	t_data->active_thresholds &= ~BIT(th_sel);
@@ -672,6 +685,8 @@ static const struct adc_npcx_config adc_npcx_cfg_0 = {
 	.base = DT_INST_REG_ADDR(0),
 	.clk_cfg = NPCX_DT_CLK_CFG_ITEM(0),
 	.alts_list = adc_alts,
+	.threshold_count = DT_INST_PROP(0, threshold_count),
+	.threshold_reg_offset = DT_INST_PROP(0, threshold_reg_offset),
 };
 
 static struct adc_npcx_threshold_data threshold_data_0;

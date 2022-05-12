@@ -99,7 +99,7 @@ static void broadcast_sink_iso_recv(struct bt_iso_chan *chan,
 	BT_DBG("stream %p ep %p len %zu", chan, ep, net_buf_frags_len(buf));
 
 	if (ops != NULL && ops->recv != NULL) {
-		ops->recv(ep->stream, buf);
+		ops->recv(ep->stream, info, buf);
 	} else {
 		BT_WARN("No callback for recv set");
 	}
@@ -781,7 +781,7 @@ static void broadcast_sink_ep_init(struct bt_audio_ep *ep)
 	ep->iso.qos = &ep->iso_qos;
 	ep->iso.qos->rx = &ep->iso_rx;
 	ep->iso.qos->tx = &ep->iso_tx;
-	ep->dir = BT_AUDIO_SINK;
+	ep->dir = BT_AUDIO_DIR_SINK;
 }
 
 static struct bt_audio_ep *broadcast_sink_new_ep(uint8_t index)

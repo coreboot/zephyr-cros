@@ -1137,6 +1137,7 @@ Logging:
         - nordic-krch
     collaborators:
         - chen-png
+        - aasthagr
     files:
         - include/zephyr/logging/
         - samples/subsys/logging/
@@ -1685,6 +1686,7 @@ STM32 Platforms:
         - ABOSTM
         - FRASTM
         - gmarull
+        - GeorgeCGV
     files:
         - boards/arm/nucleo_*/
         - boards/arm/stm32*_disco/
