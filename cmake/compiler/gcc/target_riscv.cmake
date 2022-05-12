@@ -20,10 +20,10 @@ else()
     string(CONCAT riscv_march ${riscv_march} "i")
 endif()
 
-if (CONFIG_RISCV_MUL_ISA)
+if (CONFIG_RISCV_ISA_EXT_M)
     string(CONCAT riscv_march ${riscv_march} "m")
 endif()
-if (CONFIG_RISCV_ATOMICS_ISA)
+if (CONFIG_RISCV_ISA_EXT_A)
     string(CONCAT riscv_march ${riscv_march} "a")
 endif()
 
@@ -41,7 +41,7 @@ if(CONFIG_FPU)
     endif()
 endif()
 
-if(CONFIG_COMPRESSED_ISA)
+if(CONFIG_RISCV_ISA_EXT_C)
     string(CONCAT riscv_march ${riscv_march} "c")
 endif()
 
