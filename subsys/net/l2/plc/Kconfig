@@ -1,0 +1,4 @@
+menuconfig NET_L2_PLC
+	bool "Enable L2 PLC layer"
+	help
+	  Add support for PLC.

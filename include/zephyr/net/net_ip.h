@@ -1324,6 +1324,18 @@ static inline void net_ipv6_addr_create_iid(struct in6_addr *addr,
 		}
 
 		break;
+	case 4:
+		if (lladdr->type == NET_LINK_PLC) {
+			addr->s6_addr[8] = lladdr->addr[0];
+			addr->s6_addr[9] = lladdr->addr[1];
+			addr->s6_addr[10] = 0x00;
+			addr->s6_addr[11] = 0xff;
+			addr->s6_addr[12] = 0xfe;
+			addr->s6_addr[13] = 0x00;
+			addr->s6_addr[14] = lladdr->addr[2];
+			addr->s6_addr[15] = lladdr->addr[3];
+		}
+		break;
 	case 6:
 		/* We do not toggle the Universal/Local bit
 		 * in Bluetooth. See RFC 7668 ch 3.2.2

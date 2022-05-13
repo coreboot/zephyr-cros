@@ -79,6 +79,8 @@ config NET_L2_PHY_IEEE802154
 
 source "subsys/net/l2/ieee802154/Kconfig"
 
+source "subsys/net/l2/plc/Kconfig"
+
 source "subsys/net/l2/openthread/Kconfig"
 
 config NET_L2_CUSTOM_IEEE802154

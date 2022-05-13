@@ -1,0 +1,35 @@
+include: base.yaml
+
+description: Maxim MAX79356 PLC
+
+compatible: "maxim,max79356-plc"
+
+properties:
+  ext-mac-address:
+    type: uint8-array
+    required: true
+    description: Sets extended mac eddress of the device
+  short-address:
+    type: int
+    required: true
+    description: Sets the short address of the device
+  pan-id:
+    type: uint8-array
+    required: true
+    description: Sets the short address of the device
+  multicast-group:
+    type: int
+    required: true
+    description: Multicast group that the device will automatically join
+  broadcast-group:
+    type: int
+    required: true
+    description: Broadcast group that the device will automatically join
+  hw-reset-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO port and pin for hardware reset
+  hw-prog-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO port and pin for programming the plc chip

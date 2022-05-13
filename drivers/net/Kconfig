@@ -169,6 +169,101 @@ config SLIP_MAC_ADDR
 endif
 
 #
+# SLIP options
+#
+menuconfig MAXZENO
+	bool "MAXZENO driver"
+	depends on NET_NATIVE
+	select UART_ASYNC_API
+	select CRC
+	select RING_BUFFER
+
+if MAXZENO
+
+config MAXZENO_DRV_NAME
+	string "MAXZENO Driver name"
+	default "maxzeno"
+	help
+	  This option sets the driver name
+
+module = MAXZENO
+module-dep = LOG
+module-str = Log level for maxzeno driver
+module-help = Sets log level for maxzeno driver.
+source "subsys/net/Kconfig.template.log_config.net"
+
+config MAXZENO_MAC_ADDR
+	string "MAC address for the interface"
+	help
+	  Specify a MAC address for the MAXZENO interface in the form of
+	  six hex 8-bit chars separated by colons (e.g.:
+	  aa:33:cc:22:e2:c0).  The default is an empty string, which
+	  means the code will make 00:00:5E:00:53:XX, where XX will be
+	  random.
+
+config MAXZENO_TX_GAIN
+	hex "Set maxzeno gain."
+	default 0x00
+	help
+		Sets maxzeno tx gain. See maxTxAnalogGain in G3-PLC Modem Interface Specification.
+
+config MAXZENO_FORCE_MODULATION
+	hex "Forces modulation scheme"
+	default 0x3
+	help
+		Sets default modulation. 3: 8PSK, 2: QPSK, 1: BPSK, 0: ROBO. 0xff: disabled.
+
+config MAXZENO_INIT_TIMEOUT
+	int "Initialization wait time"
+	default 25
+	help
+		Time (in sec) to wait for initialization thread to wait for a respones from PLC.
+
+config MAXZENO_RX_BUFFER_SIZE
+	int "Rx buffer size for dma"
+	default 256
+	help
+		Rx buffer size for dma transfers.
+
+config MAXZENO_RX_NUM_BUFFERS
+	int "Number of buffers for dma transfers"
+	default 4
+	help
+		Number of buffers for dma transfers.
+
+config MAXZENO_RX_STACK_SIZE
+	int "Stack size for receiving uart packets"
+	default 1024
+	help
+		Stack size for receiving uart async packets thread.
+
+config MAXZENO_RX_THREAD_PRIORITY
+	int "Priority of the async receive thread"
+	default 7
+	help
+		Priority of the async receive thread.
+
+config MAXZENO_INIT_THREAD_PRIORITY
+	int "Initialization thread priority"
+	default 4
+	help
+		Priority of the initialization thread.
+
+config MAXZENO_MAX_PAYLOAD
+	int "Maximum payload size supported by driver"
+	default 520
+	help
+		Maximum payload supported by driver
+
+config MAXZENO_USE_ASYNC_UART
+	bool "Use async uart"
+	default y
+	help
+		Use async for communication with PLC chip
+
+endif
+
+#
 # Net loopback options
 #
 menuconfig NET_LOOPBACK

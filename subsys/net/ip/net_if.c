@@ -2082,6 +2082,7 @@ bool net_if_ipv6_maddr_rm(struct net_if *iface, const struct in6_addr *addr)
 		}
 
 		ipv6->mcast[i].is_used = false;
+		ipv6->mcast[i].is_joined = false;
 
 		NET_DBG("[%d] interface %p address %s removed",
 			i, iface, net_sprint_ipv6_addr(addr));
