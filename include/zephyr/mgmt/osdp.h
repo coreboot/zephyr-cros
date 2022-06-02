@@ -211,6 +211,14 @@ struct osdp_cmd {
 	};
 };
 
+/**
+ * @brief API to initialize OSDP module.
+ * 
+ * @retval 0 on success
+ * @retval -1 on failure
+ */
+int osdp_init(void);
+
 #ifdef CONFIG_OSDP_MODE_PD
 
 /**
