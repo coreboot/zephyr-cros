@@ -172,6 +172,7 @@ Bluetooth:
         - Vudentz
         - Thalley
         - asbjornsabo
+        - sjanc
     files:
         - doc/connectivity/bluetooth/
         - drivers/bluetooth/
@@ -244,6 +245,7 @@ Bluetooth Audio:
         - Casper-Bonde-Bose
         - MariuszSkamra
         - rymanluk
+        - sjanc
     files:
         - subsys/bluetooth/audio/
         - include/zephyr/bluetooth/audio/
@@ -307,6 +309,7 @@ CMSIS API layer:
          - samples/subsys/portability/cmsis_rtos_v*/
          - tests/subsys/portability/cmsis_rtos_v*/
     labels:
+        - "area: CMSIS API Layer"
         - "area: Portability"
 
 CMSIS-DSP integration:
@@ -362,6 +365,7 @@ Debug:
     collaborators:
         - dcpleung
         - chen-png
+        - mrkhldn
     files:
         - include/zephyr/debug/
         - subsys/debug/
@@ -543,6 +547,18 @@ Documentation:
         - tests/drivers/console/
     labels:
         - "area: Console"
+
+"Drivers: Coredump":
+    status: maintained
+    maintainers:
+        - mrkhldn
+    files:
+        - drivers/coredump/
+        - dts/bindings/coredump/
+        - include/zephyr/drivers/coredump.h
+        - tests/drivers/coredump/
+    labels:
+        - "area: Coredump"
 
 "Drivers: Counter":
     status: maintained
@@ -1355,7 +1371,7 @@ nRF52 BSIM:
     files:
         - boards/posix/nrf52_bsim/
     labels:
-        - "platform: nrf52_bsim"
+        - "platform: nRF52 BSIM"
 
 POSIX API layer:
     status: odd fixes
@@ -1526,7 +1542,7 @@ Synopsys Platforms:
     labels:
         - "platform: Synopsys"
 
-Nuvoton_NPCX Platforms:
+Nuvoton NPCX Platforms:
     status: maintained
     maintainers:
         - MulinChao
@@ -1548,9 +1564,9 @@ Nuvoton_NPCX Platforms:
         - dts/bindings/*/*npcx*
         - drivers/*/*_npcx*.c
     labels:
-        - "platform: Nuvoton_NPCX"
+        - "platform: Nuvoton NPCX"
 
-Nuvoton_Numicro Platforms:
+Nuvoton Numicro Platforms:
     status: odd fixes
     collaborators:
         - ssekar15
@@ -1561,7 +1577,7 @@ Nuvoton_Numicro Platforms:
         - dts/bindings/*/*numicro*
         - drivers/*/*_numicro*
     labels:
-        - "platform: Nuvoton_Numicro"
+        - "platform: Nuvoton Numicro"
 
 SiLabs Platforms:
     status: odd fixes
@@ -1632,7 +1648,7 @@ NXP Platforms:
   labels:
     - "platform: NXP"
 
-Microchip Platforms:
+Microchip MEC Platforms:
   status: maintained
   maintainers:
     - jvasanth1
@@ -1645,7 +1661,23 @@ Microchip Platforms:
     - soc/arm/microchip_mec/
     - drivers/*/*mchp*.c
   labels:
-    - "platform: Microchip"
+    - "platform: Microchip MEC"
+
+Microchip SAM Platforms:
+  status: maintained
+  maintainers:
+    - nandojve
+  collaborators:
+    - mnkp
+    - stephanosio
+  files:
+    - boards/arm/atsam*/
+    - boards/arm/sam*/
+    - dts/arm/atmel/
+    - soc/arm/atmel_sam*/
+    - drivers/*/*sam*.c
+  labels:
+    - "platform: Microchip SAM"
 
 nRF Platforms:
     status: maintained

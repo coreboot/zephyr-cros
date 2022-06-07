@@ -47,7 +47,7 @@ struct cbor_in_fmt_data {
 	/* Decoded data */
 	struct lwm2m_senml dcd; /* Decoded data */
 	struct record *current;
-	char basename[sizeof("/65535/999/")]; /* Null terminated basename */
+	char basename[MAX_RESOURCE_LEN + 1]; /* Null terminated basename */
 };
 
 /* Statically allocated formatter data is shared between different threads */
@@ -108,14 +108,26 @@ static void clear_in_fmt_data(struct lwm2m_message *msg)
 	k_mutex_unlock(&fd_mtx);
 }
 
+static int fmt_range_check(struct cbor_out_fmt_data *fd)
+{
+	if (fd->name_cnt >= CONFIG_LWM2M_RW_SENML_CBOR_RECORDS ||
+	    fd->input._lwm2m_senml__record_count >= CONFIG_LWM2M_RW_SENML_CBOR_RECORDS) {
+		LOG_ERR("CONFIG_LWM2M_RW_SENML_CBOR_RECORDS too small");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
 static int put_basename(struct lwm2m_output_context *out, struct lwm2m_obj_path *path)
 {
 	struct cbor_out_fmt_data *fd = LWM2M_OFD_CBOR(out);
 	int len;
+	int ret;
 
-	if (fd->name_cnt >= CONFIG_LWM2M_RW_SENML_CBOR_RECORDS) {
-		LOG_ERR("CONFIG_LWM2M_RW_SENML_CBOR_RECORDS too small");
-		return -ENOMEM;
+	ret = fmt_range_check(fd);
+	if (ret < 0) {
+		return ret;
 	}
 
 	char *basename = GET_CBOR_FD_NAME(fd);
@@ -196,10 +208,11 @@ static int put_begin_r(struct lwm2m_output_context *out, struct lwm2m_obj_path *
 {
 	struct cbor_out_fmt_data *fd = LWM2M_OFD_CBOR(out);
 	int len;
+	int ret;
 
-	if (fd->name_cnt >= CONFIG_LWM2M_RW_SENML_CBOR_RECORDS) {
-		LOG_ERR("CONFIG_LWM2M_RW_SENML_CBOR_RECORDS too small");
-		return -ENOMEM;
+	ret = fmt_range_check(fd);
+	if (ret < 0) {
+		return ret;
 	}
 
 	char *name = GET_CBOR_FD_NAME(fd);
@@ -244,10 +257,11 @@ static int put_begin_ri(struct lwm2m_output_context *out, struct lwm2m_obj_path 
 	struct cbor_out_fmt_data *fd = LWM2M_OFD_CBOR(out);
 	char *name = GET_CBOR_FD_NAME(fd);
 	struct record *record = GET_CBOR_FD_REC(fd);
+	int ret;
 
-	if (fd->name_cnt >= CONFIG_LWM2M_RW_SENML_CBOR_RECORDS) {
-		LOG_ERR("CONFIG_LWM2M_RW_SENML_CBOR_RECORDS too small");
-		return -ENOMEM;
+	ret = fmt_range_check(fd);
+	if (ret < 0) {
+		return ret;
 	}
 
 	/* Forms name from resource id and resource instance id */
@@ -770,10 +784,23 @@ out:
 	return paths;
 }
 
+int do_composite_read_op_for_parsed_path_senml_cbor(struct lwm2m_message *msg,
+						    sys_slist_t *lwm_path_list)
+{
+	int ret;
+
+	setup_out_fmt_data(msg);
+
+	ret = lwm2m_perform_composite_read_op(msg, LWM2M_FORMAT_APP_SENML_CBOR, lwm_path_list);
+
+	clear_out_fmt_data(msg);
+
+	return ret;
+}
+
 
 int do_composite_read_op_senml_cbor(struct lwm2m_message *msg)
 {
-	int ret;
 	struct lwm2m_obj_path_list lwm2m_path_list_buf[CONFIG_LWM2M_COMPOSITE_PATH_LIST_SIZE];
 	sys_slist_t lwm_path_list;
 	sys_slist_t lwm_path_free_list;
@@ -793,13 +820,7 @@ int do_composite_read_op_senml_cbor(struct lwm2m_message *msg)
 
 	lwm2m_engine_clear_duplicate_path(&lwm_path_list, &lwm_path_free_list);
 
-	setup_out_fmt_data(msg);
-
-	ret = lwm2m_perform_composite_read_op(msg, LWM2M_FORMAT_APP_SENML_CBOR, &lwm_path_list);
-
-	clear_out_fmt_data(msg);
-
-	return ret;
+	return do_composite_read_op_for_parsed_path_senml_cbor(msg, &lwm_path_free_list);
 }
 
 

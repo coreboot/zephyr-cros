@@ -9,6 +9,7 @@ Peripherals
    adc.rst
    audio/index.rst
    canbus/index.rst
+   coredump.rst
    counter.rst
    clock_control.rst
    dac.rst
@@ -44,3 +45,4 @@ Peripherals
    watchdog.rst
    video.rst
    espi.rst
+   mipi_dsi.rst

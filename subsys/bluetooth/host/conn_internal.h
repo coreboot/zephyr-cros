@@ -134,7 +134,7 @@ struct bt_conn_iso {
 	struct bt_iso_info info;
 };
 
-typedef void (*bt_conn_tx_cb_t)(struct bt_conn *conn, void *user_data);
+typedef void (*bt_conn_tx_cb_t)(struct bt_conn *conn, void *user_data, int err);
 
 struct bt_conn_tx {
 	sys_snode_t node;
@@ -274,9 +274,6 @@ struct bt_iso_create_param {
 };
 
 int bt_conn_iso_init(void);
-
-/* Add a new ISO connection */
-struct bt_conn *bt_conn_add_iso(struct bt_conn *acl);
 
 /* Cleanup ISO references */
 void bt_iso_cleanup_acl(struct bt_conn *iso_conn);

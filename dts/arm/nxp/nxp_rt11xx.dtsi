@@ -11,7 +11,7 @@
 #include <zephyr/dt-bindings/i2c/i2c.h>
 #include <zephyr/dt-bindings/pwm/pwm.h>
 #include <zephyr/dt-bindings/pm/imx_spc.h>
-
+#include <zephyr/dt-bindings/mipi_dsi/mipi_dsi.h>
 / {
 	cpus {
 		#address-cells = <1>;
@@ -65,7 +65,7 @@
 			compatible = "zephyr,power-state";
 			power-state-name="runtime-idle";
 			substate-id = <IMX_SPC_SET_POINT_1_WAIT>;
-			min-residency-us = <10>;
+			min-residency-us = <100>;
 		};
 
 		suspend: set_point_10_suspend {
@@ -74,6 +74,7 @@
 			power-state-name="suspend-to-idle";
 			substate-id = <IMX_SPC_SET_POINT_10_SUSPEND>;
 			min-residency-us = <5000>;
+			exit-latency-us = <500>;
 		};
 	};
 
@@ -374,6 +375,19 @@
 			interrupts = <54 0>;
 			label = "ELCDIF_1";
 			status = "disabled";
+		};
+
+		mipi_dsi: mipi-dsi@4080c000 {
+			compatible = "nxp,imx-mipi-dsi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0x4080c000 0x200>,
+			      <0x4080c200 0x80>,
+			      <0x4080c280 0x80>,
+			      <0x4080c300 0x200>;
+			interrupts = <59 1>;
+			status = "disabled";
+			label = "MIPI_DSI";
 		};
 
 		lpspi1: spi@40114000 {
