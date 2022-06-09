@@ -91,7 +91,8 @@ struct gpio_emul_data {
 	/** Interrupt status for each pin */
 	gpio_port_pins_t interrupts;
 	/** Mutex to synchronize accesses to driver data and config */
-	struct k_mutex mu;
+	struct k_spinlock lock;
+	//struct k_mutex mu;
 	/** Singly-linked list of callbacks associated with the controller */
 	sys_slist_t callbacks;
 };
@@ -281,7 +282,6 @@ static void gpio_emul_pend_interrupt(const struct device *port, gpio_port_pins_t
 int gpio_emul_input_set_masked_pend(const struct device *port, gpio_port_pins_t mask,
 			      gpio_port_value_t values, bool pend)
 {
-	int ret;
 	gpio_port_pins_t input_mask;
 	gpio_port_pins_t prev_values;
 	struct gpio_emul_data *drv_data =
@@ -299,14 +299,11 @@ int gpio_emul_input_set_masked_pend(const struct device *port, gpio_port_pins_t 
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
-
 	input_mask = get_input_pins(port);
 	if (~input_mask & mask) {
 		LOG_ERR("Not input pin input_mask=%x mask=%x", input_mask,
 			mask);
-		ret = -EINVAL;
-		goto unlock;
+		return -EINVAL;
 	}
 
 	prev_values = drv_data->input_vals;
@@ -317,12 +314,8 @@ int gpio_emul_input_set_masked_pend(const struct device *port, gpio_port_pins_t 
 	if (pend) {
 		gpio_emul_pend_interrupt(port, mask, prev_values, values);
 	}
-	ret = 0;
 
-unlock:
-	k_mutex_unlock(&drv_data->mu);
-
-	return ret;
+	return 0;
 }
 
 /* documented in drivers/gpio/gpio_emul.h */
@@ -336,6 +329,7 @@ int gpio_emul_input_set_masked(const struct device *port, gpio_port_pins_t mask,
 int gpio_emul_output_get_masked(const struct device *port, gpio_port_pins_t mask,
 			       gpio_port_value_t *values)
 {
+	k_spinlock_key_t key;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 	const struct gpio_emul_config *config =
@@ -349,9 +343,9 @@ int gpio_emul_output_get_masked(const struct device *port, gpio_port_pins_t mask
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	*values = drv_data->output_vals & get_output_pins(port);
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 
 	return 0;
 }
@@ -359,6 +353,7 @@ int gpio_emul_output_get_masked(const struct device *port, gpio_port_pins_t mask
 /* documented in drivers/gpio/gpio_emul.h */
 int gpio_emul_flags_get(const struct device *port, gpio_pin_t pin, gpio_flags_t *flags)
 {
+	k_spinlock_key_t key;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 	const struct gpio_emul_config *config =
@@ -372,9 +367,9 @@ int gpio_emul_flags_get(const struct device *port, gpio_pin_t pin, gpio_flags_t 
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	*flags = drv_data->flags[pin];
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 
 	return 0;
 }
@@ -388,6 +383,7 @@ int gpio_emul_flags_get(const struct device *port, gpio_pin_t pin, gpio_flags_t 
 static int gpio_emul_pin_configure(const struct device *port, gpio_pin_t pin,
 				  gpio_flags_t flags)
 {
+	k_spinlock_key_t key;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 	const struct gpio_emul_config *config =
@@ -406,7 +402,7 @@ static int gpio_emul_pin_configure(const struct device *port, gpio_pin_t pin,
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	drv_data->flags[pin] = flags;
 	if (flags & GPIO_OUTPUT) {
 		if (flags & GPIO_OUTPUT_INIT_LOW) {
@@ -440,7 +436,7 @@ static int gpio_emul_pin_configure(const struct device *port, gpio_pin_t pin,
 		}
 	}
 
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 	gpio_fire_callbacks(&drv_data->callbacks, port, BIT(pin));
 
 	return 0;
@@ -448,6 +444,7 @@ static int gpio_emul_pin_configure(const struct device *port, gpio_pin_t pin,
 
 static int gpio_emul_port_get_raw(const struct device *port, gpio_port_value_t *values)
 {
+	k_spinlock_key_t key;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 
@@ -455,9 +452,9 @@ static int gpio_emul_port_get_raw(const struct device *port, gpio_port_value_t *
 		return -EINVAL;
 	}
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	*values = drv_data->input_vals & get_input_pins(port);
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 
 	return 0;
 }
@@ -466,13 +463,14 @@ static int gpio_emul_port_set_masked_raw(const struct device *port,
 					gpio_port_pins_t mask,
 					gpio_port_value_t values)
 {
+	k_spinlock_key_t key;
 	gpio_port_pins_t output_mask;
 	gpio_port_pins_t prev_values;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 	int rv;
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	output_mask = get_output_pins(port);
 	mask &= output_mask;
 	prev_values = drv_data->output_vals;
@@ -483,7 +481,7 @@ static int gpio_emul_port_set_masked_raw(const struct device *port,
 	/* in push-pull, set input values & fire interrupts */
 	rv = gpio_emul_input_set_masked(port, mask & get_input_pins(port),
 		drv_data->output_vals);
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 	__ASSERT_NO_MSG(rv == 0);
 
 	/* for output-wiring, so the user can take action based on output */
@@ -497,11 +495,12 @@ static int gpio_emul_port_set_masked_raw(const struct device *port,
 static int gpio_emul_port_set_bits_raw(const struct device *port,
 				      gpio_port_pins_t pins)
 {
+	k_spinlock_key_t key;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 	int rv;
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	pins &= get_output_pins(port);
 	drv_data->output_vals |= pins;
 	/* in push-pull, set input values & fire interrupts */
@@ -509,7 +508,7 @@ static int gpio_emul_port_set_bits_raw(const struct device *port,
 		drv_data->output_vals);
 	__ASSERT_NO_MSG(rv == 0);
 
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 	/* for output-wiring, so the user can take action based on output */
 	gpio_fire_callbacks(&drv_data->callbacks, port, pins & ~get_input_pins(port));
 
@@ -519,16 +518,17 @@ static int gpio_emul_port_set_bits_raw(const struct device *port,
 static int gpio_emul_port_clear_bits_raw(const struct device *port,
 					gpio_port_pins_t pins)
 {
+	k_spinlock_key_t key;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 	int rv;
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	pins &= get_output_pins(port);
 	drv_data->output_vals &= ~pins;
 	/* in push-pull, set input values & fire interrupts */
 	rv = gpio_emul_input_set_masked(port, pins & get_input_pins(port), drv_data->output_vals);
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 	__ASSERT_NO_MSG(rv == 0);
 	/* for output-wiring, so the user can take action based on output */
 	gpio_fire_callbacks(&drv_data->callbacks, port, pins & ~get_input_pins(port));
@@ -538,16 +538,17 @@ static int gpio_emul_port_clear_bits_raw(const struct device *port,
 
 static int gpio_emul_port_toggle_bits(const struct device *port, gpio_port_pins_t pins)
 {
+	k_spinlock_key_t key;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
 	int rv;
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 	drv_data->output_vals ^= (pins & get_output_pins(port));
 	/* in push-pull, set input values but do not fire interrupts (yet) */
 	rv = gpio_emul_input_set_masked_pend(port, pins & get_input_pins(port),
 		drv_data->output_vals, false);
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 	__ASSERT_NO_MSG(rv == 0);
 	/* for output-wiring, so the user can take action based on output */
 	gpio_fire_callbacks(&drv_data->callbacks, port, pins);
@@ -591,6 +592,7 @@ static int gpio_emul_pin_interrupt_configure(const struct device *port, gpio_pin
 					    enum gpio_int_mode mode,
 					    enum gpio_int_trig trig)
 {
+	k_spinlock_key_t key;
 	int ret;
 	struct gpio_emul_data *drv_data =
 		(struct gpio_emul_data *)port->data;
@@ -624,7 +626,7 @@ static int gpio_emul_pin_interrupt_configure(const struct device *port, gpio_pin
 		}
 	}
 
-	k_mutex_lock(&drv_data->mu, K_FOREVER);
+	key = k_spin_lock(&drv_data->lock);
 
 	switch (mode) {
 	case GPIO_INT_MODE_DISABLED:
@@ -644,7 +646,7 @@ static int gpio_emul_pin_interrupt_configure(const struct device *port, gpio_pin
 	ret = 0;
 
 unlock:
-	k_mutex_unlock(&drv_data->mu);
+	k_spin_unlock(&drv_data->lock, key);
 
 	return ret;
 }
@@ -684,7 +686,8 @@ static int gpio_emul_init(const struct device *dev)
 		(struct gpio_emul_data *)dev->data;
 
 	sys_slist_init(&drv_data->callbacks);
-	return k_mutex_init(&drv_data->mu);
+
+	return 0;
 }
 
 #ifdef CONFIG_PM_DEVICE
