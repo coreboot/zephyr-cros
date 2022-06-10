@@ -16,11 +16,6 @@ config ITE_IT8XXX2_INTC
 config RISCV_GP
 	default y
 
-# Workaround mul instruction bug, see:
-# https://www.ite.com.tw/uploads/product_download/it81202-bx-chip-errata.pdf
-config RISCV_MUL_ISA
-	default n
-
 config ITE_IT8XXX2_TIMER
 	default y
 

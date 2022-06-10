@@ -1,7 +1,6 @@
 zephyr_sources(
 	soc.c
 )
-zephyr_library_sources_ifndef(CONFIG_RISCV_MUL_ISA __arithmetic.S)
 
 # IMPORTANT:
 # The h2ram section must be first added to RAM_SECTIONS to avoid gap.
