@@ -1224,7 +1224,7 @@
  * @return node identifier for the node with the phandle at that index
  */
 #define DT_PHANDLE_BY_IDX(node_id, prop, idx) \
-	DT_CAT6(node_id, _P_, prop, _IDX_, idx, _PH)
+	DT_CAT6(node_id, _P_, prop, _IDX_, idx, _PH)	
 /*
  * Implementation note: using DT_CAT6 above defers concatenation until
  * after expansion of each parameter. This is important when 'idx' is
@@ -1639,7 +1639,6 @@
  */
 #define DT_REG_ADDR_BY_IDX(node_id, idx) \
 	DT_CAT(node_id, _REG_IDX_##idx##_VAL_ADDRESS)
-
 /**
  * @brief Get the size of the register block at index "idx"
  *

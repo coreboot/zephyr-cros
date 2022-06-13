@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
-#include <zephyr/kernel.h>
-#include <zephyr/init.h>
-#include <zephyr/device.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/sys/ring_buffer.h>
-#include <zephyr/logging/log.h>
+#include <zephyr.h>
+#include <kernel.h>
+#include <init.h>
+#include <device.h>
+#include <drivers/uart.h>
+#include <sys/ring_buffer.h>
+#include <logging/log.h>
 
 #include "osdp_common.h"
 
@@ -24,7 +24,7 @@ LOG_MODULE_REGISTER(osdp, CONFIG_OSDP_LOG_LEVEL);
 #endif
 #else
 #define OSDP_KEY_STRING ""
-#endif	/* CONFIG_OSDP_SC_ENABLED */
+#endif  /* CONFIG_OSDP_SC_ENABLED */
 
 struct osdp_device {
 	struct ring_buf rx_buf;
@@ -54,7 +54,7 @@ static void osdp_handle_in_byte(struct osdp_device *p, uint8_t *buf, int len)
 		/* Check for new packet beginning with [FF,53,...] sequence */
 		if (p->last_byte == 0xFF && buf[0] == 0x53) {
 			buf[0] = 0xFF;
-			ring_buf_put(&p->rx_buf, buf, 1);   /* put last byte */
+			ring_buf_put(&p->rx_buf, buf, 1); /* put last byte */
 			buf[0] = 0x53;
 			ring_buf_put(&p->rx_buf, buf, len); /* put rest */
 			p->wait_for_mark = 0; /* Mark found. Clear flag */
@@ -72,7 +72,6 @@ static void osdp_uart_isr(const struct device *dev, void *user_data)
 	struct osdp_device *p = user_data;
 
 	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
-
 		if (uart_irq_rx_ready(dev)) {
 			len = uart_fifo_read(dev, buf, sizeof(buf));
 			if (len > 0) {
@@ -133,7 +132,7 @@ static struct osdp *osdp_build_ctx(struct osdp_channel *channel)
 	int i;
 	struct osdp *ctx;
 	struct osdp_pd *pd;
-	int pd_adddres[CONFIG_OSDP_NUM_CONNECTED_PD] = {0};
+	int pd_adddres[CONFIG_OSDP_NUM_CONNECTED_PD] = { 0 };
 
 #ifdef CONFIG_OSDP_MODE_PD
 	pd_adddres[0] = CONFIG_OSDP_PD_ADDRESS;
@@ -157,8 +156,7 @@ static struct osdp *osdp_build_ctx(struct osdp_channel *channel)
 		pd->address = pd_adddres[i];
 		pd->baud_rate = CONFIG_OSDP_UART_BAUD_RATE;
 		memcpy(&pd->channel, channel, sizeof(struct osdp_channel));
-		k_mem_slab_init(&pd->cmd.slab,
-				pd->cmd.slab_buf, sizeof(struct osdp_cmd),
+		k_mem_slab_init(&pd->cmd.slab, pd->cmd.slab_buf, sizeof(struct osdp_cmd),
 				CONFIG_OSDP_PD_COMMAND_QUEUE_SIZE);
 	}
 	return ctx;
@@ -258,9 +256,8 @@ static int osdp_init_internal(const struct device *arg)
 	LOG_INF("OSDP init okay!");
 
 	/* kick off refresh thread */
-	k_thread_create(&osdp_refresh_thread, osdp_thread_stack,
-			CONFIG_OSDP_THREAD_STACK_SIZE, osdp_refresh,
-			NULL, NULL, NULL, K_PRIO_COOP(2), 0, K_NO_WAIT);
+	k_thread_create(&osdp_refresh_thread, osdp_thread_stack, CONFIG_OSDP_THREAD_STACK_SIZE,
+			osdp_refresh, NULL, NULL, NULL, K_PRIO_COOP(2), 0, K_NO_WAIT);
 	return 0;
 }
 
@@ -269,3 +266,8 @@ int osdp_init(void)
 	return osdp_init_internal(NULL);
 }
 
+void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb)
+{
+	struct osdp *ctx = osdp_get_ctx();
+	ctx->command_complete_callback = cb;
+}

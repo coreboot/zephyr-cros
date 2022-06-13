@@ -5,56 +5,56 @@
  */
 
 #include <stdlib.h>
-#include <zephyr/logging/log.h>
+#include <logging/log.h>
 LOG_MODULE_DECLARE(osdp, CONFIG_OSDP_LOG_LEVEL);
 
 #include "osdp_common.h"
 
 #define TAG "CP: "
 
-#define OSDP_PD_POLL_TIMEOUT_MS        (1000 / CONFIG_OSDP_PD_POLL_RATE)
-#define OSDP_CMD_RETRY_WAIT_MS         (CONFIG_OSDP_CMD_RETRY_WAIT_SEC * 1000)
+#define OSDP_PD_POLL_TIMEOUT_MS (1000 / CONFIG_OSDP_PD_POLL_RATE)
+#define OSDP_CMD_RETRY_WAIT_MS (CONFIG_OSDP_CMD_RETRY_WAIT_SEC * 1000)
 
 #ifdef CONFIG_OSDP_SC_ENABLED
-#define OSDP_PD_SC_RETRY_MS            (CONFIG_OSDP_SC_RETRY_WAIT_SEC * 1000)
+#define OSDP_PD_SC_RETRY_MS (CONFIG_OSDP_SC_RETRY_WAIT_SEC * 1000)
 #endif
 
-#define CMD_POLL_LEN                   1
-#define CMD_LSTAT_LEN                  1
-#define CMD_ISTAT_LEN                  1
-#define CMD_OSTAT_LEN                  1
-#define CMD_RSTAT_LEN                  1
-#define CMD_ID_LEN                     2
-#define CMD_CAP_LEN                    2
-#define CMD_DIAG_LEN                   2
-#define CMD_OUT_LEN                    5
-#define CMD_LED_LEN                    15
-#define CMD_BUZ_LEN                    6
-#define CMD_TEXT_LEN                   7   /* variable length command */
-#define CMD_COMSET_LEN                 6
-#define CMD_KEYSET_LEN                 19
-#define CMD_CHLNG_LEN                  9
-#define CMD_SCRYPT_LEN                 17
+#define CMD_POLL_LEN 1
+#define CMD_LSTAT_LEN 1
+#define CMD_ISTAT_LEN 1
+#define CMD_OSTAT_LEN 1
+#define CMD_RSTAT_LEN 1
+#define CMD_ID_LEN 2
+#define CMD_CAP_LEN 2
+#define CMD_DIAG_LEN 2
+#define CMD_OUT_LEN 5
+#define CMD_LED_LEN 15
+#define CMD_BUZ_LEN 6
+#define CMD_TEXT_LEN 7 /* variable length command */
+#define CMD_COMSET_LEN 6
+#define CMD_KEYSET_LEN 19
+#define CMD_CHLNG_LEN 9
+#define CMD_SCRYPT_LEN 17
 
-#define REPLY_ACK_DATA_LEN             0
-#define REPLY_PDID_DATA_LEN            12
-#define REPLY_PDCAP_ENTITY_LEN         3
-#define REPLY_LSTATR_DATA_LEN          2
-#define REPLY_RSTATR_DATA_LEN          1
-#define REPLY_COM_DATA_LEN             5
-#define REPLY_NAK_DATA_LEN             1
-#define REPLY_CCRYPT_DATA_LEN          32
-#define REPLY_RMAC_I_DATA_LEN          16
-#define REPLY_KEYPPAD_DATA_LEN         2   /* variable length command */
-#define REPLY_RAW_DATA_LEN             4   /* variable length command */
-#define REPLY_FMT_DATA_LEN             3   /* variable length command */
-#define REPLY_BUSY_DATA_LEN            0
+#define REPLY_ACK_DATA_LEN 0
+#define REPLY_PDID_DATA_LEN 12
+#define REPLY_PDCAP_ENTITY_LEN 3
+#define REPLY_LSTATR_DATA_LEN 2
+#define REPLY_RSTATR_DATA_LEN 1
+#define REPLY_COM_DATA_LEN 5
+#define REPLY_NAK_DATA_LEN 1
+#define REPLY_CCRYPT_DATA_LEN 32
+#define REPLY_RMAC_I_DATA_LEN 16
+#define REPLY_KEYPPAD_DATA_LEN 2 /* variable length command */
+#define REPLY_RAW_DATA_LEN 4 /* variable length command */
+#define REPLY_FMT_DATA_LEN 3 /* variable length command */
+#define REPLY_BUSY_DATA_LEN 0
 
-#define OSDP_CP_ERR_GENERIC           -1
-#define OSDP_CP_ERR_NO_DATA            1
-#define OSDP_CP_ERR_RETRY_CMD          2
-#define OSDP_CP_ERR_CAN_YIELD          3
-#define OSDP_CP_ERR_INPROG             4
+#define OSDP_CP_ERR_GENERIC -1
+#define OSDP_CP_ERR_NO_DATA 1
+#define OSDP_CP_ERR_RETRY_CMD 2
+#define OSDP_CP_ERR_CAN_YIELD 3
+#define OSDP_CP_ERR_INPROG 4
 
 int osdp_extract_address(int *address)
 {
@@ -225,7 +225,7 @@ static int cp_build_command(struct osdp_pd *pd, uint8_t *buf, int max_len)
 			break;
 		}
 		buf[len++] = pd->cmd_id;
-		buf[len++] = 1;  /* key type (1: SCBK) */
+		buf[len++] = 1; /* key type (1: SCBK) */
 		buf[len++] = 16; /* key length in bytes */
 		osdp_compute_scbk(pd, buf + len);
 		len += 16;
@@ -236,8 +236,8 @@ static int cp_build_command(struct osdp_pd *pd, uint8_t *buf, int max_len)
 			break;
 		}
 		osdp_fill_random(pd->sc.cp_random, 8);
-		smb[0] = 3;       /* length */
-		smb[1] = SCS_11;  /* type */
+		smb[0] = 3; /* length */
+		smb[1] = SCS_11; /* type */
 		smb[2] = ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD) ? 0 : 1;
 		buf[len++] = pd->cmd_id;
 		for (i = 0; i < 8; i++)
@@ -249,8 +249,8 @@ static int cp_build_command(struct osdp_pd *pd, uint8_t *buf, int max_len)
 			break;
 		}
 		osdp_compute_cp_cryptogram(pd);
-		smb[0] = 3;       /* length */
-		smb[1] = SCS_13;  /* type */
+		smb[0] = 3; /* length */
+		smb[1] = SCS_13; /* type */
 		smb[2] = ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD) ? 0 : 1;
 		buf[len++] = pd->cmd_id;
 		for (i = 0; i < 16; i++)
@@ -294,7 +294,7 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 	}
 
 	pd->reply_id = buf[pos++];
-	len--;		/* consume reply id from the head */
+	len--; /* consume reply id from the head */
 
 	switch (pd->reply_id) {
 	case REPLY_ACK:
@@ -314,19 +314,19 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 		if (len != REPLY_PDID_DATA_LEN) {
 			break;
 		}
-		pd->id.vendor_code  = buf[pos++];
+		pd->id.vendor_code = buf[pos++];
 		pd->id.vendor_code |= buf[pos++] << 8;
 		pd->id.vendor_code |= buf[pos++] << 16;
 
 		pd->id.model = buf[pos++];
 		pd->id.version = buf[pos++];
 
-		pd->id.serial_number  = buf[pos++];
+		pd->id.serial_number = buf[pos++];
 		pd->id.serial_number |= buf[pos++] << 8;
 		pd->id.serial_number |= buf[pos++] << 16;
 		pd->id.serial_number |= buf[pos++] << 24;
 
-		pd->id.firmware_version  = buf[pos++] << 16;
+		pd->id.firmware_version = buf[pos++] << 16;
 		pd->id.firmware_version |= buf[pos++] << 8;
 		pd->id.firmware_version |= buf[pos++];
 		ret = 0;
@@ -340,9 +340,9 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 			if (t1 >= OSDP_PD_CAP_SENTINEL) {
 				break;
 			}
-			pd->cap[t1].function_code    = t1;
+			pd->cap[t1].function_code = t1;
 			pd->cap[t1].compliance_level = buf[pos++];
-			pd->cap[t1].num_items        = buf[pos++];
+			pd->cap[t1].num_items = buf[pos++];
 		}
 		/* post-capabilities hooks */
 		t2 = OSDP_PD_CAP_COMMUNICATION_SECURITY;
@@ -357,26 +357,40 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 		if (len != REPLY_LSTATR_DATA_LEN) {
 			break;
 		}
-		if (buf[pos++]) {
-			SET_FLAG(pd, PD_FLAG_TAMPER);
-		} else {
-			CLEAR_FLAG(pd, PD_FLAG_TAMPER);
-		}
-		if (buf[pos++]) {
-			SET_FLAG(pd, PD_FLAG_POWER);
-		} else {
-			CLEAR_FLAG(pd, PD_FLAG_POWER);
-		}
+		pd->status.power = buf[pos++];
+		pd->status.tamper = buf[pos++];
 		ret = 0;
 		break;
 	case REPLY_RSTATR:
-		if (len != REPLY_RSTATR_DATA_LEN) {
+		t1 = OSDP_PD_CAP_READERS;
+		if (len != pd->cap[t1].num_items || len > OSDP_RTMAPER_STATUS_MAX_LEN) {
 			break;
 		}
-		if (buf[pos++]) {
-			SET_FLAG(pd, PD_FLAG_R_TAMPER);
-		} else {
-			CLEAR_FLAG(pd, PD_FLAG_R_TAMPER);
+		pd->status.rtampers = 0;
+		for (uint8_t n = 0; n < len; ++n) {
+			pd->status.rtampers |= (buf[n] & 0x03) << 2 * n;
+		}
+		ret = 0;
+		break;
+	case REPLY_ISTATR:
+		t1 = OSDP_PD_CAP_CONTACT_STATUS_MONITORING;
+		if (len != pd->cap[t1].num_items || len > OSDP_IO_STATUS_MAX_LEN) {
+			break;
+		}
+		pd->status.inputs = 0;
+		for (i = 0; i < len; i++) {
+			pd->status.inputs |= buf[pos++] << i;
+		}
+		ret = 0;
+		break;
+	case REPLY_OSTATR:
+		t1 = OSDP_PD_CAP_OUTPUT_CONTROL;
+		if (len != pd->cap[t1].num_items || len > OSDP_IO_STATUS_MAX_LEN) {
+			break;
+		}
+		pd->status.outputs = 0;
+		for (i = 0; i < len; i++) {
+			pd->status.outputs |= buf[pos++] << i;
 		}
 		ret = 0;
 		break;
@@ -385,7 +399,7 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 		t1 = buf[pos++];
-		temp32  = buf[pos++];
+		temp32 = buf[pos++];
 		temp32 |= buf[pos++] << 8;
 		temp32 |= buf[pos++] << 16;
 		temp32 |= buf[pos++] << 24;
@@ -398,7 +412,7 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 		if (len < REPLY_KEYPPAD_DATA_LEN) {
 			break;
 		}
-		pos++;	         /* reader number; skip */
+		pos++; /* reader number; skip */
 		t1 = buf[pos++]; /* key length */
 		if ((len - REPLY_KEYPPAD_DATA_LEN) != t1) {
 			break;
@@ -415,9 +429,9 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 		if (len < REPLY_RAW_DATA_LEN) {
 			break;
 		}
-		pos++;	                /* reader number; skip */
-		t1 = buf[pos++];        /* format */
-		t2 = buf[pos++];        /* length LSB */
+		pos++; /* reader number; skip */
+		t1 = buf[pos++]; /* format */
+		t2 = buf[pos++]; /* length LSB */
 		t2 |= buf[pos++] << 8; /* length MSB */
 		if ((len - REPLY_RAW_DATA_LEN) != t2) {
 			break;
@@ -431,15 +445,14 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 		if (len < REPLY_FMT_DATA_LEN) {
 			break;
 		}
-		pos++;	/* reader number; skip */
-		pos++;	/* skip one byte -- TODO: handle reader direction */
+		pos++; /* reader number; skip */
+		pos++; /* skip one byte -- TODO: handle reader direction */
 		t1 = buf[pos++]; /* Key length */
 		if ((len - REPLY_FMT_DATA_LEN) != t1) {
 			break;
 		}
 		if (cp->notifier.cardread) {
-			cp->notifier.cardread(pd->offset, OSDP_CARD_FMT_ASCII,
-					      buf + pos, t1);
+			cp->notifier.cardread(pd->offset, OSDP_CARD_FMT_ASCII, buf + pos, t1);
 		}
 		ret = 0;
 		break;
@@ -488,8 +501,7 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 	}
 
 	if (ret == OSDP_CP_ERR_GENERIC) {
-		LOG_ERR(TAG "REPLY %02x for CMD %02x format error!",
-			pd->cmd_id, pd->reply_id);
+		LOG_ERR(TAG "REPLY %02x for CMD %02x format error!", pd->cmd_id, pd->reply_id);
 		return OSDP_CP_ERR_GENERIC;
 	}
 
@@ -544,7 +556,7 @@ static int cp_process_reply(struct osdp_pd *pd)
 	max_len = sizeof(pd->rx_buf) - pd->rx_buf_len;
 
 	rec_bytes = pd->channel.recv(pd->channel.data, buf, max_len);
-	if (rec_bytes <= 0) {	/* No data received */
+	if (rec_bytes <= 0) { /* No data received */
 		return OSDP_CP_ERR_NO_DATA;
 	}
 	pd->rx_buf_len += rec_bytes;
@@ -719,8 +731,7 @@ static int state_update(struct osdp_pd *pd)
 	int phy_state, soft_fail;
 
 	phy_state = cp_phy_state_update(pd);
-	if (phy_state == OSDP_CP_ERR_INPROG ||
-	    phy_state == OSDP_CP_ERR_CAN_YIELD) {
+	if (phy_state == OSDP_CP_ERR_INPROG || phy_state == OSDP_CP_ERR_CAN_YIELD) {
 		return OSDP_CP_ERR_GENERIC;
 	}
 
@@ -728,8 +739,8 @@ static int state_update(struct osdp_pd *pd)
 	soft_fail = (pd->state == OSDP_CP_STATE_SC_CHLNG);
 
 	/* phy state error -- cleanup */
-	if (pd->state != OSDP_CP_STATE_OFFLINE &&
-	    phy_state == OSDP_CP_ERR_GENERIC && soft_fail == 0) {
+	if (pd->state != OSDP_CP_STATE_OFFLINE && phy_state == OSDP_CP_ERR_GENERIC &&
+	    soft_fail == 0) {
 		cp_set_offline(pd);
 	}
 
@@ -738,8 +749,8 @@ static int state_update(struct osdp_pd *pd)
 	switch (pd->state) {
 	case OSDP_CP_STATE_ONLINE:
 #ifdef CONFIG_OSDP_SC_ENABLED
-		if (ISSET_FLAG(pd, PD_FLAG_SC_ACTIVE)  == false &&
-		    ISSET_FLAG(pd, PD_FLAG_SC_CAPABLE) == true  &&
+		if (ISSET_FLAG(pd, PD_FLAG_SC_ACTIVE) == false &&
+		    ISSET_FLAG(pd, PD_FLAG_SC_CAPABLE) == true &&
 		    osdp_millis_since(pd->sc_tstamp) > OSDP_PD_SC_RETRY_MS) {
 			LOG_INF("retry SC after retry timeout");
 			cp_set_state(pd, OSDP_CP_STATE_SC_INIT);
@@ -870,7 +881,7 @@ static int osdp_cp_send_command_keyset(struct osdp_cmd_keyset *cmd)
 
 	if (osdp_get_sc_status_mask() != PD_MASK(ctx)) {
 		LOG_WRN(TAG "CMD_KEYSET can be sent only when all PDs are "
-			"ONLINE and SC_ACTIVE.");
+			    "ONLINE and SC_ACTIVE.");
 		return 1;
 	}
 
@@ -925,8 +936,7 @@ int osdp_cp_set_callback_key_press(int (*cb)(int address, uint8_t key))
 	return 0;
 }
 
-int osdp_cp_set_callback_card_read(
-	int (*cb)(int address, int format, uint8_t *data, int len))
+int osdp_cp_set_callback_card_read(int (*cb)(int address, int format, uint8_t *data, int len))
 {
 	struct osdp *ctx = osdp_get_ctx();
 

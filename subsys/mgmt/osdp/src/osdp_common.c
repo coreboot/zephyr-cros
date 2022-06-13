@@ -6,13 +6,13 @@
 
 #include <ctype.h>
 
-#include <zephyr/device.h>
-#include <zephyr/sys/crc.h>
-#include <zephyr/logging/log.h>
+#include <device.h>
+#include <sys/crc.h>
+#include <logging/log.h>
 
 #ifdef CONFIG_OSDP_SC_ENABLED
-#include <zephyr/crypto/crypto.h>
-#include <zephyr/random/rand32.h>
+#include <crypto/crypto.h>
+#include <random/rand32.h>
 #endif
 
 #include "osdp_common.h"
@@ -31,14 +31,14 @@ uint16_t osdp_compute_crc16(const uint8_t *buf, size_t len)
 
 int64_t osdp_millis_now(void)
 {
-	return (int64_t) k_uptime_get();
+	return (int64_t)k_uptime_get();
 }
 
 int64_t osdp_millis_since(int64_t last)
 {
 	int64_t tmp = last;
 
-	return (int64_t) k_uptime_delta(&tmp);
+	return (int64_t)k_uptime_delta(&tmp);
 }
 
 struct osdp_cmd *osdp_cmd_alloc(struct osdp_pd *pd)
@@ -78,6 +78,39 @@ int osdp_cmd_dequeue(struct osdp_pd *pd, struct osdp_cmd **cmd)
 struct osdp_cmd *osdp_cmd_get_last(struct osdp_pd *pd)
 {
 	return (struct osdp_cmd *)sys_slist_peek_tail(&pd->cmd.queue);
+}
+
+struct osdp_event_node *osdp_event_alloc(struct osdp_pd *pd)
+{
+	struct osdp_event_node *evt = NULL;
+
+	if (k_mem_slab_alloc(&pd->event.slab, (void **)&evt, K_MSEC(100))) {
+		LOG_ERR("Memory allocation time-out");
+		return NULL;
+	}
+	return evt;
+}
+
+void osdp_event_free(struct osdp_pd *pd, struct osdp_event_node *evt)
+{
+	k_mem_slab_free(&pd->event.slab, (void **)&evt);
+}
+
+void osdp_event_enqueue(struct osdp_pd *pd, struct osdp_event_node *evt)
+{
+	sys_slist_append(&pd->event.queue, &evt->node);
+}
+
+int osdp_event_dequeue(struct osdp_pd *pd, struct osdp_event_node **evt)
+{
+	sys_snode_t *node;
+	node = sys_slist_peek_head(&pd->event.queue);
+	if (node == NULL) {
+		return -1;
+	}
+	sys_slist_remove(&pd->event.queue, NULL, node);
+	*evt = CONTAINER_OF(node, struct osdp_event_node, node);
+	return 0;
 }
 
 #ifdef CONFIG_OSDP_SC_ENABLED

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/logging/log.h>
+#include <logging/log.h>
 LOG_MODULE_DECLARE(osdp, CONFIG_OSDP_LOG_LEVEL);
 
 #include <string.h>
