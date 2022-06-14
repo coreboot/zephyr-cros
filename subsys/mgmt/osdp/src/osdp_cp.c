@@ -40,7 +40,6 @@ LOG_MODULE_DECLARE(osdp, CONFIG_OSDP_LOG_LEVEL);
 #define REPLY_PDID_DATA_LEN            12
 #define REPLY_PDCAP_ENTITY_LEN         3
 #define REPLY_LSTATR_DATA_LEN          2
-#define REPLY_RSTATR_DATA_LEN          1
 #define REPLY_COM_DATA_LEN             5
 #define REPLY_NAK_DATA_LEN             1
 #define REPLY_CCRYPT_DATA_LEN          32
@@ -50,6 +49,10 @@ LOG_MODULE_DECLARE(osdp, CONFIG_OSDP_LOG_LEVEL);
 #define REPLY_FMT_DATA_LEN             3   /* variable length command */
 #define REPLY_BUSY_DATA_LEN            0
 #define REPLY_MFGREP_LEN               4 /* variable length command */
+
+#define REPLY_ISTATR_MAX_DATA_LEN      OSDP_IO_STATUS_MAX_LEN
+#define REPLY_OSTATR_MAX_DATA_LEN      OSDP_IO_STATUS_MAX_LEN
+#define REPLY_RSTATR_MAX_DATA_LEN      OSDP_RTMAPER_STATUS_MAX_LEN
 
 enum osdp_cp_error_e {
 	OSDP_CP_ERR_NONE = 0,
@@ -394,6 +397,7 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 		ret = OSDP_CP_ERR_NONE;
 		break;
 	case REPLY_LSTATR:
+<<<<<<< HEAD
 		if (len != REPLY_LSTATR_DATA_LEN) {
 			break;
 		}
@@ -417,8 +421,39 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 			SET_FLAG(pd, PD_FLAG_R_TAMPER);
 		} else {
 			CLEAR_FLAG(pd, PD_FLAG_R_TAMPER);
-		}
+=======
+		ASSERT_LENGTH(len, REPLY_LSTATR_DATA_LEN);
+		pd->status.power = buf[pos++];
+		pd->status.tamper = buf[pos++];
 		ret = OSDP_CP_ERR_NONE;
+		break;
+	case REPLY_RSTATR:
+		if (len < REPLY_RSTATR_MAX_DATA_LEN) {
+			pd->status.rtampers = 0;
+			for (uint8_t n = 0; n < len; ++n) {
+				pd->status.rtampers |= (buf[n] & 0x03) << 2 * n;
+			}
+			ret = OSDP_CP_ERR_NONE;
+		}
+		break;
+	case REPLY_ISTATR:
+		if (len < REPLY_ISTATR_MAX_DATA_LEN) {
+			pd->status.inputs = 0;
+			for (i = 0; i < len; i++) {
+				pd->status.inputs |= buf[pos++] << i;
+			}
+			ret = OSDP_CP_ERR_NONE;
+		}
+		break;
+	case REPLY_OSTATR:
+		if (len < REPLY_OSTATR_MAX_DATA_LEN) {
+			pd->status.outputs = 0;
+			for (i = 0; i < len; i++) {
+				pd->status.outputs |= buf[pos++] << i;
+			}
+			ret = OSDP_CP_ERR_NONE;
+>>>>>>> 5b72267527... added status commands and reworked init
+		}
 		break;
 	case REPLY_COM:
 		if (len != REPLY_COM_DATA_LEN) {

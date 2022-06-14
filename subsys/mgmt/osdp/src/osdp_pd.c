@@ -151,8 +151,9 @@ static int pd_event_dequeue(struct osdp_pd *pd, struct osdp_event **event)
 }
 
 static int pd_translate_event(struct osdp_pd *pd, struct osdp_event *event)
-{
+{	
 	int reply_code = 0;
+	uint32_t status = 0;
 
 	switch (event->type) {
 	case OSDP_EVENT_CARDREAD:
@@ -168,6 +169,41 @@ static int pd_translate_event(struct osdp_pd *pd, struct osdp_event *event)
 		break;
 	case OSDP_EVENT_KEYPRESS:
 		reply_code = REPLY_KEYPPAD;
+		break;
+	case OSDP_EVENT_ISTAT:
+		for (uint8_t n = 0; n < event->iostatus.io_num; ++n) {
+			status |= (0x01 & event->iostatus.io_statuses[n]) << n;
+		}
+		if (status != pd->status.inputs) {
+			pd->status.inputs = status;
+			reply_code = REPLY_ISTATR;
+		}
+		break;
+	case OSDP_EVENT_OSTAT:
+		for (uint8_t n = 0; n < event->iostatus.io_num; ++n) {
+			status |= (0x01 & event->iostatus.io_statuses[n]) << n;
+		}
+		if (status != pd->status.outputs) {
+			pd->status.outputs = status;
+			reply_code = REPLY_OSTATR;
+		}
+		break;
+	case OSDP_EVENT_RSTAT:
+		for (uint8_t n = 0; n < event->rtamperstatus.readers_num; ++n) {
+			status |= (0x03 & event->rtamperstatus.rtamper_statuses[n]) << 2 * n;
+		}
+		if (status != pd->status.rtampers) {
+			pd->status.rtampers = status;
+			reply_code = REPLY_RSTATR;
+		}
+		break;
+	case OSDP_EVENT_LSTAT:
+		if (pd->status.power != event->localstatus.power_status ||
+		    pd->status.tamper != event->localstatus.tamper_status) {
+			pd->status.power = event->localstatus.power_status;
+			pd->status.tamper = event->localstatus.tamper_status;
+			reply_code = REPLY_LSTATR;
+		}
 		break;
 	default:
 		LOG_ERR("Unknown event type %d", event->type);
@@ -268,12 +304,12 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 		/* Check if we have external events in the queue */
-		if (pd_event_dequeue(pd, &event) == 0) {
+		ASSERT_LENGTH(len, CMD_POLL_DATA_LEN);
+		pd->reply_id = REPLY_ACK;
+		while (pd_event_dequeue(pd, &event) == 0 && pd->reply_id == REPLY_ACK) {
 			ret = pd_translate_event(pd, event);
 			pd->reply_id = ret;
 			pd_event_free(pd, event);
-		} else {
-			pd->reply_id = REPLY_ACK;
 		}
 		ret = OSDP_PD_ERR_NONE;
 		break;
@@ -700,14 +736,36 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 	case REPLY_LSTATR:
 		assert_len(REPLY_LSTATR_LEN, max_len);
 		buf[len++] = pd->reply_id;
-		buf[len++] = ISSET_FLAG(pd, PD_FLAG_TAMPER);
-		buf[len++] = ISSET_FLAG(pd, PD_FLAG_POWER);
+		buf[len++] = pd->status.tamper;
+		buf[len++] = pd->status.power;
 		ret = OSDP_PD_ERR_NONE;
 		break;
-	case REPLY_RSTATR:
-		assert_len(REPLY_RSTATR_LEN, max_len);
+	case REPLY_ISTATR:
+		t1 = pd->cap[OSDP_PD_CAP_CONTACT_STATUS_MONITORING].num_items;
+		assert_len(t1, max_len);
 		buf[len++] = pd->reply_id;
-		buf[len++] = ISSET_FLAG(pd, PD_FLAG_R_TAMPER);
+		for (i = 0; i < t1; ++i) {
+			buf[len++] = 0x01 & (pd->status.inputs >> i);
+		}
+		ret = OSDP_PD_ERR_NONE;
+		break;
+	case REPLY_OSTATR:
+		t1 = pd->cap[OSDP_PD_CAP_OUTPUT_CONTROL].num_items;
+		assert_len(t1, max_len);
+		buf[len++] = pd->reply_id;
+		for (i = 0; i < t1; ++i) {
+			buf[len++] = 0x01 & (pd->status.outputs >> i);
+		}
+		ret = OSDP_PD_ERR_NONE;
+		break;
+
+	case REPLY_RSTATR:
+		t1 = pd->cap[OSDP_PD_CAP_READERS].num_items;
+		assert_len(t1, max_len);
+		buf[len++] = pd->reply_id;
+		for (i = 0; i < t1; ++i) {
+			buf[len++] = 0x01 & (pd->status.rtampers >> i);
+		}
 		ret = OSDP_PD_ERR_NONE;
 		break;
 	case REPLY_KEYPPAD:
@@ -1020,11 +1078,13 @@ void osdp_update(struct osdp *ctx)
 	 * If secure channel is established, we need to make sure that
 	 * the session is valid before accepting a command.
 	 */
+#ifdef CONFIG_OSDP_SC_ENABLED	
 	if (sc_is_active(pd) &&
 	    osdp_millis_since(pd->sc_tstamp) > OSDP_PD_SC_TIMEOUT_MS) {
 		LOG_INF("PD SC session timeout!");
 		sc_deactivate(pd);
 	}
+#endif	
 
 	ret = pd_receive_and_process_command(pd);
 
@@ -1046,10 +1106,11 @@ void osdp_update(struct osdp *ctx)
 		pd_error_reset(pd);
 		return;
 	}
-
+#ifdef CONFIG_OSDP_SC_ENABLED	
 	if (ret == OSDP_PD_ERR_NONE && sc_is_active(pd)) {
 		pd->sc_tstamp = osdp_millis_now();
 	}
+#endif
 
 	ret = pd_send_reply(pd);
 	if (ret != OSDP_PD_ERR_NONE) {

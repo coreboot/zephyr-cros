@@ -177,7 +177,7 @@ void osdp_refresh(void *arg1, void *arg2, void *arg3)
 	}
 }
 
-static int osdp_init(const struct device *arg)
+static int osdp_init_internal(const struct device *arg)
 {
 	ARG_UNUSED(arg);
 	int len;
@@ -263,4 +263,9 @@ static int osdp_init(const struct device *arg)
 	return 0;
 }
 
-SYS_INIT(osdp_init, POST_KERNEL, 10);
+int osdp_init(void)
+{
+	return osdp_init_internal(NULL);
+}
+
+//SYS_INIT(osdp_init, POST_KERNEL, 10);

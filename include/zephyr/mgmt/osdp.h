@@ -20,6 +20,8 @@ extern "C" {
 #define OSDP_CMD_KEYSET_KEY_MAX_LEN    32
 #define OSDP_CMD_MFG_MAX_DATALEN       64
 #define OSDP_EVENT_MAX_DATALEN         64
+#define OSDP_IO_STATUS_MAX_LEN         32
+#define OSDP_RTMAPER_STATUS_MAX_LEN    8
 
 
 /* ------------------------------- */
@@ -230,6 +232,75 @@ struct osdp_cmd {
 /* ------------------------------- */
 
 /**
+ * @brief PD tamper status.
+ */
+enum osdp_tamper_status_e {
+	TAMPER_STATUS_NORMAL,
+	TAMPER_STATUS_TAMPER,
+	TAMPER_STATUS_SENTINEL
+};
+
+/**
+ * @brief PD power status.
+ */
+enum osdp_power_status_e {
+	POWER_STATUS_NORMAL,
+	POWER_STATUS_FAILURE,
+	POWER_STATUS_SENTINEL
+};
+
+/**
+ * @brief PD local status report.
+ *
+ * @param tamper_status Tamper status (enum osdp_tamper_status_e)
+ * @param power_status Power status (enum osdp_power_status_e)
+ */
+struct osdp_event_local_status {
+	uint8_t tamper_status;
+	uint8_t power_status;
+};
+
+/**
+ * @brief PD input/output state
+ */
+enum osdp_io_status_e {
+	IO_STATUS_INACTIVE,
+	IO_STATUS_ACTIVE,
+	IO_STATUS_SENTINEL	
+};
+
+/**
+ * @brief PD inputs/outputs status.
+ *
+ * @param io_num Number of inputs/outputs
+ * @param io_statuses Array with statuses of input/output  (enum osdp_io_status_e)
+ */
+struct osdp_event_io_status {
+	uint8_t io_num;
+	uint8_t io_statuses[OSDP_IO_STATUS_MAX_LEN];
+};
+
+/**
+ * @brief PD tamper staus of connected reader. 
+ */
+enum osdp_reader_tamper_status_e {
+	RTAMPER_STATUS_NORMAL,
+	RTAMPER_STATUS_NOT_CONNECTED,
+	RTAMPER_STATUS_TAMPER,
+	RTAMPER_STATUS_SENTINEL
+};
+
+/**
+ * @brief PD tamper status of connected readers.
+ *
+ * @param readers_num Number of connected readers
+ * @param rtamper_status Array with statuses of connected reader tamper (enum osdp_reader_tamper_status_e)
+ */
+struct osdp_event_reader_tamper_status {
+	uint8_t readers_num;
+	uint8_t rtamper_statuses[OSDP_RTMAPER_STATUS_MAX_LEN];
+};
+/**
  * @brief Various card formats that a PD can support. This is sent to CP
  * when a PD must report a card read.
  */
@@ -307,6 +378,10 @@ enum osdp_event_type {
 	OSDP_EVENT_CARDREAD,
 	OSDP_EVENT_KEYPRESS,
 	OSDP_EVENT_MFGREP,
+	OSDP_EVENT_ISTAT,
+	OSDP_EVENT_RSTAT,
+	OSDP_EVENT_OSTAT,
+	OSDP_EVENT_LSTAT,
 	OSDP_EVENT_SENTINEL
 };
 
@@ -317,6 +392,9 @@ enum osdp_event_type {
  * @param keypress keypress event structure
  * @param cardread cardread event structure
  * @param mfgrep mfgrep event structure
+ * @param localstatus local status event structure
+ * @param iostatus IO status event structure
+ * @param rtamperstatus reader tamper status event structure
  */
 struct osdp_event {
 	sys_snode_t node;
@@ -325,6 +403,9 @@ struct osdp_event {
 		struct osdp_event_keypress keypress;
 		struct osdp_event_cardread cardread;
 		struct osdp_event_mfgrep mfgrep;
+		struct osdp_event_local_status localstatus;
+		struct osdp_event_io_status iostatus;
+		struct osdp_event_reader_tamper_status rtamperstatus;
 	};
 };
 
@@ -368,6 +449,14 @@ typedef int (*cp_event_callback_t)(void *arg, int pd, struct osdp_event *ev);
  * @param id OSDP command ID (Note: this is not `enum osdp_cmd_e`)
  */
 typedef void (*osdp_command_complete_callback_t)(int id);
+
+/**
+ * @brief API to initialize OSDP module.
+ * 
+ * @retval 0 on success
+ * @retval -1 on failure
+ */
+int osdp_init(void);
 
 /* ------------------------------- */
 /*            PD Methods           */
@@ -448,6 +537,8 @@ void osdp_get_status_mask(uint8_t *bitmask);
  */
 void osdp_get_sc_status_mask(uint8_t *bitmask);
 
+#endif
+
 /**
  * @brief Set osdp_command_complete_callback_t to subscribe to osdp command or
  * event completion events. This can be used to perform post command actions
@@ -458,6 +549,10 @@ void osdp_get_sc_status_mask(uint8_t *bitmask);
  */
 void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb);
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5b72267527... added status commands and reworked init
 #ifdef __cplusplus
 }
 #endif

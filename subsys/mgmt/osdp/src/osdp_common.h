@@ -127,9 +127,6 @@
 
 /* PD Flags */
 #define PD_FLAG_SC_CAPABLE      0x00000001 /* PD secure channel capable */
-#define PD_FLAG_TAMPER          0x00000002 /* local tamper status */
-#define PD_FLAG_POWER           0x00000004 /* local power status */
-#define PD_FLAG_R_TAMPER        0x00000008 /* remote tamper status */
 #define PD_FLAG_AWAIT_RESP      0x00000020 /* set after command is sent */
 #define PD_FLAG_SKIP_SEQ_CHECK  0x00000040 /* disable seq checks (debug) */
 #define PD_FLAG_SC_USE_SCBKD    0x00000080 /* in this SC attempt, use SCBKD */
@@ -396,6 +393,23 @@ struct osdp_pd_id {
 	uint32_t firmware_version;
 };
 
+/**
+ * @brief PD status.
+ *
+ * @param inputs Inputs status 
+ * @param outputs Outputs status
+ * @param rtampers Connected readers tamper status
+ * @param power Power status
+ * @param tamper Tamper status
+ */
+struct osdp_pd_status {
+	uint32_t inputs;
+	uint32_t outputs;
+	uint16_t rtampers;
+	uint8_t power;
+	uint8_t tamper;
+};
+
 struct osdp_channel {
 	/**
 	 * @brief pointer to a block of memory that will be passed to the
@@ -461,6 +475,8 @@ struct osdp_pd {
 	int baud_rate;
 	int address;
 	int seq_number;
+	
+	struct osdp_pd_status status;
 	struct osdp_pd_cap cap[OSDP_PD_CAP_SENTINEL];
 	struct osdp_pd_id id;
 
