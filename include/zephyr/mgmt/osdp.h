@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Siddharth Chandrasekaran <siddharth@embedjournal.com>
+ * Copyright (c) 2020 Siddharth Chandrasekaran <sidcha.dev@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -7,111 +7,37 @@
 #ifndef _OSDP_H_
 #define _OSDP_H_
 
-#include <zephyr.h>
+#include <zephyr/zephyr.h>
 #include <stdint.h>
 
-#include <sys/slist.h>
+#include <zephyr/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define OSDP_CMD_TEXT_MAX_LEN 32
-#define OSDP_CMD_KEYSET_KEY_MAX_LEN 32
-#define OSDP_CMD_MFG_MAX_DATALEN 64
-#define OSDP_EVENT_MAX_DATALEN 64
-#define OSDP_IO_STATUS_MAX_LEN 32
-#define OSDP_RTMAPER_STATUS_MAX_LEN 16
+#define OSDP_CMD_TEXT_MAX_LEN          32
+#define OSDP_CMD_KEYSET_KEY_MAX_LEN    32
+#define OSDP_CMD_MFG_MAX_DATALEN       64
+#define OSDP_EVENT_MAX_DATALEN         64
 
-/**
- * @brief PD tamper status.
- */
-enum osdp_tamper_status_e {
-	TAMPER_STATUS_NORMAL,
-	TAMPER_STATUS_TAMPER,
-};
 
-/**
- * @brief PD power status.
- */
-enum osdp_power_status_e {
-	POWER_STATUS_NORMAL,
-	POWER_STATUS_FAILURE,
-};
-
-/**
- * @brief PD local status report.
- *
- * @param tamper_status Tamper status (enum osdp_tamper_status_e)
- * @param power_status Power status (enum osdp_power_status_e)
- */
-struct osdp_event_local_status {
-	uint8_t tamper_status;
-	uint8_t power_status;
-};
-
-/**
- * @brief PD input/output state
- */
-enum osdp_io_status_e {
-	IO_STATUS_INACTIVE,
-	IO_STATUS_ACTIVE,
-};
-
-/**
- * @brief PD inputs/outputs status.
- *
- * @param io_num Number of inputs/outputs
- * @param io_statuses Array with statuses of input/output  (enum osdp_io_status_e)
- */
-struct osdp_event_io_status {
-	uint8_t io_num;
-	uint8_t io_statuses[OSDP_IO_STATUS_MAX_LEN];
-};
-
-/**
- * @brief PD tamper staus of connected reader. 
- */
-enum osdp_reader_tamper_status_e {
-	RTAMPER_STATUS_NORMAL,
-	RTAMPER_STATUS_NOT_CONNECTED,
-	RTAMPER_STATUS_TAMPER,
-};
-
-/**
- * @brief PD tamper status of connected readers.
- *
- * @param readers_num Number of connected readers
- * @param rtamper_status Array with statuses of connected reader tamper (enum osdp_reader_tamper_status_e)
- */
-struct osdp_event_reader_tamper_status {
-	uint8_t readers_num;
-	uint8_t rtamper_statuses[OSDP_RTMAPER_STATUS_MAX_LEN];
-};
-
-/**
- * @brief Various card formats that a PD can support. This is sent to CP
- * when a PD must report a card read.
- */
-enum osdp_card_formats_e {
-	OSDP_CARD_FMT_RAW_UNSPECIFIED,
-	OSDP_CARD_FMT_RAW_WIEGAND,
-	OSDP_CARD_FMT_ASCII,
-	OSDP_CARD_FMT_SENTINEL
-};
+/* ------------------------------- */
+/*         OSDP Commands           */
+/* ------------------------------- */
 
 /**
  * @brief Command sent from CP to Control digital output of PD.
  *
  * @param output_no 0 = First Output, 1 = Second Output, etc.
  * @param control_code One of the following:
- *   0 - NOP – do not alter this output
- *   1 - set the permanent state to OFF, abort timed operation (if any)
- *   2 - set the permanent state to ON, abort timed operation (if any)
- *   3 - set the permanent state to OFF, allow timed operation to complete
- *   4 - set the permanent state to ON, allow timed operation to complete
- *   5 - set the temporary state to ON, resume perm state on timeout
- *   6 - set the temporary state to OFF, resume permanent state on timeout
+ *        0 - NOP – do not alter this output
+ *        1 - set the permanent state to OFF, abort timed operation (if any)
+ *        2 - set the permanent state to ON, abort timed operation (if any)
+ *        3 - set the permanent state to OFF, allow timed operation to complete
+ *        4 - set the permanent state to ON, allow timed operation to complete
+ *        5 - set the temporary state to ON, resume perm state on timeout
+ *        6 - set the temporary state to OFF, resume permanent state on timeout
  * @param timer_count Time in units of 100 ms
  */
 struct osdp_cmd_output {
@@ -136,14 +62,14 @@ enum osdp_led_color_e {
  * @brief LED params sub-structure. Part of LED command. See struct osdp_cmd_led
  *
  * @param control_code One of the following:
- * Temporary Control Code:
- *   0 - NOP - do not alter this LED's temporary settings
- *   1 - Cancel any temporary operation and display this LED's permanent state
- *       immediately
- *   2 - Set the temporary state as given and start timer immediately
- * Permanent Control Code:
- *   0 - NOP - do not alter this LED's permanent settings
- *   1 - Set the permanent state as given
+ *        Temporary Control Code:
+ *           0 - NOP - do not alter this LED's temporary settings
+ *           1 - Cancel any temporary operation and display this LED's permanent
+ *               state immediately
+ *           2 - Set the temporary state as given and start timer immediately
+ *        Permanent Control Code:
+ *           0 - NOP - do not alter this LED's permanent settings
+ *           1 - Set the permanent state as given
  * @param on_count The ON duration of the flash, in units of 100 ms
  * @param off_count The OFF duration of the flash, in units of 100 ms
  * @param on_color Color to set during the ON timer (enum osdp_led_color_e)
@@ -196,10 +122,10 @@ struct osdp_cmd_buzzer {
  *
  * @param reader 0 = First Reader, 1 = Second Reader, etc.
  * @param control_code One of the following:
- *   1 - permanent text, no wrap
- *   2 - permanent text, with wrap
- *   3 - temp text, no wrap
- *   4 - temp text, with wrap
+ *        1 - permanent text, no wrap
+ *        2 - permanent text, with wrap
+ *        3 - temp text, no wrap
+ *        4 - temp text, with wrap
  * @param temp_time duration to display temporary text, in seconds
  * @param offset_row row to display the first character (1 indexed)
  * @param offset_col column to display the first character (1 indexed)
@@ -221,8 +147,8 @@ struct osdp_cmd_text {
  * PD. Must be stored in PD non-volatile memory.
  *
  * @param address Unit ID to which this PD will respond after the change takes
- *             effect.
- * @param baud_rate baud rate value 9600/38400/115200
+ *        effect.
+ * @param baud_rate baud rate value 9600/19200/38400/115200/230400
  */
 struct osdp_cmd_comset {
 	uint8_t address;
@@ -270,10 +196,6 @@ enum osdp_cmd_e {
 	OSDP_CMD_KEYSET,
 	OSDP_CMD_COMSET,
 	OSDP_CMD_MFG,
-	OSDP_CMD_ISTATR,
-	OSDP_CMD_OSTATR,
-	OSDP_CMD_RSTATR,
-	OSDP_CMD_LSTATR,
 	OSDP_CMD_SENTINEL
 };
 
@@ -293,14 +215,29 @@ struct osdp_cmd {
 	sys_snode_t node;
 	enum osdp_cmd_e id;
 	union {
-		struct osdp_cmd_led    led;
+		struct osdp_cmd_led led;
 		struct osdp_cmd_buzzer buzzer;
-		struct osdp_cmd_text   text;
+		struct osdp_cmd_text text;
 		struct osdp_cmd_output output;
 		struct osdp_cmd_comset comset;
 		struct osdp_cmd_keyset keyset;
 		struct osdp_cmd_mfg mfg;
 	};
+};
+
+/* ------------------------------- */
+/*          OSDP Events            */
+/* ------------------------------- */
+
+/**
+ * @brief Various card formats that a PD can support. This is sent to CP
+ * when a PD must report a card read.
+ */
+enum osdp_event_cardread_format_e {
+	OSDP_CARD_FMT_RAW_UNSPECIFIED,
+	OSDP_CARD_FMT_RAW_WIEGAND,
+	OSDP_CARD_FMT_ASCII,
+	OSDP_CARD_FMT_SENTINEL
 };
 
 /**
@@ -323,7 +260,7 @@ struct osdp_cmd {
  */
 struct osdp_event_cardread {
 	int reader_no;
-	enum osdp_card_formats_e format;
+	enum osdp_event_cardread_format_e format;
 	int direction;
 	int length;
 	uint8_t data[OSDP_EVENT_MAX_DATALEN];
@@ -370,52 +307,58 @@ enum osdp_event_type {
 	OSDP_EVENT_CARDREAD,
 	OSDP_EVENT_KEYPRESS,
 	OSDP_EVENT_MFGREP,
-	OSDP_EVENT_ISTAT,
-	OSDP_EVENT_RSTAT,
-	OSDP_EVENT_OSTAT,
-	OSDP_EVENT_LSTAT,
 	OSDP_EVENT_SENTINEL
 };
 
 /**
  * @brief OSDP Event structure.
  *
- * @param type used to select specific event in union. See: enum osdp_event_type
+ * @param id used to select specific event in union. See: enum osdp_event_type
  * @param keypress keypress event structure
  * @param cardread cardread event structure
  * @param mfgrep mfgrep event structure
- * @param localstatus local status event structure
- * @param iostatus IO status event structure
- * @param rtamperstatus reader tamper status event structure
  */
 struct osdp_event {
+	sys_snode_t node;
 	enum osdp_event_type type;
 	union {
 		struct osdp_event_keypress keypress;
 		struct osdp_event_cardread cardread;
 		struct osdp_event_mfgrep mfgrep;
-		struct osdp_event_local_status localstatus;
-		struct osdp_event_io_status iostatus;
-		struct osdp_event_reader_tamper_status rtamperstatus;
 	};
 };
 
 /**
-* @brief Callback for PD command notifications. After it has been registered
-* with `osdp_pd_set_command_callback`, this method is invoked when the PD
-* receives a command from the CP.
-*
-* @param arg pointer that will was passed to the arg param of
-* `osdp_pd_set_command_callback`.
-* @param cmd pointer to the received command.
-*
-* @retval 0 if LibOSDP must send a `osdp_ACK` response
-* @retval -ve if LibOSDP must send a `osdp_NAK` response
-* @retval +ve and modify the passed `struct osdp_cmd *cmd` if LibOSDP must send
-* a specific response. This is useful for sending manufacturer specific
-* reply ``osdp_MFGREP``.
-*/
+ * @brief Callback for PD command notifications. After it has been registered
+ * with `osdp_pd_set_command_callback`, this method is invoked when the PD
+ * receives a command from the CP.
+ *
+ * @param arg pointer that will was passed to the arg param of
+ * `osdp_pd_set_command_callback`.
+ * @param cmd pointer to the received command.
+ *
+ * @retval 0 if LibOSDP must send a `osdp_ACK` response
+ * @retval -ve if LibOSDP must send a `osdp_NAK` response
+ * @retval +ve and modify the passed `struct osdp_cmd *cmd` if LibOSDP must send
+ * a specific response. This is useful for sending manufacturer specific
+ * reply ``osdp_MFGREP``.
+ */
 typedef int (*pd_commnand_callback_t)(void *arg, struct osdp_cmd *cmd);
+
+/**
+ * @brief Callback for CP event notifications. After is has been registered with
+ * `osdp_cp_set_event_callback`, this method is invoked when the CP receives an
+ * event from the PD.
+ *
+ * @param arg pointer that will was passed to the arg param of
+ * `osdp_cp_set_event_callback`.
+ * @param pd PD offset number as in `pd_info_t *`.
+ * @param ev pointer to osdp_event struct (filled by libosdp).
+ *
+ * @retval 0 on handling the event successfully.
+ * @retval -ve on errors.
+ */
+typedef int (*cp_event_callback_t)(void *arg, int pd, struct osdp_event *ev);
 
 /**
  * @brief Callback for for command completion event callbacks. After is has
@@ -426,13 +369,20 @@ typedef int (*pd_commnand_callback_t)(void *arg, struct osdp_cmd *cmd);
  */
 typedef void (*osdp_command_complete_callback_t)(int id);
 
+/* ------------------------------- */
+/*            PD Methods           */
+/* ------------------------------- */
+
+#ifdef CONFIG_OSDP_MODE_PD
+
 /**
- * @brief API to initialize OSDP module.
- * 
- * @retval 0 on success
- * @retval -1 on failure
+ * @brief Set callback method for PD command notification. This callback is
+ * invoked when the PD receives a command from the CP.
+ *
+ * @param cb The callback function's pointer
+ * @param arg A pointer that will be passed as the first argument of `cb`
  */
-int osdp_init(void);
+void osdp_pd_set_command_callback(pd_commnand_callback_t cb, void *arg);
 
 /**
  * @brief API to notify PD events to CP. These events are sent to the CP as an
@@ -445,52 +395,71 @@ int osdp_init(void);
  */
 int osdp_pd_notify_event(struct osdp_event *event);
 
+#else /* CONFIG_OSDP_MODE_PD */
+
+/* ------------------------------- */
+/*            CP Methods           */
+/* ------------------------------- */
+
 /**
- * @brief Set callback method for PD command notification. This callback is
- * invoked when the PD receives a command from the CP. This function must
- * return:
- *   - 0 if LibOSDP must send a `osdp_ACK` response
- *   - -ve if LibOSDP must send a `osdp_NAK` response
- *   - +ve and modify the passed `struct osdp_cmd *cmd` if LibOSDP must send a
- *     specific response. This is useful for sending manufacturer specific reply
- *     ``osdp_MFGREP``.
+ * @brief Generic command enqueue API.
+ *
+ * @param pd PD offset number as in `pd_info_t *`.
+ * @param cmd command pointer. Must be filled by application.
+ *
+ * @retval 0 on success
+ * @retval -1 on failure
+ *
+ * @note This method only adds the command on to a particular PD's command
+ * queue. The command itself can fail due to various reasons.
+ */
+int osdp_cp_send_command(int pd, struct osdp_cmd *cmd);
+
+
+/**
+ * @brief Set callback method for CP event notification. This callback is
+ * invoked when the CP receives an event from the PD.
  *
  * @param cb The callback function's pointer
  * @param arg A pointer that will be passed as the first argument of `cb`
  */
-void osdp_pd_set_command_callback(pd_commnand_callback_t cb, void *arg);
+void osdp_cp_set_event_callback(cp_event_callback_t cb, void *arg);
+
+#endif /* CONFIG_OSDP_MODE_PD */
+
+#ifdef CONFIG_OSDP_SC_ENABLED
+
+/* ------------------------------- */
+/*          Common Methods         */
+/* ------------------------------- */
+
+/**
+ * @brief Get a bit mask of number of PD that are online currently.
+ *
+ * @param bitmask pointer to an array of bytes. must be as large as
+ *                (num_pds + 7 / 8).
+ */
+void osdp_get_status_mask(uint8_t *bitmask);
+
+/**
+ * @brief Get a bit mask of number of PD that are online and have an active
+ * secure channel currently.
+ *
+ * @param bitmask pointer to an array of bytes. must be as large as
+ *                (num_pds + 7 / 8).
+ */
+void osdp_get_sc_status_mask(uint8_t *bitmask);
 
 /**
  * @brief Set osdp_command_complete_callback_t to subscribe to osdp command or
  * event completion events. This can be used to perform post command actions
  * such as changing the baud rate of the underlying channel after a COMSET
  * command was acknowledged/issued by a peer.
- * 
- * @param cb The callback function's pointer
+ *
+ * @param ctx OSDP context
+ * @param cb Callback to be invoked when a command is completed.
  */
 void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb);
-
-#ifdef CONFIG_OSDP_MODE_PD
-
-/**
- * @param cmd pointer to a command structure that was received by the driver.
- *
- * @retval 0 on success.
- * @retval -1 on failure.
- */
-int osdp_pd_get_cmd(struct osdp_cmd *cmd);
-
-#else /* CONFIG_OSDP_MODE_PD */
-
-int osdp_cp_set_callback_key_press(int (*cb)(int address, uint8_t key));
-int osdp_cp_set_callback_card_read(int (*cb)(int address, int format, uint8_t *data, int len));
-int osdp_cp_send_command(int pd, struct osdp_cmd *cmd);
-
-#endif /* CONFIG_OSDP_MODE_PD */
-
-#ifdef CONFIG_OSDP_SC_ENABLED
-
-uint32_t osdp_get_sc_status_mask(void);
 
 #endif
 
@@ -498,4 +467,4 @@ uint32_t osdp_get_sc_status_mask(void);
 }
 #endif
 
-#endif /* _OSDP_H_ */
+#endif	/* _OSDP_H_ */

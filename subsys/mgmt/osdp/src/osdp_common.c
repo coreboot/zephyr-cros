@@ -1,18 +1,18 @@
 /*
- * Copyright (c) 2020 Siddharth Chandrasekaran <siddharth@embedjournal.com>
+ * Copyright (c) 2020 Siddharth Chandrasekaran <sidcha.dev@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <ctype.h>
 
-#include <device.h>
-#include <sys/crc.h>
-#include <logging/log.h>
+#include <zephyr/device.h>
+#include <zephyr/sys/crc.h>
+#include <zephyr/logging/log.h>
 
 #ifdef CONFIG_OSDP_SC_ENABLED
-#include <crypto/crypto.h>
-#include <random/rand32.h>
+#include <zephyr/crypto/crypto.h>
+#include <zephyr/random/rand32.h>
 #endif
 
 #include "osdp_common.h"
@@ -31,86 +31,19 @@ uint16_t osdp_compute_crc16(const uint8_t *buf, size_t len)
 
 int64_t osdp_millis_now(void)
 {
-	return (int64_t)k_uptime_get();
+	return (int64_t) k_uptime_get();
 }
 
 int64_t osdp_millis_since(int64_t last)
 {
 	int64_t tmp = last;
 
-	return (int64_t)k_uptime_delta(&tmp);
+	return (int64_t) k_uptime_delta(&tmp);
 }
 
-struct osdp_cmd *osdp_cmd_alloc(struct osdp_pd *pd)
+void osdp_keyset_complete(struct osdp_pd *pd)
 {
-	struct osdp_cmd *cmd = NULL;
-
-	if (k_mem_slab_alloc(&pd->cmd.slab, (void **)&cmd, K_MSEC(100))) {
-		LOG_ERR("Memory allocation time-out");
-		return NULL;
-	}
-	return cmd;
-}
-
-void osdp_cmd_free(struct osdp_pd *pd, struct osdp_cmd *cmd)
-{
-	k_mem_slab_free(&pd->cmd.slab, (void **)&cmd);
-}
-
-void osdp_cmd_enqueue(struct osdp_pd *pd, struct osdp_cmd *cmd)
-{
-	sys_slist_append(&pd->cmd.queue, &cmd->node);
-}
-
-int osdp_cmd_dequeue(struct osdp_pd *pd, struct osdp_cmd **cmd)
-{
-	sys_snode_t *node;
-
-	node = sys_slist_peek_head(&pd->cmd.queue);
-	if (node == NULL) {
-		return -1;
-	}
-	sys_slist_remove(&pd->cmd.queue, NULL, node);
-	*cmd = CONTAINER_OF(node, struct osdp_cmd, node);
-	return 0;
-}
-
-struct osdp_cmd *osdp_cmd_get_last(struct osdp_pd *pd)
-{
-	return (struct osdp_cmd *)sys_slist_peek_tail(&pd->cmd.queue);
-}
-
-struct osdp_event_node *osdp_event_alloc(struct osdp_pd *pd)
-{
-	struct osdp_event_node *evt = NULL;
-
-	if (k_mem_slab_alloc(&pd->event.slab, (void **)&evt, K_MSEC(100))) {
-		LOG_ERR("Memory allocation time-out");
-		return NULL;
-	}
-	return evt;
-}
-
-void osdp_event_free(struct osdp_pd *pd, struct osdp_event_node *evt)
-{
-	k_mem_slab_free(&pd->event.slab, (void **)&evt);
-}
-
-void osdp_event_enqueue(struct osdp_pd *pd, struct osdp_event_node *evt)
-{
-	sys_slist_append(&pd->event.queue, &evt->node);
-}
-
-int osdp_event_dequeue(struct osdp_pd *pd, struct osdp_event_node **evt)
-{
-	sys_snode_t *node;
-	node = sys_slist_peek_head(&pd->event.queue);
-	if (node == NULL) {
-		return -1;
-	}
-	sys_slist_remove(&pd->event.queue, NULL, node);
-	*evt = CONTAINER_OF(node, struct osdp_event_node, node);
-	return 0;
+	cp_keyset_complete(pd);
 }
 
 #ifdef CONFIG_OSDP_SC_ENABLED
@@ -214,20 +147,54 @@ void osdp_fill_random(uint8_t *buf, int len)
 	sys_csrand_get(buf, len);
 }
 
-uint32_t osdp_get_sc_status_mask(void)
+void osdp_get_sc_status_mask(uint8_t *bitmask)
 {
-	int i;
-	uint32_t mask = 0;
+	int i, pos;
+	uint8_t *mask = bitmask;
 	struct osdp_pd *pd;
 	struct osdp *ctx = osdp_get_ctx();
 
+	*mask = 0;
 	for (i = 0; i < NUM_PD(ctx); i++) {
-		pd = TO_PD(ctx, i);
+		pos = i & 0x07;
+		if (i && pos == 0) {
+			mask++;
+			*mask = 0;
+		}
+		pd = osdp_to_pd(ctx, i);
 		if (ISSET_FLAG(pd, PD_FLAG_SC_ACTIVE)) {
-			mask |= 1 << i;
+			*mask |= 1 << pos;
 		}
 	}
-	return mask;
 }
 
 #endif /* CONFIG_OSDP_SC_ENABLED */
+
+void osdp_get_status_mask(uint8_t *bitmask)
+{
+	int i, pos;
+	uint8_t *mask = bitmask;
+	struct osdp_pd *pd;
+	struct osdp *ctx = osdp_get_ctx();
+
+	*mask = 0;
+	for (i = 0; i < NUM_PD(ctx); i++) {
+		pos = i & 0x07;
+		if (i && pos == 0) {
+			mask++;
+			*mask = 0;
+		}
+		pd = osdp_to_pd(ctx, i);
+		if (ISSET_FLAG(pd, PD_FLAG_PD_MODE) ||
+		    pd->state == OSDP_CP_STATE_ONLINE) {
+			*mask |= 1 << pos;
+		}
+	}
+}
+
+void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb)
+{
+	struct osdp *ctx = osdp_get_ctx();
+
+	ctx->command_complete_callback = cb;
+}
