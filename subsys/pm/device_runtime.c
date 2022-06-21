@@ -226,11 +226,6 @@ int pm_device_runtime_auto_enable(const struct device *dev)
 	if (!pm || !atomic_test_bit(&pm->flags, PM_DEVICE_FLAG_RUNTIME_AUTO)) {
 		return 0;
 	}
-
-	if ((pm->state == PM_DEVICE_STATE_OFF) && pm_device_is_powered(dev)) {
-		/* Device is considered powered, we need to configure it */
-		pm_device_action_run(dev, PM_DEVICE_ACTION_TURN_ON);
-	}
 	return pm_device_runtime_enable(dev);
 }
 
