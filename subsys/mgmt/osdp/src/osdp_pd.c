@@ -1137,7 +1137,7 @@ void osdp_pd_set_command_callback(pd_commnand_callback_t cb, void *arg)
 	pd->command_callback = cb;
 }
 
-int osdp_pd_notify_event(struct osdp_event *event)
+int osdp_pd_notify_event(const struct osdp_event *event)
 {
 	struct osdp_event *ev;
 	struct osdp_pd *pd = osdp_to_pd(osdp_get_ctx(), 0);
