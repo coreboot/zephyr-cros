@@ -85,8 +85,10 @@ void z_sys_init_run_level(int32_t level)
 				dev->state->init_res = rc;
 			}
 			dev->state->initialized = true;
-			/* Run automatic device runtime enablement */
-			pm_device_runtime_auto_enable(dev);
+			if (rc == 0) {
+				/* Run automatic device runtime enablement */
+				pm_device_runtime_auto_enable(dev);
+			}
 		}
 	}
 }
