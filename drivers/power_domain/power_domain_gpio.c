@@ -90,20 +90,11 @@ static int pd_gpio_init(const struct device *dev)
 	/* We can't know how long the domain has been off for before boot */
 	data->next_boot = K_TIMEOUT_ABS_US(cfg->off_on_delay_us);
 
-	if (pm_device_runtime_auto_is_enabled(dev) ||
-	    !pm_device_is_powered(dev)) {
-		/* We are either powered down, in which case we don't need to do anything,
-		 * or pm_device_runtime will be automatically enabled, which will automatically
-		 * transition us to our lowest power state.
-		 */
-		pm_device_init_off(dev);
-	} else {
-		/* We are powered, move to active mode by default */
-		k_sleep(data->next_boot);
-		gpio_pin_configure_dt(&cfg->enable, GPIO_OUTPUT_ACTIVE);
-		k_sleep(K_USEC(cfg->startup_delay_us));
-	}
-	return 0;
+	/* Configure control pin for OFF */
+	pd_gpio_pm_action(dev, PM_DEVICE_ACTION_TURN_OFF);
+
+	/* Boot into appropriate power mode */
+	return pm_device_driver_init(dev, pd_gpio_pm_action);
 }
 
 #define POWER_DOMAIN_DEVICE(id)						   \
