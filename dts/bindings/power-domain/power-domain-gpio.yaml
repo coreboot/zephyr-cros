@@ -30,3 +30,10 @@ properties:
     required: false
     default: 0
     description: Off delay time, in microseconds
+
+  init-priority:
+    type: int
+    default: 75
+    description: |
+      Device initialisation priority. Powre domains that depend on other
+      power domains must be initiliased AFTER the dependant domain.
