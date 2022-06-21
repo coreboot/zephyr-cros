@@ -482,7 +482,7 @@ void osdp_pd_set_command_callback(pd_command_callback_t cb, void *arg);
  * @retval 0 on success
  * @retval -1 on failure
  */
-int osdp_pd_notify_event(struct osdp_event *event);
+int osdp_pd_notify_event(const struct osdp_event *event);
 
 #else /* CONFIG_OSDP_MODE_PD */
 
