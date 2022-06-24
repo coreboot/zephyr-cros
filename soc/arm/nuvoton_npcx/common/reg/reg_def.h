@@ -773,6 +773,9 @@ struct espi_reg {
 #define NPCX_FLASHCTL_CRCEN              14
 #define NPCX_FLASHCTL_CHKSUMSEL          15
 #define NPCX_FLASHCTL_AMTEN              16
+
+#define NPCX_ONLY_ESPI_REG1_UNLOCK_REG2         0x55
+#define NPCX_ONLY_ESPI_REG1_LOCK_REG2           0
 #define NPCX_ONLY_ESPI_REG2_TRANS_END_CONFIG    4
 /*
  * Mobile System Wake-Up Control (MSWC) device registers
