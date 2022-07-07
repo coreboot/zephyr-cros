@@ -10,7 +10,10 @@
 #include <zephyr/mgmt/osdp.h>
 #include <zephyr/sys/__assert.h>
 
-#define STR(x) #x
+#ifdef CONFIG_OSDP_SC_ENABLED
+#include <zephyr/crypto/crypto.h>
+#include <zephyr/random/rand32.h>
+#endif
 
 #define OSDP_RESP_TOUT_MS              (200)
 #define OSDP_ONLINE_RETRY_WAIT_MAX_MS  (300 * 1000)
@@ -19,12 +22,20 @@
 #define OSDP_ONLINE_RETRY_WAIT_MAX_MS  (300 * 1000)
 #define OSDP_PD_MAX                    CONFIG_OSDP_NUM_CONNECTED_PD
 
+#ifndef CONFIG_OSDP_SKIP_MARK_BYTE
+#define OSDP_CMD_ID_OFFSET 6
+#else
+#define OSDP_CMD_ID_OFFSET 5
+#endif
+
 #define OSDP_QUEUE_SLAB_SIZE \
 	(sizeof(union osdp_ephemeral_data) * CONFIG_OSDP_PD_COMMAND_QUEUE_SIZE)
 
 #define ISSET_FLAG(p, f)               (((p)->flags & (f)) == (f))
 #define SET_FLAG(p, f)                 ((p)->flags |= (f))
 #define CLEAR_FLAG(p, f)               ((p)->flags &= ~(f))
+
+#define STR(x) #x
 
 #define BYTE_0(x)                      (uint8_t)(((x) >>  0) & 0xFF)
 #define BYTE_1(x)                      (uint8_t)(((x) >>  8) & 0xFF)
@@ -116,6 +127,9 @@
 
 /* PD Flags */
 #define PD_FLAG_SC_CAPABLE      0x00000001 /* PD secure channel capable */
+#define PD_FLAG_TAMPER          0x00000002 /* local tamper status */
+#define PD_FLAG_POWER           0x00000004 /* local power status */
+#define PD_FLAG_R_TAMPER        0x00000008 /* remote tamper status */
 #define PD_FLAG_AWAIT_RESP      0x00000020 /* set after command is sent */
 #define PD_FLAG_SKIP_SEQ_CHECK  0x00000040 /* disable seq checks (debug) */
 #define PD_FLAG_SC_USE_SCBKD    0x00000080 /* in this SC attempt, use SCBKD */
@@ -382,23 +396,6 @@ struct osdp_pd_id {
 	uint32_t firmware_version;
 };
 
-/**
- * @brief PD status.
- *
- * @param inputs Inputs status 
- * @param outputs Outputs status
- * @param rtampers Connected readers tamper status
- * @param power Power status
- * @param tamper Tamper status
- */
-struct osdp_pd_status {
-	uint32_t inputs;
-	uint32_t outputs;
-	uint16_t rtampers;
-	uint8_t power;
-	uint8_t tamper;
-};
-
 struct osdp_channel {
 	/**
 	 * @brief pointer to a block of memory that will be passed to the
@@ -441,7 +438,6 @@ struct osdp_queue {
 	uint8_t slab_buf[OSDP_QUEUE_SLAB_SIZE];
 };
 
-#ifdef CONFIG_OSDP_SC_ENABLED
 struct osdp_secure_channel {
 	uint8_t scbk[16];
 	uint8_t s_enc[16];
@@ -455,7 +451,6 @@ struct osdp_secure_channel {
 	uint8_t cp_cryptogram[16];
 	uint8_t pd_cryptogram[16];
 };
-#endif
 
 struct osdp_pd {
 	void *osdp_ctx;
@@ -466,8 +461,6 @@ struct osdp_pd {
 	int baud_rate;
 	int address;
 	int seq_number;
-	
-	struct osdp_pd_status status;
 	struct osdp_pd_cap cap[OSDP_PD_CAP_SENTINEL];
 	struct osdp_pd_id id;
 
@@ -495,12 +488,10 @@ struct osdp_pd {
 
 	/* PD command callback to app with opaque arg pointer as passed by app */
 	void *command_callback_arg;
-	pd_commnand_callback_t command_callback;
+	pd_command_callback_t command_callback;
 
-#ifdef CONFIG_OSDP_SC_ENABLED
 	int64_t sc_tstamp;
 	struct osdp_secure_channel sc;
-#endif
 };
 
 struct osdp {
@@ -509,9 +500,8 @@ struct osdp {
 	int num_pd;
 	struct osdp_pd *current_pd;	/* current operational pd's pointer */
 	struct osdp_pd *pd;
-#ifdef CONFIG_OSDP_SC_ENABLED
 	uint8_t sc_master_key[16];
-#endif
+
 	/* CP event callback to app with opaque arg pointer as passed by app */
 	void *event_callback_arg;
 	cp_event_callback_t event_callback;
@@ -541,7 +531,7 @@ uint8_t *osdp_phy_packet_get_smb(struct osdp_pd *p, const uint8_t *buf);
 /* from osdp_common.c */
 int64_t osdp_millis_now(void);
 int64_t osdp_millis_since(int64_t last);
-void osdp_dump(const char *head, uint8_t *buf, int len);
+void osdp_dump(uint8_t *buf, int len, const char *fmt, ...);
 uint16_t osdp_compute_crc16(const uint8_t *buf, size_t len);
 
 /* from osdp.c */
@@ -553,8 +543,29 @@ int osdp_extract_address(int *address);
 #endif
 
 #ifdef CONFIG_OSDP_SC_ENABLED
+void osdp_fill_random(uint8_t *buf, int len);
 void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len);
 void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len);
+#else
+static inline void osdp_fill_random(uint8_t *buf, int len)
+{
+	ARG_UNUSED(buf);
+	ARG_UNUSED(len);
+}
+static inline void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
+{
+	ARG_UNUSED(key);
+	ARG_UNUSED(iv);
+	ARG_UNUSED(data);
+	ARG_UNUSED(len);
+}
+static inline void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
+{
+	ARG_UNUSED(key);
+	ARG_UNUSED(iv);
+	ARG_UNUSED(data);
+	ARG_UNUSED(len);
+}
 #endif
 
 /* from osdp_sc.c */
@@ -570,7 +581,6 @@ int osdp_encrypt_data(struct osdp_pd *pd, int is_cmd, uint8_t *data, int len);
 int osdp_compute_mac(struct osdp_pd *pd, int is_cmd,
 		     const uint8_t *data, int len);
 void osdp_sc_setup(struct osdp_pd *pd);
-void osdp_fill_random(uint8_t *buf, int len);
 
 /* must be implemented by CP or PD */
 int osdp_setup(struct osdp *ctx, uint8_t *key);
@@ -604,6 +614,16 @@ static inline bool sc_is_capable(struct osdp_pd *pd)
 static inline bool sc_is_active(struct osdp_pd *pd)
 {
 	return ISSET_FLAG(pd, PD_FLAG_SC_ACTIVE);
+}
+
+static inline bool sc_is_enabled(struct osdp_pd *pd)
+{
+	ARG_UNUSED(pd);
+#ifdef CONFIG_OSDP_SC_ENABLED
+	return true;
+#else
+	return false;
+#endif
 }
 
 static inline void sc_activate(struct osdp_pd *pd)
