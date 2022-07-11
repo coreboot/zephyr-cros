@@ -537,8 +537,6 @@ void osdp_get_status_mask(uint8_t *bitmask);
  */
 void osdp_get_sc_status_mask(uint8_t *bitmask);
 
-#endif
-
 /**
  * @brief Set osdp_command_complete_callback_t to subscribe to osdp command or
  * event completion events. This can be used to perform post command actions
@@ -549,10 +547,6 @@ void osdp_get_sc_status_mask(uint8_t *bitmask);
  */
 void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb);
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 5b72267527... added status commands and reworked init
 #ifdef __cplusplus
 }
 #endif

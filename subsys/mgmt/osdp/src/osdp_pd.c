@@ -68,8 +68,8 @@ static struct osdp_pd_cap osdp_pd_cap[] = {
 		0, /* N/A */
 	},
 	{
-#ifdef CONFIG_OSDP_SC_ENABLED
 		OSDP_PD_CAP_COMMUNICATION_SECURITY,
+#ifdef CONFIG_OSDP_SC_ENABLED
 		1, /* (Bit-0) AES128 support */
 		1, /* (Bit-0) default AES128 key */
 #else
@@ -228,32 +228,34 @@ static int pd_cmd_cap_ok(struct osdp_pd *pd, struct osdp_cmd *cmd)
 		if (cap->num_items == 0 || cap->compliance_level == 0) {
 			break;
 		}
-		return 0; /* Remove this when REPLY_ISTATR is supported */
+		return 1; 
 	case CMD_OSTAT:
 		cap = &pd->cap[OSDP_PD_CAP_OUTPUT_CONTROL];
 		if (cap->num_items == 0 || cap->compliance_level == 0) {
 			break;
 		}
-		return 0; /* Remove this when REPLY_OSTATR is supported */
+		return 1;
 	case CMD_OUT:
 		cap = &pd->cap[OSDP_PD_CAP_OUTPUT_CONTROL];
 		if (cmd->output.output_no + 1 > cap->num_items) {
-			LOG_DBG("CAP check: output_no(%d) > cap->num_items(%d)",
+			LOG_INF("CAP check: output_no(%d) > cap->num_items(%d)",
 				cmd->output.output_no + 1, cap->num_items);
 			break;
-		}
+		}		
 		if (cap->compliance_level == 0) {
+			LOG_INF("CAP check: compliance level (%d)", cap->compliance_level);
 			break;
 		}
 		return 1;
 	case CMD_LED:
 		cap = &pd->cap[OSDP_PD_CAP_READER_LED_CONTROL];
 		if (cmd->led.led_number + 1 > cap->num_items) {
-			LOG_DBG("CAP check: LED(%d) > cap->num_items(%d)",
+			LOG_INF("CAP check: LED(%d) > cap->num_items(%d)",
 				cmd->led.led_number + 1, cap->num_items);
 			break;
 		}
 		if (cap->compliance_level == 0) {
+			LOG_INF("CAP check: compliance level (%d)",cap->compliance_level);
 			break;
 		}
 		return 1;
@@ -304,7 +306,6 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 		/* Check if we have external events in the queue */
-		ASSERT_LENGTH(len, CMD_POLL_DATA_LEN);
 		pd->reply_id = REPLY_ACK;
 		while (pd_event_dequeue(pd, &event) == 0 && pd->reply_id == REPLY_ACK) {
 			ret = pd_translate_event(pd, event);
@@ -1133,7 +1134,6 @@ static void osdp_pd_set_attributes(struct osdp_pd *pd, struct osdp_pd_cap *cap,
 				   struct osdp_pd_id *id)
 {
 	int fc;
-
 	while (cap && ((fc = cap->function_code) > 0)) {
 		if (fc >= OSDP_PD_CAP_SENTINEL) {
 			break;
@@ -1141,7 +1141,7 @@ static void osdp_pd_set_attributes(struct osdp_pd *pd, struct osdp_pd_cap *cap,
 		pd->cap[fc].function_code = cap->function_code;
 		pd->cap[fc].compliance_level = cap->compliance_level;
 		pd->cap[fc].num_items = cap->num_items;
-		cap++;
+		cap++;		
 	}
 	if (id != NULL) {
 		memcpy(&pd->id, id, sizeof(struct osdp_pd_id));

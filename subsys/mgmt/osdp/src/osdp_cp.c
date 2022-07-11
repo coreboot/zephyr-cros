@@ -397,32 +397,9 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 		ret = OSDP_CP_ERR_NONE;
 		break;
 	case REPLY_LSTATR:
-<<<<<<< HEAD
 		if (len != REPLY_LSTATR_DATA_LEN) {
 			break;
 		}
-		if (buf[pos++]) {
-			SET_FLAG(pd, PD_FLAG_TAMPER);
-		} else {
-			CLEAR_FLAG(pd, PD_FLAG_TAMPER);
-		}
-		if (buf[pos++]) {
-			SET_FLAG(pd, PD_FLAG_POWER);
-		} else {
-			CLEAR_FLAG(pd, PD_FLAG_POWER);
-		}
-		ret = OSDP_CP_ERR_NONE;
-		break;
-	case REPLY_RSTATR:
-		if (len != REPLY_RSTATR_DATA_LEN) {
-			break;
-		}
-		if (buf[pos++]) {
-			SET_FLAG(pd, PD_FLAG_R_TAMPER);
-		} else {
-			CLEAR_FLAG(pd, PD_FLAG_R_TAMPER);
-=======
-		ASSERT_LENGTH(len, REPLY_LSTATR_DATA_LEN);
 		pd->status.power = buf[pos++];
 		pd->status.tamper = buf[pos++];
 		ret = OSDP_CP_ERR_NONE;
@@ -452,7 +429,6 @@ static int cp_decode_response(struct osdp_pd *pd, uint8_t *buf, int len)
 				pd->status.outputs |= buf[pos++] << i;
 			}
 			ret = OSDP_CP_ERR_NONE;
->>>>>>> 5b72267527... added status commands and reworked init
 		}
 		break;
 	case REPLY_COM:
