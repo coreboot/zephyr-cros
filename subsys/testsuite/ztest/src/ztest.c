@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
 #include <stdio.h>
+
+
+#include <zephyr/ztest.h>
 #include <zephyr/app_memory/app_memdomain.h>
 #ifdef CONFIG_USERSPACE
 #include <zephyr/sys/libc-hooks.h>
@@ -43,17 +45,8 @@ static ZTEST_BMEM int test_status;
  * @param file Filename to check
  * @returns Shortened filename, or @file if it could not be shortened
  */
-const char *ztest_relative_filename(const char *file)
+const char *__weak ztest_relative_filename(const char *file)
 {
-#ifdef CONFIG_ARCH_POSIX
-	const char *cwd;
-	char buf[200];
-
-	cwd = getcwd(buf, sizeof(buf));
-	if (cwd && strlen(file) > strlen(cwd) &&
-	    !strncmp(file, cwd, strlen(cwd)))
-		return file + strlen(cwd) + 1; /* move past the trailing '/' */
-#endif
 	return file;
 }
 
@@ -545,12 +538,15 @@ void main(void)
 	}
 #ifdef Z_MALLOC_PARTITION_EXISTS
 	/* Allow access to malloc() memory */
-	ret = k_mem_domain_add_partition(&k_mem_domain_default,
-					 &z_malloc_partition);
-	if (ret != 0) {
-		PRINT("ERROR: failed to add z_malloc_partition to mem domain (%d)\n",
-		      ret);
-		k_oops();
+	if (z_malloc_partition.size != 0) {
+		ret = k_mem_domain_add_partition(&k_mem_domain_default,
+						 &z_malloc_partition);
+		if (ret != 0) {
+			PRINT("ERROR: failed to add z_malloc_partition"
+			      " to mem domain (%d)\n",
+			      ret);
+			k_oops();
+		}
 	}
 #endif
 #endif /* CONFIG_USERSPACE */

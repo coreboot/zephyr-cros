@@ -32,8 +32,10 @@ struct bt_audio_ep;
 struct bt_audio_iso {
 	struct bt_iso_chan iso_chan;
 	struct bt_iso_chan_qos iso_qos;
-	struct bt_audio_ep *sink_ep;
-	struct bt_audio_ep *source_ep;
+	struct bt_iso_chan_io_qos sink_io_qos;
+	struct bt_iso_chan_io_qos source_io_qos;
+	struct bt_audio_stream *sink_stream;
+	struct bt_audio_stream *source_stream;
 };
 
 struct bt_audio_ep {
@@ -48,7 +50,6 @@ struct bt_audio_ep {
 	struct bt_codec_qos qos;
 	struct bt_codec_qos_pref qos_pref;
 	struct bt_audio_iso *iso;
-	struct bt_iso_chan_io_qos iso_io_qos;
 	struct bt_gatt_subscribe_params subscribe;
 	struct bt_gatt_discover_params discover;
 
@@ -59,9 +60,10 @@ struct bt_audio_ep {
 };
 
 struct bt_audio_unicast_group {
+	uint8_t index;
 	bool allocated;
 	/* QoS used to create the CIG */
-	struct bt_codec_qos *qos;
+	const struct bt_codec_qos *qos;
 	struct bt_iso_cig *cig;
 	/* The ISO API for CIG creation requires an array of pointers to ISO channels */
 	struct bt_iso_chan *cis[UNICAST_GROUP_STREAM_CNT];
@@ -85,7 +87,6 @@ struct bt_audio_broadcast_source {
 struct bt_audio_broadcast_sink {
 	uint8_t index; /* index of broadcast_snks array */
 	uint8_t stream_count;
-	uint8_t subgroup_count;
 	uint16_t pa_interval;
 	uint16_t iso_interval;
 	uint16_t biginfo_num_bis;
@@ -93,8 +94,8 @@ struct bt_audio_broadcast_sink {
 	bool syncing;
 	bool big_encrypted;
 	uint32_t broadcast_id; /* 24 bit */
+	struct bt_audio_base base;
 	struct bt_le_per_adv_sync *pa_sync;
-	struct bt_codec *codec;
 	struct bt_iso_big *big;
 	struct bt_iso_chan *bis[BROADCAST_SNK_STREAM_CNT];
 	/* The streams used to create the broadcast sink */

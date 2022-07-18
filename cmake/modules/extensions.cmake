@@ -497,7 +497,7 @@ function(zephyr_library_compile_options item)
   # zephyr_interface will be the first interface library that flags
   # are taken from.
 
-  string(MD5 uniqueness ${item})
+  string(MD5 uniqueness "${ARGV}")
   set(lib_name options_interface_lib_${uniqueness})
 
   if (NOT TARGET ${lib_name})
@@ -631,7 +631,7 @@ function(generate_inc_file
     OUTPUT ${generated_file}
     COMMAND
     ${PYTHON_EXECUTABLE}
-    ${ZEPHYR_BASE}/scripts/file2hex.py
+    ${ZEPHYR_BASE}/scripts/build/file2hex.py
     ${ARGN} # Extra arguments are passed to file2hex.py
     --file ${source_file}
     > ${generated_file} # Does pipe redirection work on Windows?

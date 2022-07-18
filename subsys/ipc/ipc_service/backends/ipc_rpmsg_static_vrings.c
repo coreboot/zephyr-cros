@@ -239,7 +239,8 @@ static int vr_shm_configure(struct ipc_static_vrings *vr, const struct backend_c
 	vr->shm_size = shm_size(num_desc, conf->buffer_size) - VDEV_STATUS_SIZE;
 
 	vr->rx_addr = vr->shm_addr + VRING_COUNT * vq_ring_size(num_desc, conf->buffer_size);
-	vr->tx_addr = vr->rx_addr + vring_size(num_desc, VRING_ALIGNMENT);
+	vr->tx_addr = ROUND_UP(vr->rx_addr + vring_size(num_desc, VRING_ALIGNMENT),
+			       VRING_ALIGNMENT);
 
 	vr->status_reg_addr = conf->shm_addr;
 
@@ -412,6 +413,11 @@ static int send(const struct device *instance, void *token,
 
 	rpmsg_ept = (struct ipc_rpmsg_ept *) token;
 
+	/* Endpoint is not registered with instance */
+	if (!rpmsg_ept) {
+		return -ENOENT;
+	}
+
 	ret = rpmsg_send(&rpmsg_ept->ep, msg, len);
 
 	/* No buffers available */
@@ -439,6 +445,11 @@ static int send_nocopy(const struct device *instance, void *token,
 	}
 
 	rpmsg_ept = (struct ipc_rpmsg_ept *) token;
+
+	/* Endpoint is not registered with instance */
+	if (!rpmsg_ept) {
+		return -ENOENT;
+	}
 
 	return rpmsg_send_nocopy(&rpmsg_ept->ep, msg, len);
 }
@@ -520,6 +531,11 @@ static int get_tx_buffer(const struct device *instance, void *token,
 
 	rpmsg_ept = (struct ipc_rpmsg_ept *) token;
 
+	/* Endpoint is not registered with instance */
+	if (!rpmsg_ept) {
+		return -ENOENT;
+	}
+
 	if (!r_data || !size) {
 		return -EINVAL;
 	}
@@ -562,6 +578,11 @@ static int hold_rx_buffer(const struct device *instance, void *token,
 
 	rpmsg_ept = (struct ipc_rpmsg_ept *) token;
 
+	/* Endpoint is not registered with instance */
+	if (!rpmsg_ept) {
+		return -ENOENT;
+	}
+
 	rpmsg_hold_rx_buffer(&rpmsg_ept->ep, data);
 
 	return 0;
@@ -573,6 +594,11 @@ static int release_rx_buffer(const struct device *instance, void *token,
 	struct ipc_rpmsg_ept *rpmsg_ept;
 
 	rpmsg_ept = (struct ipc_rpmsg_ept *) token;
+
+	/* Endpoint is not registered with instance */
+	if (!rpmsg_ept) {
+		return -ENOENT;
+	}
 
 	rpmsg_release_rx_buffer(&rpmsg_ept->ep, data);
 
@@ -623,7 +649,7 @@ static int backend_init(const struct device *instance)
 			   (0)),							\
 		.wq_prio_type = COND_CODE_1(DT_INST_NODE_HAS_PROP(i, zephyr_priority),	\
 			   (DT_INST_PROP_BY_IDX(i, zephyr_priority, 1)),		\
-			   (PRIO_COOP)),						\
+			   (PRIO_PREEMPT)),						\
 		.buffer_size = DT_INST_PROP_OR(i, zephyr_buffer_size,			\
 					       RPMSG_BUFFER_SIZE),			\
 		.id = i,								\

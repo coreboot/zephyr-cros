@@ -95,21 +95,6 @@ typedef int16_t device_handle_t;
  */
 #define DEVICE_NAME_GET(name) _CONCAT(__device_, name)
 
-/**
- * @def SYS_DEVICE_DEFINE
- *
- * @brief Run an initialization function at boot at specified priority.
- *
- * @deprecated Use SYS_INIT() instead.
- *
- * @param drv_name A string name for the pseudo-device (unused).
- * @param init_fn Pointer to the function which should run at boot time.
- * @param level Initialization level to run the function in.
- * @param prio Function's priority within its initialization level.
- */
-#define SYS_DEVICE_DEFINE(drv_name, init_fn, level, prio)		\
-	__DEPRECATED_MACRO SYS_INIT(init_fn, level, prio)
-
 /* Node paths can exceed the maximum size supported by device_get_binding() in user mode,
  * so synthesize a unique dev_name from the devicetree node.
  *
@@ -417,6 +402,28 @@ typedef int16_t device_handle_t;
  * @param name Device name
  */
 #define DEVICE_DECLARE(name) static const struct device DEVICE_NAME_GET(name)
+
+/**
+ * @def DEVICE_INIT_DT_GET
+ *
+ * @brief Get a <tt>const struct init_entry*</tt> from a devicetree node
+ *
+ * @param node_id A devicetree node identifier
+ *
+ * @return A pointer to the init_entry object created for that node
+ */
+#define DEVICE_INIT_DT_GET(node_id) (&Z_INIT_ENTRY_NAME(DEVICE_DT_NAME_GET(node_id)))
+
+/**
+ * @def DEVICE_INIT_GET
+ *
+ * @brief Get a <tt>const struct init_entry*</tt> from a device by name
+ *
+ * @param name The same as dev_name provided to DEVICE_DEFINE()
+ *
+ * @return A pointer to the init_entry object created for that device
+ */
+#define DEVICE_INIT_GET(name) (&Z_INIT_ENTRY_NAME(DEVICE_NAME_GET(name)))
 
 /**
  * @brief Runtime device dynamic structure (in RAM) per driver instance
@@ -822,39 +829,6 @@ __syscall bool device_is_ready(const struct device *dev);
 static inline bool z_impl_device_is_ready(const struct device *dev)
 {
 	return z_device_is_ready(dev);
-}
-
-/**
- * @brief Determine whether a device is ready for use
- *
- * This is equivalent to device_usable_check(), without the overhead of a
- * syscall wrapper.
- *
- * @deprecated Use z_device_is_ready() instead.
- *
- * @param dev Device instance.
- *
- * @retval 0 If device is usable.
- * @retval -ENODEV If device is not usable.
- */
-__deprecated static inline int z_device_usable_check(const struct device *dev)
-{
-	return z_device_is_ready(dev) ? 0 : -ENODEV;
-}
-
-/**
- * @brief Determine whether a device is ready for use
- *
- * @deprecated Use device_is_ready() instead.
- *
- * @param dev Device instance.
- *
- * @retval 0 If device is usable.
- * @retval -ENODEV If device is not usable.
- */
-__deprecated static inline int device_usable_check(const struct device *dev)
-{
-	return device_is_ready(dev) ? 0 : -ENODEV;
 }
 
 /**

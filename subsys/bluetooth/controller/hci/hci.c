@@ -455,6 +455,8 @@ static void reset(struct net_buf *buf, struct net_buf **evt)
 		k_poll_signal_raise(hbuf_signal, 0x0);
 	}
 #endif
+
+	hci_recv_fifo_reset();
 }
 
 #if defined(CONFIG_BT_HCI_ACL_FLOW_CONTROL)
@@ -604,7 +606,7 @@ static void write_auth_payload_timeout(struct net_buf *buf,
 }
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
-#if defined(CONFIG_BT_CTLR_ISO)
+#if defined(CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO)
 static void configure_data_path(struct net_buf *buf,
 				struct net_buf **evt)
 {
@@ -624,7 +626,7 @@ static void configure_data_path(struct net_buf *buf,
 	rp = hci_cmd_complete(evt, sizeof(*rp));
 	rp->status = status;
 }
-#endif /* CONFIG_BT_CTLR_ISO */
+#endif /* CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO */
 
 #if defined(CONFIG_BT_CONN)
 static void read_tx_power_level(struct net_buf *buf, struct net_buf **evt)
@@ -694,11 +696,11 @@ static int ctrl_bb_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		break;
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
-#if defined(CONFIG_BT_CTLR_ISO)
+#if defined(CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO)
 	case BT_OCF(BT_HCI_OP_CONFIGURE_DATA_PATH):
 		configure_data_path(cmd, evt);
 		break;
-#endif /* CONFIG_BT_CTLR_ISO */
+#endif /* CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO */
 
 	default:
 		return -EINVAL;
@@ -990,8 +992,8 @@ static void read_supported_commands(struct net_buf *buf, struct net_buf **evt)
 #if defined(CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO)
 	/* Read Supported Codecs */
 	rp->commands[29] |= BIT(5);
-	/* Read Supported Codecs [v2], Codec Capabilities, Controller Delay */
-	rp->commands[45] |= BIT(2) | BIT(3) | BIT(4);
+	/* Read Supported Codecs [v2], Codec Capabilities, Controller Delay, Configure Data Path */
+	rp->commands[45] |= BIT(2) | BIT(3) | BIT(4) | BIT(5);
 #endif /* CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO */
 }
 
@@ -4007,8 +4009,9 @@ static void le_ext_create_connection(struct net_buf *buf, struct net_buf **evt)
 			uint8_t type;
 
 			type = (phy << 1);
-			/* NOTE: Pass invalid interval value to not start
-			 *       scanning using this scan instance.
+			/* NOTE: Pass invalid interval value to reset the PHY
+			 *       value in the scan instance so not to start
+			 *       scanning on the unselected PHY.
 			 */
 			status = ll_scan_params_set(type, 0, 0, 0, 0);
 		}

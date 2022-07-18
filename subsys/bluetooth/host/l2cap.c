@@ -519,6 +519,7 @@ static int l2cap_ecred_conn_req(struct bt_l2cap_chan **chan, int channels)
 	struct bt_l2cap_le_chan *ch;
 	int i;
 	uint8_t ident;
+	uint16_t req_psm;
 
 	if (!chan || !channels) {
 		return -EINVAL;
@@ -539,11 +540,12 @@ static int l2cap_ecred_conn_req(struct bt_l2cap_chan **chan, int channels)
 	req->mtu = sys_cpu_to_le16(ch->rx.mtu);
 	req->mps = sys_cpu_to_le16(ch->rx.mps);
 	req->credits = sys_cpu_to_le16(ch->rx.init_credits);
+	req_psm = ch->psm;
 
 	for (i = 0; i < channels; i++) {
 		ch = BT_L2CAP_LE_CHAN(chan[i]);
 
-		__ASSERT(ch->psm == req->psm,
+		__ASSERT(ch->psm == req_psm,
 			 "The PSM shall be the same for channels in the same request.");
 
 		ch->ident = ident;
@@ -1338,18 +1340,13 @@ static void le_ecred_reconf_req(struct bt_l2cap *l2cap, uint8_t ident,
 		chan = bt_l2cap_le_lookup_tx_cid(conn, scid);
 		if (!chan) {
 			result = BT_L2CAP_RECONF_INVALID_CID;
-			continue;
+			goto response;
 		}
 
-		/* If the MTU value is decreased for any of the included
-		 * channels, then the receiver shall disconnect all
-		 * included channels.
-		 */
 		if (BT_L2CAP_LE_CHAN(chan)->tx.mtu > mtu) {
 			BT_ERR("chan %p decreased MTU %u -> %u", chan,
 			       BT_L2CAP_LE_CHAN(chan)->tx.mtu, mtu);
 			result = BT_L2CAP_RECONF_INVALID_MTU;
-			bt_l2cap_chan_disconnect(chan);
 			goto response;
 		}
 

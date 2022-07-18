@@ -126,161 +126,6 @@
 	}
 
 /**
- * @brief Construct a npcx_alt structure from 'pinctrl-0' property at index 'i'
- *
- * @param inst instance number for compatible defined in DT_DRV_COMPAT.
- * @param i index of 'pinctrl-0' prop which type is 'phandles'
- * @return npcx_alt item from 'pinctrl-0' property at index 'i'
- */
-#define NPCX_DT_ALT_ITEM_BY_IDX(inst, i)				   \
-	{								   \
-		.group = DT_PHA(DT_INST_PINCTRL_0(inst, i), alts, group),  \
-		.bit = DT_PHA(DT_INST_PINCTRL_0(inst, i), alts, bit),	   \
-		.inverted = DT_PHA(DT_INST_PINCTRL_0(inst, i), alts, inv), \
-	}
-
-/**
- * @brief Macro function to construct npcx_alt item in UTIL_LISTIFY extension.
- *
- * @param child child index in UTIL_LISTIFY extension.
- * @param inst instance number for compatible defined in DT_DRV_COMPAT.
- * @return macro function to construct a npcx_alt structure.
- */
-#define NPCX_DT_ALT_ITEMS_FUNC(child, inst) NPCX_DT_ALT_ITEM_BY_IDX(inst, child)
-
-/**
- * @brief Macro function to construct a list of npcx_alt items with compatible
- * defined in DT_DRV_COMPAT by UTIL_LISTIFY func
- *
- * Example devicetree fragment:
- *    / {
- *		uart1: serial@400c4000 {
- *			pinctrl-0 = <&alta_uart1_sl1>;
- *			...
- *		};
- *	};
- *
- * Example usage:
- *      const struct npcx_alt uart_alts[] = NPCX_DT_ALT_ITEMS_LIST(inst);
- *
- * @param inst instance number for compatible defined in DT_DRV_COMPAT.
- * @return an array of npcx_alt items.
- */
-#define NPCX_DT_ALT_ITEMS_LIST(inst) {			\
-	LISTIFY(DT_INST_NUM_PINCTRLS_BY_IDX(inst, 0),	\
-		NPCX_DT_ALT_ITEMS_FUNC, (,),		\
-		inst)					\
-	}
-
-/**
- * @brief Node identifier for an instance of a specific compatible
- *
- * @param compat specific compatible of devices in device-tree file
- * @param inst instance number
- * @return a node identifier for the node with "io_comp" compatible and
- *         instance number "inst"
- */
-#define NPCX_DT_COMP_INST(compat, inst) DT_INST(inst, compat)
-
-/**
- * @brief Get a specific compatible instance's node identifier for a phandle in
- * a property.
- *
- * @param compat specific compatible of devices in device-tree file
- * @param inst instance number
- * @param prop lowercase-and-underscores property name in "inst"
- *             with type "phandle", "phandles" or "phandle-array"
- * @param idx index into "prop"
- * @return a node identifier for the phandle at index "idx" in "prop"
- */
-#define NPCX_DT_COMP_INST_PHANDLE_BY_IDX(compat, inst, prop, idx) \
-	DT_PHANDLE_BY_IDX(NPCX_DT_COMP_INST(compat, inst), prop, idx)
-
-/**
- * @brief Get phandle from 'pinctrl-0' prop which type is 'phandles' at index
- *        'i' from io-pads device with specific compatible.
- *
- * @param io_comp compatible string in devicetree file for io-pads device
- * @param inst instance number for compatible defined in io_comp.
- * @param i index of 'pinctrl-0' prop which type is 'phandles'
- * @return phandle from 'pinctrl-0' prop at index 'i'
- */
-#define NPCX_DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i) \
-	DT_PINCTRL_BY_IDX(NPCX_DT_COMP_INST(io_comp, inst), 0, i)
-
-/**
- * @brief Construct a npcx_alt structure from 'pinctrl-0' property at index 'i'
- *        from io-pads device with specific compatible.
- *
- * @param io_comp compatible string in devicetree file for io-pads device
- * @param inst instance number for compatible defined in io_comp.
- * @param i index of 'pinctrl-0' prop which type is 'phandles'
- * @return npcx_alt item from 'pinctrl-0' property at index 'i'
- */
-#define NPCX_DT_IO_ALT_ITEM_BY_IDX(io_comp, inst, i)                           \
-	{                                                                      \
-	  .group = DT_PHA(NPCX_DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i),   \
-								alts, group),  \
-	  .bit = DT_PHA(NPCX_DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i),     \
-								alts, bit),    \
-	  .inverted = DT_PHA(NPCX_DT_IO_PHANDLE_FROM_PINCTRL(io_comp, inst, i),\
-								alts, inv),    \
-	}
-
-/**
- * @brief Length of npcx_alt structures in 'pinctrl-0' property of specific
- *        compatible io-pads device
- *
- * @param io_comp compatible string in devicetree file for io-pads device
- * @param inst instance number for compatible defined in io_comp.
- * @return length of 'pinctrl-0' property which type is 'phandles'
- */
-#define NPCX_DT_IO_ALT_ITEMS_LEN(io_comp, inst) \
-	DT_NUM_PINCTRLS_BY_IDX(NPCX_DT_COMP_INST(io_comp, inst), 0)
-
-/**
- * @brief Macro function to construct npcx_alt item with specific compatible
- *        string in UTIL_LISTIFY extension.
- *
- * @param child child index in UTIL_LISTIFY extension.
- * @param inst instance number for compatible defined in io_comp.
- * @param io_comp compatible string in devicetree file for io-pads device
- * @return macro function to construct a npcx_alt structure.
- */
-#define NPCX_DT_IO_ALT_ITEMS_FUNC(child, inst, io_comp) \
-			NPCX_DT_IO_ALT_ITEM_BY_IDX(io_comp, inst, child)
-
-/**
- * @brief Macro function to construct a list of npcx_alt items with specific
- *        compatible string by UTIL_LISTIFY func
- *
- * Example devicetree fragment:
- *    / {
- *		host_uart: io_host_uart {
- *			compatible = "nuvoton,npcx-host-uart";
- *
- *			pinctrl-0 = <&altb_rxd_sl &altb_txd_sl
- *				   &altb_rts_sl &altb_cts_sl
- *				   &altb_ri_sl &altb_dtr_bout_sl
- *				   &altb_dcd_sl &altb_dsr_sl>;
- *			...
- *		};
- *	};
- *
- * Example usage:
- *      const struct npcx_alt host_uart_alts[] =
- *                   NPCX_DT_IO_ALT_ITEMS_LIST(nuvoton_npcx_host_uart, 0);
- * @param io_comp compatible string in devicetree file for io-pads device
- * @param inst instance number for compatible defined in io_comp.
- * @return an array of npcx_alt items.
- */
-#define NPCX_DT_IO_ALT_ITEMS_LIST(io_comp, inst) {        \
-	LISTIFY(NPCX_DT_IO_ALT_ITEMS_LEN(io_comp, inst),  \
-		NPCX_DT_IO_ALT_ITEMS_FUNC, (,),           \
-		inst, io_comp)                            \
-	}
-
-/**
  * @brief Get phandle from "name" property which contains wui information.
  *
  * @param inst instance number for compatible defined in DT_DRV_COMPAT.
@@ -558,139 +403,6 @@
 	}
 
 /**
- * @brief Get a node from path '/vsby-psl-in-list' which has a property
- *        'psl-in-pads' contains Power Switch Logic (PSL) input pads which are
- *        in charge of detecting wake-up events on VSBY power domain.
- *
- * @return node identifier with that path.
- */
-#define NPCX_DT_NODE_PSL_IN_LIST  DT_PATH(vsby_psl_in_list)
-
-/**
- * @brief Length of npcx_psl_in structures in 'psl-in-pads' property
- *
- * @return length of 'psl-in-pads' prop which type is 'phandles'
- */
-#define NPCX_DT_PSL_IN_ITEMS_LEN DT_PROP_LEN(NPCX_DT_NODE_PSL_IN_LIST, \
-								psl_in_pads)
-
-/**
- * @brief Get phandle from 'psl-in-pads' prop which type is 'phandles' at index
- *        'i'
- *
- * @param i index of 'psl-in-pads' prop which type is 'phandles'
- * @return phandle from 'psl-in-pads' prop at index 'i'
- */
-#define NPCX_DT_PHANDLE_FROM_PSL_IN_NODE(i) \
-	DT_PHANDLE_BY_IDX(NPCX_DT_NODE_PSL_IN_LIST, psl_in_pads, i)
-
-/**
- * @brief Get phandle from 'pinctrl-0' prop which type is 'phandles' at index
- *        'i'
- *
- * @param i index of 'psl-in-pads' prop which type is 'phandles'
- * @return phandle from 'pinctrl-0' prop at index 'i'
- */
-#define NPCX_DT_PHANDLE_FROM_PSL_PINMUX_NODE(i) \
-	DT_PINCTRL_0(NPCX_DT_PHANDLE_FROM_PSL_IN_NODE(i), 0)
-
-/**
- * @brief Get phandle from 'polarity-0' prop which type is 'phandles' at index
- *        'i'
- *
- * @param i index of 'psl-in-pads' prop which type is 'phandles'
- * @return phandle from 'polarity-0' prop at index 'i'
- */
-#define NPCX_DT_PHANDLE_FROM_PSL_POLARITY_NODE(i) \
-	DT_PHANDLE(NPCX_DT_PHANDLE_FROM_PSL_IN_NODE(i), polarity_0)
-
-/**
- * @brief Construct a npcx_alt structure from 'pinctrl-0' property at index 'i'
- *        of 'psl-in-pads' prop.
- *
- * @param i index of 'psl-in-pads' prop which type is 'phandles'
- * @return npcx_alt item from 'pinctrl-0' property at index 'i'
- */
-#define NPCX_DT_PSL_IN_ALT_CONF_BY_IDX(i)                                         \
-	{                                                                         \
-	  .group = DT_PHA(NPCX_DT_PHANDLE_FROM_PSL_PINMUX_NODE(i), alts, group),  \
-	  .bit = DT_PHA(NPCX_DT_PHANDLE_FROM_PSL_PINMUX_NODE(i), alts, bit),      \
-	  .inverted = DT_PHA(NPCX_DT_PHANDLE_FROM_PSL_PINMUX_NODE(i), alts, inv), \
-	},
-
-/**
- * @brief Construct a npcx_alt structure from 'polarity-0' property at index 'i'
- *        of 'psl-in-pads' prop.
- *
- * @param i index of 'psl-in-pads' prop which type is 'phandles'
- * @return npcx_alt item from 'pinctrl-0' property at index 'i'
- */
-#define NPCX_DT_PSL_IN_POL_CONF_BY_IDX(i)                                                 \
-	{                                                                                 \
-		.group = DT_PHA(NPCX_DT_PHANDLE_FROM_PSL_POLARITY_NODE(i), alts, group),  \
-		.bit = DT_PHA(NPCX_DT_PHANDLE_FROM_PSL_POLARITY_NODE(i), alts, bit),      \
-		.inverted = DT_PHA(NPCX_DT_PHANDLE_FROM_PSL_POLARITY_NODE(i), alts, inv), \
-	},
-
-/**
- * @brief Construct a npcx_psl_in structure from 'psl-in-pads' property at index
- *        'i'
- *
- * @param i index of 'psl-in-pads' prop which type is 'phandles'
- * @return npcx_psl_in item from 'psl-in-pads' property at index 'i'
- */
-#define NPCX_DT_PSL_IN_ITEMS_BY_IDX(i, _)                                      \
-	{                                                                      \
-		.flag = DT_PROP(NPCX_DT_PHANDLE_FROM_PSL_IN_NODE(i), flag),    \
-		.offset = DT_PROP(NPCX_DT_PHANDLE_FROM_PSL_IN_NODE(i), offset),\
-		.pinctrl = NPCX_DT_PSL_IN_ALT_CONF_BY_IDX(i)                   \
-		.polarity = NPCX_DT_PSL_IN_POL_CONF_BY_IDX(i)                  \
-	}
-
-/**
- * @brief Macro function to construct a list of npcx_psl_in items by
- *        UTIL_LISTIFY func.
- *
- * Example devicetree fragment:
- *    / {
- *          vsby-psl-in-list {
- *              psl-in-pads = <&psl_in1>;
- *          };
- *	};
- *   &psl_in1 {
- *	flag = <NPCX_PSL_FALLING_EDGE>;
- *   };
- *
- * Example usage:
- * static const struct npcx_psl_in psl_in_confs[] = NPCX_DT_PSL_IN_ITEMS_LIST;
- *
- * @return an array of npcx_psl_in items which configures PSL input pads
- */
-#define NPCX_DT_PSL_IN_ITEMS_LIST {				\
-		LISTIFY(NPCX_DT_PSL_IN_ITEMS_LEN,		\
-			NPCX_DT_PSL_IN_ITEMS_BY_IDX, (,), _)	\
-	}
-
-/**
- * @brief Get base address of corresponding GPIO controller for enabling PSL
- *        output.
- *
- * @param @param inst number for devices with compatible 'nuvoton_npcx_psl_out'.
- * @return base address of corresponding GPIO controller
- */
-#define NPCX_DT_PSL_OUT_CONTROLLER(inst) DT_REG_ADDR_BY_IDX(DT_PHANDLE_BY_IDX( \
-		DT_INST(inst, nuvoton_npcx_psl_out), controller, 0), 0)
-
-/**
- * @brief Get pin of corresponding GPIO controller for enabling PSL output.
- *
- * @param @param inst number for devices with compatible 'nuvoton_npcx_psl_out'.
- * @return pin of corresponding GPIO controller.
- */
-#define NPCX_DT_PSL_OUT_PIN(inst) DT_PROP(DT_INST(inst, nuvoton_npcx_psl_out), \
-							pin)
-
-/**
  * @brief Check if the host interface type is automatically configured by
  * booter.
  *
@@ -699,5 +411,21 @@
  */
 #define NPCX_BOOTER_IS_HIF_TYPE_SET() \
 	DT_PROP(DT_PATH(booter_variant), hif_type_auto)
+
+/**
+ * @brief Helper macro to get address of system configuration module which is
+ * used by serval peripheral device drivers in npcx series.
+ *
+ * @return base address of system configuration module.
+ */
+#define NPCX_SCFG_REG_ADDR DT_REG_ADDR_BY_NAME(DT_NODELABEL(scfg), scfg)
+
+/**
+ * @brief Helper macro to get address of system glue module which is
+ * used by serval peripheral device drivers in npcx series.
+ *
+ * @return base address of system glue module.
+ */
+#define NPCX_GLUE_REG_ADDR DT_REG_ADDR_BY_NAME(DT_NODELABEL(scfg), glue)
 
 #endif /* _NUVOTON_NPCX_SOC_DT_H_ */

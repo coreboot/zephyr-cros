@@ -31,7 +31,7 @@ void test_clock_calibrate(void)
 	/* Now do it again, but with a handler to catch the result */
 	cyc1 = k_cycle_get_32();
 	cavs_ipc_send_message(CAVS_HOST_DEV, IPCCMD_TIMESTAMP, 0);
-	zassert_true(WAIT_FOR(host_dt != 0, 10000, k_msleep(1)), NULL);
+	AWAIT(host_dt != 0);
 	cavs_ipc_set_message_handler(CAVS_HOST_DEV, NULL, NULL);
 
 	hz = 1000000ULL * (cyc1 - cyc0) / host_dt;
@@ -57,6 +57,13 @@ void test_main(void)
 			 ztest_unit_test(test_clock_calibrate),
 			 ztest_unit_test(test_ipm_cavs_host)
 			 );
+
+	/* Wait a bit so the python script on host is ready to receive
+	 * IPC messages. An IPC message could be used instead of a timer,
+	 * but expecting IPC to be working on a test suite that is going
+	 * to test IPC may not be indicated.
+	 */
+	k_msleep(1000);
 
 	ztest_run_test_suite(intel_adsp);
 }

@@ -794,7 +794,6 @@
 			status = "disabled";
 			interrupts = <133 0>;
 			clocks = <&ccm IMX_CCM_USDHC1_CLK 0 0>;
-			label = "SDHC_0";
 			max-current-330 = <1020>;
 			max-current-180 = <1020>;
 			max-bus-freq = <208000000>;
@@ -807,7 +806,6 @@
 			status = "disabled";
 			interrupts = <134 0>;
 			clocks = <&ccm IMX_CCM_USDHC2_CLK 0 0>;
-			label = "SDHC_1";
 			max-current-330 = <1020>;
 			max-current-180 = <1020>;
 			max-bus-freq = <208000000>;
@@ -914,6 +912,42 @@
 			offset-value-a = <10>;
 			offset-value-b = <10>;
 			#io-channel-cells = <1>;
+		};
+
+		acmp1: cmp@401a4000 {
+			compatible = "nxp,kinetis-acmp";
+			reg = <0x401a4000 0x4000>;
+			interrupts = <157 0>;
+			label = "CMP_1";
+			status = "disabled";
+			#io-channel-cells = <2>;
+		};
+
+		acmp2: cmp@401a8000 {
+			compatible = "nxp,kinetis-acmp";
+			reg = <0x401a8000 0x4000>;
+			interrupts = <158 0>;
+			label = "CMP_2";
+			status = "disabled";
+			#io-channel-cells = <2>;
+		};
+
+		acmp3: cmp@401ac000 {
+			compatible = "nxp,kinetis-acmp";
+			reg = <0x401ac000 0x4000>;
+			interrupts = <159 0>;
+			label = "CMP_3";
+			status = "disabled";
+			#io-channel-cells = <2>;
+		};
+
+		acmp4: cmp@401b0000 {
+			compatible = "nxp,kinetis-acmp";
+			reg = <0x401b0000 0x4000>;
+			interrupts = <160 0>;
+			label = "CMP_4";
+			status = "disabled";
+			#io-channel-cells = <2>;
 		};
 
 		anatop: anatop@40c84000 {

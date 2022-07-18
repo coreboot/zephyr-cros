@@ -49,8 +49,9 @@ struct gpio_npcx_data {
 /* Platform specific GPIO functions */
 const struct device *npcx_get_gpio_dev(int port)
 {
-	if (port >= gpio_devs_count)
+	if (port >= gpio_devs_count) {
 		return NULL;
+	}
 
 	return gpio_devs[port];
 }
@@ -59,6 +60,11 @@ void npcx_gpio_enable_io_pads(const struct device *dev, int pin)
 {
 	const struct gpio_npcx_config *const config = dev->config;
 	const struct npcx_wui *io_wui = &config->wui_maps[pin];
+
+	if (io_wui->table == NPCX_MIWU_TABLE_NONE) {
+		LOG_ERR("Cannot enable GPIO(%x, %d) pad", config->port, pin);
+		return;
+	}
 
 	/*
 	 * If this pin is configured as a GPIO interrupt source, do not
@@ -73,6 +79,11 @@ void npcx_gpio_disable_io_pads(const struct device *dev, int pin)
 {
 	const struct gpio_npcx_config *const config = dev->config;
 	const struct npcx_wui *io_wui = &config->wui_maps[pin];
+
+	if (io_wui->table == NPCX_MIWU_TABLE_NONE) {
+		LOG_ERR("Cannot disable GPIO(%x, %d) pad", config->port, pin);
+		return;
+	}
 
 	/*
 	 * If this pin is configured as a GPIO interrupt source, do not
@@ -107,8 +118,9 @@ static int gpio_npcx_config(const struct device *dev,
 	 * after setting all other attributes, so as not to create a
 	 * temporary incorrect logic state 0:input 1:output
 	 */
-	if ((flags & GPIO_OUTPUT) == 0)
+	if ((flags & GPIO_OUTPUT) == 0) {
 		inst->PDIR &= ~mask;
+	}
 
 	/*
 	 * If this IO pad is configured for low-voltage power supply, the GPIO
@@ -120,10 +132,11 @@ static int gpio_npcx_config(const struct device *dev,
 	}
 
 	/* Select open drain 0:push-pull 1:open-drain */
-	if ((flags & GPIO_OPEN_DRAIN) != 0)
+	if ((flags & GPIO_OPEN_DRAIN) != 0) {
 		inst->PTYPE |= mask;
-	else
+	} else {
 		inst->PTYPE &= ~mask;
+	}
 
 	/* Select pull-up/down of GPIO 0:pull-up 1:pull-down */
 	if ((flags & GPIO_PULL_UP) != 0) {
@@ -138,17 +151,62 @@ static int gpio_npcx_config(const struct device *dev,
 	}
 
 	/* Set level 0:low 1:high */
-	if ((flags & GPIO_OUTPUT_INIT_HIGH) != 0)
+	if ((flags & GPIO_OUTPUT_INIT_HIGH) != 0) {
 		inst->PDOUT |= mask;
-	else if ((flags & GPIO_OUTPUT_INIT_LOW) != 0)
+	} else if ((flags & GPIO_OUTPUT_INIT_LOW) != 0) {
 		inst->PDOUT &= ~mask;
+	}
 
 	/* Configure pin as output, if requested 0:input 1:output */
-	if ((flags & GPIO_OUTPUT) != 0)
+	if ((flags & GPIO_OUTPUT) != 0) {
 		inst->PDIR |= mask;
+	}
 
 	return 0;
 }
+
+#ifdef CONFIG_GPIO_GET_CONFIG
+static int gpio_npcx_pin_get_config(const struct device *port, gpio_pin_t pin,
+				    gpio_flags_t *out_flags)
+{
+	struct gpio_reg *const inst = HAL_INSTANCE(port);
+	uint32_t mask = BIT(pin);
+	gpio_flags_t flags = 0;
+
+	/* 0:input 1:output */
+	if (inst->PDIR & mask) {
+		flags |= GPIO_OUTPUT;
+
+		/* 0:push-pull 1:open-drain */
+		if (inst->PTYPE & mask) {
+			flags |= GPIO_OPEN_DRAIN;
+		}
+
+		/* 0:low 1:high */
+		if (inst->PDOUT & mask) {
+			flags |= GPIO_OUTPUT_HIGH;
+		} else {
+			flags |= GPIO_OUTPUT_LOW;
+		}
+	} else {
+		flags |= GPIO_INPUT;
+
+		/* 0:disabled 1:enabled pull */
+		if (inst->PPULL & mask) {
+			/* 0:pull-up 1:pull-down */
+			if (inst->PPUD & mask) {
+				flags |= GPIO_PULL_DOWN;
+			} else {
+				flags |= GPIO_PULL_UP;
+			}
+		}
+	}
+
+	*out_flags = flags;
+
+	return 0;
+}
+#endif
 
 static int gpio_npcx_port_get_raw(const struct device *dev,
 				  gpio_port_value_t *value)
@@ -274,8 +332,9 @@ static int gpio_npcx_manage_callback(const struct device *dev,
 	int pin = find_lsb_set(callback->pin_mask) - 1;
 
 	/* pin_mask should not be zero */
-	if (pin < 0)
+	if (pin < 0) {
 		return -EINVAL;
+	}
 
 	/* Has the IO pin valid MIWU input source? */
 	if (config->wui_maps[pin].table == NPCX_MIWU_TABLE_NONE) {
@@ -295,6 +354,9 @@ static int gpio_npcx_manage_callback(const struct device *dev,
 /* GPIO driver registration */
 static const struct gpio_driver_api gpio_npcx_driver = {
 	.pin_configure = gpio_npcx_config,
+#ifdef CONFIG_GPIO_GET_CONFIG
+	.pin_get_config = gpio_npcx_pin_get_config,
+#endif
 	.port_get_raw = gpio_npcx_port_get_raw,
 	.port_set_masked_raw = gpio_npcx_port_set_masked_raw,
 	.port_set_bits_raw = gpio_npcx_port_set_bits_raw,

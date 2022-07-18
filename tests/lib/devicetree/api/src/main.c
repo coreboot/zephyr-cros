@@ -4,6 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* Override __DEPRECATED_MACRO so we don't get twister failures for
+ * deprecated macros:
+ * - DT_BUS_LABEL
+ * - DT_SPI_DEV_CS_GPIOS_LABEL
+ * - DT_GPIO_LABEL
+ * - DT_GPIO_LABEL_BY_IDX
+ * - DT_INST_BUS_LABEL
+ * - DT_INST_SPI_DEV_CS_GPIOS_LABEL
+ * - DT_INST_GPIO_LABEL
+ * - DT_INST_GPIO_LABEL_BY_IDX
+ */
+#define __DEPRECATED_MACRO
+
 #include <ztest.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/device.h>

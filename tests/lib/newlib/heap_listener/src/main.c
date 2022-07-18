@@ -35,6 +35,8 @@ static void heap_resized(uintptr_t heap_id, void *old_heap_end, void *new_heap_e
 
 static HEAP_LISTENER_RESIZE_DEFINE(listener, HEAP_ID_LIBC, heap_resized);
 
+void *ptr;
+
 /**
  * @brief Test that heap listener is notified when libc heap size changes.
  *
@@ -42,10 +44,9 @@ static HEAP_LISTENER_RESIZE_DEFINE(listener, HEAP_ID_LIBC, heap_resized);
  * and verifies that the heap listener is notified of allocating or returning
  * memory from the system.
  */
-void test_alloc_and_trim(void)
+ZTEST(newlib_libc_heap_listener, test_alloc_and_trim)
 {
 	uintptr_t saved_heap_end;
-	void *ptr;
 
 	TC_PRINT("Allocating memory...\n");
 
@@ -76,10 +77,4 @@ void test_alloc_and_trim(void)
 	heap_listener_unregister(&listener);
 }
 
-void test_main(void)
-{
-	ztest_test_suite(newlib_libc_heap_listener,
-			 ztest_unit_test(test_alloc_and_trim));
-
-	ztest_run_test_suite(newlib_libc_heap_listener);
-}
+ZTEST_SUITE(newlib_libc_heap_listener, NULL, NULL, NULL, NULL, NULL);

@@ -87,12 +87,21 @@ static const char *phy2str(uint8_t phy)
 }
 #endif
 
+#if defined(CONFIG_BT_CENTRAL)
+static struct bt_auto_connect {
+	bt_addr_le_t addr;
+	bool addr_set;
+} auto_connect;
+#endif
+
 #if defined(CONFIG_BT_OBSERVER)
 static struct bt_scan_filter {
 	char name[NAME_LEN];
 	bool name_set;
 	char addr[18]; /* fits xx:xx:xx:xx:xx:xx\0 */
 	bool addr_set;
+	int8_t rssi;
+	bool rssi_set;
 } scan_filter;
 
 
@@ -163,6 +172,10 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 		return;
 	}
 
+	if (scan_filter.rssi_set && (scan_filter.rssi > info->rssi)) {
+		return;
+	}
+
 	shell_print(ctx_shell, "[DEVICE]: %s, AD evt type %u, RSSI %i %s "
 		    "C:%u S:%u D:%d SR:%u E:%u Prim: %s, Secn: %s, "
 		    "Interval: 0x%04x (%u ms), SID: 0x%x",
@@ -175,6 +188,12 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 		    phy2str(info->primary_phy), phy2str(info->secondary_phy),
 		    info->interval, BT_CONN_INTERVAL_TO_MS(info->interval),
 		    info->sid);
+
+	/* Store address for later use */
+#if defined(CONFIG_BT_CENTRAL)
+	auto_connect.addr_set = true;
+	bt_addr_le_copy(&auto_connect.addr, info->addr);
+#endif
 }
 
 static void scan_timeout(void)
@@ -1072,6 +1091,32 @@ static int cmd_scan_filter_set_addr(const struct shell *sh, size_t argc,
 	scan_filter.addr_set = true;
 
 	return 0;
+}
+
+static int cmd_scan_filter_set_rssi(const struct shell *sh, size_t argc, char *argv[])
+{
+	int err = 0;
+	long rssi;
+
+	rssi = shell_strtol(argv[1], 10, &err);
+
+	if (!err) {
+		if (IN_RANGE(rssi, INT8_MIN, INT8_MAX)) {
+			scan_filter.rssi = (int8_t)rssi;
+			scan_filter.rssi_set = true;
+			shell_print(sh, "RSSI cutoff set at %d dB", scan_filter.rssi);
+
+			return 0;
+		}
+
+		shell_print(sh, "value out of bounds (%d to %d)", INT8_MIN, INT8_MAX);
+		err = -ERANGE;
+	}
+
+	shell_print(sh, "error %d", err);
+	shell_help(sh);
+
+	return SHELL_CMD_HELP_PRINTED;
 }
 
 static int cmd_scan_filter_clear_all(const struct shell *sh, size_t argc,
@@ -1998,6 +2043,18 @@ static int cmd_connect_le(const struct shell *sh, size_t argc, char *argv[])
 	struct bt_conn *conn;
 	uint32_t options = 0;
 
+	/* When no arguments are specified, connect to the last scanned device. */
+	if (argc == 1) {
+		if (auto_connect.addr_set) {
+			bt_addr_le_copy(&addr, &auto_connect.addr);
+		} else {
+			shell_error(sh, "No connectable adv stored, please trigger a scan first.");
+			shell_help(sh);
+
+			return SHELL_CMD_HELP_PRINTED;
+		}
+	}
+
 	err = bt_addr_le_from_str(argv[1], argv[2], &addr);
 	if (err) {
 		shell_error(sh, "Invalid peer address (err %d)", err);
@@ -2530,6 +2587,12 @@ static int cmd_security(const struct shell *sh, size_t argc, char *argv[])
 	if (!default_conn || (bt_conn_get_info(default_conn, &info) < 0)) {
 		shell_error(sh, "Not connected");
 		return -ENOEXEC;
+	}
+
+	if (argc < 2) {
+		shell_print(sh, "BT_SECURITY_L%d", bt_conn_get_security(default_conn));
+
+		return 0;
 	}
 
 	sec = *argv[1] - '0';
@@ -3244,6 +3307,7 @@ static int cmd_auth_oob_tk(const struct shell *sh, size_t argc, char *argv[])
 SHELL_STATIC_SUBCMD_SET_CREATE(bt_scan_filter_set_cmds,
 	SHELL_CMD_ARG(name, NULL, "<name>", cmd_scan_filter_set_name, 2, 0),
 	SHELL_CMD_ARG(addr, NULL, "<addr>", cmd_scan_filter_set_addr, 2, 0),
+	SHELL_CMD_ARG(rssi, NULL, "<rssi>", cmd_scan_filter_set_rssi, 1, 1),
 	SHELL_SUBCMD_SET_END
 );
 
@@ -3344,7 +3408,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 #endif /* defined(CONFIG_BT_PER_ADV_SYNC) */
 #if defined(CONFIG_BT_CENTRAL)
 	SHELL_CMD_ARG(connect, NULL, HELP_ADDR_LE EXT_ADV_SCAN_OPT,
-		      cmd_connect_le, 3, 3),
+		      cmd_connect_le, 1, 3),
 #if !defined(CONFIG_BT_FILTER_ACCEPT_LIST)
 	SHELL_CMD_ARG(auto-conn, NULL, HELP_ADDR_LE, cmd_auto_conn, 3, 0),
 #endif /* !defined(CONFIG_BT_FILTER_ACCEPT_LIST) */
@@ -3371,7 +3435,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 #if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR)
 	SHELL_CMD_ARG(security, NULL, "<security level BR/EDR: 0 - 3, "
 				      "LE: 1 - 4> [force-pair]",
-		      cmd_security, 2, 1),
+		      cmd_security, 1, 2),
 	SHELL_CMD_ARG(bondable, NULL, "<bondable: on, off>", cmd_bondable,
 		      2, 0),
 	SHELL_CMD_ARG(bonds, NULL, HELP_NONE, cmd_bonds, 1, 0),

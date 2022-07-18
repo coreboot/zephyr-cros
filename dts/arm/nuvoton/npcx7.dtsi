@@ -14,15 +14,13 @@
 #include "npcx/npcx7/npcx7-espi-vws-map.dtsi"
 /* NPCX7 series low-voltage io controls mapping table */
 #include "npcx/npcx7/npcx7-lvol-ctrl-map.dtsi"
-/* NPCX7 series power-switch-logic (PSL) io controls mapping table */
-#include "npcx/npcx7/npcx7-psl-ctrl-map.dtsi"
 
 /* Device tree declarations of npcx soc family */
 #include "npcx.dtsi"
 
 / {
 	def-io-conf-list {
-		pinctrl-0 = <&alt0_gpio_no_spip
+		pinmux = <&alt0_gpio_no_spip
 			   &alt0_gpio_no_fpip
 			   &alt1_no_pwrgd
 			   &alta_no_peci_en

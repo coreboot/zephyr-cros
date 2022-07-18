@@ -213,6 +213,36 @@ int bt_has_client_conn_get(const struct bt_has *has, struct bt_conn **conn);
  */
 int bt_has_client_presets_read(struct bt_has *has, uint8_t index, uint8_t max_count);
 
+/** @brief Preset operations structure. */
+struct bt_has_preset_ops {
+	/**
+	 * @brief Preset select callback.
+	 *
+	 * This callback is called when the client requests to select preset identified by
+	 * @p index.
+	 *
+	 * @param index Preset index requested to activate.
+	 * @param sync Whether the server must relay this change to the other member of the
+	 *             Binaural Hearing Aid Set.
+	 *
+	 * @return 0 in case of success or negative value in case of error.
+	 * @return -EBUSY if operation cannot be performed at the time.
+	 * @return -EINPROGRESS in case where user has to confirm once the requested preset
+	 *                      becomes active by calling @ref bt_has_preset_active_set.
+	 */
+	int (*select)(uint8_t index, bool sync);
+
+	/**
+	 * @brief Preset name changed callback
+	 *
+	 * This callback is called when the name of the preset identified by @p index has changed.
+	 *
+	 * @param index Preset index that name has been changed.
+	 * @param name Preset current name.
+	 */
+	void (*name_changed)(uint8_t index, const char *name);
+};
+
 /** @brief Register structure for preset. */
 struct bt_has_preset_register_param {
 	/**
@@ -238,6 +268,9 @@ struct bt_has_preset_register_param {
 	 * @ref BT_HAS_PRESET_NAME_MAX, the name will be truncated.
 	 */
 	const char *name;
+
+	/** Preset operations structure. */
+	const struct bt_has_preset_ops *ops;
 };
 
 /**
@@ -317,6 +350,51 @@ typedef uint8_t (*bt_has_preset_func_t)(uint8_t index, enum bt_has_properties pr
  * @param user_data Data to pass to the callback.
  */
 void bt_has_preset_foreach(uint8_t index, bt_has_preset_func_t func, void *user_data);
+
+/**
+ * @brief Set active preset.
+ *
+ * Function used to set the preset identified by the @p index as the active preset.
+ * The preset index will be notified to peer devices.
+ *
+ * @param index Preset index.
+ *
+ * @return 0 in case of success or negative value in case of error.
+ */
+int bt_has_preset_active_set(uint8_t index);
+
+/**
+ * @brief Get active preset.
+ *
+ * Function used to get the currently active preset index.
+ *
+ * @return Active preset index.
+ */
+uint8_t bt_has_preset_active_get(void);
+
+/**
+ * @brief Clear out active preset.
+ *
+ * Used by server to deactivate currently active preset.
+ *
+ * @return 0 in case of success or negative value in case of error.
+ */
+static inline int bt_has_preset_active_clear(void)
+{
+	return bt_has_preset_active_set(BT_HAS_PRESET_INDEX_NONE);
+}
+
+/**
+ * @brief Change the Preset Name.
+ *
+ * Change the name of the preset identified by @p index.
+ *
+ * @param index The index of the preset to change the name of.
+ * @param name Name to write.
+ *
+ * @return 0 in case of success or negative value in case of error.
+ */
+int bt_has_preset_name_change(uint8_t index, const char *name);
 
 #ifdef __cplusplus
 }

@@ -4,7 +4,7 @@
 
 /*
  * Copyright (c) 2010, 2012-2015 Wind River Systems, Inc.
- * Copyright (c) 2020 Intel Corp.
+ * Copyright (c) 2020-2022 Intel Corp.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -17,10 +17,6 @@
  *
  * Before individual UART port can be used, uart_ns16550_port_init() has to be
  * called to setup the port.
- *
- * - the following macro for the number of bytes between register addresses:
- *
- *  UART_REG_ADDR_INTERVAL
  */
 
 #include <errno.h>
@@ -32,6 +28,7 @@
 #include <zephyr/toolchain.h>
 #include <zephyr/linker/sections.h>
 #include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/clock_control.h>
 #include <zephyr/pm/policy.h>
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/spinlock.h>
@@ -40,15 +37,11 @@
 
 #define INST_HAS_PCP_HELPER(inst) DT_INST_NODE_HAS_PROP(inst, pcp) ||
 #define INST_HAS_DLF_HELPER(inst) DT_INST_NODE_HAS_PROP(inst, dlf) ||
-#define INST_HAS_REG_SHIFT_HELPER(inst) \
-	DT_INST_NODE_HAS_PROP(inst, reg_shift) ||
 
 #define UART_NS16550_PCP_ENABLED \
 	(DT_INST_FOREACH_STATUS_OKAY(INST_HAS_PCP_HELPER) 0)
 #define UART_NS16550_DLF_ENABLED \
 	(DT_INST_FOREACH_STATUS_OKAY(INST_HAS_DLF_HELPER) 0)
-#define UART_NS16550_REG_INTERVAL_ENABLED \
-	(DT_INST_FOREACH_STATUS_OKAY(INST_HAS_REG_SHIFT_HELPER) 0)
 
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(pcie)
 BUILD_ASSERT(IS_ENABLED(CONFIG_PCIE), "NS16550(s) in DT need CONFIG_PCIE");
@@ -233,15 +226,15 @@ struct uart_ns16550_device_config {
 	uint32_t port;
 #endif
 	uint32_t sys_clk_freq;
+	const struct device *clock_dev;
+	clock_control_subsys_t clock_subsys;
 #if defined(CONFIG_UART_INTERRUPT_DRIVEN) || defined(CONFIG_UART_ASYNC_API)
 	uart_irq_config_func_t	irq_config_func;
 #endif
 #if UART_NS16550_PCP_ENABLED
 	uint32_t pcp;
 #endif
-#if UART_NS16550_REG_INTERVAL_ENABLED
 	uint8_t reg_interval;
-#endif
 #if DT_ANY_INST_ON_BUS_STATUS_OKAY(pcie)
 	bool pcie;
 	pcie_bdf_t pcie_bdf;
@@ -273,28 +266,12 @@ struct uart_ns16550_dev_data {
 #endif
 };
 
-#if defined(UART_REG_ADDR_INTERVAL)
-#define DEFAULT_REG_INTERVAL UART_REG_ADDR_INTERVAL
-#elif defined(CONFIG_UART_NS16550_ACCESS_IOPORT)
-#define DEFAULT_REG_INTERVAL 1
-#else
-#define DEFAULT_REG_INTERVAL 4
-#endif
-
-#if UART_NS16550_REG_INTERVAL_ENABLED
 static inline uint8_t reg_interval(const struct device *dev)
 {
 	const struct uart_ns16550_device_config *config = dev->config;
 
-	if (config->reg_interval) {
-		return config->reg_interval;
-	}
-
-	return DEFAULT_REG_INTERVAL;
+	return config->reg_interval;
 }
-#else
-#define reg_interval(dev) DEFAULT_REG_INTERVAL
-#endif
 
 static const struct uart_driver_api uart_ns16550_driver_api;
 
@@ -309,19 +286,18 @@ static inline uintptr_t get_port(const struct device *dev)
 #endif
 }
 
-static void set_baud_rate(const struct device *dev, uint32_t baud_rate)
+static void set_baud_rate(const struct device *dev, uint32_t baud_rate, uint32_t pclk)
 {
-	const struct uart_ns16550_device_config * const dev_cfg = dev->config;
 	struct uart_ns16550_dev_data * const dev_data = dev->data;
 	uint32_t divisor; /* baud rate divisor */
 	uint8_t lcr_cache;
 
-	if ((baud_rate != 0U) && (dev_cfg->sys_clk_freq != 0U)) {
+	if ((baud_rate != 0U) && (pclk != 0U)) {
 		/*
 		 * calculate baud rate divisor. a variant of
-		 * (uint32_t)(dev_cfg->sys_clk_freq / (16.0 * baud_rate) + 0.5)
+		 * (uint32_t)(pclk / (16.0 * baud_rate) + 0.5)
 		 */
-		divisor = ((dev_cfg->sys_clk_freq + (baud_rate << 3))
+		divisor = ((pclk + (baud_rate << 3))
 					/ baud_rate) >> 4;
 
 		/* set the DLAB to access the baud rate divisor registers */
@@ -343,6 +319,7 @@ static int uart_ns16550_configure(const struct device *dev,
 	struct uart_ns16550_dev_data * const dev_data = dev->data;
 	const struct uart_ns16550_device_config * const dev_cfg = dev->config;
 	uint8_t mdc = 0U;
+	uint32_t pclk = 0U;
 
 	/* temp for return value if error occurs in this locked region */
 	int ret = 0;
@@ -393,7 +370,23 @@ static int uart_ns16550_configure(const struct device *dev,
 	}
 #endif
 
-	set_baud_rate(dev, cfg->baudrate);
+	/*
+	 * set clock frequency from clock_frequency property if valid,
+	 * otherwise, get clock frequency from clock manager
+	 */
+	if (dev_cfg->sys_clk_freq != 0U) {
+		pclk = dev_cfg->sys_clk_freq;
+	} else {
+		if (dev_cfg->clock_dev == NULL) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		clock_control_get_rate(dev_cfg->clock_dev, dev_cfg->clock_subsys,
+			   &pclk);
+	}
+
+	set_baud_rate(dev, cfg->baudrate, pclk);
 
 	/* Local structure to hold temporary values to pass to OUTBYTE() */
 	struct uart_config uart_cfg;
@@ -1114,12 +1107,6 @@ static const struct uart_driver_api uart_ns16550_driver_api = {
 #define DEV_CONFIG_PCP_INIT(n)
 #endif
 
-#define DEV_CONFIG_REG_INT0(n)
-#define DEV_CONFIG_REG_INT1(n) \
-	.reg_interval = (1 << DT_INST_PROP(n, reg_shift)),
-#define DEV_CONFIG_REG_INT_INIT(n) \
-	_CONCAT(DEV_CONFIG_REG_INT, DT_INST_NODE_HAS_PROP(n, reg_shift))(n)
-
 #define DEV_CONFIG_PCIE0(n)
 #define DEV_CONFIG_PCIE1(n)              \
 	.pcie = true,                    \
@@ -1143,10 +1130,20 @@ static const struct uart_driver_api uart_ns16550_driver_api = {
 	UART_NS16550_IRQ_FUNC_DECLARE(n);                                            \
 	static const struct uart_ns16550_device_config uart_ns16550_dev_cfg_##n = {  \
 		DEV_CONFIG_REG_INIT(n)                                               \
-		.sys_clk_freq = DT_INST_PROP(n, clock_frequency),                    \
+		COND_CODE_1(DT_INST_NODE_HAS_PROP(n, clock_frequency), (             \
+				.sys_clk_freq = DT_INST_PROP(n, clock_frequency),    \
+				.clock_dev = NULL,                                   \
+				.clock_subsys = NULL,                                \
+			), (                                                         \
+				.sys_clk_freq = 0,                                   \
+				.clock_dev = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(n)),  \
+				.clock_subsys = (clock_control_subsys_t) DT_INST_PHA(\
+								0, clocks, clkid),   \
+			)                                                            \
+		)                                                                    \
 		DEV_CONFIG_IRQ_FUNC_INIT(n)                                          \
 		DEV_CONFIG_PCP_INIT(n)                                               \
-		DEV_CONFIG_REG_INT_INIT(n)                                           \
+		.reg_interval = (1 << DT_INST_PROP(n, reg_shift)),                   \
 		DEV_CONFIG_PCIE_INIT(n)                                              \
 	};                                                                           \
 	static struct uart_ns16550_dev_data uart_ns16550_dev_data_##n = {            \

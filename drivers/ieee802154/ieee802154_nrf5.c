@@ -62,11 +62,6 @@ static struct nrf5_802154_data nrf5_data;
 #define DRX_SLOT_PH 0 /* Placeholder delayed reception window ID */
 #define DRX_SLOT_RX 1 /* Actual delayed reception window ID */
 #define PH_DURATION 10 /* Duration of the placeholder window, in microseconds */
-/* When scheduling the actual delayed reception window an adjustment of
- * 800 us is required to match the CSL transmission timing for unknown
- * reasons. This is a temporary workaround until the root cause is found.
- */
-#define DRX_ADJUST 800
 
 #if defined(CONFIG_IEEE802154_NRF5_UICR_EUI64_ENABLE)
 #if defined(CONFIG_SOC_NRF5340_CPUAPP)
@@ -132,6 +127,7 @@ static void nrf5_rx_thread(void *arg1, void *arg2, void *arg3)
 	struct net_pkt *pkt;
 	struct nrf5_802154_rx_frame *rx_frame;
 	uint8_t pkt_len;
+	uint8_t *psdu;
 
 	ARG_UNUSED(arg2);
 	ARG_UNUSED(arg3);
@@ -195,8 +191,9 @@ static void nrf5_rx_thread(void *arg1, void *arg2, void *arg3)
 			goto drop;
 		}
 
-		nrf_802154_buffer_free_raw(rx_frame->psdu);
+		psdu = rx_frame->psdu;
 		rx_frame->psdu = NULL;
+		nrf_802154_buffer_free_raw(psdu);
 
 		if (LOG_LEVEL >= LOG_LEVEL_DBG) {
 			log_stack_usage(&nrf5_radio->rx_thread);
@@ -205,8 +202,9 @@ static void nrf5_rx_thread(void *arg1, void *arg2, void *arg3)
 		continue;
 
 drop:
-		nrf_802154_buffer_free_raw(rx_frame->psdu);
+		psdu = rx_frame->psdu;
 		rx_frame->psdu = NULL;
+		nrf_802154_buffer_free_raw(psdu);
 
 		net_pkt_unref(pkt);
 	}
@@ -445,6 +443,12 @@ static bool nrf5_tx_immediate(struct net_pkt *pkt, uint8_t *payload, bool cca)
 			.dynamic_data_is_set = pkt->ieee802154_mac_hdr_rdy,
 		},
 		.cca = cca,
+		.tx_power = {
+			.use_metadata_value = IS_ENABLED(CONFIG_IEEE802154_SELECTIVE_TXPOWER),
+#if defined(CONFIG_IEEE802154_SELECTIVE_TXPOWER)
+			.power = pkt->ieee802154_txpwr,
+#endif
+		},
 	};
 
 	return nrf_802154_transmit_raw(payload, &metadata);
@@ -457,6 +461,12 @@ static bool nrf5_tx_csma_ca(struct net_pkt *pkt, uint8_t *payload)
 		.frame_props = {
 			.is_secured = pkt->ieee802154_frame_secured,
 			.dynamic_data_is_set = pkt->ieee802154_mac_hdr_rdy,
+		},
+		.tx_power = {
+			.use_metadata_value = IS_ENABLED(CONFIG_IEEE802154_SELECTIVE_TXPOWER),
+#if defined(CONFIG_IEEE802154_SELECTIVE_TXPOWER)
+			.power = pkt->ieee802154_txpwr,
+#endif
 		},
 	};
 
@@ -541,6 +551,12 @@ static bool nrf5_tx_at(struct net_pkt *pkt, uint8_t *payload, bool cca)
 		},
 		.cca = cca,
 		.channel = nrf_802154_channel_get(),
+		.tx_power = {
+			.use_metadata_value = IS_ENABLED(CONFIG_IEEE802154_SELECTIVE_TXPOWER),
+#if defined(CONFIG_IEEE802154_SELECTIVE_TXPOWER)
+			.power = pkt->ieee802154_txpwr,
+#endif
+		},
 	};
 	uint64_t tx_at = target_time_convert_to_64_bits(net_pkt_txtime(pkt) / NSEC_PER_USEC);
 	bool ret;
@@ -833,7 +849,7 @@ static void nrf5_config_csl_period(uint16_t period)
 
 static void nrf5_schedule_rx(uint8_t channel, uint32_t start, uint32_t duration)
 {
-	nrf5_receive_at(start - DRX_ADJUST, duration, channel, DRX_SLOT_RX);
+	nrf5_receive_at(start, duration, channel, DRX_SLOT_RX);
 
 	/* The placeholder reception window is rescheduled for the next period */
 	nrf_802154_receive_at_cancel(DRX_SLOT_PH);
@@ -978,7 +994,7 @@ void nrf_802154_received_timestamp_raw(uint8_t *data, int8_t power, uint8_t lqi,
 		nrf5_data.rx_frames[i].lqi = lqi;
 
 #if IS_ENABLED(CONFIG_NET_PKT_TIMESTAMP)
-		nrf5_data.rx_frames[i].time = nrf_802154_first_symbol_timestamp_get(time, data[0]);
+		nrf5_data.rx_frames[i].time = nrf_802154_mhr_timestamp_get(time, data[0]);
 #endif
 
 		if (data[ACK_REQUEST_BYTE] & ACK_REQUEST_BIT) {
@@ -1066,7 +1082,7 @@ void nrf_802154_transmitted_raw(uint8_t *frame,
 
 #if IS_ENABLED(CONFIG_NET_PKT_TIMESTAMP)
 		nrf5_data.ack_frame.time =
-			nrf_802154_first_symbol_timestamp_get(
+			nrf_802154_mhr_timestamp_get(
 				metadata->data.transmitted.time, nrf5_data.ack_frame.psdu[0]);
 #endif
 	}
@@ -1126,9 +1142,9 @@ void nrf_802154_energy_detection_failed(nrf_802154_ed_error_t error)
 }
 
 #if defined(CONFIG_NRF_802154_SER_HOST)
-void nrf_802154_serialization_error(const nrf_802154_ser_err_data_t *p_err)
+void nrf_802154_serialization_error(const nrf_802154_ser_err_data_t *err)
 {
-	__ASSERT(false, "802.15.4 serialization error");
+	__ASSERT(false, "802.15.4 serialization error: %d", err->reason);
 }
 #endif
 

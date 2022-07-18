@@ -92,6 +92,7 @@
 #define MBEDTLS_PK_PARSE_C
 #define MBEDTLS_SHA224_C
 #define MBEDTLS_SHA256_C
+#define MBEDTLS_SHA384_C
 #define MBEDTLS_SHA512_C
 #define MBEDTLS_SSL_CLI_C
 #define MBEDTLS_SSL_SRV_C
@@ -108,7 +109,6 @@
 #define MBEDTLS_AES_ROM_TABLES
 
 /* Save RAM by adjusting to our exact needs */
-#define MBEDTLS_ECP_MAX_BITS   384
 #define MBEDTLS_MPI_MAX_SIZE    48 // 384 bits is 48 bytes
 
 /* Save RAM at the expense of speed, see ecp.h */

@@ -24,7 +24,8 @@
 #define CAN_FIRX_EXT_STD_ID_POS (21U)
 #define CAN_FIRX_EXT_EXT_ID_POS (3U)
 
-#define CAN_BANK_IS_EMPTY(usage, bank_nr) (((usage >> ((bank_nr) * 4)) & 0x0F) == 0x0F)
+#define CAN_BANK_IS_EMPTY(usage, bank_nr, bank_offset) \
+	(((usage >> ((bank_nr - bank_offset) * 4)) & 0x0F) == 0x0F)
 #define CAN_BANK_IN_LIST_MODE(can, bank) ((can)->FM1R & (1U << (bank)))
 #define CAN_BANK_IN_32BIT_MODE(can, bank) ((can)->FS1R & (1U << (bank)))
 #define CAN_IN_16BIT_LIST_MODE(can, bank) (CAN_BANK_IN_LIST_MODE(can, bank) && \
@@ -73,7 +74,6 @@ struct can_stm32_config {
 	uint8_t sjw;
 	uint8_t prop_ts1;
 	uint8_t ts2;
-	bool one_shot;
 	struct stm32_pclken pclken;
 	void (*config_irq)(CAN_TypeDef *can);
 	const struct pinctrl_dev_config *pcfg;

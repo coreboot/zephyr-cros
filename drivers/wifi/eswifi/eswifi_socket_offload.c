@@ -7,7 +7,6 @@
 #include "eswifi_log.h"
 LOG_MODULE_DECLARE(LOG_MODULE_NAME);
 
-#include <zephyr/zephyr.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <string.h>
@@ -356,8 +355,9 @@ static ssize_t eswifi_socket_recv(void *obj, void *buf, size_t max_len,
 	} else {
 		eswifi_unlock(eswifi);
 		pkt = k_fifo_get(&socket->fifo, K_FOREVER);
-		if (!pkt)
+		if (!pkt) {
 			return 0; /* EOF */
+		}
 		eswifi_lock(eswifi);
 	}
 
