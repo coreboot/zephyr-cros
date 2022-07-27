@@ -205,6 +205,9 @@ static int pd_translate_event(struct osdp_pd *pd, struct osdp_event *event)
 			reply_code = REPLY_LSTATR;
 		}
 		break;
+	case OSDP_EVENT_MFGREP:
+		reply_code = REPLY_MFGREP;
+		break;
 	default:
 		LOG_ERR("Unknown event type %d", event->type);
 		break;
