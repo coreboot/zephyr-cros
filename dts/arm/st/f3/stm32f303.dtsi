@@ -43,7 +43,6 @@
 			clocks = <&rcc STM32_CLOCK_BUS_APB1 0x00008000>;
 			interrupts = <51 5>;
 			status = "disabled";
-			label = "SPI_3";
 		};
 
 		spi3: spi@40003c00 {
