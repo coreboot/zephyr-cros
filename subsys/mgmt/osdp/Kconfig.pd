@@ -24,7 +24,7 @@ config OSDP_PD_COMMAND_QUEUE_SIZE
 config OSDP_PD_ADDRESS
 	int "Peripheral Device Address"
 	default 1
-	range 1 126
+	range 0 126
 	help
 	  The 7 least significant bits represent the address of the PD to which
 	  the message is directed, or the address of the PD sending the reply.
