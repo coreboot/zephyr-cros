@@ -28,6 +28,8 @@ LOG_MODULE_DECLARE(osdp, CONFIG_OSDP_LOG_LEVEL);
 #define CMD_CHLNG_DATA_LEN             8
 #define CMD_SCRYPT_DATA_LEN            16
 #define CMD_MFG_DATA_LEN               4 /* variable length command */
+#define CMD_ACURXSIZE_DATA_LEN         2 
+#define CMD_ABORT_DATA_LEN         	   0 
 
 #define REPLY_ACK_LEN                  1
 #define REPLY_PDID_LEN                 13
@@ -403,6 +405,7 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 		cmd.id = OSDP_CMD_LED;
 		cmd.led.reader = buf[pos++];
 		cmd.led.led_number = buf[pos++];
+		printk("LED operation %d", cmd.led.led_number);
 
 		cmd.led.temporary.control_code = buf[pos++];
 		cmd.led.temporary.on_count = buf[pos++];
@@ -417,10 +420,10 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 		cmd.led.permanent.off_count = buf[pos++];
 		cmd.led.permanent.on_color = buf[pos++];
 		cmd.led.permanent.off_color = buf[pos++];
-		if (!pd_cmd_cap_ok(pd, &cmd)) {
-			ret = OSDP_PD_ERR_REPLY;
-			break;
-		}
+		// if (!pd_cmd_cap_ok(pd, &cmd)) {
+		// 	ret = OSDP_PD_ERR_REPLY;
+		// 	break;
+		// }
 		ret = pd->command_callback(pd->command_callback_arg, &cmd);
 		if (ret != 0) {
 			pd->reply_id = REPLY_NAK;
@@ -555,6 +558,38 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			pd->reply_id = REPLY_ACK;
 		}
 		ret = OSDP_PD_ERR_NONE;
+		break;
+
+	case CMD_ACURXSIZE:
+		if (len != CMD_ACURXSIZE_DATA_LEN || !pd->command_callback) {
+			break;
+		}
+		cmd.id = OSDP_CMD_ACURXSIZE;		
+		cmd.acurxsize.max_rx_size = buf[pos] | (buf[pos + 1] << 8);
+		ret = pd->command_callback(pd->command_callback_arg, &cmd);
+		if (ret != 0) {
+			pd->reply_id = REPLY_NAK;
+			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
+			ret = OSDP_PD_ERR_REPLY;
+			break;
+		}
+		pd->reply_id = REPLY_ACK;
+		ret = OSDP_PD_ERR_NONE;
+		break;
+	case CMD_ABORT:
+		if (len > CMD_ABORT_DATA_LEN || !pd->command_callback) {
+			break;
+		}		
+		cmd.id = OSDP_CMD_ABORT;		
+		ret = pd->command_callback(pd->command_callback_arg, &cmd);
+		if (ret != 0) {
+			pd->reply_id = REPLY_NAK;
+			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
+			ret = OSDP_PD_ERR_REPLY;
+			break;
+		}
+		pd->reply_id = REPLY_ACK;
+		ret = OSDP_PD_ERR_NONE;		
 		break;
 	case CMD_KEYSET:
 		if (len != CMD_KEYSET_DATA_LEN) {

@@ -188,6 +188,15 @@ struct osdp_cmd_mfg {
 };
 
 /**
+ * @brief ACU receive size
+ *
+ * @param max_rx_size ACU max receiver buffer size
+ */
+struct osdp_cmd_acurxsize {
+	uint16_t max_rx_size;
+};
+
+/**
  * @brief OSDP application exposed commands
  */
 enum osdp_cmd_e {
@@ -198,6 +207,8 @@ enum osdp_cmd_e {
 	OSDP_CMD_KEYSET,
 	OSDP_CMD_COMSET,
 	OSDP_CMD_MFG,
+	OSDP_CMD_ACURXSIZE,
+	OSDP_CMD_ABORT,
 	OSDP_CMD_SENTINEL
 };
 
@@ -224,6 +235,7 @@ struct osdp_cmd {
 		struct osdp_cmd_comset comset;
 		struct osdp_cmd_keyset keyset;
 		struct osdp_cmd_mfg mfg;
+		struct osdp_cmd_acurxsize acurxsize;
 	};
 };
 
