@@ -552,6 +552,7 @@ uint16_t osdp_compute_crc16(const uint8_t *buf, size_t len);
 
 /* from osdp.c */
 struct osdp *osdp_get_ctx();
+int osdp_uart_update_config();
 
 /* from osdp_cp.c */
 #ifdef CONFIG_OSDP_MODE_CP

@@ -405,7 +405,6 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 		cmd.id = OSDP_CMD_LED;
 		cmd.led.reader = buf[pos++];
 		cmd.led.led_number = buf[pos++];
-		printk("LED operation %d", cmd.led.led_number);
 
 		cmd.led.temporary.control_code = buf[pos++];
 		cmd.led.temporary.on_count = buf[pos++];
@@ -420,10 +419,10 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 		cmd.led.permanent.off_count = buf[pos++];
 		cmd.led.permanent.on_color = buf[pos++];
 		cmd.led.permanent.off_color = buf[pos++];
-		// if (!pd_cmd_cap_ok(pd, &cmd)) {
-		// 	ret = OSDP_PD_ERR_REPLY;
-		// 	break;
-		// }
+		if (!pd_cmd_cap_ok(pd, &cmd)) {
+			ret = OSDP_PD_ERR_REPLY;
+			break;
+		}
 		ret = pd->command_callback(pd->command_callback_arg, &cmd);
 		if (ret != 0) {
 			pd->reply_id = REPLY_NAK;
@@ -863,11 +862,10 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 		buf[len++] = BYTE_1(cmd->comset.baud_rate);
 		buf[len++] = BYTE_2(cmd->comset.baud_rate);
 		buf[len++] = BYTE_3(cmd->comset.baud_rate);
-
 		pd->address = (int)cmd->comset.address;
 		pd->baud_rate = (int)cmd->comset.baud_rate;
 		LOG_INF("COMSET Succeeded! New PD-Addr: %d; Baud: %d",
-			pd->address, pd->baud_rate);
+		 	pd->address, pd->baud_rate);
 		ret = OSDP_PD_ERR_NONE;
 		break;
 	case REPLY_NAK:
@@ -1161,6 +1159,13 @@ void osdp_update(struct osdp *ctx)
 		 */
 		LOG_ERR("REPLY send failed! CP may be waiting..");
 		return;
+	}
+
+	if (pd->reply_id == REPLY_COM) {
+		/**
+		 * Update UART config, if OSDP_COMSET command was accepted
+		 */
+		osdp_uart_update_config();
 	}
 
 	if (ctx->command_complete_callback) {

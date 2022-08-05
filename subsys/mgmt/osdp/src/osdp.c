@@ -25,6 +25,7 @@ LOG_MODULE_REGISTER(osdp, CONFIG_OSDP_LOG_LEVEL);
 #define OSDP_KEY_STRING ""
 #endif	/* CONFIG_OSDP_SC_ENABLED */
 
+#define UART_EVENT_TX_END	1UL
 struct osdp_device {
 	struct ring_buf rx_buf;
 	struct ring_buf tx_buf;
@@ -45,6 +46,7 @@ static struct osdp_pd osdp_pd_ctx[CONFIG_OSDP_NUM_CONNECTED_PD];
 static struct osdp_device osdp_device;
 static struct k_thread osdp_refresh_thread;
 static K_THREAD_STACK_DEFINE(osdp_thread_stack, CONFIG_OSDP_THREAD_STACK_SIZE);
+static K_EVENT_DEFINE(uart_tx_end);
 
 static void osdp_handle_in_byte(struct osdp_device *p, uint8_t *buf, int len)
 {
@@ -82,6 +84,7 @@ static void osdp_uart_isr(const struct device *dev, void *user_data)
 			len = ring_buf_get(&p->tx_buf, buf, 1);
 			if (!len) {
 				uart_irq_tx_disable(dev);
+				k_event_set(&uart_tx_end, UART_EVENT_TX_END);
 			} else {
 				uart_fifo_fill(dev, buf, 1);
 			}
@@ -106,7 +109,6 @@ static int osdp_uart_send(void *data, uint8_t *buf, int len)
 {
 	int sent = 0;
 	struct osdp_device *p = data;
-
 	sent = (int)ring_buf_put(&p->tx_buf, buf, len);
 	uart_irq_tx_enable(p->dev);
 	return sent;
@@ -267,5 +269,37 @@ int osdp_init(void)
 {
 	return osdp_init_internal(NULL);
 }
+
+int osdp_uart_update_config() 
+{
+	uint8_t c;
+	int status = 0;
+	struct osdp* ctx = osdp_get_ctx();
+	struct osdp_device *p = ctx->pd->channel.data;	
+
+	if (p->dev_config.baudrate != ctx->pd->baud_rate) {
+		/* Wait for sending response before reconfiguring UART */
+		if(!k_event_wait(&uart_tx_end, UART_EVENT_TX_END, true, K_MSEC(30))) {
+			return -ETIME;
+		}		
+		uart_irq_rx_disable(p->dev);
+		uart_irq_tx_disable(p->dev);		
+		p->dev_config.baudrate = ctx->pd->baud_rate;
+		status = uart_configure(p->dev, &p->dev_config);
+		if(status!=0) {
+			ctx->pd->baud_rate = p->dev_config.baudrate;
+			LOG_ERR("Baudrate change failed\n");
+		} 
+		/* Drain UART fifo and set channel to wait for mark byte */
+		while (uart_irq_rx_ready(p->dev)) {
+			uart_fifo_read(p->dev, &c, 1);
+		}
+		p->wait_for_mark = 1;
+		/* Both TX and RX are interrupt driven */
+		uart_irq_rx_enable(p->dev);
+	}
+	return status;
+}
+
 
 //SYS_INIT(osdp_init, POST_KERNEL, 10);
