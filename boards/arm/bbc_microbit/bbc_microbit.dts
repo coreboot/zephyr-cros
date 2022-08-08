@@ -17,6 +17,8 @@
 		sw0 = &buttonA;
 		sw1 = &buttonB;
 		magn0 = &lsm303agr_magn;
+		accel0 = &mma8653fc;
+		watchdog0 = &wdt0;
 	};
 
 	chosen {
@@ -130,7 +132,7 @@
 	pinctrl-0 = <&i2c0_default>;
 	pinctrl-1 = <&i2c0_sleep>;
 	pinctrl-names = "default", "sleep";
-	mma8653fc@1d {
+	mma8653fc: mma8653fc@1d {
 		compatible = "nxp,fxos8700", "nxp,mma8653fc";
 		status = "okay";
 		reg = <0x1d>;
@@ -148,7 +150,7 @@
 		irq-gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;	/* A3 */
 	};
 
-	lsm303agr-accel@19 {
+	lsm303agr_accel: lsm303agr-accel@19 {
 		compatible = "st,lis2dh", "st,lsm303agr-accel";
 		status = "disabled";
 		reg = <0x19>;

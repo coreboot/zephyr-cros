@@ -11,11 +11,10 @@ config BOARD
 config BT_CTLR
 	default BT
 
-config SPI
-	default y
-	depends on IEEE802154
+config I2C
+	default SENSOR
 
-config IEEE802154_DW1000
+config SPI
 	default y
 	depends on IEEE802154
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 #include <zephyr/app_memory/app_memdomain.h>
 #ifdef CONFIG_USERSPACE
@@ -234,12 +234,6 @@ static jmp_buf test_pass;
 static jmp_buf test_skip;
 static jmp_buf stack_fail;
 
-void ztest_test_fail(void) { raise(SIGABRT); }
-
-void ztest_test_pass(void) { longjmp(test_pass, 1); }
-
-void ztest_test_skip(void) { longjmp(test_skip, 1); }
-
 /**
  * @brief Get a friendly name string for a given test phrase.
  *
@@ -266,9 +260,8 @@ static inline const char *get_friendly_phase_name(enum ztest_phase phase)
 	}
 }
 
-static void handle_signal(int sig)
+void ztest_test_fail(void)
 {
-	PRINT("    %s", strsignal(sig));
 	switch (phase) {
 	case TEST_PHASE_SETUP:
 	case TEST_PHASE_BEFORE:
@@ -283,11 +276,12 @@ static void handle_signal(int sig)
 	}
 }
 
+void ztest_test_pass(void) { longjmp(test_pass, 1); }
+
+void ztest_test_skip(void) { longjmp(test_skip, 1); }
+
 static void init_testing(void)
 {
-	signal(SIGABRT, handle_signal);
-	signal(SIGSEGV, handle_signal);
-
 	if (setjmp(stack_fail)) {
 		PRINT("TESTSUITE crashed.");
 		exit(1);
@@ -458,7 +452,7 @@ static int run_test(struct ztest_suite_node *suite, struct ztest_unit_test *test
 		ret |= cleanup_test(test);
 	}
 
-	if (test_result == ZTEST_RESULT_SKIP) {
+	if (test_result == ZTEST_RESULT_SKIP || test_result == ZTEST_RESULT_SUITE_SKIP) {
 		Z_TC_END_RESULT(TC_SKIP, test->name);
 	} else {
 		Z_TC_END_RESULT(ret, test->name);

@@ -13,6 +13,9 @@ choice STM32_LPTIM_CLOCK
 	depends on STM32_LPTIM_TIMER
 endchoice
 
+config I2C
+	default y if SENSOR
+
 if BT
 
 config SPI

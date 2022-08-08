@@ -8,7 +8,7 @@
 #include <zephyr/sd/sdmmc.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/disk.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 
 #define SECTOR_COUNT 32
@@ -24,8 +24,11 @@ static uint32_t sector_count;
 #define SDMMC_UNALIGN_OFFSET 1
 
 
-/* Verify that SD stack can initialize an SD card */
-ZTEST(sd_stack, test_init)
+/*
+ * Verify that SD stack can initialize an SD card
+ * This test must run first, to ensure the card is initialized.
+ */
+ZTEST(sd_stack, test_0_init)
 {
 	int ret;
 

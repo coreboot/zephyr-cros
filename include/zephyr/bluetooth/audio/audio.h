@@ -235,7 +235,7 @@ enum bt_audio_location {
 	BT_AUDIO_LOCATION_TOP_FRONT_CENTER = BIT(14),
 	BT_AUDIO_LOCATION_TOP_CENTER = BIT(15),
 	BT_AUDIO_LOCATION_TOP_BACK_LEFT = BIT(16),
-	BT_AUDIO_LOCATION_TOP_BECK_RIGHT = BIT(17),
+	BT_AUDIO_LOCATION_TOP_BACK_RIGHT = BIT(17),
 	BT_AUDIO_LOCATION_TOP_SIDE_LEFT = BIT(18),
 	BT_AUDIO_LOCATION_TOP_SIDE_RIGHT = BIT(19),
 	BT_AUDIO_LOCATION_TOP_BACK_CENTER = BIT(20),
@@ -1279,14 +1279,13 @@ struct bt_audio_stream {
 	/** Endpoint reference */
 	struct bt_audio_ep *ep;
 	/** Codec Configuration */
-	struct bt_codec *codec;
+	const struct bt_codec *codec;
 	/** QoS Configuration */
 	struct bt_codec_qos *qos;
 	/** ISO channel reference */
 	struct bt_iso_chan *iso;
 	/** Audio stream operations */
 	struct bt_audio_stream_ops *ops;
-	sys_snode_t node;
 
 	union {
 		void *group;
@@ -1297,7 +1296,53 @@ struct bt_audio_stream {
 
 	/** Stream user data */
 	void *user_data;
+
+	/* Internally used list node */
+	sys_snode_t _node;
 };
+
+/** Unicast Client callback structure */
+struct bt_audio_unicast_client_cb {
+	/** @brief Remote Unicast Server Audio Locations
+	 *
+	 *  This callback is called whenever the audio locations is read from
+	 *  the server or otherwise notified to the client.
+	 *
+	 *  @param conn  Connection to the remote unicast server.
+	 *  @param dir   Direction of the location.
+	 *  @param loc   The location bitfield value.
+	 *
+	 *  @return 0 in case of success or negative value in case of error.
+	 */
+	void (*location)(struct bt_conn *conn, enum bt_audio_dir dir,
+			 enum bt_audio_location loc);
+
+	/** @brief Remote Unicast Server Available Contexts
+	 *
+	 *  This callback is called whenever the available contexts are read
+	 *  from the server or otherwise notified to the client.
+	 *
+	 *  @param conn     Connection to the remote unicast server.
+	 *  @param snk_ctx  The sink context bitfield value.
+	 *  @param src_ctx  The source context bitfield value.
+	 *
+	 *  @return 0 in case of success or negative value in case of error.
+	 */
+	void (*available_contexts)(struct bt_conn *conn,
+				   enum bt_audio_context snk_ctx,
+				   enum bt_audio_context src_ctx);
+};
+
+/** @brief Register unicast client callbacks.
+ *
+ *  Only one callback structure can be registered, and attempting to
+ *  registering more than one will result in an error.
+ *
+ *  @param cb  Unicast client callback structure.
+ *
+ *  @return 0 in case of success or negative value in case of error.
+ */
+int bt_audio_unicast_client_register_cb(const struct bt_audio_unicast_client_cb *cb);
 
 /** Unicast Server callback structure */
 struct bt_audio_unicast_server_cb {
@@ -1606,7 +1651,7 @@ struct bt_audio_broadcast_sink_cb {
 	void (*pa_sync_lost)(struct bt_audio_broadcast_sink *sink);
 
 	/* Internally used list node */
-	sys_snode_t node;
+	sys_snode_t _node;
 };
 
 /** @brief Stream operation. */
@@ -1858,8 +1903,8 @@ int bt_audio_stream_config(struct bt_conn *conn,
 
 /** @brief Reconfigure Audio Stream
  *
- *  This procedure is used by a client to reconfigure a stream using the
- *  a different local capability and/or codec configuration.
+ *  This procedure is used by a unicast client or unicast server to reconfigure
+ *  a stream to use a different local codec configuration.
  *
  *  This can only be done for unicast streams.
  *
@@ -1869,7 +1914,7 @@ int bt_audio_stream_config(struct bt_conn *conn,
  *  @return 0 in case of success or negative value in case of error.
  */
 int bt_audio_stream_reconfig(struct bt_audio_stream *stream,
-			     struct bt_codec *codec);
+			     const struct bt_codec *codec);
 
 /** @brief Configure Audio Stream QoS
  *
@@ -1905,7 +1950,8 @@ int bt_audio_stream_enable(struct bt_audio_stream *stream,
 
 /** @brief Change Audio Stream Metadata
  *
- *  This procedure is used by a client to change the metadata of a stream.
+ *  This procedure is used by a unicast client or unicast server to change the
+ *  metadata of a stream.
  *
  *  @param stream Stream object
  *  @param meta_count Number of metadata entries
@@ -1919,7 +1965,8 @@ int bt_audio_stream_metadata(struct bt_audio_stream *stream,
 
 /** @brief Disable Audio Stream
  *
- *  This procedure is used by a client to disable a stream.
+ *  This procedure is used by a unicast client or unicast server to disable a
+ *  stream.
  *
  *  This shall only be called for unicast streams, as broadcast streams will
  *  always be enabled once created.
@@ -1932,7 +1979,8 @@ int bt_audio_stream_disable(struct bt_audio_stream *stream);
 
 /** @brief Start Audio Stream
  *
- *  This procedure is used by a client to make a stream start streaming.
+ *  This procedure is used by a unicast client or unicast server to make a
+ *  stream start streaming.
  *
  *  This shall only be called for unicast streams.
  *  Broadcast sinks will always be started once synchronized, and broadcast
@@ -1960,8 +2008,8 @@ int bt_audio_stream_stop(struct bt_audio_stream *stream);
 
 /** @brief Release Audio Stream
  *
- *  This procedure is used by a client to release a unicast or broadcast
- *  source stream.
+ *  This procedure is used by a unicast client or unicast server to release a
+ *  unicast stream.
  *
  *  Broadcast sink streams cannot be released, but can be deleted by
  *  bt_audio_broadcast_sink_delete().
@@ -2093,8 +2141,7 @@ int bt_audio_unicast_group_delete(struct bt_audio_unicast_group *unicast_group);
  *  (see bt_le_per_adv_sync_cb).
  *
  *  @param[in]  streams     Array of stream object pointers being used for the
- *                          broadcaster. This array shall remain valid for the
- *                          duration of the broadcast source.
+ *                          broadcaster.
  *  @param[in]  num_stream  Number of streams in @p streams.
  *  @param[in]  codec       Codec configuration.
  *  @param[in]  qos         Quality of Service configuration
@@ -2195,7 +2242,7 @@ int bt_audio_broadcast_sink_scan_stop(void);
  *  @param indexes_bitfield   Bitfield of the BIS index to sync to. To sync to
  *                            e.g. BIS index 1 and 2, this should have the value
  *                            of BIT(1) | BIT(2).
- *  @param streams            Stream objects pointers to be used for the
+ *  @param streams            Stream object pointers to be used for the
  *                            receiver. If multiple BIS indexes shall be
  *                            synchronized, multiple streams shall be provided.
  *  @param broadcast_code     The 16-octet broadcast code. Shall be supplied if

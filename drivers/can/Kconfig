@@ -93,6 +93,9 @@ source "drivers/can/Kconfig.mcan"
 source "drivers/can/Kconfig.rcar"
 source "drivers/can/Kconfig.loopback"
 
+source "drivers/can/Kconfig.sja1000"
+source "drivers/can/Kconfig.esp32"
+
 source "drivers/can/transceiver/Kconfig"
 
 endif # CAN

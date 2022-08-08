@@ -20,7 +20,7 @@
 #include <stdbool.h>
 #include <zephyr/toolchain.h>
 #include <zephyr/tracing/tracing_macros.h>
-#include <sys/mem_stats.h>
+#include <zephyr/sys/mem_stats.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -2128,6 +2128,21 @@ __syscall void k_event_post(struct k_event *event, uint32_t events);
  * @param events Set of events to post to @a event
  */
 __syscall void k_event_set(struct k_event *event, uint32_t events);
+
+/**
+ * @brief Set or clear the events in an event object
+ *
+ * This routine sets the events stored in event object to the specified value.
+ * All tasks waiting on the event object @a event whose waiting conditions
+ * become met by this immediately unpend. Unlike @ref k_event_set, this routine
+ * allows specific event bits to be set and cleared as determined by the mask.
+ *
+ * @param event Address of the event object
+ * @param events Set of events to post to @a event
+ * @param events_mask Mask to be applied to @a events
+ */
+__syscall void k_event_set_masked(struct k_event *event, uint32_t events,
+				  uint32_t events_mask);
 
 /**
  * @brief Wait for any of the specified events

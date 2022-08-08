@@ -115,6 +115,9 @@
 		pwm-led1 = &green_led_pwm;
 		pwm-led2 = &blue_led_pwm;
 		magn0 = &bmm150;
+		watchdog0 = &wdt0;
+		accel0 = &adxl362;
+		accel1 = &bmi270;
 	};
 };
 
