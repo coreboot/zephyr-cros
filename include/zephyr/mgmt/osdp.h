@@ -16,13 +16,258 @@
 extern "C" {
 #endif
 
-#define OSDP_CMD_TEXT_MAX_LEN          32
-#define OSDP_CMD_KEYSET_KEY_MAX_LEN    32
-#define OSDP_CMD_MFG_MAX_DATALEN       64
-#define OSDP_EVENT_MAX_DATALEN         64
-#define OSDP_IO_STATUS_MAX_LEN         32
-#define OSDP_RTMAPER_STATUS_MAX_LEN    8
+#define OSDP_CMD_TEXT_MAX_LEN 32
+#define OSDP_CMD_KEYSET_KEY_MAX_LEN 32
+#define OSDP_CMD_MFG_MAX_DATALEN 64
+#define OSDP_EVENT_MAX_DATALEN 64
+#define OSDP_IO_STATUS_MAX_LEN 32
+#define OSDP_RTMAPER_STATUS_MAX_LEN 8
 
+/**
+ * @brief Various PD capability function codes.
+ */
+enum osdp_pd_cap_function_code_e {
+	/**
+	 * @brief Dummy.
+	 */
+	OSDP_PD_CAP_UNUSED,
+
+	/**
+	 * @brief This function indicates the ability to monitor the status of a
+	 * switch using a two-wire electrical connection between the PD and the
+	 * switch. The on/off position of the switch indicates the state of an
+	 * external device.
+	 *
+	 * The PD may simply resolve all circuit states to an open/closed
+	 * status, or it may implement supervision of the monitoring circuit.
+	 * A supervised circuit is able to indicate circuit fault status in
+	 * addition to open/closed status.
+	 */
+	OSDP_PD_CAP_CONTACT_STATUS_MONITORING,
+
+	/**
+	 * @brief This function provides a switched output, typically in the
+	 * form of a relay. The Output has two states: active or inactive. The
+	 * Control Panel (CP) can directly set the Output's state, or, if the PD
+	 * supports timed operations, the CP can specify a time period for the
+	 * activation of the Output.
+	 */
+	OSDP_PD_CAP_OUTPUT_CONTROL,
+
+	/**
+	 * @brief This capability indicates the form of the card data is
+	 * presented to the Control Panel.
+	 */
+	OSDP_PD_CAP_CARD_DATA_FORMAT,
+
+	/**
+	 * @brief This capability indicates the presence of and type of LEDs.
+	 */
+	OSDP_PD_CAP_READER_LED_CONTROL,
+
+	/**
+	 * @brief This capability indicates the presence of and type of an
+	 * Audible Annunciator (buzzer or similar tone generator)
+	 */
+	OSDP_PD_CAP_READER_AUDIBLE_OUTPUT,
+
+	/**
+	 * @brief This capability indicates that the PD supports a text display
+	 * emulating character-based display terminals.
+	 */
+	OSDP_PD_CAP_READER_TEXT_OUTPUT,
+
+	/**
+	 * @brief This capability indicates that the type of date and time
+	 * awareness or time keeping ability of the PD.
+	 */
+	OSDP_PD_CAP_TIME_KEEPING,
+
+	/**
+	 * @brief All PDs must be able to support the checksum mode. This
+	 * capability indicates if the PD is capable of supporting CRC mode.
+	 */
+	OSDP_PD_CAP_CHECK_CHARACTER_SUPPORT,
+
+	/**
+	 * @brief This capability indicates the extent to which the PD supports
+	 * communication security (Secure Channel Communication)
+	 */
+	OSDP_PD_CAP_COMMUNICATION_SECURITY,
+
+	/**
+	 * @brief This capability indicates the maximum size single message the
+	 * PD can receive.
+	 */
+	OSDP_PD_CAP_RECEIVE_BUFFERSIZE,
+
+	/**
+	 * @brief This capability indicates the maximum size multi-part message
+	 * which the PD can handle.
+	 */
+	OSDP_PD_CAP_LARGEST_COMBINED_MESSAGE_SIZE,
+
+	/**
+	 * @brief This capability indicates whether the PD supports the
+	 * transparent mode used for communicating directly with a smart card.
+	 */
+	OSDP_PD_CAP_SMART_CARD_SUPPORT,
+
+	/**
+	 * @brief This capability indicates the number of credential reader
+	 * devices present. Compliance levels are bit fields to be assigned as
+	 * needed.
+	 */
+	OSDP_PD_CAP_READERS,
+
+	/**
+	 * @brief This capability indicates the ability of the reader to handle
+	 * biometric input
+	 */
+	OSDP_PD_CAP_BIOMETRICS,
+
+	/**
+	 * @brief This capability indicates if teh reader is capable of supporting 
+	 * Secure PIN Entry (SPE) 
+	 */
+	OSDP_PD_CAP_SECURE_PIN_ENTRY_SUPPORT,
+
+	/**
+	 * @brief This capability indicates the version of OSDP this PD supports.
+	 */
+	OSDP_PD_CAP_OSDP_VERSION,
+
+	/**
+	 * @brief Capability Sentinel
+	 */
+	OSDP_PD_CAP_SENTINEL
+};
+
+/**
+ * @brief PD capability structure. Each PD capability has a 3 byte
+ * representation.
+ *
+ * @param function_code One of enum osdp_pd_cap_function_code_e.
+ * @param compliance_level A function_code dependent number that indicates what
+ *                         the PD can do with this capability.
+ * @param num_items Number of such capability entities in PD.
+ */
+struct osdp_pd_cap {
+	uint8_t function_code;
+	uint8_t compliance_level;
+	uint8_t num_items;
+};
+
+/**
+ * @brief PD ID information advertised by the PD.
+ *
+ * @param version 3-bytes IEEE assigned OUI
+ * @param model 1-byte Manufacturer's model number
+ * @param vendor_code 1-Byte Manufacturer's version number
+ * @param serial_number 4-byte serial number for the PD
+ * @param firmware_version 3-byte version (major, minor, build)
+ */
+struct osdp_pd_id {
+	int version;
+	int model;
+	uint32_t vendor_code;
+	uint32_t serial_number;
+	uint32_t firmware_version;
+};
+
+/**
+ * @brief PD status.
+ *
+ * @param inputs Inputs status 
+ * @param outputs Outputs status
+ * @param rtampers Connected readers tamper status
+ * @param power Power status
+ * @param tamper Tamper status
+ */
+struct osdp_pd_status {
+	uint32_t inputs;
+	uint32_t outputs;
+	uint16_t rtampers;
+	uint8_t power;
+	uint8_t tamper;
+};
+
+struct osdp_channel {
+	/**
+	 * @brief pointer to a block of memory that will be passed to the
+	 * send/receive method. This is optional and can be left empty.
+	 */
+	void *data;
+
+	/**
+	 * @brief pointer to function that copies received bytes into buffer
+	 * @param data for use by underlying layers. channel_s::data is passed
+	 * @param buf byte array copy incoming data
+	 * @param len sizeof `buf`. Can copy utmost `len` bytes into `buf`
+	 *
+	 * @retval +ve: number of bytes copied on to `bug`. Must be <= `len`
+	 * @retval -ve on errors
+	 */
+	int (*recv)(void *data, uint8_t *buf, int maxlen);
+
+	/**
+	 * @brief pointer to function that sends byte array into some channel
+	 * @param data for use by underlying layers. channel_s::data is passed
+	 * @param buf byte array to be sent
+	 * @param len number of bytes in `buf`
+	 *
+	 * @retval +ve: number of bytes sent. must be <= `len`
+	 * @retval -ve on errors
+	 */
+	int (*send)(void *data, uint8_t *buf, int len);
+
+	/**
+	 * @brief pointer to function that drops all bytes in TX/RX fifo
+	 * @param data for use by underlying layers. channel_s::data is passed
+	 */
+	void (*flush)(void *data);
+};
+
+/**
+ * @brief OSDP PD Information. This struct is used to describe a PD to LibOSDP.
+ *
+ * @param baud_rate Can be one of 9600/19200/38400/115200/230400
+ * @param skip_mark_byte Set to ingonre mark byte in packet
+ * @param address 7 bit PD address. the rest of the bits are ignored. The
+ *        special address 0x7F is used for broadcast. So there can be 2^7-1
+ *        devices on a multi-drop channel
+ * @param id Static information that the PD reports to the CP when it received a
+ *        `CMD_ID`. These information must be populated by a PD appliication.
+ * @param cap This is a pointer to an array of structures containing the PD'
+ *        capabilities. Use { -1, 0, 0 } to terminate the array. This is used
+ *        only PD mode of operation
+ * @param channel Communication channel ops structure, containing send/recv
+ *        function pointers.
+ * @param status Information on reader status
+ * @param scbk Pointer to 16 bytes of Secure Channel Base Key for the PD. If
+ *        non-null, this is used to set-up the secure channel instead of using
+ *        the Master Key (in case of CP).
+ */
+
+struct osdp_cp_info {
+	int connected_readers_num;
+	uint8_t *connected_readers_addresses;
+};
+
+struct osdp_pd_info {
+	uint8_t reader_address; 
+	struct osdp_pd_id *id;
+	struct osdp_pd_cap *cap;
+	struct osdp_pd_status *status; 
+}; 
+
+struct osdp_info {
+	int baud_rate;
+	bool skip_mark_byte;
+	struct osdp_cp_info *cp_cfg;
+	struct osdp_pd_info *pd_cfg;
+	uint8_t *scbk;	
+};
 
 /* ------------------------------- */
 /*         OSDP Commands           */
@@ -246,18 +491,18 @@ struct osdp_cmd {
 /**
  * @brief PD tamper status.
  */
-enum osdp_tamper_status_e {
-	TAMPER_STATUS_NORMAL,
-	TAMPER_STATUS_TAMPER,
-	TAMPER_STATUS_SENTINEL
+enum osdp_tamper_status_e { 
+	TAMPER_STATUS_NORMAL, 
+	TAMPER_STATUS_TAMPER, 
+	TAMPER_STATUS_SENTINEL 
 };
 
 /**
  * @brief PD power status.
  */
-enum osdp_power_status_e {
-	POWER_STATUS_NORMAL,
-	POWER_STATUS_FAILURE,
+enum osdp_power_status_e { 
+	POWER_STATUS_NORMAL, 
+	POWER_STATUS_FAILURE, 
 	POWER_STATUS_SENTINEL
 };
 
@@ -275,10 +520,10 @@ struct osdp_event_local_status {
 /**
  * @brief PD input/output state
  */
-enum osdp_io_status_e {
-	IO_STATUS_INACTIVE,
-	IO_STATUS_ACTIVE,
-	IO_STATUS_SENTINEL	
+enum osdp_io_status_e { 
+	IO_STATUS_INACTIVE, 
+	IO_STATUS_ACTIVE, 
+	IO_STATUS_SENTINEL
 };
 
 /**
@@ -301,7 +546,6 @@ enum osdp_reader_tamper_status_e {
 	RTAMPER_STATUS_TAMPER,
 	RTAMPER_STATUS_SENTINEL
 };
-
 /**
  * @brief PD tamper status of connected readers.
  *
@@ -468,7 +712,7 @@ typedef void (*osdp_command_complete_callback_t)(int id);
  * @retval 0 on success
  * @retval -1 on failure
  */
-int osdp_init(void);
+int osdp_init(const struct osdp_info* info);
 
 /* ------------------------------- */
 /*            PD Methods           */
@@ -516,7 +760,6 @@ int osdp_pd_notify_event(const struct osdp_event *event);
  */
 int osdp_cp_send_command(int pd, struct osdp_cmd *cmd);
 
-
 /**
  * @brief Set callback method for CP event notification. This callback is
  * invoked when the CP receives an event from the PD.
@@ -563,4 +806,4 @@ void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb);
 }
 #endif
 
-#endif	/* _OSDP_H_ */
+#endif /* _OSDP_H_ */

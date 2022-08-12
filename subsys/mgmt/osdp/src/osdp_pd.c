@@ -54,7 +54,15 @@ enum osdp_pd_error_e {
 	OSDP_PD_ERR_IGNORE = -4,
 };
 
-static struct osdp_pd_id osdp_pd_id = {
+struct osdp_pd_status osdp_pd_status = {
+	.inputs = IO_STATUS_INACTIVE,
+	.outputs = IO_STATUS_INACTIVE,
+	.rtampers = RTAMPER_STATUS_NOT_CONNECTED,
+	.power = POWER_STATUS_NORMAL,
+	.tamper = TAMPER_STATUS_NORMAL,
+};
+
+struct osdp_pd_id osdp_pd_id = {
 	.version = CONFIG_OSDP_PD_ID_VERSION,
 	.model = CONFIG_OSDP_PD_ID_MODEL,
 	.vendor_code = CONFIG_OSDP_PD_ID_VENDOR_CODE,
@@ -62,7 +70,7 @@ static struct osdp_pd_id osdp_pd_id = {
 	.firmware_version = CONFIG_OSDP_PD_ID_FIRMWARE_VERSION,
 };
 
-static struct osdp_pd_cap osdp_pd_cap[] = {
+struct osdp_pd_cap osdp_pd_cap[] = {
 	/* Driver Implicit capabilities */
 	{
 		OSDP_PD_CAP_CHECK_CHARACTER_SUPPORT,
@@ -117,6 +125,17 @@ static struct osdp_pd_cap osdp_pd_cap[] = {
 	},
 	{ -1, 0, 0 } /* Sentinel */
 };
+
+static struct osdp_pd_info pd_info = {
+	.reader_address = CONFIG_OSDP_PD_ADDRESS,
+	.id = &osdp_pd_id,
+	.cap = &osdp_pd_cap[0],
+	.status = &osdp_pd_status,
+};
+
+struct osdp_pd_info* pd_get_info() {
+	return &pd_info;
+}
 
 static struct osdp_event *pd_event_alloc(struct osdp_pd *pd)
 {
@@ -1191,7 +1210,7 @@ static void osdp_pd_set_attributes(struct osdp_pd *pd, struct osdp_pd_cap *cap,
 	}
 }
 
-int osdp_setup(struct osdp *ctx, uint8_t *key)
+int osdp_setup(struct osdp *ctx, uint8_t *key, const struct osdp_info *info)
 {
 	struct osdp_pd *pd = osdp_to_pd(ctx, 0);
 
@@ -1200,7 +1219,7 @@ int osdp_setup(struct osdp *ctx, uint8_t *key)
 		return -1;
 	}
 
-	osdp_pd_set_attributes(pd, osdp_pd_cap, &osdp_pd_id);
+	osdp_pd_set_attributes(pd, info->pd_cfg->cap, info->pd_cfg->id);
 	SET_FLAG(pd, PD_FLAG_PD_MODE);
 
 	if (sc_is_enabled(pd)) {
