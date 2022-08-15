@@ -1,6 +1,10 @@
 menu "Programmable IO"
 
-source "drivers/pio/Kconfig.*"
+config PIO
+	bool "pio"
+	default y
+
+source "drivers/pio/Kconfig.rpi_pico"
 
 endmenu
 
