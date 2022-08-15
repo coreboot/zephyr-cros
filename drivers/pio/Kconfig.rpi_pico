@@ -1,0 +1,4 @@
+
+config PIO_RPI_PICO
+	default y
+	bool "Pico Pio"

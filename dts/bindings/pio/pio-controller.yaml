@@ -1,0 +1,8 @@
+# Copyright (c) 2021, Yonatan Schachter
+# SPDX-License-Identifier: Apache-2.0
+
+description: Raspberry Pi Pico PIO
+
+compatible: "pio-controller"
+
+include: base.yaml

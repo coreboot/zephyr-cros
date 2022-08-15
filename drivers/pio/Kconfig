@@ -1,0 +1,6 @@
+menu "Programmable IO"
+
+source "drivers/pio/Kconfig.*"
+
+endmenu
+
