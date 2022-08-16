@@ -107,7 +107,7 @@ extern "C" {
 #define ESP_MODE_AP		2
 #define ESP_MODE_STA_AP		3
 
-#if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7)
+#if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7) || defined(CONFIG_WIFI_ESP_AT_VERSION_2_0)
 #define ESP_CMD_CWMODE(mode) "AT+"_CWMODE"="STRINGIFY(_CONCAT(ESP_MODE_, mode))
 #else
 #define ESP_CMD_CWMODE(mode) "AT+"_CWMODE"="STRINGIFY(_CONCAT(ESP_MODE_, mode))",0"
@@ -250,6 +250,7 @@ struct esp_data {
 	struct k_work_delayable ip_addr_work;
 	struct k_work scan_work;
 	struct k_work connect_work;
+	struct k_work disconnect_work;
 	struct k_work mode_switch_work;
 	struct k_work dns_work;
 

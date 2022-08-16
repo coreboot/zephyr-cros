@@ -94,6 +94,8 @@ extern "C" {
 enum bt_iso_state {
 	/** Channel disconnected */
 	BT_ISO_STATE_DISCONNECTED,
+	/** Channel is pending ACL encryption before connecting */
+	BT_ISO_STATE_ENCRYPT_PENDING,
 	/** Channel in connecting state */
 	BT_ISO_STATE_CONNECTING,
 	/** Channel ready for upper layer traffic on it */
@@ -119,7 +121,16 @@ struct bt_iso_chan {
 	/** Channel QoS reference */
 	struct bt_iso_chan_qos		*qos;
 	enum bt_iso_state		state;
+#if defined(CONFIG_BT_SMP)
+	/** @brief The required security level of the channel
+	 *
+	 * This value can be set as the central before connecting a CIS
+	 * with bt_iso_chan_connect().
+	 * The value is overwritten to @ref bt_iso_server::sec_level for the
+	 * peripheral once a channel has been accepted.
+	 */
 	bt_security_t			required_sec_level;
+#endif /* CONFIG_BT_SMP */
 	/** Node used internally by the stack */
 	sys_snode_t node;
 };
@@ -435,7 +446,7 @@ struct bt_iso_chan_ops {
 	 *
 	 *  If this callback is provided it will be called whenever the
 	 *  channel is disconnected, including when a connection gets
-	 *  rejected.
+	 *  rejected or when setting security fails.
 	 *
 	 *  @param chan   The channel that has been Disconnected
 	 *  @param reason BT_HCI_ERR_* reason for the disconnection.
@@ -494,8 +505,10 @@ struct bt_iso_accept_info {
 
 /** @brief ISO Server structure. */
 struct bt_iso_server {
+#if defined(CONFIG_BT_SMP)
 	/** Required minimum security level */
 	bt_security_t		sec_level;
+#endif /* CONFIG_BT_SMP */
 
 	/** @brief Server accept callback
 	 *
@@ -702,6 +715,22 @@ struct bt_iso_info {
 
 	/** The maximum number of subevents in each ISO event */
 	uint8_t  max_subevent;
+
+	/**
+	 * @brief True if the channel is able to send data
+	 *
+	 * This is always true when @p type is BT_ISO_CHAN_TYPE_BROADCASTER,
+	 * and never true when @p type is BT_ISO_CHAN_TYPE_SYNC_RECEIVER.
+	 */
+	bool can_send;
+
+	/**
+	 * @brief True if the channel is able to recv data
+	 *
+	 * This is always true when @p type is BT_ISO_CHAN_TYPE_SYNC_RECEIVER,
+	 * and never true when @p type is BT_ISO_CHAN_TYPE_BROADCASTER.
+	 */
+	bool can_recv;
 
 	/** Connection Type specific Info.*/
 	union {

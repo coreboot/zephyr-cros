@@ -4,10 +4,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <soc.h>
 #include <zephyr/arch/arm64/arm_mmu.h>
-
-#define SZ_1K	1024
+#include <zephyr/devicetree.h>
+#include <zephyr/sys/util.h>
 
 static const struct arm_mmu_region mmu_regions[] = {
 

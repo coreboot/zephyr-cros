@@ -77,8 +77,6 @@ uint32_t lpuartdiv_calc(const uint64_t clock_rate, const uint32_t baud_rate)
 #endif /* USART_PRESC_PRESCALER */
 #endif /* HAS_LPUART_1 */
 
-#define TIMEOUT 1000
-
 #ifdef CONFIG_PM
 static void uart_stm32_pm_policy_state_lock_get(const struct device *dev)
 {
@@ -1639,6 +1637,18 @@ static int uart_stm32_init(const struct device *dev)
 	}
 #endif
 
+#ifdef LL_USART_RXPIN_LEVEL_INVERTED
+	if (config->rx_invert) {
+		LL_USART_SetRXPinLevel(config->usart, LL_USART_RXPIN_LEVEL_INVERTED);
+	}
+#endif
+
+#ifdef LL_USART_TXPIN_LEVEL_INVERTED
+	if (config->tx_invert) {
+		LL_USART_SetTXPinLevel(config->usart, LL_USART_TXPIN_LEVEL_INVERTED);
+	}
+#endif
+
 	LL_USART_Enable(config->usart);
 
 #ifdef USART_ISR_TEACK
@@ -1751,6 +1761,8 @@ static const struct uart_stm32_config uart_stm32_cfg_##index = {	\
 	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(index),			\
 	.single_wire = DT_INST_PROP_OR(index, single_wire, false),	\
 	.tx_rx_swap = DT_INST_PROP_OR(index, tx_rx_swap, false),	\
+	.rx_invert = DT_INST_PROP(index, rx_invert),	\
+	.tx_invert = DT_INST_PROP(index, tx_invert),	\
 	STM32_UART_IRQ_HANDLER_FUNC(index)				\
 };									\
 									\

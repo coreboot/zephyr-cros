@@ -45,7 +45,7 @@ manifest:
       groups:
         - tools
     - name: fatfs
-      revision: 9237454a30bcf6e14a89db174e8dbeb8f31831d2
+      revision: a30531af3a95a9a3ea7d771ea8a578ebfed45514
       path: modules/fs/fatfs
       groups:
         - fs
@@ -64,13 +64,8 @@ manifest:
       path: modules/hal/atmel
       groups:
         - hal
-    - name: hal_cypress
-      revision: 81a059f21435bc7e315bccd720da5a9b615bbb50
-      path: modules/hal/cypress
-      groups:
-        - hal
     - name: hal_espressif
-      revision: 83d01afcea5ac1a6c1f7c06dadbdc9ca5ee9ee09
+      revision: df85671c5d0405c0747c2939c8dfe808b7e4cf38
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -81,7 +76,7 @@ manifest:
       groups:
         - hal
     - name: hal_infineon
-      revision: f1fa8241f8786198ba41155413243de36ed878a5
+      revision: 4af06965f57ba1e7d170e6a97d24c33785543a8c
       path: modules/hal/infineon
       groups:
         - hal
@@ -132,13 +127,14 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 6253094a4147cbd30d2b466c975eb4013ac6be90
+      revision: 51b373cd3455b8c2b9babbf6ff41918116a442ac
       path: modules/hal/stm32
       groups:
         - hal
     - name: hal_telink
-      revision: ffcfd6282aa213f1dc0848dbca6279b098f6b143
+      revision: d7b72519dc5288487e6eedf39c08c3b12ce307ff
       path: modules/hal/telink
+      submodules: true
       groups:
         - hal
     - name: hal_ti
@@ -163,23 +159,23 @@ manifest:
       path: modules/fs/littlefs
       groups:
         - fs
-      revision: 7b2cf4ba759bd530b543644e2790b07cf20cd6aa
+      revision: 652f2c5646e79b881e6f3099686ad3b7af9e216c
     - name: loramac-node
       revision: 12019623bbad9eb54fe51066847a7cbd4b4eac57
       path: modules/lib/loramac-node
     - name: lvgl
-      revision: 9955c3e1e4f361884e938dc016da5a715a4527fe
+      revision: df717ac87a9fd80246cc8df24554475e59bda21f
       path: modules/lib/gui/lvgl
     - name: lz4
       revision: 8e303c264fc21c2116dc612658003a22e933124d
       path: modules/lib/lz4
     - name: mbedtls
-      revision: 3e3e58a92de76069730c63e0d524f40fea948a61
+      revision: 7fed49c9b9f983ad6416986661ef637459723bcb
       path: modules/crypto/mbedtls
       groups:
         - crypto
     - name: mcuboot
-      revision: e86f575f68fdac2cab1898e0a893c8c6d8fd0fa1
+      revision: e7415b555134e671ba04f036b02f55cbc087d0e9
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -201,7 +197,7 @@ manifest:
       revision: 8d53544871e1f300c478224faca6be8384ab0d04
       path: modules/lib/open-amp
     - name: openthread
-      revision: d4d46ba94290bcf93cc849b832f0ad305c72c473
+      revision: e2a765599aa0379d0f72f0149a9cbafec070c12d
       path: modules/lib/openthread
     - name: segger
       revision: 3a52ab222133193802d3c3b4d21730b9b1f1d2f6
@@ -229,17 +225,17 @@ manifest:
       groups:
         - debug
     - name: trusted-firmware-m
-      revision: bfbd7803b0ed77680e220e44ce6fb363ef2a4224
+      revision: 7c53a6e76130a85303f83b15d868a92fdcd5f5be
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee
     - name: tf-m-tests
-      revision: 52814181f0fde6d1422fac204d42cde30c62e40e
+      revision: c99a86b295c4887520da9d8402566d7f225c974e
       path: modules/tee/tf-m/tf-m-tests
       groups:
         - tee
     - name: psa-arch-tests
-      revision: 4f45df539d3d98b6e38e112be9936be4a2b8a97c
+      revision: a81f9da287569f169d60026916952641b233faa8
       path: modules/tee/tf-m/psa-arch-tests
       groups:
         - tee
@@ -248,7 +244,7 @@ manifest:
       path: modules/lib/zcbor
     - name: zscilib
       path: modules/lib/zscilib
-      revision: 12bfe3f0a9fcbfe3edab7eabc9678b6c62875d34
+      revision: fc979a8dcb74169c69b02835927bff8f070d6325
 
   group-filter:
     - -ci
