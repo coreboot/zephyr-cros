@@ -202,6 +202,11 @@ static int spi_mcux_configure(const struct device *dev,
 
 		SPI_MasterGetDefaultConfig(&master_config);
 
+		if (!device_is_ready(config->clock_dev)) {
+			LOG_ERR("clock control device not ready");
+			return -ENODEV;
+		}
+
 		/* Get the clock frequency */
 		if (clock_control_get_rate(config->clock_dev,
 					   config->clock_subsys, &clock_freq)) {
@@ -284,6 +289,8 @@ static int spi_mcux_configure(const struct device *dev,
 
 		SPI_SlaveTransferCreateHandle(base, &data->handle,
 					      spi_mcux_transfer_callback, data);
+
+		data->ctx.config = spi_cfg;
 	}
 
 	return 0;
