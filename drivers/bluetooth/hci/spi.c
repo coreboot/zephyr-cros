@@ -13,6 +13,7 @@
 #include <zephyr/drivers/spi.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/pm/device_runtime.h>
 
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/drivers/bluetooth/hci_driver.h>
@@ -289,6 +290,9 @@ static void bt_spi_rx_thread(void)
 		gpio_pin_interrupt_configure_dt(&irq_gpio, GPIO_INT_DISABLE);
 		k_sem_take(&sem_busy, K_FOREVER);
 
+		/* Power up SPI bus */
+		pm_device_runtime_get(spi_dev);
+
 		BT_DBG("");
 
 		do {
@@ -375,6 +379,9 @@ static void bt_spi_rx_thread(void)
 		/* On BlueNRG-MS, host is expected to read */
 		/* as long as IRQ pin is high */
 		} while (irq_pin_high());
+		
+		/* Power down SPI bus */
+		pm_device_runtime_put(spi_dev);
 	}
 }
 
@@ -416,6 +423,9 @@ static int bt_spi_send(struct net_buf *buf)
 		return -EINVAL;
 	}
 
+	/* Power up SPI bus */
+	pm_device_runtime_get(spi_dev);
+
 	/* Poll sanity values until device has woken-up */
 	do {
 		kick_cs();
@@ -439,6 +449,8 @@ static int bt_spi_send(struct net_buf *buf)
 
 	release_cs();
 
+	/* Power down SPI bus */
+	pm_device_runtime_put(spi_dev);
 	k_sem_give(&sem_busy);
 
 	if (ret) {
