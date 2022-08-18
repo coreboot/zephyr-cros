@@ -34,14 +34,14 @@ uint16_t osdp_compute_crc16(const uint8_t *buf, size_t len)
 
 int64_t osdp_millis_now(void)
 {
-	return (int64_t) k_uptime_get();
+	return (int64_t)k_uptime_get();
 }
 
 int64_t osdp_millis_since(int64_t last)
 {
 	int64_t tmp = last;
 
-	return (int64_t) k_uptime_delta(&tmp);
+	return (int64_t)k_uptime_delta(&tmp);
 }
 
 void osdp_keyset_complete(struct osdp_pd *pd)
@@ -54,16 +54,9 @@ void osdp_keyset_complete(struct osdp_pd *pd)
 void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 {
 	const struct device *dev;
-	struct cipher_ctx ctx = {
-		.keylen = 16,
-		.key.bit_stream = key,
-		.flags = CAP_NO_IV_PREFIX
-	};
+	struct cipher_ctx ctx = { .keylen = 16, .key.bit_stream = key, .flags = CAP_NO_IV_PREFIX };
 	struct cipher_pkt encrypt = {
-		.in_buf = data,
-		.in_len = len,
-		.out_buf = data,
-		.out_len = len
+		.in_buf = data, .in_len = len, .out_buf = data, .out_len = len
 	};
 
 	dev = device_get_binding(CONFIG_OSDP_CRYPTO_DRV_NAME);
@@ -73,9 +66,7 @@ void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 	}
 
 	if (iv != NULL) {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_CBC,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_CBC,
 					 CRYPTO_CIPHER_OP_ENCRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -84,9 +75,7 @@ void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 			LOG_ERR("CBC ENCRYPT - Failed");
 		}
 	} else {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_ECB,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_ECB,
 					 CRYPTO_CIPHER_OP_ENCRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -101,16 +90,9 @@ void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 {
 	const struct device *dev;
-	struct cipher_ctx ctx = {
-		.keylen = 16,
-		.key.bit_stream = key,
-		.flags = CAP_NO_IV_PREFIX
-	};
+	struct cipher_ctx ctx = { .keylen = 16, .key.bit_stream = key, .flags = CAP_NO_IV_PREFIX };
 	struct cipher_pkt decrypt = {
-		.in_buf = data,
-		.in_len = len,
-		.out_buf = data,
-		.out_len = len
+		.in_buf = data, .in_len = len, .out_buf = data, .out_len = len
 	};
 
 	dev = device_get_binding(CONFIG_OSDP_CRYPTO_DRV_NAME);
@@ -120,9 +102,7 @@ void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 	}
 
 	if (iv != NULL) {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_CBC,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_CBC,
 					 CRYPTO_CIPHER_OP_DECRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -131,9 +111,7 @@ void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 			LOG_ERR("CBC DECRYPT - Failed");
 		}
 	} else {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_ECB,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_ECB,
 					 CRYPTO_CIPHER_OP_DECRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -188,8 +166,7 @@ void osdp_get_status_mask(uint8_t *bitmask)
 			*mask = 0;
 		}
 		pd = osdp_to_pd(ctx, i);
-		if (ISSET_FLAG(pd, PD_FLAG_PD_MODE) ||
-		    pd->state == OSDP_CP_STATE_ONLINE) {
+		if (ISSET_FLAG(pd, PD_FLAG_PD_MODE) || pd->state == OSDP_CP_STATE_ONLINE) {
 			*mask |= 1 << pos;
 		}
 	}
@@ -200,4 +177,10 @@ void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb)
 	struct osdp *ctx = osdp_get_ctx();
 
 	ctx->command_complete_callback = cb;
+}
+
+bool osdp_is_valid_baudrate(int baud_rate)
+{
+	return (baud_rate != 9600 && baud_rate != 19200 && baud_rate != 38400 && baud_rate != 57600 &&
+	    baud_rate != 115200 && baud_rate != 230400);
 }

@@ -168,6 +168,13 @@ static struct osdp *osdp_build_ctx(struct osdp_channel *channel)
 	pd_address = osdp_info.cp_cfg->connected_readers_addresses;
 #endif
 
+	/* Validate PD addresses */
+	for (i = 0; i < num_pd; i++) {
+		if (!osdp_is_valid_pd_address(pd_address[i])) {
+			return NULL;
+		}
+	} 
+
 	ctx = &osdp_ctx;
 	ctx->num_pd = num_pd;
 	ctx->pd = &osdp_pd_ctx[0];
@@ -238,6 +245,11 @@ static int osdp_configure_device(struct osdp_device *p)
 	}
 
 	/* configure uart device to 8N1 */
+
+	if (!osdp_is_valid_baudrate(osdp_info.baud_rate)) {
+		return EINVAL;
+	}
+
 	p->dev_config.baudrate = osdp_info.baud_rate;
 	p->dev_config.data_bits = UART_CFG_DATA_BITS_8;
 	p->dev_config.parity = UART_CFG_PARITY_NONE;

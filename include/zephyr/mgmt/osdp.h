@@ -127,7 +127,7 @@ enum osdp_pd_cap_function_code_e {
 	OSDP_PD_CAP_BIOMETRICS,
 
 	/**
-	 * @brief This capability indicates if teh reader is capable of supporting 
+	 * @brief This capability indicates if the reader is capable of supporting 
 	 * Secure PIN Entry (SPE) 
 	 */
 	OSDP_PD_CAP_SECURE_PIN_ENTRY_SUPPORT,

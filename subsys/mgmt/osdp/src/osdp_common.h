@@ -458,6 +458,12 @@ static inline void sc_deactivate(struct osdp_pd *pd)
 	CLEAR_FLAG(pd, PD_FLAG_SC_ACTIVE);
 }
 
+bool osdp_is_valid_baudrate(int baud_rate);
+
+inline bool osdp_is_valid_pd_address(uint8_t address)
+{
+	return (address < 0x7F);
+}
 
 
 #endif	/* _OSDP_COMMON_H_ */
