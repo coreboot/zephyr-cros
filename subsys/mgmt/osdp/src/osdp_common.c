@@ -181,6 +181,6 @@ void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb)
 
 bool osdp_is_valid_baudrate(int baud_rate)
 {
-	return (baud_rate != 9600 && baud_rate != 19200 && baud_rate != 38400 && baud_rate != 57600 &&
-	    baud_rate != 115200 && baud_rate != 230400);
+	return (baud_rate == 9600 || baud_rate == 19200 || baud_rate == 38400 || baud_rate == 57600 ||
+	    baud_rate == 115200 || baud_rate == 230400);
 }
