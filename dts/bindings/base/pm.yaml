@@ -36,3 +36,10 @@ properties:
         will be automatically transitioned to the lowest power mode possible.
         For devices on a power-domain, this will be PM_DEVICE_STATE_OFF, otherwise
         PM_DEVICE_STATE_SUSPENDED.
+
+    pm-device-runtime-auto-active:
+      required: false
+      type: boolean
+      description: |
+        Automatically request the device to be in active mode through
+        `pm_device_runtime_get` after enabling runtime power management.
