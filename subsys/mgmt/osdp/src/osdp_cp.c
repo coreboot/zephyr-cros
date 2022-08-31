@@ -1088,18 +1088,18 @@ void osdp_update(struct osdp *ctx)
 	}
 }
 
-int osdp_setup(struct osdp *ctx, uint8_t *key, const struct osdp_info *info)
+int osdp_setup(struct osdp *ctx, const struct osdp_info *info)
 {
 	ARG_UNUSED(key);
 	struct osdp_pd *pd = osdp_to_pd(ctx, 0);
 
-	if (sc_is_enabled(pd) && key == NULL) {
+	if (sc_is_enabled(pd) && info->key == NULL) {
 		LOG_ERR("Master key cannot be null");
 		return -1;
 	}
 
-	if (key) {
-		memcpy(ctx->sc_master_key, key, 16);
+	if (info->key) {
+		memcpy(ctx->sc_master_key, info->key, 16);
 	}
 	return 0;
 }

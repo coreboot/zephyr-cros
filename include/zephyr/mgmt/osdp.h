@@ -22,6 +22,10 @@ extern "C" {
 #define OSDP_EVENT_MAX_DATALEN 64
 #define OSDP_IO_STATUS_MAX_LEN 32
 #define OSDP_RTMAPER_STATUS_MAX_LEN 8
+#define OSDP_CMD_CHLNG_RND_NUM_LEN 8
+#define OSDP_CMD_SCRYPT_CRYPT_LEN 16
+#define OSDP_EVENT_CCRYPT_DATA_LEN 24
+#define OSDP_EVENT_R_MACI_DATA_LEN 16
 
 /**
  * @brief Various PD capability function codes.
@@ -255,18 +259,18 @@ struct osdp_cp_info {
 };
 
 struct osdp_pd_info {
-	uint8_t reader_address; 
+	uint8_t reader_address;
 	struct osdp_pd_id *id;
 	struct osdp_pd_cap *cap;
-	struct osdp_pd_status *status; 
-}; 
+	struct osdp_pd_status *status;
+};
 
 struct osdp_info {
 	int baud_rate;
 	bool skip_mark_byte;
 	struct osdp_cp_info *cp_cfg;
 	struct osdp_pd_info *pd_cfg;
-	uint8_t *scbk;	
+	uint8_t *key;
 };
 
 /* ------------------------------- */
@@ -417,6 +421,26 @@ struct osdp_cmd_keyset {
 };
 
 /**
+ * @brief This command delivers a random challenge to the PD and it requests 
+ * the PD to initialize for the secure session.
+ *
+ * @param random_number Random number genrated by the ACU (RND.A)
+ */
+struct osdp_cmd_chlng {
+	uint8_t random_number[OSDP_CMD_CHLNG_RND_NUM_LEN];
+};
+
+/**
+ * @brief This command transfers a blovk of data used for encryption 
+ * synchronization 
+ *
+ * @param crypotogram 16-byte Server Cryptogram array
+ */
+struct osdp_cmd_scrypt {
+	uint8_t crypotogram[OSDP_CMD_SCRYPT_CRYPT_LEN];
+};
+
+/**
  * @brief Manufacturer Specific Commands
  *
  * @param vendor_code 3-byte IEEE assigned OUI. Most Significat 8-bits are
@@ -449,6 +473,8 @@ enum osdp_cmd_e {
 	OSDP_CMD_LED,
 	OSDP_CMD_BUZZER,
 	OSDP_CMD_TEXT,
+	OSDP_CMD_CHLNG,
+	OSDP_CMD_SCRYPT,
 	OSDP_CMD_KEYSET,
 	OSDP_CMD_COMSET,
 	OSDP_CMD_MFG,
@@ -479,8 +505,11 @@ struct osdp_cmd {
 		struct osdp_cmd_output output;
 		struct osdp_cmd_comset comset;
 		struct osdp_cmd_keyset keyset;
+		struct osdp_cmd_chlng chlng;
+		struct osdp_cmd_scrypt scrypt;
 		struct osdp_cmd_mfg mfg;
 		struct osdp_cmd_acurxsize acurxsize;
+		uint8_t data[0];
 	};
 };
 
@@ -712,7 +741,7 @@ typedef void (*osdp_command_complete_callback_t)(int id);
  * @retval 0 on success
  * @retval -1 on failure
  */
-int osdp_init(const struct osdp_info* info);
+int osdp_init(const struct osdp_info *info);
 
 /* ------------------------------- */
 /*            PD Methods           */

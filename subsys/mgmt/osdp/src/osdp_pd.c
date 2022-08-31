@@ -661,19 +661,36 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			pd->ephemeral_data[0] = OSDP_PD_NAK_SC_UNSUP;
 			break;
 		}
-		if (len != CMD_CHLNG_DATA_LEN) {
+		if (len != CMD_CHLNG_DATA_LEN || !pd->command_callback) {
 			break;
 		}
+		cmd.id = OSDP_CMD_CHLNG;
+		memcpy(cmd.chlng.random_number, &buf[pos], 8U);
+		ret = pd->command_callback(pd->command_callback_arg, &cmd);
+		if (ret < 0) {
+			pd->reply_id = REPLY_NAK;
+			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
+			ret = OSDP_PD_ERR_REPLY;
+			break;
+		}
+		// TODO: we should be unique if we want app / module to establish secure channel
 		sc_deactivate(pd);
-		osdp_sc_setup(pd);
-		for (i = 0; i < CMD_CHLNG_DATA_LEN; i++) {
-			pd->sc.cp_random[i] = buf[pos++];
+		if (ret > 0) {
+			// use data provided by app
+
+			memcpy(pd->ephemeral_data, &cmd, sizeof(struct osdp_cmd));
+		} else {
+			// use internal module data
+			((struct osdp_cmd *)pd->ephemeral_data)->id = OSDP_CMD_SENTINEL;
+			for (i = 0; i < CMD_CHLNG_DATA_LEN; i++) {
+				pd->sc.cp_random[i] = buf[pos++];
+			}
 		}
 		pd->reply_id = REPLY_CCRYPT;
 		ret = OSDP_PD_ERR_NONE;
 		break;
 	case CMD_SCRYPT:
-		if (len != CMD_SCRYPT_DATA_LEN) {
+		if (len != CMD_SCRYPT_DATA_LEN || !pd->command_callback) {
 			break;
 		}
 		if (!pd_cmd_cap_ok(pd, NULL)) {
@@ -686,8 +703,22 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			LOG_WRN("Out of order CMD_SCRYPT; has CP gone rogue?");
 			break;
 		}
-		for (i = 0; i < CMD_SCRYPT_DATA_LEN; i++) {
-			pd->sc.cp_cryptogram[i] = buf[pos++];
+		cmd.id = OSDP_CMD_SCRYPT;
+		memcpy(cmd.scrypt.crypotogram, &buf[pos], 16U);
+		ret = pd->command_callback(pd->command_callback_arg, &cmd);
+		if (ret < 0) {
+			pd->reply_id = REPLY_NAK;
+			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
+			ret = OSDP_PD_ERR_REPLY;
+			break;
+		}
+		if (ret > 0) {
+			memcpy(pd->ephemeral_data, &cmd, sizeof(struct osdp_cmd));
+		} else {
+			((struct osdp_cmd *)pd->ephemeral_data)->id = OSDP_CMD_SENTINEL;
+			for (i = 0; i < CMD_SCRYPT_DATA_LEN; i++) {
+				pd->sc.cp_cryptogram[i] = buf[pos++];
+			}
 		}
 		pd->reply_id = REPLY_RMAC_I;
 		ret = OSDP_PD_ERR_NONE;
@@ -900,18 +931,24 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 			break;
 		}
 		assert_len(REPLY_CCRYPT_LEN, max_len);
-		osdp_fill_random(pd->sc.pd_random, 8);
-		osdp_compute_session_keys(pd);
-		osdp_compute_pd_cryptogram(pd);
 		buf[len++] = pd->reply_id;
-		for (i = 0; i < 8; i++) {
-			buf[len++] = pd->sc.pd_client_uid[i];
-		}
-		for (i = 0; i < 8; i++) {
-			buf[len++] = pd->sc.pd_random[i];
-		}
-		for (i = 0; i < 16; i++) {
-			buf[len++] = pd->sc.pd_cryptogram[i];
+		cmd = (struct osdp_cmd *)pd->ephemeral_data;
+		if (cmd->id == OSDP_CMD_CHLNG) {
+			memcpy(&buf[len], cmd->data, 32U);
+			len += 32U;
+		} else {
+			osdp_fill_random(pd->sc.pd_random, 8);
+			osdp_compute_session_keys(pd);
+			osdp_compute_pd_cryptogram(pd);
+			for (i = 0; i < 8; i++) {
+				buf[len++] = pd->sc.pd_client_uid[i];
+			}
+			for (i = 0; i < 8; i++) {
+				buf[len++] = pd->sc.pd_random[i];
+			}
+			for (i = 0; i < 16; i++) {
+				buf[len++] = pd->sc.pd_cryptogram[i];
+			}
 		}
 		smb[0] = 3; /* length */
 		smb[1] = SCS_12; /* type */
@@ -923,25 +960,34 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 			break;
 		}
 		assert_len(REPLY_RMAC_I_LEN, max_len);
-		osdp_compute_rmac_i(pd);
 		buf[len++] = pd->reply_id;
-		for (i = 0; i < 16; i++) {
-			buf[len++] = pd->sc.r_mac[i];
-		}
 		smb[0] = 3; /* length */
 		smb[1] = SCS_14; /* type */
-		if (osdp_verify_cp_cryptogram(pd) == 0) {
+		cmd = (struct osdp_cmd *)pd->ephemeral_data;
+		if (cmd->id == OSDP_CMD_SCRYPT) {
+			memcpy(&buf[len], cmd->data, 16U);
+			len += 16U;
 			smb[2] = 1; /* CP auth succeeded */
 			sc_activate(pd);
-			pd->sc_tstamp = osdp_millis_now();
-			if (ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD)) {
-				LOG_WRN("SC Active with SCBK-D");
-			} else {
-				LOG_INF("SC Active");
-			}
+			LOG_INF("SC Active - APP");
 		} else {
-			smb[2] = 0; /* CP auth failed */
-			LOG_WRN("failed to verify CP_crypt");
+			osdp_compute_rmac_i(pd);
+			for (i = 0; i < 16; i++) {
+				buf[len++] = pd->sc.r_mac[i];
+			}
+			if (osdp_verify_cp_cryptogram(pd) == 0) {
+				smb[2] = 1; /* CP auth succeeded */
+				sc_activate(pd);
+				pd->sc_tstamp = osdp_millis_now();
+				if (ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD)) {
+					LOG_WRN("SC Active with SCBK-D");
+				} else {
+					LOG_INF("SC Active");
+				}
+			} else {
+				smb[2] = 0; /* CP auth failed */
+				LOG_WRN("failed to verify CP_crypt");
+			}
 		}
 		ret = OSDP_PD_ERR_NONE;
 		break;
@@ -1194,7 +1240,7 @@ static void osdp_pd_set_attributes(struct osdp_pd *pd, struct osdp_pd_cap *cap,
 	}
 }
 
-int osdp_setup(struct osdp *ctx, uint8_t *key, const struct osdp_info *info)
+int osdp_setup(struct osdp *ctx, const struct osdp_info *info)
 {
 	struct osdp_pd *pd = osdp_to_pd(ctx, 0);
 
@@ -1207,11 +1253,11 @@ int osdp_setup(struct osdp *ctx, uint8_t *key, const struct osdp_info *info)
 	SET_FLAG(pd, PD_FLAG_PD_MODE);
 
 	if (sc_is_enabled(pd)) {
-		if (key == NULL) {
+		if (info->key == NULL) {
 			LOG_WRN("SCBK not provided. PD is in INSTALL_MODE");
 			SET_FLAG(pd, PD_FLAG_INSTALL_MODE);
 		} else {
-			memcpy(pd->sc.scbk, key, 16);
+			memcpy(pd->sc.scbk, info->key, 16);
 		}
 		SET_FLAG(pd, PD_FLAG_SC_CAPABLE);
 	}

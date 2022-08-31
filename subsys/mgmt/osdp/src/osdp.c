@@ -173,7 +173,7 @@ static struct osdp *osdp_build_ctx(struct osdp_channel *channel)
 		if (!osdp_is_valid_pd_address(pd_address[i])) {
 			return NULL;
 		}
-	} 
+	}
 
 	ctx = &osdp_ctx;
 	ctx->num_pd = num_pd;
@@ -275,10 +275,29 @@ static int osdp_configure_device(struct osdp_device *p)
 	return 0;
 }
 
+static uint8_t *osdp_get_key(uint8_t *key_buf)
+{
+	uint8_t len;
+	if (IS_ENABLED(CONFIG_OSDP_SC_ENABLED)) {
+		if (strcmp(OSDP_KEY_STRING, "NONE") != 0) {
+			len = strlen(OSDP_KEY_STRING);
+			if (len != 32) {
+				LOG_ERR("Key string length must be 32");
+				k_panic();
+			}
+			len = hex2bin(OSDP_KEY_STRING, 32, key_buf, 16);
+			if (len != 16) {
+				LOG_ERR("Failed to parse key buffer");
+				k_panic();
+			}
+			return key_buf;
+		}
+	}
+	return NULL;
+}
+
 static int osdp_init_internal()
 {
-	int len;
-	uint8_t *key = NULL, key_buf[16];
 	struct osdp *ctx;
 
 	struct osdp_channel channel = {
@@ -301,23 +320,7 @@ static int osdp_init_internal()
 		k_panic();
 	}
 
-	if (IS_ENABLED(CONFIG_OSDP_SC_ENABLED)) {
-		if (strcmp(OSDP_KEY_STRING, "NONE") != 0) {
-			len = strlen(OSDP_KEY_STRING);
-			if (len != 32) {
-				LOG_ERR("Key string length must be 32");
-				k_panic();
-			}
-			len = hex2bin(OSDP_KEY_STRING, 32, key_buf, 16);
-			if (len != 16) {
-				LOG_ERR("Failed to parse key buffer");
-				k_panic();
-			}
-			key = key_buf;
-		}
-	}
-
-	if (osdp_setup(ctx, key, &osdp_info)) {
+	if (osdp_setup(ctx, &osdp_info)) {
 		LOG_ERR("Failed to setup OSDP device!");
 		k_panic();
 	}
@@ -335,6 +338,8 @@ int osdp_init(const struct osdp_info *info)
 	if (info) {
 		memcpy(&osdp_info, info, sizeof(struct osdp_info));
 	} else {
+		uint8_t key_buf[16];
+		osdp_info.key = osdp_get_key(key_buf);
 #ifdef CONFIG_OSDP_MODE_PD
 		osdp_info.pd_cfg = pd_get_info();
 #else
