@@ -80,6 +80,8 @@ source "drivers/sensor/dht/Kconfig"
 
 source "drivers/sensor/dps310/Kconfig"
 
+source "drivers/sensor/ds18b20/Kconfig"
+
 source "drivers/sensor/ens210/Kconfig"
 
 source "drivers/sensor/fdc2x1x/Kconfig"
@@ -216,6 +218,8 @@ source "drivers/sensor/sm351lt/Kconfig"
 
 source "drivers/sensor/stm32_temp/Kconfig"
 
+source "drivers/sensor/stm32_vbat/Kconfig"
+
 source "drivers/sensor/stts751/Kconfig"
 
 source "drivers/sensor/sx9500/Kconfig"
@@ -247,5 +251,7 @@ source "drivers/sensor/nuvoton_adc_cmp_npcx/Kconfig"
 source "drivers/sensor/ite_tach_it8xxx2/Kconfig"
 
 source "drivers/sensor/ite_vcmp_it8xxx2/Kconfig"
+
+source "drivers/sensor/pcnt_esp32/Kconfig"
 
 endif # SENSOR

@@ -82,12 +82,10 @@ __syscall void log_panic(void);
 /**
  * @brief Process one pending log message.
  *
- * @param bypass If true message is released without being processed.
- *
  * @retval true There is more messages pending to be processed.
  * @retval false No messages pending.
  */
-__syscall bool log_process(bool bypass);
+__syscall bool log_process(void);
 
 /**
  * @brief Return number of buffered log messages.
@@ -121,6 +119,15 @@ const char *log_source_name_get(uint32_t domain_id, uint32_t source_id);
  * @return Domain name.
  */
 const char *log_domain_name_get(uint32_t domain_id);
+
+/**
+ * @brief Function for finding source ID based on source name.
+ *
+ * @param name Source name
+ *
+ * @return Source ID or negative number when source ID is not found.
+ */
+int log_source_id_get(const char *name);
 
 /**
  * @brief Get source filter for the provided backend.
@@ -218,12 +225,7 @@ uint32_t log_get_strdup_longest_string(void);
  */
 static inline bool log_data_pending(void)
 {
-	if (IS_ENABLED(CONFIG_LOG_MODE_DEFERRED)) {
-		return IS_ENABLED(CONFIG_LOG2) ?
-			z_log_msg2_pending() : (log_msg_mem_get_used() > 0);
-	}
-
-	return false;
+	return IS_ENABLED(CONFIG_LOG_MODE_DEFERRED) ? z_log_msg_pending() : false;
 }
 
 /**
@@ -271,7 +273,7 @@ int log_mem_get_max_usage(uint32_t *max);
 #define LOG_PROCESS() false
 #else /* !CONFIG_LOG_FRONTEND_ONLY */
 #define LOG_INIT() log_init()
-#define LOG_PROCESS() log_process(false)
+#define LOG_PROCESS() log_process()
 #endif /* !CONFIG_LOG_FRONTEND_ONLY */
 #else
 #define LOG_CORE_INIT() do { } while (false)

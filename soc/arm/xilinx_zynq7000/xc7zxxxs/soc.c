@@ -6,10 +6,20 @@
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
+#include <zephyr/sys/sys_io.h>
 #include <zephyr/sys/util.h>
 
 #include <zephyr/arch/arm/aarch32/mmu/arm_mmu.h>
 #include "soc.h"
+
+/* System Level Configuration Registers */
+#define SLCR_UNLOCK     0x0008
+#define SLCR_UNLOCK_KEY 0xdf0d
+#define AXI_GPIO_MMU_ENTRY(id)\
+	MMU_REGION_FLAT_ENTRY("axigpio",\
+			      DT_REG_ADDR(id),\
+			      DT_REG_SIZE(id),\
+			      MT_DEVICE | MATTR_SHARED | MPERM_R | MPERM_W),
 
 static const struct arm_mmu_region mmu_regions[] = {
 
@@ -17,10 +27,6 @@ static const struct arm_mmu_region mmu_regions[] = {
 			      0x00000000,
 			      0x1000,
 			      MT_STRONGLY_ORDERED | MPERM_R | MPERM_X),
-	MMU_REGION_FLAT_ENTRY("slcr",
-			      0xF8000000,
-			      0x1000,
-			      MT_STRONGLY_ORDERED | MPERM_R | MPERM_W),
 	MMU_REGION_FLAT_ENTRY("mpcore",
 			      0xF8F00000,
 			      0x2000,
@@ -66,6 +72,8 @@ static const struct arm_mmu_region mmu_regions[] = {
 			      DT_REG_SIZE(DT_NODELABEL(psgpio)),
 			      MT_DEVICE | MATTR_SHARED | MPERM_R | MPERM_W),
 #endif
+
+DT_FOREACH_STATUS_OKAY(xlnx_xps_gpio_1_00_a, AXI_GPIO_MMU_ENTRY)
 
 };
 
@@ -128,4 +136,11 @@ void z_arm_platform_init(void)
 	sctlr &= ~SCTLR_C_Msk;
 	sctlr &= ~SCTLR_A_Msk;
 	__set_SCTLR(sctlr);
+
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(slcr), okay)
+	mm_reg_t addr = DT_REG_ADDR(DT_NODELABEL(slcr));
+
+	/* Unlock System Level Control Registers (SLCR) */
+	sys_write32(SLCR_UNLOCK_KEY, addr + SLCR_UNLOCK);
+#endif
 }

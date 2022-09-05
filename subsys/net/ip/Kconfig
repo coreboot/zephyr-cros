@@ -357,7 +357,7 @@ endif # NET_TCP
 config NET_TCP_TIME_WAIT_DELAY
 	int "How long to wait in TIME_WAIT state (in milliseconds)"
 	depends on NET_TCP
-	default 250
+	default 1500
 	help
 	  To avoid a (low-probability) issue when delayed packets from
 	  previous connection get delivered to next connection reusing
@@ -371,7 +371,7 @@ config NET_TCP_TIME_WAIT_DELAY
 	  DoS attacks). At the same time, the issue of packet misdelivery
 	  is largely alleviated in the modern TCP stacks by using random,
 	  non-repeating port numbers and initial sequence numbers. Due
-	  to this, Zephyr uses much lower value of 250ms by default.
+	  to this, Zephyr uses much lower value of 1500ms by default.
 	  Value of 0 disables TIME_WAIT state completely.
 
 config NET_TCP_ACK_TIMEOUT
@@ -411,6 +411,18 @@ config NET_TCP_RETRY_COUNT
 	  below 9, though.
 	  Should a retransmission timeout occur, the receive callback is
 	  called with -ECONNRESET error code and the context is dereferenced.
+
+config NET_TCP_RANDOMIZED_RTO
+	bool "Use a randomized retransmission time"
+	default y
+	depends on NET_TCP
+	help
+	  It can happen that two similar stacks enter a retransmission cycle
+	  due to a packet collision. If the transmission timeout is the same
+	  both stacks will retry at the same moment resulting in another
+	  collision. By introducing a randomized retry timeout, the chance of
+	  a second collision is reduced and it reduces furter the more
+	  retransmissions occur.
 
 config NET_TCP_MAX_SEND_WINDOW_SIZE
 	int "Maximum sending window size to use"

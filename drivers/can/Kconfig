@@ -54,30 +54,6 @@ config CAN_FD_MODE
 	help
 	  Enable CAN-FD compatible API
 
-if CAN_FD_MODE
-
-config CANFD_MAX_DLC
-	int "Max data length code in CAN frames"
-	range 8 15
-	default 15
-	help
-	  Maximum allowed DLC in a CAN frame. This parameter sets the
-	  data buffer size in a CAN frame and is therefore only used to
-	  optimize memory consumption.
-endif # CAN_FD_MODE
-
-config CAN_SOCKETCAN_INIT_PRIORITY
-	int "socketCAN net device init priority"
-	default 81
-	depends on NET_SOCKETS_CAN
-	help
-	  socketCAN net device initialization priority.
-	  Do not mess with it unless you know what you are doing.
-	  Note that the priority needs to be lower than the net stack
-	  so that it can start before the networking sub-system,
-	  and higher than the CAN driver so that it can use the underlaying
-	  driver when starting.
-
 config CAN_RX_TIMESTAMP
 	bool "Receiving timestamps"
 	depends on CAN_HAS_RX_TIMESTAMP
@@ -104,6 +80,9 @@ source "drivers/can/Kconfig.mcp2515"
 source "drivers/can/Kconfig.mcan"
 source "drivers/can/Kconfig.rcar"
 source "drivers/can/Kconfig.loopback"
+
+source "drivers/can/Kconfig.sja1000"
+source "drivers/can/Kconfig.esp32"
 
 source "drivers/can/transceiver/Kconfig"
 

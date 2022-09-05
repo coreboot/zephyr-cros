@@ -60,8 +60,9 @@ static int gic_wait_rwp(uint32_t intid)
 		rwp_mask = BIT(GICD_CTLR_RWP);
 	}
 
-	while (sys_read32(base) & rwp_mask)
+	while (sys_read32(base) & rwp_mask) {
 		;
+	}
 
 	return 0;
 }
@@ -99,6 +100,20 @@ static bool arm_gic_lpi_is_enabled(unsigned int intid)
 	uint8_t *cfg = &((uint8_t *)lpi_prop_table)[intid - 8192];
 
 	return (*cfg & BIT(0));
+}
+#endif
+
+#if defined(CONFIG_ARMV8_A_NS) || defined(CONFIG_GIC_SINGLE_SECURITY_STATE)
+static inline void arm_gic_write_irouter(uint64_t val, unsigned int intid)
+{
+	mem_addr_t addr = IROUTER(GET_DIST_BASE(intid), intid);
+
+#ifdef CONFIG_ARM
+	sys_write32((uint32_t)val, addr);
+	sys_write32((uint32_t)(val >> 32U), addr + 4);
+#else
+	sys_write64(val, addr);
+#endif
 }
 #endif
 
@@ -151,15 +166,15 @@ void arm_gic_irq_enable(unsigned int intid)
 
 	sys_write32(mask, ISENABLER(GET_DIST_BASE(intid), idx));
 
-#ifdef CONFIG_ARMV8_A_NS
+#if defined(CONFIG_ARMV8_A_NS) || defined(CONFIG_GIC_SINGLE_SECURITY_STATE)
 	/*
-	 * Affinity routing is enabled for Non-secure state (GICD_CTLR.ARE_NS
-	 * is set to '1' when GIC distributor is initialized) ,so need to set
-	 * SPI's affinity, now set it to be the PE on which it is enabled.
+	 * Affinity routing is enabled for Armv8-A Non-secure state (GICD_CTLR.ARE_NS
+	 * is set to '1') and for GIC single security state (GICD_CTRL.ARE is set to '1'),
+	 * so need to set SPI's affinity, now set it to be the PE on which it is enabled.
 	 */
-	if (GIC_IS_SPI(intid))
-		sys_write64(MPIDR_TO_CORE(GET_MPIDR()),
-				IROUTER(GET_DIST_BASE(intid), intid));
+	if (GIC_IS_SPI(intid)) {
+		arm_gic_write_irouter(MPIDR_TO_CORE(GET_MPIDR()), intid);
+	}
 #endif
 }
 
@@ -257,12 +272,14 @@ void gic_raise_sgi(unsigned int sgi_id, uint64_t target_aff,
  */
 static void gicv3_rdist_enable(mem_addr_t rdist)
 {
-	if (!(sys_read32(rdist + GICR_WAKER) & BIT(GICR_WAKER_CA)))
+	if (!(sys_read32(rdist + GICR_WAKER) & BIT(GICR_WAKER_CA))) {
 		return;
+	}
 
 	sys_clear_bit(rdist + GICR_WAKER, GICR_WAKER_PS);
-	while (sys_read32(rdist + GICR_WAKER) & BIT(GICR_WAKER_CA))
+	while (sys_read32(rdist + GICR_WAKER) & BIT(GICR_WAKER_CA)) {
 		;
+	}
 }
 
 #ifdef CONFIG_GIC_V3_ITS

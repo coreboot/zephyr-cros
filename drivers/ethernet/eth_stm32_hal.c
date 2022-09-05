@@ -786,6 +786,11 @@ static int eth_initialize(const struct device *dev)
 
 	dev_data->clock = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 
+	if (!device_is_ready(dev_data->clock)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
+
 	/* enable clock */
 	ret = clock_control_on(dev_data->clock,
 		(clock_control_subsys_t *)&cfg->pclken);
@@ -1132,7 +1137,7 @@ static int ptp_clock_stm32_set(const struct device *dev,
 	struct ptp_context *ptp_context = dev->data;
 	struct eth_stm32_hal_dev_data *eth_dev_data = ptp_context->eth_dev_data;
 	ETH_HandleTypeDef *heth = &eth_dev_data->heth;
-	int key;
+	unsigned int key;
 
 	key = irq_lock();
 
@@ -1163,7 +1168,7 @@ static int ptp_clock_stm32_get(const struct device *dev,
 	struct ptp_context *ptp_context = dev->data;
 	struct eth_stm32_hal_dev_data *eth_dev_data = ptp_context->eth_dev_data;
 	ETH_HandleTypeDef *heth = &eth_dev_data->heth;
-	int key;
+	unsigned int key;
 	uint32_t second_2;
 
 	key = irq_lock();

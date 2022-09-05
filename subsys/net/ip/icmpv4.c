@@ -65,7 +65,10 @@ int net_icmpv4_finalize(struct net_pkt *pkt)
 		return -ENOBUFS;
 	}
 
-	icmp_hdr->chksum = net_calc_chksum_icmpv4(pkt);
+	icmp_hdr->chksum = 0U;
+	if (net_if_need_calc_tx_checksum(net_pkt_iface(pkt))) {
+		icmp_hdr->chksum = net_calc_chksum_icmpv4(pkt);
+	}
 
 	return net_pkt_set_data(pkt, &icmpv4_access);
 }
@@ -424,8 +427,8 @@ static enum net_verdict icmpv4_handle_echo_request(struct net_pkt *pkt,
 	}
 
 	NET_DBG("Received Echo Request from %s to %s",
-		log_strdup(net_sprint_ipv4_addr(&ip_hdr->src)),
-		log_strdup(net_sprint_ipv4_addr(&ip_hdr->dst)));
+		net_sprint_ipv4_addr(&ip_hdr->src),
+		net_sprint_ipv4_addr(&ip_hdr->dst));
 
 	payload_len = net_pkt_get_len(pkt) -
 		      net_pkt_ip_hdr_len(pkt) -
@@ -474,8 +477,8 @@ static enum net_verdict icmpv4_handle_echo_request(struct net_pkt *pkt,
 	net_ipv4_finalize(reply, IPPROTO_ICMP);
 
 	NET_DBG("Sending Echo Reply from %s to %s",
-		log_strdup(net_sprint_ipv4_addr(src)),
-		log_strdup(net_sprint_ipv4_addr(&ip_hdr->src)));
+		net_sprint_ipv4_addr(src),
+		net_sprint_ipv4_addr(&ip_hdr->src));
 
 	if (net_send_data(reply) < 0) {
 		goto drop;
@@ -553,8 +556,8 @@ int net_icmpv4_send_echo_request(struct net_if *iface,
 
 	NET_DBG("Sending ICMPv4 Echo Request type %d from %s to %s",
 		NET_ICMPV4_ECHO_REQUEST,
-		log_strdup(net_sprint_ipv4_addr(src)),
-		log_strdup(net_sprint_ipv4_addr(dst)));
+		net_sprint_ipv4_addr(src),
+		net_sprint_ipv4_addr(dst));
 
 	if (net_send_data(pkt) >= 0) {
 		net_stats_update_icmp_sent(iface);
@@ -606,7 +609,7 @@ int net_icmpv4_send_error(struct net_pkt *orig, uint8_t type, uint8_t code)
 		 * were sent to broadcast
 		 */
 		NET_DBG("Not sending error to bcast pkt from %s on proto %s",
-			log_strdup(net_sprint_ipv4_addr(&ip_hdr->src)),
+			net_sprint_ipv4_addr(&ip_hdr->src),
 			net_proto2str(AF_INET, ip_hdr->proto));
 		goto drop_no_pkt;
 	}
@@ -646,8 +649,8 @@ int net_icmpv4_send_error(struct net_pkt *orig, uint8_t type, uint8_t code)
 
 	NET_DBG("Sending ICMPv4 Error Message type %d code %d from %s to %s",
 		type, code,
-		log_strdup(net_sprint_ipv4_addr(&ip_hdr->dst)),
-		log_strdup(net_sprint_ipv4_addr(&ip_hdr->src)));
+		net_sprint_ipv4_addr(&ip_hdr->dst),
+		net_sprint_ipv4_addr(&ip_hdr->src));
 
 	if (net_send_data(pkt) >= 0) {
 		net_stats_update_icmp_sent(net_pkt_iface(orig));
@@ -688,9 +691,11 @@ enum net_verdict net_icmpv4_input(struct net_pkt *pkt,
 		return NET_DROP;
 	}
 
-	if (net_calc_chksum_icmpv4(pkt) != 0U) {
-		NET_DBG("DROP: Invalid checksum");
-		goto drop;
+	if (net_if_need_calc_rx_checksum(net_pkt_iface(pkt))) {
+		if (net_calc_chksum_icmpv4(pkt) != 0U) {
+			NET_DBG("DROP: Invalid checksum");
+			goto drop;
+		}
 	}
 
 	if (net_ipv4_is_addr_bcast(net_pkt_iface(pkt),

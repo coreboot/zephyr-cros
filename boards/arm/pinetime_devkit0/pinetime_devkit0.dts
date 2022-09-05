@@ -25,6 +25,7 @@
 		zephyr,flash = &flash0;
 		zephyr,code-partition = &slot0_partition;
 		zephyr,display = &st7789v;
+		zephyr,keyboard-scan = &cst816s;
 	};
 
 	aliases {
@@ -34,6 +35,7 @@
 		led3 = &statusled;	/* status led, may be not populated */
 		sw0 = &key_in;  /* key in */
 		kscan0 = &cst816s;
+		watchdog0 = &wdt0;
 	};
 
 	leds {
@@ -66,7 +68,6 @@
 	key_out {
 		compatible = "pine64,pinetime-key-out";
 		gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
-		label = "Key out";
 	};
 
 	vbatt {
@@ -110,7 +111,6 @@
 	bma421: bma421@18 {
 		compatible = "bosch,bma4xx";
 		reg = <0x18>;
-		label = "BMA421";
 		int1-gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
 	};
 
@@ -118,14 +118,12 @@
 	hrs3300: hrs3300@44 {
 		compatible = "tian-yi-he-xin-hrs3300";
 		reg = <0x44>;
-		label = "HRS3300";
 	};
 
 	/* Hynitron CST816S Capacitive Touch Controller (400KHz) */
 	cst816s: cst816s@15 {
 		compatible = "hynitron,cst816s";
 		reg = <0x15>;
-		label = "CST816S";
 		irq-gpios = <&gpio0 28 GPIO_ACTIVE_LOW>;
 		rst-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
 	};
@@ -144,9 +142,26 @@
 		compatible = "jedec,spi-nor";
 		reg = <0>;
 		spi-max-frequency = <8000000>; /* 8MHz */
-		label = "XT25FB32";
 		jedec-id = [0b 40 16];
 		size = <DT_SIZE_M(32)>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			/* next firmware update */
+			slot1_partition: partition@0 {
+				label = "image-1";
+				reg = <0x00000000 0x74000>;
+			};
+
+			/* to be used in firmware */
+			storage_partition: partition@300000 {
+				label = "storage";
+				reg = <0x00300000 0x00100000>;
+			};
+		};
 	};
 
 	/* Sitronix ST7789V LCD */
@@ -154,7 +169,6 @@
 		compatible = "sitronix,st7789v";
 		reg = <1>;
 		spi-max-frequency = <8000000>; /* 8MHz */
-		label = "ST7789V";
 		cmd-data-gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;	/* DET */
 		reset-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;	/* RESX reset */
 		width = <240>;
@@ -194,25 +208,7 @@
 		/* main firmware partition */
 		slot0_partition: partition@c000 {
 			label = "image-0";
-			reg = <0x0000C000 0x32000>;
-		};
-
-		/* next firmware update */
-		slot1_partition: partition@3e000 {
-			label = "image-1";
-			reg = <0x0003E000 0x32000>;
-		};
-
-		/* needed to slot0-slot1 swapping */
-		scratch_partition: partition@70000 {
-			label = "image-scratch";
-			reg = <0x00070000 0xa000>;
-		};
-
-		/* to be used in firmware */
-		storage_partition: partition@7a000 {
-			label = "storage";
-			reg = <0x0007a000 0x00006000>;
+			reg = <0x0000C000 0x74000>;
 		};
 	};
 };

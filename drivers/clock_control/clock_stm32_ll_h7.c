@@ -176,8 +176,7 @@ static uint32_t get_pllout_frequency(uint32_t pllsrc_freq,
 {
 	__ASSERT_NO_MSG(pllm_div && pllout_div);
 
-	return (pllsrc_freq * plln_mul) /
-		(pllm_div * pllout_div);
+	return (pllsrc_freq / pllm_div) * plln_mul / pllout_div;
 }
 
 __unused
@@ -253,6 +252,8 @@ static int32_t prepare_regulator_voltage_scale(void)
 	/* Make sure to put the CPU in highest Voltage scale during clock configuration */
 	/* Highest voltage is SCALE0 */
 	LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
+	while (LL_PWR_IsActiveFlag_VOS() == 0) {
+	}
 	return 0;
 }
 
@@ -286,6 +287,8 @@ static int32_t optimize_regulator_voltage_scale(uint32_t sysclk_freq)
 	LL_PWR_ConfigSupply(LL_PWR_LDO_SUPPLY);
 #endif
 	LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
+	while (LL_PWR_IsActiveFlag_VOS() == 0) {
+	}
 	return 0;
 }
 

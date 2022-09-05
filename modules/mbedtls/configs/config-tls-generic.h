@@ -17,7 +17,12 @@
 #define MBEDTLS_MEMORY_BUFFER_ALLOC_C
 #define MBEDTLS_PLATFORM_EXIT_ALT
 #define MBEDTLS_NO_PLATFORM_ENTROPY
+
+#if defined(CONFIG_MBEDTLS_ZEPHYR_ENTROPY)
+#define MBEDTLS_ENTROPY_HARDWARE_ALT
+#else
 #define MBEDTLS_NO_DEFAULT_ENTROPY_SOURCES
+#endif
 
 #if defined(CONFIG_MBEDTLS_HAVE_ASM)
 #define MBEDTLS_HAVE_ASM
@@ -172,6 +177,24 @@
 #define MBEDTLS_CIPHER_MODE_CTR
 #endif
 
+/* Supported elliptic curve libraries */
+
+#if defined(CONFIG_MBEDTLS_ECDH_C)
+#define MBEDTLS_ECDH_C
+#endif
+
+#if defined(CONFIG_MBEDTLS_ECDSA_C)
+#define MBEDTLS_ECDSA_C
+#endif
+
+#if defined(CONFIG_MBEDTLS_ECJPAKE_C)
+#define MBEDTLS_ECJPAKE_C
+#endif
+
+#if defined(CONFIG_MBEDTLS_ECP_C)
+#define MBEDTLS_ECP_C
+#endif
+
 /* Supported elliptic curves */
 
 #if defined(CONFIG_MBEDTLS_ECP_DP_SECP192R1_ENABLED)
@@ -254,6 +277,11 @@
 #define MBEDTLS_SHA256_SMALLER
 #endif
 
+#if defined(CONFIG_MBEDTLS_MAC_SHA384_ENABLED) || \
+	defined(CONFIG_MBEDTLS_HASH_SHA384_ENABLED)
+#define MBEDTLS_SHA384_C
+#endif
+
 #if defined(CONFIG_MBEDTLS_MAC_SHA512_ENABLED) || \
 	defined(CONFIG_MBEDTLS_HASH_SHA512_ENABLED)
 #define MBEDTLS_SHA512_C
@@ -322,14 +350,6 @@
 #define MBEDTLS_DHM_C
 #endif
 
-#if defined(MBEDTLS_KEY_EXCHANGE_ECDHE_PSK_ENABLED) || \
-    defined(MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED) || \
-    defined(MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED) || \
-    defined(MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA_ENABLED) || \
-    defined(MBEDTLS_KEY_EXCHANGE_ECDH_RSA_ENABLED)
-#define MBEDTLS_ECDH_C
-#endif
-
 #if defined(MBEDTLS_KEY_EXCHANGE_RSA_PSK_ENABLED) || \
     defined(MBEDTLS_KEY_EXCHANGE_RSA_ENABLED) || \
     defined(MBEDTLS_KEY_EXCHANGE_DHE_RSA_ENABLED) || \
@@ -359,20 +379,6 @@
     defined(MBEDTLS_X509_CRT_PARSE_C)
 #define MBEDTLS_PEM_PARSE_C
 #define MBEDTLS_BASE64_C
-#endif
-
-#if defined(MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED)
-#define MBEDTLS_ECDSA_C
-#endif
-
-#if defined(MBEDTLS_KEY_EXCHANGE_ECJPAKE_ENABLED)
-#define MBEDTLS_ECJPAKE_C
-#endif
-
-#if defined(MBEDTLS_ECDH_C) || \
-    defined(MBEDTLS_ECDSA_C) || \
-    defined(MBEDTLS_ECJPAKE_C)
-#define MBEDTLS_ECP_C
 #endif
 
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
@@ -442,6 +448,10 @@
 
 #if defined(CONFIG_MBEDTLS_SSL_EXTENDED_MASTER_SECRET)
 #define MBEDTLS_SSL_EXTENDED_MASTER_SECRET
+#endif
+
+#if defined(CONFIG_MBEDTLS_PSA_CRYPTO_C)
+#define MBEDTLS_PSA_CRYPTO_C
 #endif
 
 /* User config file */

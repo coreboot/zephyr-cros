@@ -125,6 +125,8 @@ features:
 +-----------+------------+-------------------------------------+
 | GPT       | on-chip    | gpt                                 |
 +-----------+------------+-------------------------------------+
+| TRNG      | on-chip    | entropy                             |
++-----------+------------+-------------------------------------+
 
 The default configuration can be found in the defconfig file:
 ``boards/arm/mimxrt1060_evk/mimxrt1060_evk_defconfig``
@@ -332,6 +334,12 @@ etc.):
 - Data: 8 bits
 - Parity: None
 - Stop bits: 1
+
+Using SWO
+---------
+SWO can be used as a logging backend, by setting ``CONFIG_LOG_BACKEND_SWO=y``.
+Your SWO viewer should be configured with a CPU frequency of 132MHz, and
+SWO frequency of 7500KHz.
 
 Flashing
 ========

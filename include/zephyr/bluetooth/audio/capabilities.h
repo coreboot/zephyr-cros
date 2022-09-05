@@ -26,7 +26,7 @@ enum bt_audio_capability_framing {
 	BT_AUDIO_CAPABILITY_UNFRAMED_NOT_SUPPORTED = 0x01,
 };
 
-/** @def BT_AUDIO_CAPABILITY_PREF
+/**
  *  @brief Helper to declare elements of @ref bt_audio_capability_pref
  *
  *  @param _framing Framing Support
@@ -232,11 +232,15 @@ struct bt_audio_capability {
 	enum bt_audio_dir dir;
 	/** Capability codec reference */
 	struct bt_codec *codec;
+#if defined(CONFIG_BT_AUDIO_UNICAST_SERVER)
 	/** Capability preferences */
 	struct bt_audio_capability_pref pref;
 	/** Capability operations reference */
 	struct bt_audio_capability_ops *ops;
-	sys_snode_t node;
+#endif /* CONFIG_BT_AUDIO_UNICAST_SERVER */
+
+	/* Internally used list node */
+	sys_snode_t _node;
 };
 
 /** @brief Register Audio Capability.
@@ -270,11 +274,19 @@ int bt_audio_capability_set_location(enum bt_audio_dir dir,
 
 /** @brief Set the available contexts for an endpoint type
  *
- * @param dir      Direction of the endpoints to change location for.
+ * @param dir      Direction of the endpoints to change available contexts for.
  * @param contexts The contexts to be set.
  */
 int bt_audio_capability_set_available_contexts(enum bt_audio_dir dir,
 					       enum bt_audio_context contexts);
+
+/** @brief Get the available contexts for an endpoint type
+ *
+ * @param dir      Direction of the endpoints to get contexts for.
+ *
+ * @return Bitmask of available contexts.
+ */
+enum bt_audio_context bt_audio_capability_get_available_contexts(enum bt_audio_dir dir);
 
 #ifdef __cplusplus
 }

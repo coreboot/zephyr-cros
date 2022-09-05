@@ -39,7 +39,6 @@ config BT_PAC_SNK_LOC
 
 config BT_PAC_SNK_LOC_WRITEABLE
 	bool "Sink PAC Location Writable Support"
-	default y
 	depends on BT_PAC_SNK_LOC
 	help
 	  This option enables support for clients to write to the Sink PAC
@@ -79,7 +78,6 @@ config BT_PAC_SRC_LOC
 
 config BT_PAC_SRC_LOC_WRITEABLE
 	bool "Source PAC Location Writable Support"
-	default y
 	depends on BT_PAC_SRC_LOC
 	help
 	  This option enables support for clients to write to the Source PAC
@@ -89,7 +87,6 @@ endif # BT_PAC_SRC
 
 config BT_PACS
 	def_bool BT_PAC_SNK || BT_PAC_SRC
-	select BT_SMP_SC_PAIR_ONLY
 
 config BT_DEBUG_PACS
 	bool "Published Audio Capabilities Service debug"

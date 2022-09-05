@@ -29,7 +29,7 @@ void lora_receive_cb(const struct device *dev, uint8_t *data, uint16_t size,
 	ARG_UNUSED(size);
 
 	LOG_INF("Received data: %s (RSSI:%ddBm, SNR:%ddBm)",
-		log_strdup(data), rssi, snr);
+		data, rssi, snr);
 
 	/* Stop receiving after 10 packets */
 	if (++cnt == 10) {
@@ -57,6 +57,8 @@ void main(void)
 	config.datarate = SF_10;
 	config.preamble_len = 8;
 	config.coding_rate = CR_4_5;
+	config.iq_inverted = false;
+	config.public_network = false;
 	config.tx_power = 14;
 	config.tx = false;
 
@@ -78,7 +80,7 @@ void main(void)
 		}
 
 		LOG_INF("Received data: %s (RSSI:%ddBm, SNR:%ddBm)",
-			log_strdup(data), rssi, snr);
+			data, rssi, snr);
 	}
 
 	/* Enable asynchronous reception */

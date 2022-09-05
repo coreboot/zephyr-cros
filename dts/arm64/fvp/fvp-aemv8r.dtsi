@@ -48,7 +48,6 @@
 			      IRQ_DEFAULT_PRIORITY>,
 			     <GIC_PPI 10 IRQ_TYPE_LEVEL
 			      IRQ_DEFAULT_PRIORITY>;
-		label = "arch_timer";
 	};
 
 	uartclk: apb-pclk {
@@ -66,7 +65,6 @@
 			      <0xaf100000 0x100>;
 			interrupt-controller;
 			#interrupt-cells = <4>;
-			label = "GIC";
 			status = "okay";
 		};
 
@@ -76,7 +74,6 @@
 			status = "disabled";
 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>;
 			interrupt-names = "irq_5";
-			label = "UART_0";
 			clocks = <&uartclk>;
 		};
 
@@ -86,7 +83,6 @@
 			status = "disabled";
 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>;
 			interrupt-names = "irq_6";
-			label = "UART_1";
 			clocks = <&uartclk>;
 		};
 
@@ -96,7 +92,6 @@
 			status = "disabled";
 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>;
 			interrupt-names = "irq_7";
-			label = "UART_2";
 			clocks = <&uartclk>;
 		};
 
@@ -106,7 +101,6 @@
 			status = "disabled";
 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>;
 			interrupt-names = "irq_8";
-			label = "UART_3";
 			clocks = <&uartclk>;
 		};
 	};

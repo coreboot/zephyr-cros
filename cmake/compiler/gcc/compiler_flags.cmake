@@ -26,7 +26,7 @@ set_compiler_property(PROPERTY optimization_size  -Os)
 #######################################################
 
 # GCC Option standard warning base in Zephyr
-set_compiler_property(PROPERTY warning_base
+check_set_compiler_property(PROPERTY warning_base
     -Wall
     -Wformat
     -Wformat-security
@@ -129,6 +129,9 @@ set_property(TARGET compiler-cpp PROPERTY dialect_cpp20 "-std=c++20"
 set_property(TARGET compiler-cpp PROPERTY dialect_cpp2b "-std=c++2b"
   "-Wno-register" "-Wno-volatile")
 
+# Flag for disabling strict aliasing rule in C and C++
+set_compiler_property(PROPERTY no_strict_aliasing -fno-strict-aliasing)
+
 # Disable exceptions flag in C++
 set_property(TARGET compiler-cpp PROPERTY no_exceptions "-fno-exceptions")
 
@@ -160,7 +163,7 @@ endif()
 check_set_compiler_property(APPEND PROPERTY hosted -fno-freestanding)
 
 # gcc flag for a freestanding application
-set_compiler_property(PROPERTY freestanding -ffreestanding)
+check_set_compiler_property(PROPERTY freestanding -ffreestanding)
 
 # Flag to enable debugging
 set_compiler_property(PROPERTY debug -g)

@@ -202,5 +202,93 @@ static inline size_t z_cbprintf_cxx_alignment(T arg)
 	return MAX(__alignof__(arg), VA_STACK_MIN_ALIGN);
 }
 
+/* C++ version for checking if two arguments are same type */
+template < typename T1, typename T2 >
+struct z_cbprintf_cxx_is_same_type {
+	enum {
+		value = false
+	};
+};
+
+template < typename T >
+struct z_cbprintf_cxx_is_same_type < T, T > {
+	enum {
+		value = true
+	};
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_reference {
+	typedef T type;
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_reference < T & > {
+	typedef T type;
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_reference < T && > {
+	typedef T type;
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_cv {
+	typedef T type;
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_cv < const T > {
+	typedef T type;
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_cv < volatile T > {
+	typedef T type;
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_cv < const volatile T > {
+	typedef T type;
+};
+
+/* Determine if a type is an array */
+template < typename T >
+struct z_cbprintf_cxx_is_array {
+	enum {
+		value = false
+	};
+};
+
+template < typename T >
+struct z_cbprintf_cxx_is_array < T[] > {
+	enum {
+		value = true
+	};
+};
+
+template < typename T, size_t N >
+struct z_cbprintf_cxx_is_array < T[N] > {
+	enum {
+		value = true
+	};
+};
+
+/* Determine the type of elements in an array */
+template < typename T >
+struct z_cbprintf_cxx_remove_extent {
+	typedef T type;
+};
+
+template < typename T >
+struct z_cbprintf_cxx_remove_extent < T[] > {
+	typedef T type;
+};
+
+template < typename T, size_t N >
+struct z_cbprintf_cxx_remove_extent < T[N] > {
+	typedef T type;
+};
+
 #endif /* __cplusplus */
 #endif /* ZEPHYR_INCLUDE_SYS_CBPRINTF_CXX_H_ */

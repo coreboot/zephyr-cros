@@ -16,9 +16,8 @@ static int count;
 K_MUTEX_DEFINE(count_mutex);
 K_CONDVAR_DEFINE(count_threshold_cv);
 
-#define STACK_SIZE (1024 + CONFIG_TEST_EXTRA_STACK_SIZE)
+#define STACK_SIZE (1024)
 
-K_THREAD_STACK_EXTERN(tstack);
 K_THREAD_STACK_ARRAY_DEFINE(tstacks, NUM_THREADS, STACK_SIZE);
 
 static struct k_thread t[NUM_THREADS];

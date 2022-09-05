@@ -514,8 +514,9 @@ static void i2c_ctrl_handle_write_int_event(const struct device *dev)
 		size_t tx_avail = MIN(tx_remain, i2c_ctrl_fifo_tx_avail(dev));
 
 		LOG_DBG("tx remains %d, avail %d", tx_remain, tx_avail);
-		for (int i = 0U; i < tx_avail; i++)
+		for (int i = 0U; i < tx_avail; i++) {
 			i2c_ctrl_fifo_write(dev, *(data->ptr_msg++));
+		}
 
 		/* Is there any remaining bytes? */
 		if (data->ptr_msg == data->msg->buf + data->msg->len) {
@@ -627,6 +628,10 @@ static int i2c_ctrl_proc_write_msg(const struct device *dev,
 
 	if (data->oper_state == NPCX_I2C_IDLE) {
 		data->oper_state = NPCX_I2C_WAIT_START;
+
+		/* Clear FIFO status before starting a new transaction */
+		i2c_ctrl_fifo_clear_status(dev);
+
 		/* Issue a START, wait for transaction completed */
 		i2c_ctrl_start(dev);
 
@@ -654,6 +659,10 @@ static int i2c_ctrl_proc_read_msg(const struct device *dev, struct i2c_msg *msg)
 
 	if (data->oper_state == NPCX_I2C_IDLE) {
 		data->oper_state = NPCX_I2C_WAIT_START;
+
+		/* Clear FIFO status before starting a new transaction */
+		i2c_ctrl_fifo_clear_status(dev);
+
 		/* Issue a START, wait for transaction completed */
 		i2c_ctrl_start(dev);
 
@@ -900,6 +909,11 @@ static int i2c_ctrl_init(const struct device *dev)
 	const struct device *const clk_dev = DEVICE_DT_GET(NPCX_CLK_CTRL_NODE);
 	uint32_t i2c_rate;
 
+	if (!device_is_ready(clk_dev)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
+
 	/* Turn on device clock first and get source clock freq. */
 	if (clock_control_on(clk_dev,
 		(clock_control_subsys_t *) &config->clk_cfg) != 0) {
@@ -918,9 +932,9 @@ static int i2c_ctrl_init(const struct device *dev)
 		return -EIO;
 	}
 
-	if (i2c_rate == 15000000)
+	if (i2c_rate == 15000000) {
 		data->ptr_speed_confs = npcx_15m_speed_confs;
-	else if (i2c_rate == 20000000) {
+	} else if (i2c_rate == 20000000) {
 		data->ptr_speed_confs = npcx_20m_speed_confs;
 	} else {
 		LOG_ERR("Unsupported apb2/3 freq for %s.", dev->name);

@@ -52,27 +52,17 @@ extern "C" {
 /**
  * @brief Maximum data length code for CAN-FD.
  */
-#define CANFD_MAX_DLC   CONFIG_CANFD_MAX_DLC
+#define CANFD_MAX_DLC   15U
 
 /**
  * @cond INTERNAL_HIDDEN
  * Internally calculated maximum data length
  */
-#ifndef CONFIG_CANFD_MAX_DLC
+#ifndef CONFIG_CAN_FD_MODE
 #define CAN_MAX_DLEN    8U
 #else
-#if CONFIG_CANFD_MAX_DLC <= 8
-#define CAN_MAX_DLEN    CONFIG_CANFD_MAX_DLC
-#elif CONFIG_CANFD_MAX_DLC <= 12
-#define CAN_MAX_DLEN    (CONFIG_CANFD_MAX_DLC + (CONFIG_CANFD_MAX_DLC - 8U) * 4U)
-#elif CONFIG_CANFD_MAX_DLC == 13
-#define CAN_MAX_DLEN    32U
-#elif CONFIG_CANFD_MAX_DLC == 14
-#define CAN_MAX_DLEN    48U
-#elif CONFIG_CANFD_MAX_DLC == 15
 #define CAN_MAX_DLEN    64U
-#endif
-#endif /* CONFIG_CANFD_MAX_DLC */
+#endif /* CONFIG_CAN_FD_MODE */
 
 /** @endcond */
 
@@ -96,6 +86,12 @@ extern "C" {
 
 /** Controller allows transmitting/receiving CAN-FD frames. */
 #define CAN_MODE_FD         BIT(2)
+
+/** Controller does not retransmit in case of lost arbitration or missing ACK */
+#define CAN_MODE_ONE_SHOT   BIT(3)
+
+/** Controller uses triple sampling mode */
+#define CAN_MODE_3_SAMPLES  BIT(4)
 
 /** @} */
 
@@ -324,6 +320,12 @@ typedef int (*can_set_timing_data_t)(const struct device *dev,
 				     const struct can_timing *timing_data);
 
 /**
+ * @brief Callback API upon getting CAN controller capabilities
+ * See @a can_get_capabilities() for argument description
+ */
+typedef int (*can_get_capabilities_t)(const struct device *dev, can_mode_t *cap);
+
+/**
  * @brief Callback API upon setting CAN controller mode
  * See @a can_set_mode() for argument description
  */
@@ -393,6 +395,7 @@ typedef int (*can_get_max_filters_t)(const struct device *dev, enum can_ide id_t
 typedef int (*can_get_max_bitrate_t)(const struct device *dev, uint32_t *max_bitrate);
 
 __subsystem struct can_driver_api {
+	can_get_capabilities_t get_capabilities;
 	can_set_mode_t set_mode;
 	can_set_timing_t set_timing;
 	can_send_t send;
@@ -900,6 +903,28 @@ static inline int z_impl_can_set_timing(const struct device *dev,
 }
 
 /**
+ * @brief Get the supported modes of the CAN controller
+ *
+ * The returned capabilities may not necessarily be supported at the same time (e.g. some CAN
+ * controllers support both ``CAN_MODE_LOOPBACK`` and ``CAN_MODE_LISTENONLY``, but not at the same
+ * time).
+ *
+ * @param dev      Pointer to the device structure for the driver instance.
+ * @param[out] cap Supported capabilities.
+ *
+ * @retval 0 If successful.
+ * @retval -EIO General input/output error, failed to get capabilities.
+ */
+__syscall int can_get_capabilities(const struct device *dev, can_mode_t *cap);
+
+static inline int z_impl_can_get_capabilities(const struct device *dev, can_mode_t *cap)
+{
+	const struct can_driver_api *api = (const struct can_driver_api *)dev->api;
+
+	return api->get_capabilities(dev, cap);
+}
+
+/**
  * @brief Set the CAN controller to the given operation mode
  *
  * @param dev  Pointer to the device structure for the driver instance.
@@ -971,8 +996,7 @@ __syscall int can_set_bitrate(const struct device *dev, uint32_t bitrate);
  *
  * By default, the CAN controller will automatically retry transmission in case
  * of lost bus arbitration or missing acknowledge. Some CAN controllers support
- * disabling automatic retransmissions ("one-shot" mode) via a devicetree
- * property.
+ * disabling automatic retransmissions via ``CAN_MODE_ONE_SHOT``.
  *
  * @param dev       Pointer to the device structure for the driver instance.
  * @param frame     CAN frame to transmit.

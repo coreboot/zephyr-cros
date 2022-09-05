@@ -14,16 +14,13 @@
 #define STM32_PERIPH_BUS_MIN	STM32_CLOCK_BUS_AHB1
 #define STM32_PERIPH_BUS_MAX	STM32_CLOCK_BUS_APB1
 
-/** Peripheral clock sources */
+/** Domain clocks */
 /* RM0038.pdf, §6.3.14 Control/status register (RCC_CSR) */
 
 /** Fixed clocks  */
 #define STM32_SRC_HSE		0x001
 #define STM32_SRC_LSE		0x002
 #define STM32_SRC_LSI		0x003
-
-#define STM32_SRC_CLOCK_MIN	STM32_SRC_HSE
-#define STM32_SRC_CLOCK_MAX	STM32_SRC_LSI
 
 /**
  * @brief STM32 clock configuration bit field.

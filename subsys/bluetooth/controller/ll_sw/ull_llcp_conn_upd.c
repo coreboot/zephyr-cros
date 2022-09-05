@@ -27,9 +27,22 @@
 #include "lll/lll_df_types.h"
 #include "lll_conn.h"
 
+#include "lll_conn_iso.h"
+
 #include "ull_tx_queue.h"
+
+#include "isoal.h"
+#include "ull_iso_types.h"
+#include "ull_conn_iso_types.h"
+#include "ull_conn_iso_internal.h"
+
 #include "ull_conn_internal.h"
 #include "ull_conn_types.h"
+
+#if defined(CONFIG_BT_CTLR_USER_EXT)
+#include "ull_vendor.h"
+#endif /* CONFIG_BT_CTLR_USER_EXT */
+
 #include "ull_internal.h"
 #include "ull_llcp.h"
 #include "ull_llcp_features.h"
@@ -195,6 +208,7 @@ static bool cu_should_notify_host(struct proc_ctx *ctx)
 		(ctx->data.cu.params_changed != 0U));
 }
 
+#if defined(CONFIG_BT_CENTRAL) || defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 static void lp_cu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 {
 	struct node_tx *tx;
@@ -240,6 +254,7 @@ static void lp_cu_tx(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t opcode)
 	}
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 }
+#endif /* CONFIG_BT_CENTRAL || CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
 static void lp_cu_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
 {

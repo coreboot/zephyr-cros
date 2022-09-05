@@ -49,6 +49,11 @@
 			min-residency-us = <900>;
 		};
 	};
+
+	aliases {
+		watchdog0 = &iwdg;
+		spi-flash0 = &mx25lm51245;
+	};
 };
 
 &clk_lse {
@@ -84,6 +89,8 @@
 };
 
 &lptim1 {
+	clocks = <&rcc STM32_CLOCK_BUS_APB3 0x00000800>,
+		 <&rcc STM32_SRC_LSE LPTIM1_SEL(3)>;
 	status = "okay";
 };
 
@@ -121,12 +128,12 @@
 
 	mx25lm51245: ospi-nor-flash@0 {
 		compatible = "st,stm32-ospi-nor";
-		label = "MX25LM51245";
 		reg = <0>;
 		ospi-max-frequency = <DT_FREQ_M(50)>;
 		size = <DT_SIZE_M(64)>;
 		spi-bus-width = <OSPI_OPI_MODE>;
 		data-rate = <OSPI_DTR_TRANSFER>;
+		four-byte-opcodes;
 		status = "okay";
 		sfdp-bfp = [
 			53 46 44 50 06 01 02 ff
@@ -165,7 +172,6 @@
 	hts221@5f {
 		compatible = "st,hts221";
 		reg = <0x5f>;
-		label = "HTS221";
 	};
 };
 

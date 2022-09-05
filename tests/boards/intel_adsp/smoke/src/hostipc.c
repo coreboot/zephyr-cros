@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <zephyr/kernel.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 #include <cavs_ipc.h>
 #include "tests.h"
 
@@ -41,8 +41,8 @@ void test_host_ipc(void)
 	done_flag = false;
 	ret = cavs_ipc_send_message(CAVS_HOST_DEV, IPCCMD_SIGNAL_DONE, 0);
 	zassert_true(ret, "send failed");
-	zassert_true(WAIT_FOR(cavs_ipc_is_complete(CAVS_HOST_DEV), 10000, k_msleep(1)), NULL);
-	zassert_true(WAIT_FOR(done_flag, 10000, k_msleep(1)), NULL);
+	AWAIT(cavs_ipc_is_complete(CAVS_HOST_DEV));
+	AWAIT(done_flag);
 
 	/* Request the host to return a message which we will complete
 	 * immediately.
@@ -53,9 +53,9 @@ void test_host_ipc(void)
 	ret = cavs_ipc_send_message(CAVS_HOST_DEV, IPCCMD_RETURN_MSG,
 				    RETURN_MSG_SYNC_VAL);
 	zassert_true(ret, "send failed");
-	zassert_true(WAIT_FOR(done_flag, 10000, k_msleep(1)), NULL);
-	zassert_true(WAIT_FOR(cavs_ipc_is_complete(CAVS_HOST_DEV), 10000, k_msleep(1)), NULL);
-	zassert_true(WAIT_FOR(msg_flag, 10000, k_msleep(1)), NULL);
+	AWAIT(done_flag);
+	AWAIT(cavs_ipc_is_complete(CAVS_HOST_DEV));
+	AWAIT(msg_flag);
 
 	/* Do exactly the same thing again to check for state bugs
 	 * (e.g. failing to signal done on one side or the other)
@@ -66,22 +66,21 @@ void test_host_ipc(void)
 	ret = cavs_ipc_send_message(CAVS_HOST_DEV, IPCCMD_RETURN_MSG,
 				    RETURN_MSG_SYNC_VAL);
 	zassert_true(ret, "send failed");
-	zassert_true(WAIT_FOR(done_flag, 10000, k_msleep(1)), NULL);
-	zassert_true(WAIT_FOR(cavs_ipc_is_complete(CAVS_HOST_DEV), 10000, k_msleep(1)), NULL);
-	zassert_true(WAIT_FOR(msg_flag, 10000, k_msleep(1)), NULL);
+	AWAIT(done_flag);
+	AWAIT(cavs_ipc_is_complete(CAVS_HOST_DEV));
+	AWAIT(msg_flag);
 
 	/* Same, but we'll complete it asynchronously (1.8+ only) */
-	if (!IS_ENABLED(CONFIG_SOC_SERIES_INTEL_CAVS_V15)) {
+	if (!IS_ENABLED(CONFIG_SOC_INTEL_CAVS_V15)) {
 		printk("Return message request, async...\n");
 		done_flag = false;
 		msg_flag = false;
 		ret = cavs_ipc_send_message(CAVS_HOST_DEV, IPCCMD_RETURN_MSG,
 					    RETURN_MSG_ASYNC_VAL);
 		zassert_true(ret, "send failed");
-		zassert_true(WAIT_FOR(done_flag, 10000, k_msleep(1)), NULL);
-		zassert_true(WAIT_FOR(cavs_ipc_is_complete(CAVS_HOST_DEV), 10000, k_msleep(1)),
-			     NULL);
-		zassert_true(WAIT_FOR(msg_flag, 10000, k_msleep(1)), NULL);
+		AWAIT(done_flag);
+		AWAIT(cavs_ipc_is_complete(CAVS_HOST_DEV));
+		AWAIT(msg_flag);
 		cavs_ipc_complete(CAVS_HOST_DEV);
 	}
 

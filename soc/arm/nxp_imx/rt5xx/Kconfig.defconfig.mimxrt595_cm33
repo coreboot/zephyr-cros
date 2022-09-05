@@ -12,17 +12,9 @@ config PINMUX_MCUX_LPC
 	default y
 	depends on PINMUX
 
-config GPIO_MCUX_LPC
+config DMA_MCUX_LPC
 	default y
-	depends on GPIO
-
-config UART_MCUX_FLEXCOMM
-	default y if HAS_MCUX_FLEXCOMM
-	depends on SERIAL
-
-config CLOCK_CONTROL_MCUX_SYSCON
-	default y if HAS_MCUX_SYSCON
-	depends on CLOCK_CONTROL
+	depends on DMA
 
 if MCUX_OS_TIMER
 

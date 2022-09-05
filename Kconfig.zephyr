@@ -377,6 +377,11 @@ config OUTPUT_STAT
 	help
 	  Create a stat file using readelf -e <elf>
 
+config OUTPUT_SYMBOLS
+	bool "Create a symbol file"
+	help
+	  Create a symbol file using nm <elf>
+
 config OUTPUT_DISASSEMBLY
 	bool "Create a disassembly file"
 	default y
@@ -595,6 +600,20 @@ config BUILD_OUTPUT_META_STATE_PROPAGATE
 
 endmenu
 
+config DEPRECATED
+	bool
+	help
+	  Symbol that must be selected by a feature or module if it is
+	  considered to be deprecated.
+
+config WARN_DEPRECATED
+	bool
+	default y
+	prompt "Warn on deprecated usage"
+	help
+	  Print a warning when the Kconfig tree is parsed if any deprecated
+	  features are enabled.
+
 config EXPERIMENTAL
 	bool
 	help
@@ -607,6 +626,22 @@ config WARN_EXPERIMENTAL
 	help
 	  Print a warning when the Kconfig tree is parsed if any experimental
 	  features are enabled.
+
+config ENFORCE_ZEPHYR_STDINT
+	bool
+	prompt "Enforce Zephyr convention for stdint"
+	depends on !ARCH_POSIX
+	default y
+	help
+	  This enforces the Zephyr stdint convention where int32_t = int,
+	  int64_t = long long, and intptr_t = long so that short string
+	  format length modifiers can be used universally across ILP32
+	  and LP64 architectures. Sometimes this is not possible e.g. when
+	  linking against a binary-only C++ library whose type mangling
+	  is incompatible with the Zephyr convention, or if the build
+	  environment doesn't allow such enforcement, in which case this
+	  should be turned off with the caveat that argument type validation
+	  on Zephyr code will be skipped.
 
 endmenu
 
@@ -809,13 +844,11 @@ config COMPAT_INCLUDES
 endmenu
 
 config LEGACY_INCLUDE_PATH
-	bool "Allow for the legacy include paths (without the zephyr/ prefix)"
-	default y
+	bool "Allow for the legacy include paths (without the zephyr/ prefix) (DEPRECATED)"
 	help
-	  Allow applications and libraries to use the Zephyr legacy include
-	  path which does not use the zephyr/ prefix. For example, the
+	  DEPRECATED: Allow applications and libraries to use the Zephyr legacy
+	  include path which does not use the zephyr/ prefix. For example, the
 	  preferred way to include a Zephyr header is to use <zephyr/kernel.h>,
-	  but enabling CONFIG_LEGACY_INCLUDE_PATH will allow developers to
-	  use <kernel.h> instead. This (without the zephyr/ prefix) is
-	  deprecated and should be avoided. Eventually, it will not be
-	  supported.
+	  but enabling CONFIG_LEGACY_INCLUDE_PATH will allow developers to use
+	  <kernel.h> instead. This (without the zephyr/ prefix) is deprecated
+	  and should be avoided. Eventually, it will not be supported.

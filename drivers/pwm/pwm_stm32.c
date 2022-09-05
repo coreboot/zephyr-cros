@@ -22,6 +22,7 @@
 #include <zephyr/dt-bindings/pwm/stm32_pwm.h>
 
 #include <zephyr/logging/log.h>
+
 LOG_MODULE_REGISTER(pwm_stm32, CONFIG_PWM_LOG_LEVEL);
 
 /* L0 series MCUs only have 16-bit timers and don't have below macro defined */
@@ -634,6 +635,11 @@ static int pwm_stm32_init(const struct device *dev)
 
 	/* enable clock and store its speed */
 	clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+
+	if (!device_is_ready(clk)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
 
 	r = clock_control_on(clk, (clock_control_subsys_t *)&cfg->pclken);
 	if (r < 0) {

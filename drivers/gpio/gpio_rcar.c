@@ -13,7 +13,7 @@
 #include <zephyr/init.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/clock_control.h>
-#include <zephyr/drivers/clock_control/rcar_clock_control.h>
+#include <zephyr/drivers/clock_control/renesas_cpg_mssr.h>
 
 #include "gpio_utils.h"
 
@@ -246,6 +246,10 @@ static int gpio_rcar_init(const struct device *dev)
 {
 	const struct gpio_rcar_cfg *config = dev->config;
 	int ret;
+
+	if (!device_is_ready(config->clock_dev)) {
+		return -ENODEV;
+	}
 
 	ret = clock_control_on(config->clock_dev,
 			       (clock_control_subsys_t *) &config->mod_clk);

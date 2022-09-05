@@ -11,16 +11,6 @@ config BOARD
 config BT_CTLR
 	default BT
 
-if DISPLAY
-
-config SPI
-	default y
-
-config ST7789V
-	default y
-
-endif # DISPLAY
-
 if FLASH
 
 config SPI
@@ -29,9 +19,9 @@ config SPI
 config SPI_NOR
 	default y
 
-endif # FLASH
+config SPI_NOR_FLASH_LAYOUT_PAGE_SIZE
+	default 4096
 
-config I2C
-	default y if KSCAN
+endif # FLASH
 
 endif # BOARD_PINETIME_DEVKIT0

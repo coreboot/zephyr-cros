@@ -6,7 +6,7 @@
  */
 
 #include <zephyr/drivers/can.h>
-#include <ztest.h>
+#include <zephyr/ztest.h>
 
 /**
  * @addtogroup t_can_driver
@@ -31,9 +31,9 @@
 /**
  * @brief Global variables.
  */
-const struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
-struct k_sem rx_callback_sem;
-struct k_sem tx_callback_sem;
+static const struct device *can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
+static struct k_sem rx_callback_sem;
+static struct k_sem tx_callback_sem;
 
 CAN_MSGQ_DEFINE(can_msgq, 5);
 
@@ -340,23 +340,23 @@ static void send_receive(const struct zcan_filter *filter1,
 }
 
 /**
- * @brief Test configuring the CAN controller for loopback mode.
- *
- * This test case must be run before sending/receiving test cases as it allows
- * these test cases to send/receive their own frames.
+ * @brief Test getting the CAN controller capabilities.
  */
-static void test_set_loopback(void)
+ZTEST(canfd, test_get_capabilities)
 {
+	can_mode_t cap;
 	int err;
 
-	err = can_set_mode(can_dev, CAN_MODE_LOOPBACK | CAN_MODE_FD);
-	zassert_equal(err, 0, "failed to set loopback-mode (err %d)", err);
+	err = can_get_capabilities(can_dev, &cap);
+	zassert_equal(err, 0, "failed to get CAN capabilities (err %d)", err);
+	zassert_not_equal(cap & (CAN_MODE_LOOPBACK | CAN_MODE_FD), 0,
+			  "CAN-FD loopback mode not supported");
 }
 
 /**
  * @brief Test send/receive with standard (11-bit) CAN IDs and classic CAN frames.
  */
-void test_send_receive_classic(void)
+ZTEST(canfd, test_send_receive_classic)
 {
 	send_receive(&test_std_filter_1, &test_std_filter_2,
 		     &test_std_frame_1, &test_std_frame_2);
@@ -365,7 +365,7 @@ void test_send_receive_classic(void)
 /**
  * @brief Test send/receive with standard (11-bit) CAN IDs and CAN-FD frames.
  */
-void test_send_receive_fd(void)
+ZTEST(canfd, test_send_receive_fd)
 {
 	send_receive(&test_std_filter_1, &test_std_filter_2,
 		     &test_std_frame_fd_1, &test_std_frame_fd_2);
@@ -374,23 +374,25 @@ void test_send_receive_fd(void)
 /**
  * @brief Test send/receive with (11-bit) CAN IDs, mixed classic and CAN-FD frames.
  */
-void test_send_receive_mixed(void)
+ZTEST(canfd, test_send_receive_mixed)
 {
 	send_receive(&test_std_filter_1, &test_std_filter_2,
 		     &test_std_frame_fd_1, &test_std_frame_2);
 }
 
-void test_main(void)
+void *canfd_setup(void)
 {
+	int err;
+
 	k_sem_init(&rx_callback_sem, 0, 2);
 	k_sem_init(&tx_callback_sem, 0, 2);
 
 	zassert_true(device_is_ready(can_dev), "CAN device not ready");
 
-	ztest_test_suite(canfd_driver,
-			 ztest_unit_test(test_set_loopback),
-			 ztest_unit_test(test_send_receive_classic),
-			 ztest_unit_test(test_send_receive_fd),
-			 ztest_unit_test(test_send_receive_mixed));
-	ztest_run_test_suite(canfd_driver);
+	err = can_set_mode(can_dev, CAN_MODE_LOOPBACK | CAN_MODE_FD);
+	zassert_equal(err, 0, "failed to set CAN-FD loopback mode (err %d)", err);
+
+	return NULL;
 }
+
+ZTEST_SUITE(canfd, NULL, canfd_setup, NULL, NULL, NULL);

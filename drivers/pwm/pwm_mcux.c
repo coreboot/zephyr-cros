@@ -13,9 +13,9 @@
 #include <fsl_pwm.h>
 #include <zephyr/drivers/pinctrl.h>
 
-#define LOG_LEVEL CONFIG_PWM_LOG_LEVEL
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(pwm_mcux);
+
+LOG_MODULE_REGISTER(pwm_mcux, CONFIG_PWM_LOG_LEVEL);
 
 #define CHANNEL_COUNT 2
 
@@ -137,6 +137,11 @@ static int pwm_mcux_init(const struct device *dev)
 	status_t status;
 	int i, err;
 
+	if (!device_is_ready(config->clock_dev)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
+
 	err = pinctrl_apply_state(config->pincfg, PINCTRL_STATE_DEFAULT);
 	if (err < 0) {
 		return err;
@@ -155,7 +160,7 @@ static int pwm_mcux_init(const struct device *dev)
 
 	/* Disable fault sources */
 	for (i = 0; i < FSL_FEATURE_PWM_FAULT_CH_COUNT; i++) {
-		((PWM_Type *)config->base)->SM[config->index].DISMAP[i] = 0x0000;
+		config->base->SM[config->index].DISMAP[i] = 0x0000;
 	}
 
 	data->channel[0].pwmChannel = kPWM_PwmA;
@@ -176,7 +181,7 @@ static const struct pwm_driver_api pwm_mcux_driver_api = {
 	PINCTRL_DT_INST_DEFINE(n);					  \
 									  \
 	static const struct pwm_mcux_config pwm_mcux_config_ ## n = {     \
-		.base = (void *)DT_REG_ADDR(DT_INST_PARENT(n)),		  \
+		.base = (PWM_Type *)DT_REG_ADDR(DT_INST_PARENT(n)),	  \
 		.index = DT_INST_PROP(n, index),			  \
 		.mode = kPWM_EdgeAligned,				  \
 		.prescale = kPWM_Prescale_Divide_128,			  \

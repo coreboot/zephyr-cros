@@ -124,6 +124,7 @@ struct net_pkt {
 	/* Filled by layer 2 when network packet is received. */
 	struct net_linkaddr lladdr_src;
 	struct net_linkaddr lladdr_dst;
+	uint16_t ll_proto_type;
 
 #if defined(CONFIG_NET_TCP)
 	/** Allow placing the packet into sys_slist_t */
@@ -243,8 +244,24 @@ struct net_pkt {
 #endif /* CONFIG_NET_IPV6 */
 
 #if defined(CONFIG_IEEE802154)
-	uint8_t ieee802154_rssi; /* Received Signal Strength Indication */
+#if defined(CONFIG_IEEE802154_2015)
+	uint32_t ieee802154_ack_fc; /* Frame counter set in the ACK */
+	uint8_t ieee802154_ack_keyid; /* Key index set in the ACK */
+#endif
 	uint8_t ieee802154_lqi;  /* Link Quality Indicator */
+	union {
+		uint8_t ieee802154_rssi; /* Received Signal Strength Indication */
+#if defined(CONFIG_IEEE802154_SELECTIVE_TXPOWER)
+		int8_t ieee802154_txpwr; /* TX power in dBm. It should be clear from
+					  * the context which field of the union
+					  * is valid at the moment.
+					  */
+#endif /* CONFIG_IEEE802154_SELECTIVE_TXPOWER */
+	};
+#if defined(CONFIG_IEEE802154_2015)
+	uint8_t ieee802154_fv2015 : 1; /* Frame version is IEEE 802.15.4-2015 */
+	uint8_t ieee802154_ack_seb : 1; /* Security Enabled Bit was set in the ACK */
+#endif
 	uint8_t ieee802154_arb : 1; /* ACK Request Bit is set in the frame */
 	uint8_t ieee802154_ack_fpb : 1; /* Frame Pending Bit was set in the ACK */
 	uint8_t ieee802154_frame_secured : 1; /* Frame is authenticated and
@@ -256,12 +273,6 @@ struct net_pkt {
 					     * it requires further modifications,
 					     * e.g. Frame Counter injection.
 					     */
-#if defined(CONFIG_IEEE802154_2015)
-	uint8_t ieee802154_fv2015 : 1; /* Frame version is IEEE 802.15.4-2015 */
-	uint8_t ieee802154_ack_seb : 1; /* Security Enabled Bit was set in the ACK */
-	uint32_t ieee802154_ack_fc; /* Frame counter set in the ACK */
-	uint8_t ieee802154_ack_keyid; /* Key index set in the ACK */
-#endif
 #endif
 	/* @endcond */
 };
@@ -1008,6 +1019,16 @@ static inline void net_pkt_lladdr_clear(struct net_pkt *pkt)
 	net_pkt_lladdr_src(pkt)->len = 0U;
 }
 
+static inline uint16_t net_pkt_ll_proto_type(struct net_pkt *pkt)
+{
+	return pkt->ll_proto_type;
+}
+
+static inline void net_pkt_set_ll_proto_type(struct net_pkt *pkt, uint16_t type)
+{
+	pkt->ll_proto_type = type;
+}
+
 #if defined(CONFIG_IEEE802154) || defined(CONFIG_IEEE802154_RAW_MODE)
 static inline uint8_t net_pkt_ieee802154_rssi(struct net_pkt *pkt)
 {
@@ -1117,6 +1138,19 @@ static inline void net_pkt_set_ieee802154_ack_keyid(struct net_pkt *pkt,
 	pkt->ieee802154_ack_keyid = keyid;
 }
 #endif /* CONFIG_IEEE802154_2015 */
+
+#if defined(CONFIG_IEEE802154_SELECTIVE_TXPOWER)
+static inline int8_t net_pkt_ieee802154_txpwr(struct net_pkt *pkt)
+{
+	return pkt->ieee802154_txpwr;
+}
+
+static inline void net_pkt_set_ieee802154_txpwr(struct net_pkt *pkt,
+						int8_t txpwr)
+{
+	pkt->ieee802154_txpwr = txpwr;
+}
+#endif /* CONFIG_IEEE802154_SELECTIVE_TXPOWER */
 #endif /* CONFIG_IEEE802154 || CONFIG_IEEE802154_RAW_MODE */
 
 #if defined(CONFIG_NET_IPV4_AUTO)

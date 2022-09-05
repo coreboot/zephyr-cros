@@ -144,36 +144,10 @@ def main():
             write_vanilla_props(node)
 
         write_chosen(edt)
-        write_global_compat_info(edt)
-
-        write_device_extern_header(args.device_header_out, edt)
+        write_global_macros(edt)
 
     if args.edt_pickle_out:
         write_pickled_edt(edt, args.edt_pickle_out)
-
-
-def write_device_extern_header(device_header_out, edt):
-    # Generate header that will extern devicetree struct device's
-
-    with open(device_header_out, "w", encoding="utf-8") as dev_header_file:
-        print("#ifndef DEVICE_EXTERN_GEN_H", file=dev_header_file)
-        print("#define DEVICE_EXTERN_GEN_H", file=dev_header_file)
-        print("", file=dev_header_file)
-        print("#ifdef __cplusplus", file=dev_header_file)
-        print('extern "C" {', file=dev_header_file)
-        print("#endif", file=dev_header_file)
-        print("", file=dev_header_file)
-
-        for node in sorted(edt.nodes, key=lambda node: node.dep_ordinal):
-            print(f"extern const struct device DEVICE_DT_NAME_GET(DT_{node.z_path_id}); /* dts_ord_{node.dep_ordinal} */",
-                  file=dev_header_file)
-
-        print("", file=dev_header_file)
-        print("#ifdef __cplusplus", file=dev_header_file)
-        print("}", file=dev_header_file)
-        print("#endif", file=dev_header_file)
-        print("", file=dev_header_file)
-        print("#endif /* DEVICE_EXTERN_GEN_H */", file=dev_header_file)
 
 
 def setup_edtlib_logging():
@@ -222,8 +196,6 @@ def parse_args():
     parser.add_argument("--dts-out", required=True,
                         help="path to write merged DTS source code to (e.g. "
                              "as a debugging aid)")
-    parser.add_argument("--device-header-out", required=True,
-                        help="path to write device struct extern header to")
     parser.add_argument("--edt-pickle-out",
                         help="path to write pickled edtlib.EDT object to")
     parser.add_argument("--vendor-prefixes", action='append', default=[],
@@ -351,9 +323,6 @@ def write_bus(node):
     bus = node.bus_node
     if not bus:
         return
-
-    if not bus.label:
-        err(f"missing 'label' property on bus node {bus!r}")
 
     out_comment(f"Bus info (controller: '{bus.path}', type: '{node.on_bus}')")
     out_dt_define(f"{node.z_path_id}_BUS_{str2ident(node.on_bus)}", 1)
@@ -537,6 +506,8 @@ def write_compatibles(node):
 def write_children(node):
     # Writes helper macros for dealing with node's children.
 
+    out_comment("Helper macros for child nodes of this node.")
+
     out_dt_define(f"{node.z_path_id}_FOREACH_CHILD(fn)",
             " ".join(f"fn(DT_{child.z_path_id})" for child in
                 node.children.values()))
@@ -651,6 +622,9 @@ def write_vanilla_props(node):
             for i, subval in enumerate(prop.val):
                 if isinstance(subval, str):
                     macro2val[macro + f"_IDX_{i}"] = quote_str(subval)
+                    subval_as_token = edtlib.str_as_token(subval)
+                    macro2val[macro + f"_IDX_{i}_TOKEN"] = subval_as_token
+                    macro2val[macro + f"_IDX_{i}_UPPER_TOKEN"] = subval_as_token.upper()
                 else:
                     macro2val[macro + f"_IDX_{i}"] = subval
                 macro2val[macro + f"_IDX_{i}_EXISTS"] = 1
@@ -852,9 +826,17 @@ def write_chosen(edt):
         out_define(macro, value, width=max_len)
 
 
-def write_global_compat_info(edt):
-    # Tree-wide information related to each compatible, such as number
-    # of instances with status "okay", is printed here.
+def write_global_macros(edt):
+    # Global or tree-wide information, such as number of instances
+    # with status "okay" for each compatible, is printed here.
+
+
+    out_comment("Macros for iterating over all nodes and enabled nodes")
+    out_dt_define("FOREACH_HELPER(fn)",
+                  " ".join(f"fn(DT_{node.z_path_id})" for node in edt.nodes))
+    out_dt_define("FOREACH_OKAY_HELPER(fn)",
+                  " ".join(f"fn(DT_{node.z_path_id})" for node in edt.nodes
+                           if node.status == "okay"))
 
     n_okay_macros = {}
     for_each_macros = {}

@@ -52,6 +52,11 @@ static int can_stm32h7_clock_enable(const struct device *dev)
 
 	LL_RCC_SetFDCANClockSource(LL_RCC_FDCAN_CLKSOURCE_PLL1Q);
 
+	if (!device_is_ready(clk)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
+
 	ret = clock_control_on(clk, (clock_control_subsys_t *)&stm32h7_cfg->pclken);
 	if (ret != 0) {
 		LOG_ERR("failure enabling clock");
@@ -95,6 +100,7 @@ static int can_stm32h7_init(const struct device *dev)
 }
 
 static const struct can_driver_api can_stm32h7_driver_api = {
+	.get_capabilities = can_mcan_get_capabilities,
 	.set_mode = can_mcan_set_mode,
 	.set_timing = can_mcan_set_timing,
 	.send = can_mcan_send,

@@ -15,6 +15,7 @@
 #include <zephyr/drivers/pinctrl.h>
 
 #include <zephyr/logging/log.h>
+
 LOG_MODULE_REGISTER(pwm_mcux_pwt, CONFIG_PWM_LOG_LEVEL);
 
 /* Number of PWT input ports */
@@ -281,6 +282,11 @@ static int mcux_pwt_init(const struct device *dev)
 	struct mcux_pwt_data *data = dev->data;
 	pwt_config_t *pwt_config = &data->pwt_config;
 	int err;
+
+	if (!device_is_ready(config->clock_dev)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
+	}
 
 	if (clock_control_get_rate(config->clock_dev, config->clock_subsys,
 				   &data->clock_freq)) {

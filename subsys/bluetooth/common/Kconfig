@@ -214,6 +214,14 @@ config BT_HCI_VS_EXT
 	  Host and/or Controller. This enables  Write BD_ADDR, Read Build Info,
 	  Read Static Addresses and Read Key Hierarchy Roots vendor commands.
 
+config BT_HCI_VS_FATAL_ERROR
+	bool "Allow vendor specific HCI event Zephyr Fatal Error"
+	depends on BT_HCI_VS_EXT
+	default n
+	help
+	  Enable emiting HCI Vendor-Specific events for system and Controller error that are
+	  unrecoverable.
+
 config BT_HCI_VS_EXT_DETECT
 	bool "Use heuristics to guess HCI vendor extensions support in advance"
 	depends on BT_HCI_VS_EXT && !BT_CTLR
@@ -313,6 +321,8 @@ config BT_DEBUG_MONITOR_RTT
 	depends on USE_SEGGER_RTT
 	depends on SEGGER_RTT_MAX_NUM_UP_BUFFERS >= 2
 	select BT_DEBUG
+	select LOG
+	select CONSOLE_HAS_DRIVER
 	select BT_MONITOR
 	help
 	  Use a custom logging protocol over the RTT buffer instead of

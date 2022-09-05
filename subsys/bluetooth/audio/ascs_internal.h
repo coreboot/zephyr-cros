@@ -45,7 +45,7 @@
 #define BT_ASCS_QOS_FRAMING_UNFRAMED     0x00
 #define BT_ASCS_QOS_FRAMING_FRAMED       0x01
 
-/* Format of the ASE characteristic, defined in Table 4.6 */
+/* Format of the ASE characteristic, defined in Table 4.2 */
 struct bt_ascs_ase_status {
 	uint8_t  id;
 	uint8_t  state;
@@ -66,7 +66,7 @@ struct bt_ascs_codec {
 
 #define BT_ASCS_PD_NO_PREF 0x00000000
 
-/* ASE_State = 0x01 (Codec Configured), defined in Table 4.7. */
+/* ASE_State = 0x01 (Codec Configured), defined in Table 4.3. */
 struct bt_ascs_ase_status_config {
 	uint8_t  framing;
 	uint8_t  phy;
@@ -82,7 +82,7 @@ struct bt_ascs_ase_status_config {
 	struct bt_ascs_codec_config cc[0];
 } __packed;
 
-/* ASE_State = 0x02 (QoS Configured), defined in Table 4.8. */
+/* ASE_State = 0x02 (QoS Configured), defined in Table 4.4. */
 struct bt_ascs_ase_status_qos {
 	uint8_t  cig_id;
 	uint8_t  cis_id;
@@ -95,7 +95,7 @@ struct bt_ascs_ase_status_qos {
 	uint8_t  pd[3];
 } __packed;
 
-/* ASE_Status = 0x03 (Enabling) defined in Table 4.9.
+/* ASE_Status = 0x03 (Enabling) defined in Table 4.5.
  */
 struct bt_ascs_ase_status_enable {
 	uint8_t  cig_id;
@@ -104,7 +104,7 @@ struct bt_ascs_ase_status_enable {
 	uint8_t  metadata[0];
 } __packed;
 
-/* ASE_Status =  0x04 (Streaming) defined in Table 4.9.
+/* ASE_Status =  0x04 (Streaming) defined in Table 4.5.
  */
 struct bt_ascs_ase_status_stream {
 	uint8_t  cig_id;
@@ -113,7 +113,7 @@ struct bt_ascs_ase_status_stream {
 	uint8_t  metadata[0];
 } __packed;
 
-/* ASE_Status = 0x05 (Disabling) as defined in Table 4.9.
+/* ASE_Status = 0x05 (Disabling) as defined in Table 4.5.
  */
 struct bt_ascs_ase_status_disable {
 	uint8_t  cig_id;
@@ -359,3 +359,8 @@ static inline const char *bt_ascs_reason_str(uint8_t reason)
 
 	return "Unknown";
 }
+
+void ascs_ep_set_state(struct bt_audio_ep *ep, uint8_t state);
+int ascs_ep_set_metadata(struct bt_audio_ep *ep,
+			 struct net_buf_simple *buf, uint8_t len,
+			 struct bt_codec *codec);

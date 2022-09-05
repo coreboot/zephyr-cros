@@ -52,6 +52,8 @@
 #include "common/log.h"
 #include "hal/debug.h"
 
+#define PDU_FREE_TIMEOUT K_SECONDS(5)
+
 static int init_reset(void);
 static void pdu_free_sem_give(void);
 
@@ -266,6 +268,10 @@ int lll_adv_data_init(struct lll_adv_pdu *pdu)
 		return -ENOMEM;
 	}
 
+#if defined(CONFIG_BT_CTLR_ADV_PDU_LINK)
+	PDU_ADV_NEXT_PTR(p) = NULL;
+#endif /* CONFIG_BT_CTLR_ADV_PDU_LINK */
+
 	p->len = 0U;
 	pdu->pdu[0] = (void *)p;
 
@@ -406,8 +412,7 @@ struct pdu_adv *lll_adv_pdu_alloc_pdu_adv(void)
 
 	p = MFIFO_DEQUEUE_PEEK(pdu_free);
 	if (p) {
-		err = k_sem_take(&sem_pdu_free, K_NO_WAIT);
-		LL_ASSERT(!err);
+		k_sem_reset(&sem_pdu_free);
 
 		MFIFO_DEQUEUE(pdu_free);
 
@@ -425,8 +430,10 @@ struct pdu_adv *lll_adv_pdu_alloc_pdu_adv(void)
 		return p;
 	}
 
-	err = k_sem_take(&sem_pdu_free, K_FOREVER);
+	err = k_sem_take(&sem_pdu_free, PDU_FREE_TIMEOUT);
 	LL_ASSERT(!err);
+
+	k_sem_reset(&sem_pdu_free);
 
 	p = MFIFO_DEQUEUE(pdu_free);
 	LL_ASSERT(p);
@@ -518,6 +525,10 @@ int lll_adv_and_extra_data_init(struct lll_adv_pdu *pdu)
 	if (!p) {
 		return -ENOMEM;
 	}
+
+#if defined(CONFIG_BT_CTLR_ADV_PDU_LINK)
+	PDU_ADV_NEXT_PTR(p) = NULL;
+#endif /* CONFIG_BT_CTLR_ADV_PDU_LINK */
 
 	pdu->pdu[0] = (void *)p;
 
@@ -795,11 +806,10 @@ static void pdu_free_sem_give(void)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, mfy_pdu_free_sem_give};
-	uint32_t retval;
 
-	retval = mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 0,
-				&mfy);
-	LL_ASSERT(!retval);
+	/* Ignore mayfly_enqueue failure on repeated enqueue call */
+	(void)mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 0,
+			     &mfy);
 }
 
 #else /* !CONFIG_BT_CTLR_ZLI */
@@ -838,7 +848,7 @@ static void *adv_extra_data_allocate(struct lll_adv_pdu *pdu, uint8_t last)
 		return extra_data;
 	}
 
-	err = k_sem_take(&sem_extra_data_free, K_FOREVER);
+	err = k_sem_take(&sem_extra_data_free, PDU_FREE_TIMEOUT);
 	LL_ASSERT(!err);
 
 	extra_data = MFIFO_DEQUEUE(extra_data_free);
@@ -1306,7 +1316,8 @@ static void isr_done(void *param)
 		lll_aux = lll->aux;
 		if (lll_aux) {
 			(void)ull_adv_aux_lll_offset_fill(pdu,
-							  lll_aux->ticks_offset,
+							  lll_aux->ticks_pri_pdu_offset,
+							  lll_aux->us_pri_pdu_offset,
 							  start_us);
 		}
 #else /* !CONFIG_BT_CTLR_ADV_EXT */
@@ -1381,10 +1392,35 @@ static void isr_abort(void *param)
 	/* Clear radio status and events */
 	lll_isr_status_reset();
 
+	/* Disable any filter that was setup */
 	radio_filter_disable();
 
+	/* Current LLL radio event is done*/
 	lll_isr_cleanup(param);
 }
+
+#if defined(CONFIG_BT_PERIPHERAL)
+static void isr_abort_all(void *param)
+{
+	static memq_link_t link;
+	static struct mayfly mfy = {0, 0, &link, NULL, lll_disable};
+	uint32_t ret;
+
+	/* Clear radio status and events */
+	lll_isr_status_reset();
+
+	/* Disable any filter that was setup */
+	radio_filter_disable();
+
+	/* Current LLL radio event is done*/
+	lll_isr_cleanup(param);
+
+	/* Abort any LLL prepare/resume enqueued in pipeline */
+	mfy.param = param;
+	ret = mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_LLL, 1U, &mfy);
+	LL_ASSERT(!ret);
+}
+#endif /* CONFIG_BT_PERIPHERAL */
 
 static struct pdu_adv *chan_prepare(struct lll_adv *lll)
 {
@@ -1552,7 +1588,7 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 			return -ENOBUFS;
 		}
 
-		radio_isr_set(isr_abort, lll);
+		radio_isr_set(isr_abort_all, lll);
 		radio_disable();
 
 		/* assert if radio started tx */

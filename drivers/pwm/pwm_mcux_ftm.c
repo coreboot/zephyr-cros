@@ -15,9 +15,9 @@
 #include <fsl_clock.h>
 #include <zephyr/drivers/pinctrl.h>
 
-#define LOG_LEVEL CONFIG_PWM_LOG_LEVEL
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(pwm_mcux_ftm);
+
+LOG_MODULE_REGISTER(pwm_mcux_ftm, CONFIG_PWM_LOG_LEVEL);
 
 #define MAX_CHANNELS ARRAY_SIZE(FTM0->CONTROLS)
 
@@ -402,6 +402,11 @@ static int mcux_ftm_init(const struct device *dev)
 	if (config->channel_count > ARRAY_SIZE(data->channel)) {
 		LOG_ERR("Invalid channel count");
 		return -EINVAL;
+	}
+
+	if (!device_is_ready(config->clock_dev)) {
+		LOG_ERR("clock control device not ready");
+		return -ENODEV;
 	}
 
 	if (clock_control_get_rate(config->clock_dev, config->clock_subsys,

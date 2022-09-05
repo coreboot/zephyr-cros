@@ -17,7 +17,7 @@
 #define STM32_PERIPH_BUS_MIN	STM32_CLOCK_BUS_AHB1
 #define STM32_PERIPH_BUS_MAX	STM32_CLOCK_BUS_APB2
 
-/** Peripheral clock sources */
+/** Domain clocks */
 /* RM0434, § Clock configuration register (RCC_CCIPRx) */
 
 /** Fixed clocks  */
@@ -30,12 +30,11 @@
 #define STM32_SRC_SYSCLK	0x006
 /** Bus clock */
 #define STM32_SRC_PCLK		0x007
-/** PLL clocks */
-#define STM32_SRC_PLLCLK	0x008
+/** PLL clock outputs */
+#define STM32_SRC_PLL_P		0x008
+#define STM32_SRC_PLL_Q		0x009
+#define STM32_SRC_PLL_R		0x00a
 /* TODO: PLLSAI clocks */
-
-#define STM32_SRC_CLOCK_MIN	STM32_SRC_HSI
-#define STM32_SRC_CLOCK_MAX	STM32_SRC_PLLCLK
 
 /**
  * @brief STM32 clock configuration bit field.
@@ -69,7 +68,7 @@
 /** @brief RCC_CCIPR register offset */
 #define CCIPR_REG		0x88
 
-/** @brief Device clk sources selection helpers */
+/** @brief Device domain clocks selection helpers */
 /** CCIPR devices */
 #define USART1_SEL(val)		STM32_CLOCK(val, 3, 0, CCIPR_REG)
 #define LPUART1_SEL(val)	STM32_CLOCK(val, 3, 10, CCIPR_REG)

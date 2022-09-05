@@ -93,7 +93,7 @@ The current minimum required version for the main dependencies are:
             sudo apt install --no-install-recommends git cmake ninja-build gperf \
               ccache dfu-util device-tree-compiler wget \
               python3-dev python3-pip python3-setuptools python3-tk python3-wheel xz-utils file \
-              make gcc gcc-multilib g++-multilib libsdl2-dev
+              make gcc gcc-multilib g++-multilib libsdl2-dev libmagic1
 
       #. Verify the versions of the main dependencies installed on your system by entering::
 
@@ -119,7 +119,7 @@ The current minimum required version for the main dependencies are:
 
          .. code-block:: bash
 
-            brew install cmake ninja gperf python3 ccache qemu dtc wget
+            brew install cmake ninja gperf python3 ccache qemu dtc wget libmagic
 
    .. group-tab:: Windows
 
@@ -233,6 +233,12 @@ reason it is suggested to use `Python virtual environments`_.
                   pip3 install --user -r ~/zephyrproject/zephyr/scripts/requirements.txt
 
          .. group-tab:: Install within virtual environment
+
+            #. Use ``apt`` to install Python ``venv`` package:
+
+               .. code-block:: bash
+
+                  sudo apt install python3-venv
 
             #. Create a new virtual environment:
 
@@ -701,6 +707,24 @@ Here are some next steps for exploring Zephyr:
 * Check out :ref:`beyond-GSG` for additional setup alternatives and ideas
 * Discover :ref:`project-resources` for getting help from the Zephyr
   community
+
+.. _troubleshooting_installation:
+
+Troubleshooting Installation
+****************************
+
+Here are some tips for fixing some issues related to the installation process.
+
+.. _toolchain_zephyr_sdk_update:
+
+Double Check the Zephyr SDK Variables When Updating
+===================================================
+
+When updating Zephyr SDK, check whether the :envvar:`ZEPHYR_TOOLCHAIN_VARIANT`
+or :envvar:`ZEPHYR_SDK_INSTALL_DIR` environment variables are already set.
+See :ref:`gs_toolchain_update` for more information.
+
+For more information about these environment variables in Zephyr, see :ref:`env_vars_important`.
 
 .. _help:
 
