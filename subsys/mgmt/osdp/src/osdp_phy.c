@@ -433,10 +433,18 @@ int osdp_phy_decode_packet(struct osdp_pd *pd, uint8_t *buf, int len,
 			 * usage of SCBKD is allowed only when the PD is in
 			 * install mode (indicated by PD_FLAG_INSTALL_MODE).
 			 */
-			if (ISSET_FLAG(pd, PD_FLAG_INSTALL_MODE) &&
-			    pkt->data[2] == 0) {
-				SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);
+			if (pkt->data[2] == 0) {
+				if (ISSET_FLAG(pd, PD_FLAG_INSTALL_MODE)) {
+					SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);	
+				} else {
+					pd->reply_id = REPLY_NAK;
+					return OSDP_ERR_PKT_NACK;
+				}
 			}
+			// if (ISSET_FLAG(pd, PD_FLAG_INSTALL_MODE) &&
+			//     pkt->data[2] == 0) {
+			// 	SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);
+			// }
 		}
 		data = pkt->data + pkt->data[0];
 		len -= pkt->data[0]; /* consume security block */

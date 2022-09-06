@@ -665,6 +665,11 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 		cmd.id = OSDP_CMD_CHLNG;
+		if (ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD)) {
+			cmd.chlng.key_type = 0;
+		} else {
+			cmd.chlng.key_type = 1;
+		}
 		memcpy(cmd.chlng.random_number, &buf[pos], 8U);
 		ret = pd->command_callback(pd->command_callback_arg, &cmd);
 		if (ret < 0) {
@@ -934,7 +939,7 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 		buf[len++] = pd->reply_id;
 		cmd = (struct osdp_cmd *)pd->ephemeral_data;
 		if (cmd->id == OSDP_CMD_CHLNG) {
-			memcpy(&buf[len], cmd->data, 32U);
+			memcpy(&buf[len], cmd->data, 32U);			
 			len += 32U;
 		} else {
 			osdp_fill_random(pd->sc.pd_random, 8);
@@ -965,11 +970,20 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 		smb[1] = SCS_14; /* type */
 		cmd = (struct osdp_cmd *)pd->ephemeral_data;
 		if (cmd->id == OSDP_CMD_SCRYPT) {
+			memcpy(pd->sc.r_mac, cmd->data, 16U);
+			memcpy(pd->sc.s_mac1, cmd->data + 16U, 16U);
+			memcpy(pd->sc.s_mac2, cmd->data + 32U, 16U);
+			memcpy(pd->sc.s_enc, cmd->data + 48U, 16U);
 			memcpy(&buf[len], cmd->data, 16U);
 			len += 16U;
 			smb[2] = 1; /* CP auth succeeded */
 			sc_activate(pd);
-			LOG_INF("SC Active - APP");
+			pd->sc_tstamp = osdp_millis_now();
+			if (ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD)) {
+				LOG_WRN("SC Active with SCBK-D");
+			} else {
+				LOG_WRN("SC Active");
+			}
 		} else {
 			osdp_compute_rmac_i(pd);
 			for (i = 0; i < 16; i++) {
@@ -1253,10 +1267,12 @@ int osdp_setup(struct osdp *ctx, const struct osdp_info *info)
 	SET_FLAG(pd, PD_FLAG_PD_MODE);
 
 	if (sc_is_enabled(pd)) {
-		if (info->key == NULL) {
+		if (info->key == NULL) {			
 			LOG_WRN("SCBK not provided. PD is in INSTALL_MODE");
 			SET_FLAG(pd, PD_FLAG_INSTALL_MODE);
+			SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);			
 		} else {
+			
 			memcpy(pd->sc.scbk, info->key, 16);
 		}
 		SET_FLAG(pd, PD_FLAG_SC_CAPABLE);

@@ -424,9 +424,11 @@ struct osdp_cmd_keyset {
  * @brief This command delivers a random challenge to the PD and it requests 
  * the PD to initialize for the secure session.
  *
- * @param random_number Random number genrated by the ACU (RND.A)
+ * @param key_type 		Used key type
+ * @param random_number Random number genrated by the ACU (RND.A)* 
  */
 struct osdp_cmd_chlng {
+	uint8_t key_type;
 	uint8_t random_number[OSDP_CMD_CHLNG_RND_NUM_LEN];
 };
 

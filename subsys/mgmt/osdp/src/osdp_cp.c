@@ -1090,7 +1090,6 @@ void osdp_update(struct osdp *ctx)
 
 int osdp_setup(struct osdp *ctx, const struct osdp_info *info)
 {
-	ARG_UNUSED(key);
 	struct osdp_pd *pd = osdp_to_pd(ctx, 0);
 
 	if (sc_is_enabled(pd) && info->key == NULL) {

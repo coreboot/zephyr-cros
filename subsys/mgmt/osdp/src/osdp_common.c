@@ -58,8 +58,10 @@ void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 	struct cipher_pkt encrypt = {
 		.in_buf = data, .in_len = len, .out_buf = data, .out_len = len
 	};
-
 	dev = device_get_binding(CONFIG_OSDP_CRYPTO_DRV_NAME);
+	struct crypto_driver_api *api = (struct crypto_driver_api *) dev->api;
+	ctx.flags = api->query_hw_caps(dev);
+
 	if (dev == NULL) {
 		LOG_ERR("Failed to get crypto dev binding!");
 		return;
@@ -96,6 +98,9 @@ void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 	};
 
 	dev = device_get_binding(CONFIG_OSDP_CRYPTO_DRV_NAME);
+	struct crypto_driver_api *api = (struct crypto_driver_api *) dev->api;
+	ctx.flags = api->query_hw_caps(dev);
+		
 	if (dev == NULL) {
 		LOG_ERR("Failed to get crypto dev binding!");
 		return;
@@ -125,7 +130,8 @@ void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 
 void osdp_fill_random(uint8_t *buf, int len)
 {
-	sys_csrand_get(buf, len);
+	memset(buf, len, 0);
+	//sys_csrand_get(buf, len);
 }
 
 #endif /* CONFIG_OSDP_SC_ENABLED */

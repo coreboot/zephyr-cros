@@ -73,7 +73,9 @@ config OSDP_SC_ENABLED
 	depends on CSPRING_ENABLED
 	default y
 	select CRYPTO
-	select CRYPTO_TC_SHIM
+	select CRYPTO_MBEDTLS_SHIM
+	select MBEDTLS
+	select MBEDTLS_CIPHER_CCM_ENABLED
 	help
 	  Secure the OSDP communication channel with encryption and mutual
 	  authentication.
@@ -89,7 +91,7 @@ config OSDP_SC_RETRY_WAIT_SEC
 
 config OSDP_CRYPTO_DRV_NAME
 	string "Crypto driver to use with OSDP"
-	default "CRYPTO_TC"
+	default "CRYPTO_MTLS"
 	help
 	  OSDP Secure Channel uses AES-128 to secure communication between
 	  CP and PD. Provide an available crypto driver name here.

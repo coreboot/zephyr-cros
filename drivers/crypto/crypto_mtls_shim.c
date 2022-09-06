@@ -60,7 +60,7 @@ struct mtls_shim_session mtls_sessions[CRYPTO_MAX_SESSION];
 #if defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C)
 #include "mbedtls/memory_buffer_alloc.h"
 #else
-#error "You need to define MBEDTLS_MEMORY_BUFFER_ALLOC_C"
+//#error "You need to define MBEDTLS_MEMORY_BUFFER_ALLOC_C"
 #endif /* MBEDTLS_MEMORY_BUFFER_ALLOC_C */
 
 #define MTLS_GET_CTX(c, m) \
