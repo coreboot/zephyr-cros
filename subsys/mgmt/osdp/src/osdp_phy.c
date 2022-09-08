@@ -438,13 +438,10 @@ int osdp_phy_decode_packet(struct osdp_pd *pd, uint8_t *buf, int len,
 					SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);	
 				} else {
 					pd->reply_id = REPLY_NAK;
+					pd->ephemeral_data[0] = OSDP_PD_NAK_SC_COND;
 					return OSDP_ERR_PKT_NACK;
 				}
 			}
-			// if (ISSET_FLAG(pd, PD_FLAG_INSTALL_MODE) &&
-			//     pkt->data[2] == 0) {
-			// 	SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);
-			// }
 		}
 		data = pkt->data + pkt->data[0];
 		len -= pkt->data[0]; /* consume security block */
