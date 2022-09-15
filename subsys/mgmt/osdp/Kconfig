@@ -52,6 +52,12 @@ config OSDP_THREAD_STACK_SIZE
 	help
 	  Thread stack size for osdp refresh thread
 
+config OSDP_THREAD_PRIORITY
+	int "OSDP Priority"
+	default 2
+	help
+	  Thread cooperative priority
+
 config OSDP_PACKET_TRACE
 	bool "Print bytes sent/received over OSDP to console"
 	help
