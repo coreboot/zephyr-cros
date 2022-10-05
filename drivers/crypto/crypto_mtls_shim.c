@@ -55,7 +55,7 @@ struct mtls_shim_session {
 
 #define CRYPTO_MAX_SESSION CONFIG_CRYPTO_MBEDTLS_SHIM_MAX_SESSION
 
-static struct mtls_shim_session mtls_sessions[CRYPTO_MAX_SESSION];
+struct mtls_shim_session mtls_sessions[CRYPTO_MAX_SESSION];
 
 #if defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C)
 #include "mbedtls/memory_buffer_alloc.h"

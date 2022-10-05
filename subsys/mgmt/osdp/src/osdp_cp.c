@@ -65,7 +65,7 @@ enum osdp_cp_error_e {
 };
 
 int pd_addresses[CONFIG_OSDP_NUM_CONNECTED_PD];
-static struct osdp_cp_info cp_info = {
+static struct osdp_cp_cfg cp_cfg = {
 	.connected_readers_num = CONFIG_OSDP_NUM_CONNECTED_PD,
 	.connected_readers_addresses = NULL,
 };
@@ -91,16 +91,16 @@ static int osdp_extract_address(int *address)
 	return (pd_offset == CONFIG_OSDP_NUM_CONNECTED_PD) ? 0 : -1;
 }
 
-struct osdp_cp_info *cp_get_info()
+struct osdp_cp_cfg *cp_get_cfg()
 {
-	if (cp_info.connected_readers_addresses == NULL) {
+	if (cp_cfg.connected_readers_addresses == NULL) {
 		if (osdp_extract_address(pd_addresses)) {
 			return NULL;
 		} else {
-			cp_info.connected_readers_addresses = pd_addresses;
+			cp_cfg.connected_readers_addresses = pd_addresses;
 		}
 	}
-	return &cp_info;
+	return &cp_cfg;
 }
 
 static struct osdp_cmd *cp_cmd_alloc(struct osdp_pd *pd)
@@ -1088,17 +1088,17 @@ void osdp_update(struct osdp *ctx)
 	}
 }
 
-int osdp_setup(struct osdp *ctx, const struct osdp_info *info)
+int osdp_setup(struct osdp *ctx, const struct osdp_cfg *cfg)
 {
 	struct osdp_pd *pd = osdp_to_pd(ctx, 0);
 
-	if (sc_is_enabled(pd) && info->key == NULL) {
+	if (sc_is_enabled(pd) && cfg->key == NULL) {
 		LOG_ERR("Master key cannot be null");
 		return -1;
 	}
 
-	if (info->key) {
-		memcpy(ctx->sc_master_key, info->key, 16);
+	if (cfg->key) {
+		memcpy(ctx->sc_master_key, cfg->key, 16);
 	}
 	return 0;
 }

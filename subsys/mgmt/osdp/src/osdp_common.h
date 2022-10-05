@@ -403,10 +403,10 @@ int osdp_compute_mac(struct osdp_pd *pd, int is_cmd,
 void osdp_sc_setup(struct osdp_pd *pd);
 
 /* must be implemented by CP or PD */
-int osdp_setup(struct osdp *ctx, const struct osdp_info* info);
+int osdp_setup(struct osdp *ctx, const struct osdp_cfg* info);
 void osdp_update(struct osdp *ctx);
-struct osdp_pd_info* pd_get_info();
-struct osdp_cp_info* cp_get_info();
+struct osdp_pd_cfg* pd_get_cfg();
+struct osdp_cp_cfg* cp_get_cfg();
 
 static inline struct osdp *pd_to_osdp(struct osdp_pd *pd)
 {

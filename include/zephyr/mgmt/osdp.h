@@ -24,8 +24,6 @@ extern "C" {
 #define OSDP_RTMAPER_STATUS_MAX_LEN 8
 #define OSDP_CMD_CHLNG_RND_NUM_LEN 8
 #define OSDP_CMD_SCRYPT_CRYPT_LEN 16
-#define OSDP_EVENT_CCRYPT_DATA_LEN 24
-#define OSDP_EVENT_R_MACI_DATA_LEN 16
 
 /**
  * @brief Various PD capability function codes.
@@ -184,7 +182,7 @@ struct osdp_pd_id {
  *
  * @param inputs Inputs status 
  * @param outputs Outputs status
- * @param rtampers Connected readers tamper status
+ * @param rtampers Connected reader tamper status
  * @param power Power status
  * @param tamper Tamper status
  */
@@ -233,43 +231,52 @@ struct osdp_channel {
 };
 
 /**
- * @brief OSDP PD Information. This struct is used to describe a PD to LibOSDP.
+ * @brief OSDP CP Configuration.
  *
- * @param baud_rate Can be one of 9600/19200/38400/115200/230400
- * @param skip_mark_byte Set to ingonre mark byte in packet
- * @param address 7 bit PD address. the rest of the bits are ignored. The
- *        special address 0x7F is used for broadcast. So there can be 2^7-1
- *        devices on a multi-drop channel
- * @param id Static information that the PD reports to the CP when it received a
- *        `CMD_ID`. These information must be populated by a PD appliication.
- * @param cap This is a pointer to an array of structures containing the PD'
- *        capabilities. Use { -1, 0, 0 } to terminate the array. This is used
- *        only PD mode of operation
- * @param channel Communication channel ops structure, containing send/recv
- *        function pointers.
- * @param status Information on reader status
- * @param scbk Pointer to 16 bytes of Secure Channel Base Key for the PD. If
- *        non-null, this is used to set-up the secure channel instead of using
- *        the Master Key (in case of CP).
+ * @param connected_readers_num Specifies number of connected readers
+ * @param connected_readers_addresses Pointer to array with addresses of connected readers
  */
-
-struct osdp_cp_info {
+struct osdp_cp_cfg {
 	int connected_readers_num;
 	uint8_t *connected_readers_addresses;
 };
 
-struct osdp_pd_info {
+/**
+ * @brief OSDP PD Configuration.
+ * @param reader_address Reader address.
+ * @param id Pointer to static information that the PD reports to the CP when 
+ *        it received a `CMD_ID`. These information must be populated by a PD 
+ *        appliication.
+ * @param cap This is a pointer to an array of structures containing the PD'
+ *        capabilities. Use { -1, 0, 0 } to terminate the array. This is used
+ *        only PD mode of operation
+ * @param status Pointer to struct with information on reader status
+ */
+struct osdp_pd_cfg {
 	uint8_t reader_address;
 	struct osdp_pd_id *id;
 	struct osdp_pd_cap *cap;
 	struct osdp_pd_status *status;
 };
 
-struct osdp_info {
+/**
+ * @brief OSDP Configuration. This struct is used to configure OSDP on runtime.
+ *
+ * @param baud_rate Can be one of 9600/19200/38400/115200/230400
+ * @param skip_mark_byte Set to ignore mark byte in packet
+ * @param cp_cfg Pointer to CP configuration. If not-null it is used to configure 
+ *        CP device on runtime. Otherwise the default build time configuration is used.
+ * @param pd_cfg Pointer to PD configuration. If not-null it is used to configure 
+ *        PD device on runtime. Otherwise the default build time configuration is used. 
+ * @param key Pointer to 16 bytes of Secure Channel Base Key for the PD. If
+ *        non-null, this is used to set-up the secure channel instead of using
+ *        the Master Key (in case of CP).
+ */
+struct osdp_cfg {
 	int baud_rate;
 	bool skip_mark_byte;
-	struct osdp_cp_info *cp_cfg;
-	struct osdp_pd_info *pd_cfg;
+	struct osdp_cp_cfg *cp_cfg;
+	struct osdp_pd_cfg *pd_cfg;
 	uint8_t *key;
 };
 
@@ -433,7 +440,7 @@ struct osdp_cmd_chlng {
 };
 
 /**
- * @brief This command transfers a blovk of data used for encryption 
+ * @brief This command transfers a block of data used for encryption 
  * synchronization 
  *
  * @param crypotogram 16-byte Server Cryptogram array
@@ -496,6 +503,9 @@ enum osdp_cmd_e {
  * @param output output command structure
  * @param comset comset command structure
  * @param keyset keyset command structure
+ * @param chlng chlng command structure
+ * @param scrypt scrypt command structure
+
  */
 struct osdp_cmd {
 	sys_snode_t node;
@@ -743,7 +753,7 @@ typedef void (*osdp_command_complete_callback_t)(int id);
  * @retval 0 on success
  * @retval -1 on failure
  */
-int osdp_init(const struct osdp_info *info);
+int osdp_init(const struct osdp_cfg *info);
 
 /* ------------------------------- */
 /*            PD Methods           */

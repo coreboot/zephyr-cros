@@ -27,7 +27,7 @@ LOG_MODULE_REGISTER(osdp, CONFIG_OSDP_LOG_LEVEL);
 
 #define UART_EVENT_TX_END 1UL
 
-struct osdp_info osdp_info = {
+struct osdp_cfg osdp_cfg = {
 	.baud_rate = CONFIG_OSDP_UART_BAUD_RATE,
 	.skip_mark_byte = IS_ENABLED(CONFIG_OSDP_SKIP_MARK_BYTE),
 	.cp_cfg = NULL,
@@ -159,13 +159,13 @@ static struct osdp *osdp_build_ctx(struct osdp_channel *channel)
 
 #ifdef CONFIG_OSDP_MODE_PD
 	num_pd = 1;
-	pd_address = &osdp_info.pd_cfg->reader_address;
+	pd_address = &osdp_cfg.pd_cfg->reader_address;
 #else
-	if (osdp_info.cp_cfg->connected_readers_num > CONFIG_OSDP_NUM_CONNECTED_PD) {
+	if (osdp_cfg.cp_cfg->connected_readers_num > CONFIG_OSDP_NUM_CONNECTED_PD) {
 		return NULL;
 	}
-	num_pd = osdp_info.cp_cfg->connected_readers_num;
-	pd_address = osdp_info.cp_cfg->connected_readers_addresses;
+	num_pd = osdp_cfg.cp_cfg->connected_readers_num;
+	pd_address = osdp_cfg.cp_cfg->connected_readers_addresses;
 #endif
 
 	/* Validate PD addresses */
@@ -186,8 +186,8 @@ static struct osdp *osdp_build_ctx(struct osdp_channel *channel)
 		pd->seq_number = -1;
 		pd->osdp_ctx = ctx;
 		pd->address = pd_address[i];
-		pd->baud_rate = osdp_info.baud_rate;
-		if (osdp_info.skip_mark_byte) {
+		pd->baud_rate = osdp_cfg.baud_rate;
+		if (osdp_cfg.skip_mark_byte) {
 			SET_FLAG(pd, PD_FLAG_PKT_SKIP_MARK);
 		}
 		memcpy(&pd->channel, channel, sizeof(struct osdp_channel));
@@ -246,11 +246,11 @@ static int osdp_configure_device(struct osdp_device *p)
 
 	/* configure uart device to 8N1 */
 
-	if (!osdp_is_valid_baudrate(osdp_info.baud_rate)) {
+	if (!osdp_is_valid_baudrate(osdp_cfg.baud_rate)) {
 		return EINVAL;
 	}
 
-	p->dev_config.baudrate = osdp_info.baud_rate;
+	p->dev_config.baudrate = osdp_cfg.baud_rate;
 	p->dev_config.data_bits = UART_CFG_DATA_BITS_8;
 	p->dev_config.parity = UART_CFG_PARITY_NONE;
 	p->dev_config.stop_bits = UART_CFG_STOP_BITS_1;
@@ -320,7 +320,7 @@ static int osdp_init_internal()
 		k_panic();
 	}
 
-	if (osdp_setup(ctx, &osdp_info)) {
+	if (osdp_setup(ctx, &osdp_cfg)) {
 		LOG_ERR("Failed to setup OSDP device!");
 		k_panic();
 	}
@@ -333,17 +333,17 @@ static int osdp_init_internal()
 	return 0;
 }
 
-int osdp_init(const struct osdp_info *info)
+int osdp_init(const struct osdp_cfg *cfg)
 {
-	if (info) {
-		memcpy(&osdp_info, info, sizeof(struct osdp_info));
+	if (cfg) {
+		memcpy(&osdp_cfg, cfg, sizeof(struct osdp_cfg));
 	} else {
 		uint8_t key_buf[16];
-		osdp_info.key = osdp_get_key(key_buf);
+		osdp_cfg.key = osdp_get_key(key_buf);
 #ifdef CONFIG_OSDP_MODE_PD
-		osdp_info.pd_cfg = pd_get_info();
+		osdp_cfg.pd_cfg = pd_get_cfg();
 #else
-		osdp_info.cp_cfg = cp_get_info();
+		osdp_cfg.cp_cfg = cp_get_cfg();
 #endif
 	}
 	return osdp_init_internal();

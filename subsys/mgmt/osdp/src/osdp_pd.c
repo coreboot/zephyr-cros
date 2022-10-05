@@ -113,26 +113,28 @@ struct osdp_pd_cap osdp_pd_cap[] = {
 		CONFIG_OSDP_PD_CAP_READER_TEXT_OUTPUT_NUM_ITEMS,
 	},
 	{
-		OSDP_PD_CAP_CARD_DATA_FORMAT, CONFIG_OSDP_PD_CAP_CARD_DATA_FORMAT_COMP_LEVEL,
+		OSDP_PD_CAP_CARD_DATA_FORMAT, 
+		CONFIG_OSDP_PD_CAP_CARD_DATA_FORMAT_COMP_LEVEL,
 		0, /* N/A set to 0 */
 	},
 	{
-		OSDP_PD_CAP_TIME_KEEPING, CONFIG_OSDP_PD_CAP_TIME_KEEPING_COMP_LEVEL,
+		OSDP_PD_CAP_TIME_KEEPING, 
+		CONFIG_OSDP_PD_CAP_TIME_KEEPING_COMP_LEVEL,
 		0, /* N/A set to 0 */
 	},
 	{ -1, 0, 0 } /* Sentinel */
 };
 
-static struct osdp_pd_info pd_info = {
+static struct osdp_pd_cfg pd_cfg = {
 	.reader_address = CONFIG_OSDP_PD_ADDRESS,
 	.id = &osdp_pd_id,
 	.cap = &osdp_pd_cap[0],
 	.status = &osdp_pd_status,
 };
 
-struct osdp_pd_info *pd_get_info()
+struct osdp_pd_cfg *pd_get_cfg()
 {
-	return &pd_info;
+	return &pd_cfg;
 }
 
 static struct osdp_event *pd_event_alloc(struct osdp_pd *pd)
@@ -1254,7 +1256,7 @@ static void osdp_pd_set_attributes(struct osdp_pd *pd, struct osdp_pd_cap *cap,
 	}
 }
 
-int osdp_setup(struct osdp *ctx, const struct osdp_info *info)
+int osdp_setup(struct osdp *ctx, const struct osdp_cfg *cfg)
 {
 	struct osdp_pd *pd = osdp_to_pd(ctx, 0);
 
@@ -1263,17 +1265,17 @@ int osdp_setup(struct osdp *ctx, const struct osdp_info *info)
 		return -1;
 	}
 
-	osdp_pd_set_attributes(pd, info->pd_cfg->cap, info->pd_cfg->id);
+	osdp_pd_set_attributes(pd, cfg->pd_cfg->cap, cfg->pd_cfg->id);
 	SET_FLAG(pd, PD_FLAG_PD_MODE);
 
 	if (sc_is_enabled(pd)) {
-		if (info->key == NULL) {			
+		if (cfg->key == NULL) {			
 			LOG_WRN("SCBK not provided. PD is in INSTALL_MODE");
 			SET_FLAG(pd, PD_FLAG_INSTALL_MODE);
 			SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);			
 		} else {
 			
-			memcpy(pd->sc.scbk, info->key, 16);
+			memcpy(pd->sc.scbk, cfg->key, 16);
 		}
 		SET_FLAG(pd, PD_FLAG_SC_CAPABLE);
 	}
