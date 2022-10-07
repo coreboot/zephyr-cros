@@ -65,4 +65,9 @@ config HAS_XMCLIB_CAN
 	help
 	  Enable XMCLIB CAN
 
+config HAS_XMCLIB_EBU
+	bool
+	help
+	  Enable XMCLIB EBU
+
 endif # HAS_XMCLIB

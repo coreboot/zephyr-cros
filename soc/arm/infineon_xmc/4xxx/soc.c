@@ -41,6 +41,9 @@ void z_arm_platform_init(void)
 #ifdef CONFIG_ETH_XMC4XXX
 				     | XMC_SCU_CLOCK_SLEEP_MODE_CONFIG_ENABLE_ETH
 #endif
+#ifdef CONFIG_MEMC_XMC4XXX_EBU
+				     | XMC_SCU_CLOCK_SLEEP_MODE_CONFIG_ENABLE_EBU
+#endif
 	);
 
 	/* configure PLL & system clock */

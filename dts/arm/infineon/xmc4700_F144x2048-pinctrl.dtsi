@@ -593,6 +593,10 @@
 		pinmux = <XMC4XXX_PINMUX_SET(6, 6, 0)>;
 		hwctrl = "periph2";
 	};
+	/omit-if-no-ref/ ebu_p3_3_nwait: ebu_p3_3_nwait {
+		pinmux = <XMC4XXX_PINMUX_SET(3, 3, 0)>;
+		hwctrl = "periph2";
+	};
 
 	/omit-if-no-ref/ i2c_sda_p4_7_u2c1: i2c_sda_p4_7_u2c1 {
 		pinmux = <XMC4XXX_PINMUX_SET(4, 7, 1)>; /* USIC sda-src = DX0C */
