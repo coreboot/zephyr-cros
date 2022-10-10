@@ -3669,6 +3669,7 @@ int bt_enable(bt_ready_cb_t cb)
 
 #if defined(CONFIG_BT_RECV_WORKQ_BT)
 	/* RX thread */
+	k_work_queue_init(&bt_workq);
 	k_work_queue_start(&bt_workq, rx_thread_stack,
 			   CONFIG_BT_RX_STACK_SIZE,
 			   K_PRIO_COOP(CONFIG_BT_RX_PRIO), NULL);
@@ -3723,6 +3724,9 @@ int bt_disable(void)
 
 	/* Some functions rely on checking this bitfield */
 	memset(bt_dev.supported_commands, 0x00, sizeof(bt_dev.supported_commands));
+
+	/* If random address was set up - clear it */
+	bt_addr_le_copy(&bt_dev.random_addr, BT_ADDR_LE_ANY);
 
 	/* Abort TX thread */
 	k_thread_abort(&tx_thread_data);
