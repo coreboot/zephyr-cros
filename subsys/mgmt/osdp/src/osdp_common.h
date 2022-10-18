@@ -462,7 +462,7 @@ bool osdp_is_valid_baudrate(int baud_rate);
 
 inline bool osdp_is_valid_pd_address(uint8_t address)
 {
-	return (address < 0x7F);
+	return (address <= 0x7F);
 }
 
 
