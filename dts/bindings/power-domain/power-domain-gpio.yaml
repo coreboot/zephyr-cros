@@ -19,6 +19,13 @@ properties:
       selector.  The Linux enable-active-high and gpio-open-drain
       properties are not valid for Zephyr devicetree files.
 
+  enable-pin-high-drive:
+    type: boolean
+    description:
+      Drive the enable pin with the highest possible drive strength.
+      This is useful when the enable pin is used as the power source
+      itself.
+
   startup-delay-us:
     type: int
     required: false

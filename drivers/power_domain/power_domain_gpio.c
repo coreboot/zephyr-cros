@@ -19,6 +19,7 @@ struct pd_gpio_config {
 	struct gpio_dt_spec enable;
 	uint32_t startup_delay_us;
 	uint32_t off_on_delay_us;
+	bool enable_high_drive;
 };
 
 struct pd_gpio_data {
@@ -31,6 +32,7 @@ static int pd_gpio_pm_action(const struct device *dev,
 	const struct pd_gpio_config *cfg = dev->config;
 	struct pd_gpio_data *data = dev->data;
 	int64_t next_boot_ticks;
+	gpio_flags_t flags = 0;
 	int rc = 0;
 
 	/* Validate that blocking API's can be used */
@@ -62,8 +64,12 @@ static int pd_gpio_pm_action(const struct device *dev,
 		data->next_boot = K_TIMEOUT_ABS_TICKS(next_boot_ticks);
 		break;
 	case PM_DEVICE_ACTION_TURN_ON:
+		/* DS_ALT is the highest drive strength for both directions */
+		if (cfg->enable_high_drive) {
+			flags |= GPIO_DS_ALT;
+		}
 		/* Actively control the enable pin now that the device is powered */
-		gpio_pin_configure_dt(&cfg->enable, GPIO_OUTPUT_INACTIVE);
+		gpio_pin_configure_dt(&cfg->enable, GPIO_OUTPUT_INACTIVE | flags);
 		LOG_DBG("%s is OFF and powered", dev->name);
 		break;
 	case PM_DEVICE_ACTION_TURN_OFF:
@@ -103,17 +109,18 @@ static int pd_gpio_init(const struct device *dev)
 	return pm_device_driver_init(dev, pd_gpio_pm_action);
 }
 
-#define POWER_DOMAIN_DEVICE(id)						    \
-	static const struct pd_gpio_config pd_gpio_##id##_cfg = {	    \
-		.enable = GPIO_DT_SPEC_INST_GET(id, enable_gpios),	    \
-		.startup_delay_us = DT_INST_PROP(id, startup_delay_us),	    \
-		.off_on_delay_us = DT_INST_PROP(id, off_on_delay_us),	    \
-	};								    \
-	static struct pd_gpio_data pd_gpio_##id##_data;			    \
-	PM_DEVICE_DT_INST_DEFINE(id, pd_gpio_pm_action);		    \
-	DEVICE_DT_INST_DEFINE(id, pd_gpio_init, PM_DEVICE_DT_INST_GET(id),  \
-			      &pd_gpio_##id##_data, &pd_gpio_##id##_cfg,    \
-			      POST_KERNEL, DT_INST_PROP(id, init_priority), \
+#define POWER_DOMAIN_DEVICE(id)								\
+	static const struct pd_gpio_config pd_gpio_##id##_cfg = {			\
+		.enable = GPIO_DT_SPEC_INST_GET(id, enable_gpios),			\
+		.startup_delay_us = DT_INST_PROP(id, startup_delay_us),			\
+		.off_on_delay_us = DT_INST_PROP(id, off_on_delay_us),			\
+		.enable_high_drive = DT_INST_PROP_OR(id, enable_pin_high_drive, false),	\
+	};										\
+	static struct pd_gpio_data pd_gpio_##id##_data;					\
+	PM_DEVICE_DT_INST_DEFINE(id, pd_gpio_pm_action);				\
+	DEVICE_DT_INST_DEFINE(id, pd_gpio_init, PM_DEVICE_DT_INST_GET(id),		\
+			      &pd_gpio_##id##_data, &pd_gpio_##id##_cfg,		\
+			      POST_KERNEL, DT_INST_PROP(id, init_priority),		\
 			      NULL);
 
 DT_INST_FOREACH_STATUS_OKAY(POWER_DOMAIN_DEVICE)
