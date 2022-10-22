@@ -9,6 +9,8 @@
 #ifndef ZEPHYR_INCLUDE_KERNEL_VERSION_H_
 #define ZEPHYR_INCLUDE_KERNEL_VERSION_H_
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,6 +47,18 @@ extern "C" {
  * @return kernel version
  */
 extern uint32_t sys_kernel_version_get(void);
+
+#ifdef CONFIG_LINKER_GNU_BUILD_ID
+/**
+ * @brief Return the pointer to the GNU build ID
+ *
+ * The GNU build ID is a 160bit (20 byte) SHA1 hash of the elf header bits and
+ * section data.
+ *
+ * @retval build_id Pointer to 20 byte build ID
+ */
+const uint8_t *sys_gnu_build_id_get(void);
+#endif /* CONFIG_LINKER_GNU_BUILD_ID */
 
 /**
  * @}
