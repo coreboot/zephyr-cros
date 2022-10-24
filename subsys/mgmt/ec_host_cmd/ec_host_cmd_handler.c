@@ -7,6 +7,7 @@
 #include <zephyr/drivers/ec_host_cmd_periph.h>
 #include <zephyr/mgmt/ec_host_cmd.h>
 #include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
 #include <string.h>
 
 #if !DT_HAS_CHOSEN(zephyr_ec_host_interface)
@@ -55,7 +56,7 @@ static void handle_host_cmds_entry(void *arg1, void *arg2, void *arg3)
 	ARG_UNUSED(arg1);
 	ARG_UNUSED(arg2);
 	ARG_UNUSED(arg3);
-	const struct device *ec_host_cmd_dev = DEVICE_DT_GET(DT_HOST_CMD_DEV);
+	const struct device *const ec_host_cmd_dev = DEVICE_DT_GET(DT_HOST_CMD_DEV);
 	struct ec_host_cmd_periph_rx_ctx rx;
 
 	if (!device_is_ready(ec_host_cmd_dev)) {

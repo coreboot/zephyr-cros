@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 
 #include <nrfx_gpiote.h>
 #include <helpers/nrfx_gppi.h>
@@ -15,6 +15,7 @@
 #endif
 
 #include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 LOG_MODULE_REGISTER(nrfx_sample, LOG_LEVEL_INF);
 
 #define INPUT_PIN	DT_GPIO_PIN(DT_ALIAS(sw0), gpios)

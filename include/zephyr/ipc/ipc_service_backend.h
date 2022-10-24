@@ -8,6 +8,7 @@
 #define ZEPHYR_INCLUDE_IPC_SERVICE_IPC_SERVICE_BACKEND_H_
 
 #include <zephyr/ipc/ipc_service.h>
+#include <zephyr/kernel.h>
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -36,6 +37,18 @@ struct ipc_service_backend {
 	 *	    backend.
 	 */
 	int (*open_instance)(const struct device *instance);
+
+	/** @brief Pointer to the function that will be used to close an instance
+	 *
+	 *  @param[in] instance Instance pointer.
+	 *
+	 *  @retval -EALREADY when the instance is not already inited.
+	 *
+	 *  @retval 0 on success
+	 *  @retval other errno codes depending on the implementation of the
+	 *	    backend.
+	 */
+	int (*close_instance)(const struct device *instance);
 
 	/** @brief Pointer to the function that will be used to send data to the endpoint.
 	 *
@@ -73,6 +86,21 @@ struct ipc_service_backend {
 	int (*register_endpoint)(const struct device *instance,
 				 void **token,
 				 const struct ipc_ept_cfg *cfg);
+
+	/** @brief Pointer to the function that will be used to deregister endpoints
+	 *
+	 *  @param[in] instance Instance from which to deregister the endpoint.
+	 *  @param[in] token Backend-specific token.
+	 *
+	 *  @retval -EINVAL when the endpoint configuration or instance is invalid.
+	 *  @retval -ENOENT when the endpoint is not registered with the instance.
+	 *  @retval -EBUSY when the instance is busy or not ready.
+	 *
+	 *  @retval 0 on success
+	 *  @retval other errno codes depending on the implementation of the
+	 *      backend.
+	 */
+	int (*deregister_endpoint)(const struct device *instance, void *token);
 
 	/** @brief Pointer to the function that will return the TX buffer size
 	 *

@@ -17,6 +17,11 @@
 		zephyr,flash = &flash0;
 		zephyr,console = &usart0;
 		zephyr,shell-uart = &usart0;
+		zephyr,flash-controller = &fmc;
+	};
+
+	aliases {
+		watchdog0 = &fwdgt;
 	};
 };
 
@@ -33,4 +38,8 @@
 	rcu-clock-source = <4>;
 	pinctrl-0 = <&adc0_default>;
 	pinctrl-names = "default";
+};
+
+&fwdgt {
+	status = "okay";
 };

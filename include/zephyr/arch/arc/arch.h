@@ -77,6 +77,10 @@
 #error "Unsupported configuration: ARC_FIRQ_STACK and (RGF_NUM_BANKS < 2)"
 #endif
 
+#if defined(CONFIG_SMP) && !defined(CONFIG_MULTITHREADING)
+#error "Non-multithreading mode isn't supported on SMP targets"
+#endif
+
 #ifndef _ASMLANGUAGE
 
 #ifdef __cplusplus
@@ -339,6 +343,10 @@ static ALWAYS_INLINE void arch_nop(void)
 {
 	__builtin_arc_nop();
 }
+
+#ifndef CONFIG_XIP
+extern char __arc_rw_sram_size[];
+#endif /* CONFIG_XIP */
 
 #endif /* _ASMLANGUAGE */
 

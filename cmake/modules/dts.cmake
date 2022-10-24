@@ -5,7 +5,8 @@ include_guard(GLOBAL)
 include(extensions)
 include(python)
 include(boards)
-include(generic_toolchain)
+find_package(HostTools)
+find_package(Dtc 1.4.6)
 
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/include/generated)
 
@@ -91,7 +92,8 @@ set(dts_files
 if(SUPPORTS_DTS)
   if(DTC_OVERLAY_FILE)
     # Convert from space-separated files into file list
-    string(REPLACE " " ";" DTC_OVERLAY_FILE_RAW_LIST "${DTC_OVERLAY_FILE}")
+    string(CONFIGURE "${DTC_OVERLAY_FILE}" DTC_OVERLAY_FILE_EXPANDED)
+    string(REPLACE " " ";" DTC_OVERLAY_FILE_RAW_LIST "${DTC_OVERLAY_FILE_EXPANDED}")
     foreach(file ${DTC_OVERLAY_FILE_RAW_LIST})
       file(TO_CMAKE_PATH "${file}" cmake_path_file)
       list(APPEND DTC_OVERLAY_FILE_AS_LIST ${cmake_path_file})

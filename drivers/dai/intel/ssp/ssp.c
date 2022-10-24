@@ -677,13 +677,14 @@ static int dai_ssp_poll_for_register_delay(uint32_t reg, uint32_t mask,
 
 static inline void dai_ssp_pm_runtime_dis_ssp_clk_gating(struct dai_intel_ssp *dp, uint32_t index)
 {
-#if CONFIG_SOC_INTEL_CAVS_V15
+#if CONFIG_DAI_SSP_CLK_FORCE_DYNAMIC_CLOCK_GATING
 	uint32_t shim_reg;
 
 	shim_reg = sys_read32(dai_shim_base(dp) + SHIM_CLKCTL) |
-		(index < DAI_INTEL_SSP_NUM_BASE ?
+		(index < CONFIG_DAI_INTEL_SSP_NUM_BASE ?
 			SHIM_CLKCTL_I2SFDCGB(index) :
-			SHIM_CLKCTL_I2SEFDCGB(index - DAI_INTEL_SSP_NUM_BASE));
+			SHIM_CLKCTL_I2SEFDCGB(index -
+					      CONFIG_DAI_INTEL_SSP_NUM_BASE));
 
 	sys_write32(shim_reg, dai_shim_base(dp) + SHIM_CLKCTL);
 
@@ -693,13 +694,14 @@ static inline void dai_ssp_pm_runtime_dis_ssp_clk_gating(struct dai_intel_ssp *d
 
 static inline void dai_ssp_pm_runtime_en_ssp_clk_gating(struct dai_intel_ssp *dp, uint32_t index)
 {
-#if CONFIG_SOC_INTEL_CAVS_V15
+#if CONFIG_DAI_SSP_CLK_FORCE_DYNAMIC_CLOCK_GATING
 	uint32_t shim_reg;
 
 	shim_reg = sys_read32(dai_shim_base(dp) + SHIM_CLKCTL) &
-		~(index < DAI_INTEL_SSP_NUM_BASE ?
+		~(index < CONFIG_DAI_INTEL_SSP_NUM_BASE ?
 			SHIM_CLKCTL_I2SFDCGB(index) :
-			SHIM_CLKCTL_I2SEFDCGB(index - DAI_INTEL_SSP_NUM_BASE));
+			SHIM_CLKCTL_I2SEFDCGB(index -
+					      CONFIG_DAI_INTEL_SSP_NUM_BASE));
 
 	sys_write32(shim_reg, dai_shim_base(dp) + SHIM_CLKCTL);
 
@@ -1829,6 +1831,9 @@ static const struct dai_config *dai_ssp_config_get(const struct device *dev, enu
 	struct dai_intel_ssp *dp = (struct dai_intel_ssp *)dev->data;
 	struct dai_intel_ssp_pdata *ssp = dai_get_drvdata(dp);
 
+	if (!ssp)
+		return params;
+
 	params->rate = ssp->params.fsync_rate;
 
 	if (dir == DAI_DIR_PLAYBACK) {
@@ -1991,7 +1996,10 @@ static struct dai_intel_ssp_mn ssp_mn_divider = {
 static const char irq_name_level5_z[] = "level5";
 
 #define DAI_INTEL_SSP_DEVICE_INIT(n)						\
-	static struct dai_config dai_intel_ssp_config_##n;			\
+	static struct dai_config dai_intel_ssp_config_##n = {			\
+		.type = DAI_INTEL_SSP,						\
+		.dai_index = n,							\
+	};									\
 	static struct dai_intel_ssp dai_intel_ssp_data_##n = {			\
 		.index = n,							\
 		.plat_data = {							\

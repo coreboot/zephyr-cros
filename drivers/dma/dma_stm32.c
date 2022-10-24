@@ -18,6 +18,7 @@
 #include <zephyr/drivers/dma/dma_stm32.h>
 
 #include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 LOG_MODULE_REGISTER(dma_stm32, CONFIG_DMA_LOG_LEVEL);
 
 #if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_dma_v1)
@@ -52,13 +53,13 @@ LOG_MODULE_REGISTER(dma_stm32, CONFIG_DMA_LOG_LEVEL);
 #endif
 #endif /* DT_NODE_HAS_STATUS(DT_DRV_INST(1), okay) */
 
-static uint32_t table_m_size[] = {
+static const uint32_t table_m_size[] = {
 	LL_DMA_MDATAALIGN_BYTE,
 	LL_DMA_MDATAALIGN_HALFWORD,
 	LL_DMA_MDATAALIGN_WORD,
 };
 
-static uint32_t table_p_size[] = {
+static const uint32_t table_p_size[] = {
 	LL_DMA_PDATAALIGN_BYTE,
 	LL_DMA_PDATAALIGN_HALFWORD,
 	LL_DMA_PDATAALIGN_WORD,
@@ -143,7 +144,8 @@ static void dma_stm32_irq_handler(const struct device *dev, uint32_t id)
 #ifdef CONFIG_DMA_STM32_SHARED_IRQS
 
 #define HANDLE_IRQS(index)						       \
-	static const struct device *dev_##index = DEVICE_DT_INST_GET(index);   \
+	static const struct device *const dev_##index =			       \
+		DEVICE_DT_INST_GET(index);				       \
 	const struct dma_stm32_config *cfg_##index = dev_##index->config;      \
 	DMA_TypeDef *dma_##index = (DMA_TypeDef *)(cfg_##index->base);	       \
 									       \
@@ -614,7 +616,7 @@ DMA_STM32_EXPORT_API int dma_stm32_stop(const struct device *dev, uint32_t id)
 static int dma_stm32_init(const struct device *dev)
 {
 	const struct dma_stm32_config *config = dev->config;
-	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 
 	if (!device_is_ready(clk)) {
 		LOG_ERR("clock control device not ready");

@@ -3,6 +3,91 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Usage:
+#   load_cache(IMAGE <image> BINARY_DIR <dir>)
+#
+# This function will load the CMakeCache.txt file from the binary directory
+# given by the BINARY_DIR argument.
+#
+# All CMake cache variables are stored in a custom target which is identified by
+# the name given as value to the IMAGE argument.
+#
+# IMAGE:      image name identifying the cache for later sysbuild_get() lookup calls.
+# BINARY_DIR: binary directory (build dir) containing the CMakeCache.txt file to load.
+function(load_cache)
+  set(single_args IMAGE BINARY_DIR)
+  cmake_parse_arguments(LOAD_CACHE "" "${single_args}" "" ${ARGN})
+
+  if(NOT TARGET ${LOAD_CACHE_IMAGE}_cache)
+    add_custom_target(${LOAD_CACHE_IMAGE}_cache)
+  endif()
+  file(STRINGS "${LOAD_CACHE_BINARY_DIR}/CMakeCache.txt" cache_strings)
+  foreach(str ${cache_strings})
+    # Using a regex for matching whole 'VAR_NAME:TYPE=VALUE' will strip semi-colons
+    # thus resulting in lists to become strings.
+    # Therefore we first fetch VAR_NAME and TYPE, and afterwards extract
+    # remaining of string into a value that populates the property.
+    # This method ensures that both quoted values and ;-separated list stays intact.
+    string(REGEX MATCH "([^:]*):([^=]*)=" variable_identifier ${str})
+    if(NOT "${variable_identifier}" STREQUAL "")
+      string(LENGTH ${variable_identifier} variable_identifier_length)
+      string(SUBSTRING "${str}" ${variable_identifier_length} -1 variable_value)
+      set_property(TARGET ${LOAD_CACHE_IMAGE}_cache APPEND PROPERTY "CACHE:VARIABLES" "${CMAKE_MATCH_1}")
+      set_property(TARGET ${LOAD_CACHE_IMAGE}_cache PROPERTY "${CMAKE_MATCH_1}:TYPE" "${CMAKE_MATCH_2}")
+      set_property(TARGET ${LOAD_CACHE_IMAGE}_cache PROPERTY "${CMAKE_MATCH_1}" "${variable_value}")
+    endif()
+  endforeach()
+endfunction()
+
+# Usage:
+#   sysbuild_get(<variable> IMAGE <image> [VAR <image-variable>])
+#
+# This function will return the variable found in the CMakeCache.txt file
+# identified by image.
+# If `VAR` is provided, the name given as parameter will be looked up, but if
+# `VAR` is not given, the `<variable>` name provided will be used both for
+# lookup and value return.
+#
+# The result will be returned in `<variable>`.
+#
+# Example use:
+#   sysbuild_get(PROJECT_NAME IMAGE my_sample)
+#     will lookup PROJECT_NAME from the CMakeCache identified by `my_sample` and
+#     and return the value in the local variable `PROJECT_NAME`.
+#
+#   sysbuild_get(my_sample_PROJECT_NAME IMAGE my_sample VAR PROJECT_NAME)
+#     will lookup PROJECT_NAME from the CMakeCache identified by `my_sample` and
+#     and return the value in the local variable `my_sample_PROJECT_NAME`.
+#
+# <variable>: variable used for returning CMake cache value. Also used as lookup
+#             variable if `VAR` is not provided.
+# IMAGE:      image name identifying the cache to use for variable lookup.
+# VAR:        name of the CMake cache variable name to lookup.
+function(sysbuild_get variable)
+  cmake_parse_arguments(GET_VAR "" "IMAGE;VAR" "" ${ARGN})
+
+  if(NOT DEFINED GET_VAR_IMAGE)
+    message(FATAL_ERROR "sysbuild_get(...) requires IMAGE.")
+  endif()
+
+  if(DEFINED ${variable})
+    message(WARNING "Return variable ${variable} already defined with a value. "
+                    "sysbuild_get(${variable} ...) may overwrite existing value. "
+		    "Please use sysbuild_get(<variable> ... VAR <image-variable>) "
+		    "where <variable> is undefined."
+    )
+  endif()
+
+  if(NOT DEFINED GET_VAR_VAR)
+    set(GET_VAR_VAR ${variable})
+  endif()
+
+  get_property(${GET_VAR_IMAGE}_${GET_VAR_VAR} TARGET ${GET_VAR_IMAGE}_cache PROPERTY ${GET_VAR_VAR})
+  if(DEFINED ${GET_VAR_IMAGE}_${GET_VAR_VAR})
+    set(${variable} ${${GET_VAR_IMAGE}_${GET_VAR_VAR}} PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Usage:
 #   ExternalZephyrProject_Add(APPLICATION <name>
 #                             SOURCE_DIR <dir>
 #                             [BOARD <board>]
@@ -32,104 +117,92 @@ function(ExternalZephyrProject_Add)
     )
   endif()
 
-  set(sysbuild_vars
-      "APP_DIR"
-      "SB_CONF_FILE"
-  )
+  set(sysbuild_image_conf_dir ${APP_DIR}/sysbuild)
+  set(sysbuild_image_name_conf_dir ${APP_DIR}/sysbuild/${ZBUILD_APPLICATION})
+  # User defined `-D<image>_CONF_FILE=<file.conf>` takes precedence over anything else.
+  if (NOT ${ZBUILD_APPLICATION}_CONF_FILE)
+    if(EXISTS ${sysbuild_image_name_conf_dir})
+      set(${ZBUILD_APPLICATION}_APPLICATION_CONFIG_DIR ${sysbuild_image_name_conf_dir}
+          CACHE INTERNAL "Application configuration dir controlled by sysbuild"
+      )
+    endif()
 
-  # General variables that should be propagated to all Zephyr builds, for example:
-  # - ZEPHYR_MODULES / ZEPHYR_EXTRA_MODULES
-  # - ZEPHYR_TOOLCHAIN_VARIANT
-  # - *_TOOLCHAIN_PATH
-  # - *_ROOT
-  # etc.
-  # Note: setting vars on a single image can be done by using
-  #       `<image>_CONF_FILE`, like `mcuboot_CONF_FILE`
+     # Check for sysbuild related configuration fragments.
+     # The contents of these are appended to the image existing configuration
+     # when user is not specifying custom fragments.
+    if(NOT "${CONF_FILE_BUILD_TYPE}" STREQUAL "")
+      set(sysbuil_image_conf_fragment ${sysbuild_image_conf_dir}/${ZBUILD_APPLICATION}_${CONF_FILE_BUILD_TYPE}.conf)
+    else()
+      set(sysbuild_image_conf_fragment ${sysbuild_image_conf_dir}/${ZBUILD_APPLICATION}.conf)
+    endif()
+
+    if (NOT ${ZBUILD_APPLICATION}_OVERLAY_CONFIG AND EXISTS ${sysbuild_image_conf_fragment})
+      set(${ZBUILD_APPLICATION}_OVERLAY_CONFIG ${sysbuild_image_conf_fragment}
+          CACHE INTERNAL "Kconfig fragment defined by main application"
+      )
+    endif()
+
+    # Check for overlay named <ZBUILD_APPLICATION>.overlay.
+    set(sysbuild_image_dts_overlay ${sysbuild_image_conf_dir}/${ZBUILD_APPLICATION}.overlay)
+    if (NOT ${ZBUILD_APPLICATION}_DTC_OVERLAY_FILE AND EXISTS ${sysbuild_image_dts_overlay})
+      set(${ZBUILD_APPLICATION}_DTC_OVERLAY_FILE ${sysbuild_image_dts_overlay}
+          CACHE INTERNAL "devicetree overlay file defined by main application"
+      )
+    endif()
+  endif()
+  # CMake variables which must be known by all Zephyr CMake build systems
+  # Those are settings which controls the build and must be known to CMake at
+  # invocation time, and thus cannot be passed though the sysbuild cache file.
   set(
-    shared_image_variables_list
+    shared_cmake_variables_list
     CMAKE_BUILD_TYPE
     CMAKE_VERBOSE_MAKEFILE
-    BOARD
-    ZEPHYR_MODULES
-    ZEPHYR_EXTRA_MODULES
-    ZEPHYR_TOOLCHAIN_VARIANT
-    EXTRA_KCONFIG_TARGETS
   )
 
-  set(shared_image_variables_regex
-      "^[^_]*_TOOLCHAIN_PATH|^[^_]*_ROOT"
-  )
+  set(sysbuild_cache_file ${CMAKE_BINARY_DIR}/${ZBUILD_APPLICATION}_sysbuild_cache.txt)
 
-  set(app_cache_file ${CMAKE_BINARY_DIR}/CMake${ZBUILD_APPLICATION}PreloadCache.txt)
-
-  if(EXISTS ${app_cache_file})
-    file(STRINGS ${app_cache_file} app_cache_strings)
-    set(app_cache_strings_current ${app_cache_strings})
-  endif()
-
-  get_cmake_property(variables_cached CACHE_VARIABLES)
-  foreach(var_name ${variables_cached})
-    # Any var of the form `<app>_<var>` should be propagated.
-    # For example mcuboot_<VAR>=<val> ==> -D<VAR>=<val> for mcuboot build.
-    if("${var_name}" MATCHES "^${ZBUILD_APPLICATION}_.*")
-      list(APPEND application_vars ${var_name})
-      continue()
-    endif()
-
-    # This means there is a match to another image than current one, ignore.
-    if("${var_name}" MATCHES "^.*_CONFIG_.*")
-      continue()
-    endif()
-
-    # sysbuild reserved namespace.
-    if(var_name IN_LIST sysbuild_vars OR "${var_name}" MATCHES "^SB_CONFIG_.*")
-      continue()
-    endif()
-
-    if("${var_name}" MATCHES "^CONFIG_.*")
-      if(ZBUILD_MAIN_APP)
-        list(APPEND application_vars ${var_name})
-      endif()
-      continue()
-    endif()
-
-    if(var_name IN_LIST shared_image_variables_list)
-      list(APPEND application_vars ${var_name})
-      continue()
-    endif()
-
-    if("${var_name}" MATCHES "${shared_image_variables_regex}")
-      list(APPEND application_vars ${var_name})
+  get_cmake_property(sysbuild_cache CACHE_VARIABLES)
+  foreach(var_name ${sysbuild_cache})
+    if(NOT "${var_name}" MATCHES "^CMAKE_.*")
+      # We don't want to pass internal CMake variables.
+      # Required CMake variable to be passed, like CMAKE_BUILD_TYPE must be
+      # passed using `-D` on command invocation.
+      get_property(var_type CACHE ${var_name} PROPERTY TYPE)
+      set(cache_entry "${var_name}:${var_type}=${${var_name}}")
+      string(REPLACE ";" "\;" cache_entry "${cache_entry}")
+      list(APPEND sysbuild_cache_strings "${cache_entry}\n")
     endif()
   endforeach()
+  list(APPEND sysbuild_cache_strings "SYSBUILD_NAME:STRING=${ZBUILD_APPLICATION}\n")
 
-  foreach(app_var_name ${application_vars})
-    string(REGEX REPLACE "^${ZBUILD_APPLICATION}_" "" var_name "${app_var_name}")
-    get_property(var_type  CACHE ${app_var_name} PROPERTY TYPE)
-    set(new_cache_entry "${var_name}:${var_type}=${${app_var_name}}")
-    if(NOT new_cache_entry IN_LIST app_cache_strings)
-      # This entry does not exists, let's see if it has been updated.
-      foreach(entry ${app_cache_strings})
-        if("${entry}" MATCHES "^${var_name}:.*")
-          list(REMOVE_ITEM app_cache_strings "${entry}")
-          break()
-        endif()
-      endforeach()
-      list(APPEND app_cache_strings "${var_name}:${var_type}=${${app_var_name}}")
-      list(APPEND app_cache_entries "-D${var_name}:${var_type}=${${app_var_name}}")
-    endif()
-  endforeach()
-
-  if(NOT "${app_cache_strings_current}" STREQUAL "${app_cache_strings}")
-    string(REPLACE ";" "\n" app_cache_strings "${app_cache_strings}")
-    file(WRITE ${app_cache_file} ${app_cache_strings})
+  if(ZBUILD_MAIN_APP)
+    list(APPEND sysbuild_cache_strings "SYSBUILD_MAIN_APP:BOOL=True\n")
   endif()
 
   if(DEFINED ZBUILD_BOARD)
-    list(APPEND app_cache_entries "-DBOARD=${ZBUILD_BOARD}")
-  elseif(NOT ZBUILD_MAIN_APP)
-    list(APPEND app_cache_entries "-DBOARD=${BOARD}")
+    # Only set image specific board if provided.
+    # The sysbuild BOARD is exported through sysbuild cache, and will be used
+    # unless <image>_BOARD is defined.
+    list(APPEND sysbuild_cache_strings "${ZBUILD_APPLICATION}_BOARD:STRING=${ZBUILD_BOARD}\n")
   endif()
+
+  file(WRITE ${sysbuild_cache_file}.tmp ${sysbuild_cache_strings})
+  zephyr_file_copy(${sysbuild_cache_file}.tmp ${sysbuild_cache_file} ONLY_IF_DIFFERENT)
+
+  set(shared_cmake_vars_argument)
+  foreach(shared_var ${shared_cmake_variables_list})
+    if(DEFINED CACHE{${ZBUILD_APPLICATION}_${shared_var}})
+      get_property(var_type  CACHE ${ZBUILD_APPLICATION}_${shared_var} PROPERTY TYPE)
+      list(APPEND shared_cmake_vars_argument
+           "-D${shared_var}:${var_type}=$CACHE{${ZBUILD_APPLICATION}_${shared_var}}"
+      )
+    elseif(DEFINED CACHE{${shared_var}})
+      get_property(var_type  CACHE ${shared_var} PROPERTY TYPE)
+      list(APPEND shared_cmake_vars_argument
+           "-D${shared_var}:${var_type}=$CACHE{${shared_var}}"
+      )
+    endif()
+  endforeach()
 
   set(image_banner "* Running CMake for ${ZBUILD_APPLICATION} *")
   string(LENGTH "${image_banner}" image_banner_width)
@@ -142,7 +215,9 @@ function(ExternalZephyrProject_Add)
   execute_process(
     COMMAND ${CMAKE_COMMAND}
       -G${CMAKE_GENERATOR}
-      ${app_cache_entries}
+      -DSYSBUILD:BOOL=True
+      -DSYSBUILD_CACHE:FILEPATH=${sysbuild_cache_file}
+      ${shared_cmake_vars_argument}
       -B${CMAKE_BINARY_DIR}/${ZBUILD_APPLICATION}
       -S${ZBUILD_SOURCE_DIR}
     RESULT_VARIABLE   return_val
@@ -155,6 +230,7 @@ function(ExternalZephyrProject_Add)
             "Location: ${ZBUILD_SOURCE_DIR}"
     )
   endif()
+  load_cache(IMAGE ${ZBUILD_APPLICATION} BINARY_DIR ${CMAKE_BINARY_DIR}/${ZBUILD_APPLICATION})
 
   foreach(kconfig_target
       menuconfig

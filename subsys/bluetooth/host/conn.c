@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -136,7 +136,7 @@ struct k_sem *bt_conn_get_pkts(struct bt_conn *conn)
 	 * dedicated ISO buffers.
 	 */
 	if (conn->type == BT_CONN_TYPE_ISO) {
-		if (bt_dev.le.iso_mtu && bt_dev.le.iso_pkts.limit) {
+		if (bt_dev.le.iso_mtu && bt_dev.le.iso_limit != 0) {
 			return &bt_dev.le.iso_pkts;
 		}
 
@@ -1120,6 +1120,8 @@ struct bt_conn *bt_conn_ref(struct bt_conn *conn)
 {
 	atomic_val_t old;
 
+	__ASSERT_NO_MSG(conn);
+
 	/* Reference counter must be checked to avoid incrementing ref from
 	 * zero, then we should return NULL instead.
 	 * Loop on clear-and-set in case someone has modified the reference
@@ -1150,7 +1152,7 @@ void bt_conn_unref(struct bt_conn *conn)
 	__ASSERT(old > 0, "Conn reference counter is 0");
 
 	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->type == BT_CONN_TYPE_LE &&
-	    atomic_get(&conn->ref) == 0) {
+	    conn->role == BT_CONN_ROLE_PERIPHERAL && atomic_get(&conn->ref) == 0) {
 		bt_le_adv_resume();
 	}
 }
@@ -2178,16 +2180,16 @@ bool bt_conn_is_peer_addr_le(const struct bt_conn *conn, uint8_t id,
 	}
 
 	/* Check against conn dst address as it may be the identity address */
-	if (!bt_addr_le_cmp(peer, &conn->le.dst)) {
+	if (bt_addr_le_eq(peer, &conn->le.dst)) {
 		return true;
 	}
 
 	/* Check against initial connection address */
 	if (conn->role == BT_HCI_ROLE_CENTRAL) {
-		return bt_addr_le_cmp(peer, &conn->le.resp_addr) == 0;
+		return bt_addr_le_eq(peer, &conn->le.resp_addr);
 	}
 
-	return bt_addr_le_cmp(peer, &conn->le.init_addr) == 0;
+	return bt_addr_le_eq(peer, &conn->le.init_addr);
 }
 
 struct bt_conn *bt_conn_lookup_addr_le(uint8_t id, const bt_addr_le_t *peer)
@@ -3039,16 +3041,28 @@ int bt_conn_init(void)
 }
 
 #if defined(CONFIG_BT_DF_CONNECTION_CTE_RX)
-void bt_hci_le_df_connection_iq_report(struct net_buf *buf)
+void bt_hci_le_df_connection_iq_report_common(uint8_t event, struct net_buf *buf)
 {
 	struct bt_df_conn_iq_samples_report iq_report;
 	struct bt_conn *conn;
 	struct bt_conn_cb *cb;
 	int err;
 
-	err = hci_df_prepare_connection_iq_report(buf, &iq_report, &conn);
-	if (err) {
-		BT_ERR("Prepare CTE conn IQ report failed %d", err);
+	if (event == BT_HCI_EVT_LE_CONNECTION_IQ_REPORT) {
+		err = hci_df_prepare_connection_iq_report(buf, &iq_report, &conn);
+		if (err) {
+			BT_ERR("Prepare CTE conn IQ report failed %d", err);
+			return;
+		}
+	} else if (IS_ENABLED(CONFIG_BT_DF_VS_CONN_IQ_REPORT_16_BITS_IQ_SAMPLES) &&
+		   event == BT_HCI_EVT_VS_LE_CONNECTION_IQ_REPORT) {
+		err = hci_df_vs_prepare_connection_iq_report(buf, &iq_report, &conn);
+		if (err) {
+			BT_ERR("Prepare CTE conn IQ report failed %d", err);
+			return;
+		}
+	} else {
+		BT_ERR("Unhandled VS connection IQ report");
 		return;
 	}
 
@@ -3067,6 +3081,18 @@ void bt_hci_le_df_connection_iq_report(struct net_buf *buf)
 
 	bt_conn_unref(conn);
 }
+
+void bt_hci_le_df_connection_iq_report(struct net_buf *buf)
+{
+	bt_hci_le_df_connection_iq_report_common(BT_HCI_EVT_LE_CONNECTION_IQ_REPORT, buf);
+}
+
+#if defined(CONFIG_BT_DF_VS_CONN_IQ_REPORT_16_BITS_IQ_SAMPLES)
+void bt_hci_le_vs_df_connection_iq_report(struct net_buf *buf)
+{
+	bt_hci_le_df_connection_iq_report_common(BT_HCI_EVT_VS_LE_CONNECTION_IQ_REPORT, buf);
+}
+#endif /* CONFIG_BT_DF_VS_CONN_IQ_REPORT_16_BITS_IQ_SAMPLES */
 #endif /* CONFIG_BT_DF_CONNECTION_CTE_RX */
 
 #if defined(CONFIG_BT_DF_CONNECTION_CTE_REQ)

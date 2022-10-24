@@ -26,6 +26,7 @@
 #include "soc/gpio_periph.h"
 #include "esp_spi_flash.h"
 #include "esp_err.h"
+#include "esp_timer.h"
 #include "esp32/spiram.h"
 #include "esp_app_format.h"
 #include <zephyr/sys/printk.h>
@@ -118,13 +119,12 @@ void __attribute__((section(".iram1"))) __esp_platform_start(void)
 	*wdt_rtc_reg &= ~RTC_CNTL_WDT_EN;
 	*wdt_rtc_protect = 0;
 
+	esp_timer_early_init();
+
 #if CONFIG_ESP32_NETWORK_CORE
 	/* start the esp32 network core before
 	 * start zephyr
 	 */
-	soc_ll_stall_core(1);
-	soc_ll_reset_core(1);
-	DPORT_REG_WRITE(DPORT_APPCPU_CTRL_D_REG, 0);
 	start_esp32_net_cpu();
 #endif
 

@@ -985,7 +985,7 @@ static void mux_setup(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct gsm_modem *gsm = CONTAINER_OF(dwork, struct gsm_modem,
 					     gsm_configure_work);
-	const struct device *uart = DEVICE_DT_GET(GSM_UART_NODE);
+	const struct device *const uart = DEVICE_DT_GET(GSM_UART_NODE);
 	int ret;
 
 	gsm_ppp_lock(gsm);
@@ -1199,10 +1199,11 @@ void gsm_ppp_stop(const struct device *dev)
 		if (gsm->ppp_dev != NULL) {
 			uart_mux_disable(gsm->ppp_dev);
 		}
-	}
 
-	if (modem_cmd_handler_tx_lock(&gsm->context.cmd_handler, GSM_CMD_LOCK_TIMEOUT) < 0) {
-		LOG_WRN("Failed locking modem cmds!");
+		if (modem_cmd_handler_tx_lock(&gsm->context.cmd_handler,
+								GSM_CMD_LOCK_TIMEOUT) < 0) {
+			LOG_WRN("Failed locking modem cmds!");
+		}
 	}
 
 	if (gsm->modem_off_cb != NULL) {

@@ -7,6 +7,7 @@
 #define DT_DRV_COMPAT atmel_sam0_eic
 
 #include <zephyr/device.h>
+#include <zephyr/irq.h>
 #include <soc.h>
 #include <zephyr/drivers/interrupt_controller/sam0_eic.h>
 #include "intc_sam0_eic_priv.h"
@@ -95,7 +96,7 @@ static void sam0_eic_isr(const struct device *dev)
 int sam0_eic_acquire(int port, int pin, enum sam0_eic_trigger trigger,
 		     bool filter, sam0_eic_callback_t cb, void *data)
 {
-	const struct device *dev = DEVICE_DT_INST_GET(0);
+	const struct device *const dev = DEVICE_DT_INST_GET(0);
 	struct sam0_eic_data *dev_data = dev->data;
 	struct sam0_eic_port_data *port_data;
 	struct sam0_eic_line_assignment *line_assignment;
@@ -185,7 +186,7 @@ err_in_use:
 
 static bool sam0_eic_check_ownership(int port, int pin, int line_index)
 {
-	const struct device *dev = DEVICE_DT_INST_GET(0);
+	const struct device *const dev = DEVICE_DT_INST_GET(0);
 	struct sam0_eic_data *dev_data = dev->data;
 	struct sam0_eic_line_assignment *line_assignment =
 		&dev_data->lines[line_index];
@@ -204,7 +205,7 @@ static bool sam0_eic_check_ownership(int port, int pin, int line_index)
 
 int sam0_eic_release(int port, int pin)
 {
-	const struct device *dev = DEVICE_DT_INST_GET(0);
+	const struct device *const dev = DEVICE_DT_INST_GET(0);
 	struct sam0_eic_data *dev_data = dev->data;
 	uint32_t mask;
 	int line_index;
@@ -295,7 +296,7 @@ int sam0_eic_disable_interrupt(int port, int pin)
 
 uint32_t sam0_eic_interrupt_pending(int port)
 {
-	const struct device *dev = DEVICE_DT_INST_GET(0);
+	const struct device *const dev = DEVICE_DT_INST_GET(0);
 	struct sam0_eic_data *dev_data = dev->data;
 	struct sam0_eic_line_assignment *line_assignment;
 	uint32_t set = EIC->INTFLAG.reg;

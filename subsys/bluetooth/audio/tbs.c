@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/types.h>
 
 #include <zephyr/device.h>
@@ -400,10 +400,9 @@ static void net_buf_put_current_calls(const void *inst_p)
 					continue;
 				}
 				uri_length = strlen(call->remote_uri);
-				item_len = sizeof(call->index != BT_TBS_FREE_CALL_INDEX) +
-						sizeof(call->state) +
-						sizeof(call->flags) +
-						uri_length;
+				item_len = sizeof(call->index) + sizeof(call->state) +
+					   sizeof(call->flags) + uri_length;
+
 				net_buf_simple_add_u8(&read_buf, item_len);
 				net_buf_simple_add_u8(&read_buf, call->index);
 				net_buf_simple_add_u8(&read_buf, call->state);

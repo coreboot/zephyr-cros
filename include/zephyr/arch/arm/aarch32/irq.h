@@ -16,7 +16,6 @@
 #ifndef ZEPHYR_INCLUDE_ARCH_ARM_AARCH32_IRQ_H_
 #define ZEPHYR_INCLUDE_ARCH_ARM_AARCH32_IRQ_H_
 
-#include <zephyr/irq.h>
 #include <zephyr/sw_isr_table.h>
 #include <stdbool.h>
 
@@ -177,6 +176,8 @@ static inline void arch_isr_direct_footer(int maybe_swap)
 
 #define ARCH_ISR_DIRECT_DECLARE(name) \
 	static inline int name##_body(void); \
+	_Pragma("GCC diagnostic push") \
+	_Pragma("GCC diagnostic ignored \"-Wattributes\"") \
 	__attribute__ ((interrupt ("IRQ"))) void name(void) \
 	{ \
 		int check_reschedule; \
@@ -184,6 +185,7 @@ static inline void arch_isr_direct_footer(int maybe_swap)
 		check_reschedule = name##_body(); \
 		ISR_DIRECT_FOOTER(check_reschedule); \
 	} \
+	_Pragma("GCC diagnostic pop") \
 	static inline int name##_body(void)
 
 #if defined(CONFIG_DYNAMIC_DIRECT_INTERRUPTS)

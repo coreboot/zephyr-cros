@@ -10,6 +10,7 @@
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/i2c/i2c.h>
 #include <zephyr/dt-bindings/pwm/pwm.h>
+#include <zephyr/dt-bindings/adc/adc.h>
 #include <zephyr/dt-bindings/pwm/stm32_pwm.h>
 #include <freq.h>
 
@@ -333,6 +334,7 @@
 			clocks = <&rcc STM32_CLOCK_BUS_AHB2 0x00002000>;
 			interrupts = <18 0>;
 			status = "disabled";
+			vref-mv = <3300>;
 			#io-channel-cells = <1>;
 			has-temp-channel;
 			has-vref-channel;
@@ -417,6 +419,17 @@
 			clocks = <&rcc STM32_CLOCK_BUS_AHB3 0x00040000>;
 			status = "disabled";
 		};
+	};
+
+	die_temp: dietemp {
+		compatible = "st,stm32-temp-cal";
+		ts-cal1-addr = <0x1FFF75A8>;
+		ts-cal2-addr = <0x1FFF75CA>;
+		ts-cal1-temp = <30>;
+		ts-cal2-temp = <130>;
+		ts-cal-vrefanalog = <3000>;
+		io-channels = <&adc1 17>;
+		status = "disabled";
 	};
 
 	usb_fs_phy: usbphy {

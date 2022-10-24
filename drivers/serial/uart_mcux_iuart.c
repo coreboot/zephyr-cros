@@ -9,9 +9,9 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/clock_control.h>
+#include <zephyr/irq.h>
 #include <errno.h>
 #include <fsl_uart.h>
-#include <soc.h>
 #include <zephyr/drivers/pinctrl.h>
 
 struct mcux_iuart_config {

@@ -15,9 +15,11 @@ LOG_MODULE_REGISTER(net_ieee802154, CONFIG_NET_L2_IEEE802154_LOG_LEVEL);
 #include <errno.h>
 
 #include <zephyr/net/capture.h>
+#include <zephyr/net/ethernet.h>
 #include <zephyr/net/net_core.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_l2.h>
+#include <zephyr/net/net_linkaddr.h>
 
 #ifdef CONFIG_NET_6LO
 #include "ieee802154_6lo.h"
@@ -40,7 +42,7 @@ LOG_MODULE_REGISTER(net_ieee802154, CONFIG_NET_L2_IEEE802154_LOG_LEVEL);
 
 #define BUF_TIMEOUT K_MSEC(50)
 
-NET_BUF_POOL_DEFINE(frame_buf_pool, 1, IEEE802154_MTU - 2, 8, NULL);
+NET_BUF_POOL_DEFINE(tx_frame_buf_pool, 1, IEEE802154_MTU, 8, NULL);
 
 #define PKT_TITLE    "IEEE 802.15.4 packet content:"
 #define TX_PKT_TITLE "> " PKT_TITLE
@@ -96,11 +98,10 @@ static inline void set_pkt_ll_addr(struct net_linkaddr *addr, bool comp,
 				   enum ieee802154_addressing_mode mode,
 				   struct ieee802154_address_field *ll)
 {
-	if (mode == IEEE802154_ADDR_MODE_NONE) {
-		return;
-	}
+	addr->type = NET_LINK_IEEE802154;
 
-	if (mode == IEEE802154_ADDR_MODE_EXTENDED) {
+	switch (mode) {
+	case IEEE802154_ADDR_MODE_EXTENDED:
 		addr->len = IEEE802154_EXT_ADDR_LENGTH;
 
 		if (comp) {
@@ -108,13 +109,32 @@ static inline void set_pkt_ll_addr(struct net_linkaddr *addr, bool comp,
 		} else {
 			addr->addr = ll->plain.addr.ext_addr;
 		}
-	} else {
-		/* TODO: Handle short address (lookup known nbr, ...) */
+		break;
+
+	case IEEE802154_ADDR_MODE_SHORT:
+		addr->len = IEEE802154_SHORT_ADDR_LENGTH;
+
+		if (comp) {
+			addr->addr = (uint8_t *)&ll->comp.addr.short_addr;
+		} else {
+			addr->addr = (uint8_t *)&ll->plain.addr.short_addr;
+		}
+		break;
+
+	case IEEE802154_ADDR_MODE_NONE:
+	default:
 		addr->len = 0U;
 		addr->addr = NULL;
 	}
 
-	addr->type = NET_LINK_IEEE802154;
+	/* Swap address byte order in place from little to big endian.
+	 * This is ok as the ll address field comes from the header
+	 * part of the packet buffer which will not be directly accessible
+	 * once the packet reaches the upper layers.
+	 */
+	if (addr->len > 0) {
+		sys_mem_swap(addr->addr, addr->len);
+	}
 }
 
 /**
@@ -123,8 +143,9 @@ static inline void set_pkt_ll_addr(struct net_linkaddr *addr, bool comp,
  */
 static bool ieeee802154_check_dst_addr(struct net_if *iface, struct ieee802154_mhr *mhr)
 {
-	struct ieee802154_context *ctx = net_if_l2_data(iface);
 	struct ieee802154_address_field_plain *dst_plain = &mhr->dst_addr->plain;
+	struct ieee802154_context *ctx = net_if_l2_data(iface);
+	bool ret = false;
 
 	/*
 	 * Apply filtering requirements from chapter 6.7.2 of the IEEE
@@ -136,6 +157,8 @@ static bool ieeee802154_check_dst_addr(struct net_if *iface, struct ieee802154_m
 		/* also, macImplicitBroadcast is not implemented */
 		return false;
 	}
+
+	k_sem_take(&ctx->ctx_lock, K_FOREVER);
 
 	/*
 	 * c. If a destination PAN ID is included in the frame, it shall match
@@ -154,9 +177,9 @@ static bool ieeee802154_check_dst_addr(struct net_if *iface, struct ieee802154_m
 		 * address.
 		 */
 		if (!(dst_plain->addr.short_addr == IEEE802154_BROADCAST_ADDRESS ||
-		      dst_plain->addr.short_addr == ctx->short_addr)) {
+		      dst_plain->addr.short_addr == sys_cpu_to_le16(ctx->short_addr))) {
 			LOG_DBG("Frame dst address (short) does not match!");
-			return false;
+			goto out;
 		}
 
 	} else if (mhr->fs->fc.dst_addr_mode == IEEE802154_ADDR_MODE_EXTENDED) {
@@ -169,11 +192,14 @@ static bool ieeee802154_check_dst_addr(struct net_if *iface, struct ieee802154_m
 		if (memcmp(dst_plain->addr.ext_addr, ctx->ext_addr,
 				IEEE802154_EXT_ADDR_LENGTH) != 0) {
 			LOG_DBG("Frame dst address (ext) does not match!");
-			return false;
+			goto out;
 		}
 	}
+	ret = true;
 
-	return true;
+out:
+	k_sem_give(&ctx->ctx_lock);
+	return ret;
 }
 
 static enum net_verdict ieee802154_recv(struct net_if *iface, struct net_pkt *pkt)
@@ -212,6 +238,8 @@ static enum net_verdict ieee802154_recv(struct net_if *iface, struct net_pkt *pk
 
 	ieee802154_acknowledge(iface, &mpdu);
 
+	net_pkt_set_ll_proto_type(pkt, ETH_P_IEEE802154);
+
 	set_pkt_ll_addr(net_pkt_lladdr_src(pkt), mpdu.mhr.fs->fc.pan_id_comp,
 			mpdu.mhr.fs->fc.src_addr_mode, mpdu.mhr.src_addr);
 
@@ -240,21 +268,66 @@ static enum net_verdict ieee802154_recv(struct net_if *iface, struct net_pkt *pk
 static int ieee802154_send(struct net_if *iface, struct net_pkt *pkt)
 {
 	static struct net_buf *frame_buf;
+	uint8_t ll_hdr_len = 0;
+	bool send_raw = false;
+#ifdef CONFIG_NET_L2_IEEE802154_FRAGMENT
+	struct ieee802154_6lo_fragment_ctx f_ctx;
+	int requires_fragmentation = 0;
+#endif
+
 	if (frame_buf == NULL) {
-		frame_buf = net_buf_alloc(&frame_buf_pool, K_FOREVER);
+		frame_buf = net_buf_alloc(&tx_frame_buf_pool, K_FOREVER);
 	}
 
-	struct net_linkaddr *ll_addr_dst = net_pkt_lladdr_dst(pkt);
-	uint8_t ll_hdr_len = ieee802154_compute_header_and_authtag_size(iface, ll_addr_dst);
+#if defined(CONFIG_NET_SOCKETS_PACKET)
+	uint8_t pkt_family = net_pkt_family(pkt);
+
+	if (pkt_family == AF_PACKET) {
+		struct net_context *context = net_pkt_context(pkt);
+
+		if (!context) {
+			return -EINVAL;
+		}
+
+		switch (net_context_get_type(context)) {
+		case SOCK_RAW:
+			send_raw = true;
+			break;
+
+#if defined(CONFIG_NET_SOCKETS_PACKET_DGRAM)
+		case SOCK_DGRAM: {
+			struct sockaddr_ll *dst_addr = (struct sockaddr_ll *)&context->remote;
+			struct sockaddr_ll_ptr *src_addr =
+				(struct sockaddr_ll_ptr *)&context->local;
+
+			net_pkt_lladdr_dst(pkt)->addr = dst_addr->sll_addr;
+			net_pkt_lladdr_dst(pkt)->len = dst_addr->sll_halen;
+			net_pkt_lladdr_src(pkt)->addr = src_addr->sll_addr;
+			net_pkt_lladdr_src(pkt)->len = src_addr->sll_halen;
+			break;
+		}
+#endif
+		default:
+			return -EINVAL;
+		}
+	}
+#endif /* CONFIG_NET_SOCKETS_PACKET */
+
+	if (!send_raw) {
+		ll_hdr_len = ieee802154_compute_header_and_authtag_size(
+			iface, net_pkt_lladdr_dst(pkt), net_pkt_lladdr_src(pkt));
 
 #ifdef CONFIG_NET_6LO
 #ifdef CONFIG_NET_L2_IEEE802154_FRAGMENT
-	struct ieee802154_6lo_fragment_ctx f_ctx;
-	bool requires_fragmentation = ieee802154_6lo_encode_pkt(iface, pkt, &f_ctx, ll_hdr_len);
+		requires_fragmentation = ieee802154_6lo_encode_pkt(iface, pkt, &f_ctx, ll_hdr_len);
+		if (requires_fragmentation < 0) {
+			return requires_fragmentation;
+		}
 #else
-	ieee802154_6lo_encode_pkt(iface, pkt, NULL, ll_hdr_len);
+		ieee802154_6lo_encode_pkt(iface, pkt, NULL, ll_hdr_len);
 #endif /* CONFIG_NET_L2_IEEE802154_FRAGMENT */
 #endif /* CONFIG_NET_6LO */
+	}
 
 	net_capture_pkt(iface, pkt);
 
@@ -276,11 +349,18 @@ static int ieee802154_send(struct net_if *iface, struct net_pkt *pkt)
 			buf = buf->frags;
 		}
 #else
+
+		if (buf->len > IEEE802154_MTU) {
+			NET_ERR("Wrong packet length: %d", buf->len);
+			return -EINVAL;
+		}
 		net_buf_add_mem(frame_buf, buf->data, buf->len);
 		buf = buf->frags;
 #endif /* CONFIG_NET_L2_IEEE802154_FRAGMENT */
 
-		if (!ieee802154_create_data_frame(ctx, ll_addr_dst, frame_buf, ll_hdr_len)) {
+		if (!(send_raw || ieee802154_create_data_frame(ctx, net_pkt_lladdr_dst(pkt),
+							       net_pkt_lladdr_src(pkt),
+							       frame_buf, ll_hdr_len))) {
 			return -EINVAL;
 		}
 
@@ -311,9 +391,14 @@ static int ieee802154_enable(struct net_if *iface, bool state)
 
 	NET_DBG("iface %p %s", iface, state ? "up" : "down");
 
+	k_sem_take(&ctx->ctx_lock, K_FOREVER);
+
 	if (ctx->channel == IEEE802154_NO_CHANNEL) {
+		k_sem_give(&ctx->ctx_lock);
 		return -ENETDOWN;
 	}
+
+	k_sem_give(&ctx->ctx_lock);
 
 	if (state) {
 		return ieee802154_start(iface);
@@ -322,10 +407,13 @@ static int ieee802154_enable(struct net_if *iface, bool state)
 	return ieee802154_stop(iface);
 }
 
-enum net_l2_flags ieee802154_flags(struct net_if *iface)
+static enum net_l2_flags ieee802154_flags(struct net_if *iface)
 {
 	struct ieee802154_context *ctx = net_if_l2_data(iface);
 
+	/* No need for locking as these flags are set once
+	 * during L2 initialization and then never changed.
+	 */
 	return ctx->flags;
 }
 
@@ -334,14 +422,34 @@ NET_L2_INIT(IEEE802154_L2, ieee802154_recv, ieee802154_send, ieee802154_enable, 
 void ieee802154_init(struct net_if *iface)
 {
 	struct ieee802154_context *ctx = net_if_l2_data(iface);
-	const uint8_t *mac = net_if_get_link_addr(iface)->addr;
+	const uint8_t *eui64_be = net_if_get_link_addr(iface)->addr;
 	int16_t tx_power = CONFIG_NET_L2_IEEE802154_RADIO_DFLT_TX_POWER;
-	uint8_t long_addr[8];
 
 	NET_DBG("Initializing IEEE 802.15.4 stack on iface %p", iface);
 
+	k_sem_init(&ctx->ctx_lock, 1, 1);
+
+	/* no need to lock the context here as it has
+	 * not been published yet.
+	 */
 	ctx->channel = IEEE802154_NO_CHANNEL;
 	ctx->flags = NET_L2_MULTICAST;
+	if (ieee802154_get_hw_capabilities(iface) & IEEE802154_HW_PROMISC) {
+		ctx->flags |= NET_L2_PROMISC_MODE;
+	}
+
+	ctx->short_addr = IEEE802154_SHORT_ADDRESS_NOT_ASSOCIATED;
+	sys_memcpy_swap(ctx->ext_addr, eui64_be, IEEE802154_EXT_ADDR_LENGTH);
+
+	/* We switch to a link address store that we
+	 * own so that we can write user defined short
+	 * or extended addresses w/o mutating internal
+	 * driver storage.
+	 */
+	ctx->linkaddr.type = NET_LINK_IEEE802154;
+	ctx->linkaddr.len = IEEE802154_EXT_ADDR_LENGTH;
+	memcpy(ctx->linkaddr.addr, eui64_be, IEEE802154_EXT_ADDR_LENGTH);
+	net_if_set_link_addr(iface, ctx->linkaddr.addr, ctx->linkaddr.len, ctx->linkaddr.type);
 
 	if (IS_ENABLED(CONFIG_IEEE802154_NET_IF_NO_AUTO_START)) {
 		LOG_DBG("Interface auto start disabled.");
@@ -356,8 +464,7 @@ void ieee802154_init(struct net_if *iface)
 	}
 #endif
 
-	sys_memcpy_swap(long_addr, mac, 8);
-	memcpy(ctx->ext_addr, long_addr, 8);
+	sys_memcpy_swap(ctx->ext_addr, eui64_be, IEEE802154_EXT_ADDR_LENGTH);
 	ieee802154_filter_ieee_addr(iface, ctx->ext_addr);
 
 	if (!ieee802154_set_tx_power(iface, tx_power)) {

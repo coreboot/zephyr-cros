@@ -29,6 +29,7 @@
 
 #define LOG_LEVEL CONFIG_USB_DRIVER_LOG_LEVEL
 #include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 LOG_MODULE_REGISTER(usb_dc_stm32);
 
 #if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otgfs) && DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs)
@@ -188,7 +189,7 @@ void HAL_PCD_SOFCallback(PCD_HandleTypeDef *hpcd)
 
 static int usb_dc_stm32_clock_enable(void)
 {
-	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 	struct stm32_pclken pclken = {
 		.bus = USB_CLOCK_BUS,
 		.enr = USB_CLOCK_BITS,

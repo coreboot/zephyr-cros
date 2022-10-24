@@ -18,8 +18,6 @@
 #include <stm32_ll_system.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/clock_control/stm32_clock_control.h>
-#include <pinmux/pinmux_stm32.h>
-#include <zephyr/drivers/pinmux.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/drivers/interrupt_controller/exti_stm32.h>
 #include <zephyr/pm/device.h>
@@ -277,7 +275,7 @@ static int gpio_stm32_clock_request(const struct device *dev, bool on)
 	__ASSERT_NO_MSG(dev != NULL);
 
 	/* enable clock for subsystem */
-	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 
 	if (on) {
 		ret = clock_control_on(clk,
@@ -385,7 +383,7 @@ static int gpio_stm32_enable_int(int port, int pin)
 	defined(CONFIG_SOC_SERIES_STM32L1X) || \
 	defined(CONFIG_SOC_SERIES_STM32L4X) || \
 	defined(CONFIG_SOC_SERIES_STM32G4X)
-	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 	struct stm32_pclken pclken = {
 #ifdef CONFIG_SOC_SERIES_STM32H7X
 		.bus = STM32_CLOCK_BUS_APB4,
@@ -708,7 +706,8 @@ static int gpio_stm32_init(const struct device *dev)
 		return -ENODEV;
 	}
 
-#if defined(PWR_CR2_IOSV) && DT_NODE_HAS_STATUS(DT_NODELABEL(gpiog), okay)
+#if (defined(PWR_CR2_IOSV) || defined(PWR_SVMCR_IO2SV)) && \
+	DT_NODE_HAS_STATUS(DT_NODELABEL(gpiog), okay)
 	z_stm32_hsem_lock(CFG_HW_RCC_SEMID, HSEM_LOCK_DEFAULT_RETRY);
 	/* Port G[15:2] requires external power supply */
 	/* Cf: L4/L5 RM, Chapter "Independent I/O supply rail" */

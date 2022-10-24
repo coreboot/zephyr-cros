@@ -23,23 +23,17 @@
 #include "img_mgmt_priv.h"
 #include "img_mgmt/img_mgmt_config.h"
 
+#ifdef CONFIG_IMG_ENABLE_IMAGE_CHECK
+#include <zephyr/dfu/flash_img.h>
+#endif
+
 static img_mgmt_upload_fn img_mgmt_upload_cb;
 
 const struct img_mgmt_dfu_callbacks_t *img_mgmt_dfu_callbacks_fn;
 
 struct img_mgmt_state g_img_mgmt_state;
 
-#if SIZE_MAX == UINT32_MAX
-#define zcbor_size_decode	zcbor_uint32_decode
-#define zcbor_size_put		zcbor_uint32_put
-#elif SIZE_MAX == UINT64_MAX
-#define zcbor_size_decode	zcbor_uint64_decode
-#define zcbor_size_put		zcbor_uint64_put
-#else
-#error "Unsupported size_t encoding"
-#endif
-
-#if CONFIG_IMG_MGMT_VERBOSE_ERR
+#ifdef CONFIG_IMG_MGMT_VERBOSE_ERR
 const char *img_mgmt_err_str_app_reject = "app reject";
 const char *img_mgmt_err_str_hdr_malformed = "header malformed";
 const char *img_mgmt_err_str_magic_mismatch = "magic mismatch";
@@ -86,7 +80,7 @@ img_mgmt_read_info(int image_slot, struct image_version *ver, uint8_t *hash,
 				   uint32_t *flags)
 {
 
-#if CONFIG_IMG_MGMT_DUMMY_HDR
+#ifdef CONFIG_IMG_MGMT_DUMMY_HDR
 	uint8_t dummy_hash[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x00, 0x11, 0x22,
 				0x33, 0x44, 0x55, 0x66, 0x77};
 
@@ -257,33 +251,48 @@ img_mgmt_erase(struct mgmt_ctxt *ctxt)
 {
 	struct image_version ver;
 	int rc;
+	zcbor_state_t *zsd = ctxt->cnbd->zs;
 	zcbor_state_t *zse = ctxt->cnbe->zs;
 	bool ok;
+	uint32_t slot = 1;
+	size_t decoded = 0;
+
+	struct zcbor_map_decode_key_val image_erase_decode[] = {
+		ZCBOR_MAP_DECODE_KEY_VAL(slot, zcbor_uint32_decode, &slot),
+	};
+
+	ok = zcbor_map_decode_bulk(zsd, image_erase_decode,
+		ARRAY_SIZE(image_erase_decode), &decoded) == 0;
+
+	if (!ok) {
+		return MGMT_ERR_EINVAL;
+	}
 
 	/*
 	 * First check if image info is valid.
 	 * This check is done incase the flash area has a corrupted image.
 	 */
-	rc = img_mgmt_read_info(1, &ver, NULL, NULL);
+	rc = img_mgmt_read_info(slot, &ver, NULL, NULL);
 
 	if (rc == 0) {
 		/* Image info is valid. */
-		if (img_mgmt_slot_in_use(1)) {
+		if (img_mgmt_slot_in_use(slot)) {
 			/* No free slot. */
 			return MGMT_ERR_EBADSTATE;
 		}
 	}
 
-	rc = img_mgmt_impl_erase_slot();
-
+	rc = img_mgmt_impl_erase_slot(slot);
 	if (rc != 0) {
 		img_mgmt_dfu_stopped();
+		return rc;
 	}
 
-	ok = zcbor_tstr_put_lit(zse, "rc")	&&
-	     zcbor_int32_put(zse, rc);
+	if (zcbor_tstr_put_lit(zse, "rc") && zcbor_int32_put(zse, 0)) {
+		return MGMT_ERR_EOK;
+	}
 
-	return ok ? MGMT_ERR_EOK : MGMT_ERR_EMSGSIZE;
+	return MGMT_ERR_EMSGSIZE;
 }
 
 static int
@@ -411,6 +420,11 @@ img_mgmt_upload(struct mgmt_ctxt *ctxt)
 		/*
 		 * New upload.
 		 */
+#ifdef CONFIG_IMG_ENABLE_IMAGE_CHECK
+		struct flash_img_context ctx;
+		struct flash_img_check fic;
+#endif
+
 		g_img_mgmt_state.off = 0;
 
 		img_mgmt_dfu_started();
@@ -425,6 +439,23 @@ img_mgmt_upload(struct mgmt_ctxt *ctxt)
 		memcpy(g_img_mgmt_state.data_sha, req.data_sha.value, req.data_sha.len);
 		memset(&g_img_mgmt_state.data_sha[req.data_sha.len], 0,
 			   IMG_MGMT_DATA_SHA_LEN - req.data_sha.len);
+
+#ifdef CONFIG_IMG_ENABLE_IMAGE_CHECK
+		/* Check if the existing image hash matches the hash of the underlying data */
+		fic.match = g_img_mgmt_state.data_sha;
+		fic.clen = g_img_mgmt_state.size;
+
+		if (flash_img_check(&ctx, &fic, g_img_mgmt_state.area_id) == 0) {
+			/* Underlying data already matches, no need to upload any more, set offset
+			 * to image size so client knows upload has finished.
+			 */
+			g_img_mgmt_state.off = g_img_mgmt_state.size;
+			img_mgmt_dfu_pending();
+			cmd_status_arg.status = IMG_MGMT_ID_UPLOAD_STATUS_COMPLETE;
+			g_img_mgmt_state.area_id = -1;
+			goto end;
+		}
+#endif
 
 #ifndef CONFIG_IMG_ERASE_PROGRESSIVELY
 		/* erase the entire req.size all at once */

@@ -8,11 +8,12 @@
 #define __SOC_H__
 
 #ifndef _ASMLANGUAGE
+#include <soc/soc.h>
 #include <rom/ets_sys.h>
 #include <rom/spi_flash.h>
 #include <zephyr/types.h>
 #include <stdbool.h>
-#include <esp_clk.h>
+#include "esp32c3/clk.h"
 #endif
 
 /* IRQ numbers */

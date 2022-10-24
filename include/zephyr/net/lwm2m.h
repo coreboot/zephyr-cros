@@ -23,6 +23,7 @@
 #ifndef ZEPHYR_INCLUDE_NET_LWM2M_H_
 #define ZEPHYR_INCLUDE_NET_LWM2M_H_
 
+#include <time.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/mutex.h>
 #include <zephyr/net/coap.h>
@@ -215,6 +216,25 @@ struct lwm2m_ctx {
 	uint8_t validate_buf[CONFIG_LWM2M_ENGINE_VALIDATION_BUFFER_SIZE];
 };
 
+/**
+ * LwM2M Time series data structure
+ */
+struct lwm2m_time_series_elem {
+	/* Cached data Unix timestamp */
+	time_t t;
+	union {
+		uint8_t u8;
+		uint16_t u16;
+		uint32_t u32;
+		uint64_t u64;
+		int8_t i8;
+		int16_t i16;
+		int32_t i32;
+		int64_t i64;
+		double f;
+		bool b;
+	};
+};
 
 /**
  * @brief Asynchronous callback to get a resource buffer and length.
@@ -646,6 +666,21 @@ int lwm2m_engine_create_obj_inst(const char *pathstr);
 int lwm2m_engine_delete_obj_inst(const char *pathstr);
 
 /**
+ * @brief Locks the registry for this thread.
+ *
+ * Use this function before writing to multiple resources. This halts the
+ * lwm2m main thread until all the write-operations are finished.
+ *
+ */
+void lwm2m_registry_lock(void);
+
+/**
+ * @brief Unlocks the registry previously locked by lwm2m_registry_lock().
+ *
+ */
+void lwm2m_registry_unlock(void);
+
+/**
  * @brief Set resource (instance) value (opaque buffer)
  *
  * @param[in] pathstr LwM2M path string "obj/obj-inst/res(/res-inst)"
@@ -654,7 +689,7 @@ int lwm2m_engine_delete_obj_inst(const char *pathstr);
  *
  * @return 0 for success or negative in case of error.
  */
-int lwm2m_engine_set_opaque(const char *pathstr, char *data_ptr, uint16_t data_len);
+int lwm2m_engine_set_opaque(const char *pathstr, const char *data_ptr, uint16_t data_len);
 
 /**
  * @brief Set resource (instance) value (string)
@@ -664,7 +699,7 @@ int lwm2m_engine_set_opaque(const char *pathstr, char *data_ptr, uint16_t data_l
  *
  * @return 0 for success or negative in case of error.
  */
-int lwm2m_engine_set_string(const char *pathstr, char *data_ptr);
+int lwm2m_engine_set_string(const char *pathstr, const char *data_ptr);
 
 /**
  * @brief Set resource (instance) value (u8)
@@ -764,7 +799,7 @@ int lwm2m_engine_set_bool(const char *pathstr, bool value);
  *
  * @return 0 for success or negative in case of error.
  */
-int lwm2m_engine_set_float(const char *pathstr, double *value);
+int lwm2m_engine_set_float(const char *pathstr, const double *value);
 
 /**
  * @brief Set resource (instance) value (ObjLnk)
@@ -774,7 +809,7 @@ int lwm2m_engine_set_float(const char *pathstr, double *value);
  *
  * @return 0 for success or negative in case of error.
  */
-int lwm2m_engine_set_objlnk(const char *pathstr, struct lwm2m_objlnk *value);
+int lwm2m_engine_set_objlnk(const char *pathstr, const struct lwm2m_objlnk *value);
 
 /**
  * @brief Get resource (instance) value (opaque buffer)
@@ -1237,7 +1272,7 @@ enum lwm2m_rd_client_event {
 	LWM2M_RD_CLIENT_EVENT_BOOTSTRAP_TRANSFER_COMPLETE,
 	LWM2M_RD_CLIENT_EVENT_REGISTRATION_FAILURE,
 	LWM2M_RD_CLIENT_EVENT_REGISTRATION_COMPLETE,
-	LWM2M_RD_CLIENT_EVENT_REG_UPDATE_FAILURE,
+	LWM2M_RD_CLIENT_EVENT_REG_TIMEOUT,
 	LWM2M_RD_CLIENT_EVENT_REG_UPDATE_COMPLETE,
 	LWM2M_RD_CLIENT_EVENT_DEREGISTER_FAILURE,
 	LWM2M_RD_CLIENT_EVENT_DISCONNECT,
@@ -1245,6 +1280,12 @@ enum lwm2m_rd_client_event {
 	LWM2M_RD_CLIENT_EVENT_ENGINE_SUSPENDED,
 	LWM2M_RD_CLIENT_EVENT_NETWORK_ERROR,
 };
+
+/**
+ *	Define for old event name keeping backward compatibility.
+ */
+#define LWM2M_RD_CLIENT_EVENT_REG_UPDATE_FAILURE                                                   \
+	LWM2M_RD_CLIENT_EVENT_REG_TIMEOUT __DEPRECATED_MACRO
 
 /*
  * LwM2M RD client flags, used to configure LwM2M session.
@@ -1362,6 +1403,22 @@ int lwm2m_engine_send(struct lwm2m_ctx *ctx, char const *path_list[], uint8_t pa
  *
  */
 struct lwm2m_ctx *lwm2m_rd_client_ctx(void);
+
+/** 
+ * @brief Enable data cache for a resource.
+ *
+ * Application may enable caching of resource data by allocating buffer for LwM2M engine to use.
+ * Buffer must be size of struct @ref lwm2m_time_series_elem times cache_len
+ *
+ * @param resource_path LwM2M resourcepath string "obj/obj-inst/res(/res-inst)"
+ * @param data_cache Pointer to Data cache array
+ * @param cache_len number of cached entries
+ * 
+ * @return 0 for success or negative in case of error.
+ *
+ */
+int lwm2m_engine_enable_cache(char const *resource_path, struct lwm2m_time_series_elem *data_cache,
+			      size_t cache_len);
 
 #endif	/* ZEPHYR_INCLUDE_NET_LWM2M_H_ */
 /**@}  */

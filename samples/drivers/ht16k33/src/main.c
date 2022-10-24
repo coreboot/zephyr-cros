@@ -7,6 +7,7 @@
 #include <zephyr/drivers/led.h>
 #include <zephyr/drivers/kscan.h>
 #include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
@@ -23,8 +24,8 @@ static void keyscan_callback(const struct device *dev, uint32_t row,
 
 void main(void)
 {
-	const struct device *led = DEVICE_DT_GET(LED_NODE);
-	const struct device *key = DEVICE_DT_GET(KEY_NODE);
+	const struct device *const led = DEVICE_DT_GET(LED_NODE);
+	const struct device *const key = DEVICE_DT_GET(KEY_NODE);
 	int err;
 	int i;
 

@@ -77,7 +77,6 @@ struct k_fifo;
 struct k_lifo;
 struct k_stack;
 struct k_mem_slab;
-struct k_mem_pool;
 struct k_timer;
 struct k_poll_event;
 struct k_poll_signal;
@@ -635,7 +634,7 @@ struct _static_thread_data {
 
 #define Z_THREAD_INITIALIZER(thread, stack, stack_size,           \
 			    entry, p1, p2, p3,                   \
-			    prio, options, delay, abort, tname)  \
+			    prio, options, delay, tname)         \
 	{                                                        \
 	.init_thread = (thread),				 \
 	.init_stack = (stack),					 \
@@ -647,7 +646,6 @@ struct _static_thread_data {
 	.init_prio = (prio),                                     \
 	.init_options = (options),                               \
 	.init_delay = (delay),                                   \
-	.init_abort = (abort),                                   \
 	.init_name = STRINGIFY(tname),                           \
 	}
 
@@ -693,7 +691,7 @@ struct _static_thread_data {
 		Z_THREAD_INITIALIZER(&_k_thread_obj_##name,		 \
 				    _k_thread_stack_##name, stack_size,  \
 				entry, p1, p2, p3, prio, options, delay, \
-				NULL, name);				 	 \
+				name);					 \
 	const k_tid_t name = (k_tid_t)&_k_thread_obj_##name
 
 /**
@@ -4645,6 +4643,8 @@ struct k_pipe {
 		_wait_q_t      writers; /**< Writer wait queue */
 	} wait_q;			/** Wait queue */
 
+	_POLL_EVENT;
+
 	uint8_t	       flags;		/**< Flags */
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_pipe)
@@ -4667,7 +4667,8 @@ struct k_pipe {
 		.readers = Z_WAIT_Q_INIT(&obj.wait_q.readers),       \
 		.writers = Z_WAIT_Q_INIT(&obj.wait_q.writers)        \
 	},                                                          \
-	.flags = 0                                                  \
+	_POLL_EVENT_OBJ_INIT(obj)                                   \
+	.flags = 0,                                                 \
 	}
 
 /**
@@ -5260,8 +5261,7 @@ extern void *k_malloc(size_t size);
  * @brief Free memory allocated from heap.
  *
  * This routine provides traditional free() semantics. The memory being
- * returned must have been allocated from the heap memory pool or
- * k_mem_pool_malloc().
+ * returned must have been allocated from the heap memory pool.
  *
  * If @a ptr is NULL, no operation is performed.
  *
@@ -5309,6 +5309,9 @@ enum _poll_types_bits {
 	/* msgq data availability */
 	_POLL_TYPE_MSGQ_DATA_AVAILABLE,
 
+	/* pipe data availability */
+	_POLL_TYPE_PIPE_DATA_AVAILABLE,
+
 	_POLL_NUM_TYPES
 };
 
@@ -5333,6 +5336,9 @@ enum _poll_states_bits {
 
 	/* data is available to read on a message queue */
 	_POLL_STATE_MSGQ_DATA_AVAILABLE,
+
+	/* data is available to read from a pipe */
+	_POLL_STATE_PIPE_DATA_AVAILABLE,
 
 	_POLL_NUM_STATES
 };
@@ -5365,6 +5371,7 @@ enum _poll_states_bits {
 #define K_POLL_TYPE_DATA_AVAILABLE Z_POLL_TYPE_BIT(_POLL_TYPE_DATA_AVAILABLE)
 #define K_POLL_TYPE_FIFO_DATA_AVAILABLE K_POLL_TYPE_DATA_AVAILABLE
 #define K_POLL_TYPE_MSGQ_DATA_AVAILABLE Z_POLL_TYPE_BIT(_POLL_TYPE_MSGQ_DATA_AVAILABLE)
+#define K_POLL_TYPE_PIPE_DATA_AVAILABLE Z_POLL_TYPE_BIT(_POLL_TYPE_PIPE_DATA_AVAILABLE)
 
 /* public - polling modes */
 enum k_poll_modes {
@@ -5381,6 +5388,7 @@ enum k_poll_modes {
 #define K_POLL_STATE_DATA_AVAILABLE Z_POLL_STATE_BIT(_POLL_STATE_DATA_AVAILABLE)
 #define K_POLL_STATE_FIFO_DATA_AVAILABLE K_POLL_STATE_DATA_AVAILABLE
 #define K_POLL_STATE_MSGQ_DATA_AVAILABLE Z_POLL_STATE_BIT(_POLL_STATE_MSGQ_DATA_AVAILABLE)
+#define K_POLL_STATE_PIPE_DATA_AVAILABLE Z_POLL_STATE_BIT(_POLL_STATE_PIPE_DATA_AVAILABLE)
 #define K_POLL_STATE_CANCELLED Z_POLL_STATE_BIT(_POLL_STATE_CANCELLED)
 
 /* public - poll signal object */
@@ -5438,6 +5446,9 @@ struct k_poll_event {
 		struct k_fifo *fifo;
 		struct k_queue *queue;
 		struct k_msgq *msgq;
+#ifdef CONFIG_PIPES
+		struct k_pipe *pipe;
+#endif
 	};
 };
 

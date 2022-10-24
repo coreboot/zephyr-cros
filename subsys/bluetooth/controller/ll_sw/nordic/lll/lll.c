@@ -14,6 +14,7 @@
 #include <zephyr/device.h>
 
 #include <zephyr/drivers/entropy.h>
+#include <zephyr/irq.h>
 
 #include "hal/swi.h"
 #include "hal/ccm.h"
@@ -59,7 +60,7 @@ static struct {
 } event;
 
 /* Entropy device */
-static const struct device *dev_entropy = DEVICE_DT_GET(DT_NODELABEL(rng));
+static const struct device *const dev_entropy = DEVICE_DT_GET(DT_NODELABEL(rng));
 
 static int init_reset(void);
 #if defined(CONFIG_BT_CTLR_LOW_LAT_ULL_DONE)
@@ -472,10 +473,13 @@ uint32_t lll_preempt_calc(struct ull_hdr *ull, uint8_t ticker_id,
 		 *    duration.
 		 * 3. Increase the preempt to start ticks for future events.
 		 */
-		return 1;
+		LL_ASSERT_MSG(false, "%s: Actual EVENT_OVERHEAD_START_US = %u",
+			      __func__, HAL_TICKER_TICKS_TO_US(diff));
+
+		return 1U;
 	}
 
-	return 0;
+	return 0U;
 }
 
 void lll_chan_set(uint32_t chan)
@@ -738,10 +742,13 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
 	uint32_t ret;
 
-	/* Stop any scheduled preempt ticker */
-	ret = preempt_ticker_stop();
-	LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
-		  (ret == TICKER_STATUS_BUSY));
+	/* NOTE: preempt timeout started prior for the current event that has
+	 *       its prepare that is now invoked is not explicitly stopped here.
+	 *       If there is a next prepare event in pipeline, then the prior
+	 *       preempt timeout if started will be stopped before starting
+	 *       the new preempt timeout. Refer to implementation in
+	 *       preempt_ticker_start().
+	 */
 
 	/* Find next prepare needing preempt timeout to be setup */
 	do {

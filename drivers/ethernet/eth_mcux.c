@@ -31,6 +31,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <zephyr/net/ethernet.h>
 #include <ethernet/eth_stats.h>
 #include <zephyr/pm/device.h>
+#include <zephyr/irq.h>
 
 #if defined(CONFIG_PTP_CLOCK_MCUX)
 #include <zephyr/drivers/ptp_clock.h>
@@ -1203,7 +1204,7 @@ static void eth_iface_init(struct net_if *iface)
 	dsa_register_master_tx(iface, &eth_tx);
 #endif
 	ethernet_init(iface);
-	net_if_flag_set(iface, NET_IF_NO_AUTO_START);
+	net_if_carrier_off(iface);
 
 	context->config_func();
 }
@@ -1405,7 +1406,7 @@ static void eth_mcux_err_isr(const struct device *dev)
 		    (ETH_MCUX_NONE))
 
 #if defined(CONFIG_PTP_CLOCK_MCUX)
-#define PTP_INST_NODEID(n) DT_CHILD(DT_DRV_INST(n), ptp)
+#define PTP_INST_NODEID(n) DT_INST_CHILD(n, ptp)
 
 #define ETH_MCUX_IRQ_PTP_INIT(n)							\
 	do {										\
@@ -1767,7 +1768,7 @@ static const struct ptp_clock_driver_api api = {
 
 static int ptp_mcux_init(const struct device *port)
 {
-	const struct device *eth_dev = DEVICE_DT_GET(DT_NODELABEL(enet));
+	const struct device *const eth_dev = DEVICE_DT_GET(DT_NODELABEL(enet));
 	struct eth_context *context = eth_dev->data;
 	struct ptp_context *ptp_context = port->data;
 #if defined(CONFIG_PINCTRL)

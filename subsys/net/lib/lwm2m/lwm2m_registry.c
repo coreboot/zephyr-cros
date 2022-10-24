@@ -16,6 +16,7 @@
 #define LOG_LEVEL	CONFIG_LWM2M_LOG_LEVEL
 
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/ring_buffer.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include "lwm2m_engine.h"
@@ -29,6 +30,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <zephyr/types.h>
 
@@ -40,6 +42,18 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define BINDING_OPT_MAX_LEN 3 /* "UQ" */
 #define QUEUE_OPT_MAX_LEN   2 /* "Q" */
 
+/* Thread safety */
+static K_MUTEX_DEFINE(registry_lock);
+
+void lwm2m_registry_lock(void)
+{
+	(void)k_mutex_lock(&registry_lock, K_FOREVER);
+}
+
+void lwm2m_registry_unlock(void)
+{
+	(void)k_mutex_unlock(&registry_lock);
+}
 /* Resources */
 static sys_slist_t engine_obj_list;
 static sys_slist_t engine_obj_inst_list;
@@ -49,10 +63,15 @@ sys_slist_t *lwm2m_engine_obj_list(void) { return &engine_obj_list; }
 
 sys_slist_t *lwm2m_engine_obj_inst_list(void) { return &engine_obj_inst_list; }
 
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+static void lwm2m_engine_cache_write(struct lwm2m_engine_obj_field *obj_field, const char *pathstr,
+				     void *value);
+#endif
 /* Engine object */
 
 void lwm2m_register_obj(struct lwm2m_engine_obj *obj)
 {
+	k_mutex_lock(&registry_lock, K_FOREVER);
 #if defined(CONFIG_LWM2M_ACCESS_CONTROL_ENABLE)
 	/* If bootstrap, then bootstrap server should create the ac obj instances */
 #if !IS_ENABLED(CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP)
@@ -62,15 +81,18 @@ void lwm2m_register_obj(struct lwm2m_engine_obj *obj)
 #endif /* CONFIG_LWM2M_RD_CLIENT_SUPPORT_BOOTSTRAP */
 #endif /* CONFIG_LWM2M_ACCESS_CONTROL_ENABLE */
 	sys_slist_append(&engine_obj_list, &obj->node);
+	k_mutex_unlock(&registry_lock);
 }
 
 void lwm2m_unregister_obj(struct lwm2m_engine_obj *obj)
 {
+	k_mutex_lock(&registry_lock, K_FOREVER);
 #if defined(CONFIG_LWM2M_ACCESS_CONTROL_ENABLE)
 	access_control_remove_obj(obj->obj_id);
 #endif
 	engine_remove_observer_by_id(obj->obj_id, -1);
 	sys_slist_find_and_remove(&engine_obj_list, &obj->node);
+	k_mutex_unlock(&registry_lock);
 }
 
 struct lwm2m_engine_obj *get_engine_obj(int obj_id)
@@ -163,6 +185,7 @@ struct lwm2m_engine_obj_inst *next_engine_obj_inst(int obj_id, int obj_inst_id)
 int lwm2m_create_obj_inst(uint16_t obj_id, uint16_t obj_inst_id,
 			  struct lwm2m_engine_obj_inst **obj_inst)
 {
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	struct lwm2m_engine_obj *obj;
 	int ret;
 
@@ -170,16 +193,19 @@ int lwm2m_create_obj_inst(uint16_t obj_id, uint16_t obj_inst_id,
 	obj = get_engine_obj(obj_id);
 	if (!obj) {
 		LOG_ERR("unable to find obj: %u", obj_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
 	if (!obj->create_cb) {
 		LOG_ERR("obj %u has no create_cb", obj_id);
+		k_mutex_unlock(&registry_lock);
 		return -EINVAL;
 	}
 
 	if (obj->instance_count + 1 > obj->max_instance_count) {
 		LOG_ERR("no more instances available for obj %u", obj_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOMEM;
 	}
 
@@ -190,6 +216,7 @@ int lwm2m_create_obj_inst(uint16_t obj_id, uint16_t obj_inst_id,
 		 * Already checked for instance count total.
 		 * This can only be an error if the object instance exists.
 		 */
+		k_mutex_unlock(&registry_lock);
 		return -EEXIST;
 	}
 
@@ -202,27 +229,31 @@ int lwm2m_create_obj_inst(uint16_t obj_id, uint16_t obj_inst_id,
 		ret = obj->user_create_cb(obj_inst_id);
 		if (ret < 0) {
 			LOG_ERR("Error in user obj create %u/%u: %d", obj_id, obj_inst_id, ret);
+			k_mutex_unlock(&registry_lock);
 			lwm2m_delete_obj_inst(obj_id, obj_inst_id);
 			return ret;
 		}
 	}
-
+	k_mutex_unlock(&registry_lock);
 	return 0;
 }
 
 int lwm2m_delete_obj_inst(uint16_t obj_id, uint16_t obj_inst_id)
 {
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	int i, ret = 0;
 	struct lwm2m_engine_obj *obj;
 	struct lwm2m_engine_obj_inst *obj_inst;
 
 	obj = get_engine_obj(obj_id);
 	if (!obj) {
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
 	obj_inst = get_engine_obj_inst(obj_id, obj_inst_id);
 	if (!obj_inst) {
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
@@ -249,6 +280,7 @@ int lwm2m_delete_obj_inst(uint16_t obj_id, uint16_t obj_inst_id)
 
 	clear_attrs(obj_inst);
 	(void)memset(obj_inst, 0, sizeof(struct lwm2m_engine_obj_inst));
+	k_mutex_unlock(&registry_lock);
 	return ret;
 }
 
@@ -417,14 +449,17 @@ int lwm2m_engine_set_res_buf(const char *pathstr, void *buffer_ptr, uint16_t buf
 		return -EINVAL;
 	}
 
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	/* look up resource obj */
 	ret = path_to_objs(&path, NULL, NULL, NULL, &res_inst);
 	if (ret < 0) {
+		k_mutex_unlock(&registry_lock);
 		return ret;
 	}
 
 	if (!res_inst) {
 		LOG_ERR("res instance %d not found", path.res_inst_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
@@ -434,6 +469,7 @@ int lwm2m_engine_set_res_buf(const char *pathstr, void *buffer_ptr, uint16_t buf
 	res_inst->max_data_len = buffer_len;
 	res_inst->data_flags = data_flags;
 
+	k_mutex_unlock(&registry_lock);
 	return ret;
 }
 
@@ -443,7 +479,7 @@ int lwm2m_engine_set_res_data(const char *pathstr, void *data_ptr, uint16_t data
 	return lwm2m_engine_set_res_buf(pathstr, data_ptr, data_len, data_len, data_flags);
 }
 
-static int lwm2m_engine_set(const char *pathstr, void *value, uint16_t len)
+static int lwm2m_engine_set(const char *pathstr, const void *value, uint16_t len)
 {
 	struct lwm2m_obj_path path;
 	struct lwm2m_engine_obj_inst *obj_inst;
@@ -468,14 +504,17 @@ static int lwm2m_engine_set(const char *pathstr, void *value, uint16_t len)
 		return -EINVAL;
 	}
 
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	/* look up resource obj */
 	ret = path_to_objs(&path, &obj_inst, &obj_field, &res, &res_inst);
 	if (ret < 0) {
+		k_mutex_unlock(&registry_lock);
 		return ret;
 	}
 
 	if (!res_inst) {
 		LOG_ERR("res instance %d not found", path.res_inst_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
@@ -483,6 +522,7 @@ static int lwm2m_engine_set(const char *pathstr, void *value, uint16_t len)
 		LOG_ERR("res instance data pointer is read-only "
 			"[%u/%u/%u/%u:%u]",
 			path.obj_id, path.obj_inst_id, path.res_id, path.res_inst_id, path.level);
+		k_mutex_unlock(&registry_lock);
 		return -EACCES;
 	}
 
@@ -499,12 +539,14 @@ static int lwm2m_engine_set(const char *pathstr, void *value, uint16_t len)
 	if (!data_ptr) {
 		LOG_ERR("res instance data pointer is NULL [%u/%u/%u/%u:%u]", path.obj_id,
 			path.obj_inst_id, path.res_id, path.res_inst_id, path.level);
+		k_mutex_unlock(&registry_lock);
 		return -EINVAL;
 	}
 
 	/* check length (note: we add 1 to string length for NULL pad) */
 	if (len > max_data_len - (obj_field->data_type == LWM2M_RES_TYPE_STRING ? 1 : 0)) {
 		LOG_ERR("length %u is too long for res instance %d data", len, path.res_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOMEM;
 	}
 
@@ -515,8 +557,9 @@ static int lwm2m_engine_set(const char *pathstr, void *value, uint16_t len)
 #if CONFIG_LWM2M_ENGINE_VALIDATION_BUFFER_SIZE > 0
 	if (res->validate_cb) {
 		ret = res->validate_cb(obj_inst->obj_inst_id, res->res_id, res_inst->res_inst_id,
-				       value, len, false, 0);
+				       (uint8_t *)value, len, false, 0);
 		if (ret < 0) {
+			k_mutex_unlock(&registry_lock);
 			return -EINVAL;
 		}
 	}
@@ -576,10 +619,16 @@ static int lwm2m_engine_set(const char *pathstr, void *value, uint16_t len)
 
 	default:
 		LOG_ERR("unknown obj data_type %d", obj_field->data_type);
+		k_mutex_unlock(&registry_lock);
 		return -EINVAL;
 	}
 
 	res_inst->data_len = len;
+
+	/* Cache Data Write */
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	lwm2m_engine_cache_write(obj_field, pathstr, value);
+#endif
 
 	if (res->post_write_cb) {
 		ret = res->post_write_cb(obj_inst->obj_inst_id, res->res_id, res_inst->res_inst_id,
@@ -589,16 +638,16 @@ static int lwm2m_engine_set(const char *pathstr, void *value, uint16_t len)
 	if (changed && LWM2M_HAS_PERM(obj_field, LWM2M_PERM_R)) {
 		lwm2m_notify_observer_path(&path);
 	}
-
+	k_mutex_unlock(&registry_lock);
 	return ret;
 }
 
-int lwm2m_engine_set_opaque(const char *pathstr, char *data_ptr, uint16_t data_len)
+int lwm2m_engine_set_opaque(const char *pathstr, const char *data_ptr, uint16_t data_len)
 {
 	return lwm2m_engine_set(pathstr, data_ptr, data_len);
 }
 
-int lwm2m_engine_set_string(const char *pathstr, char *data_ptr)
+int lwm2m_engine_set_string(const char *pathstr, const char *data_ptr)
 {
 	return lwm2m_engine_set(pathstr, data_ptr, strlen(data_ptr));
 }
@@ -650,12 +699,12 @@ int lwm2m_engine_set_bool(const char *pathstr, bool value)
 	return lwm2m_engine_set(pathstr, &temp, 1);
 }
 
-int lwm2m_engine_set_float(const char *pathstr, double *value)
+int lwm2m_engine_set_float(const char *pathstr, const double *value)
 {
 	return lwm2m_engine_set(pathstr, value, sizeof(double));
 }
 
-int lwm2m_engine_set_objlnk(const char *pathstr, struct lwm2m_objlnk *value)
+int lwm2m_engine_set_objlnk(const char *pathstr, const struct lwm2m_objlnk *value)
 {
 	return lwm2m_engine_set(pathstr, value, sizeof(struct lwm2m_objlnk));
 }
@@ -694,14 +743,17 @@ int lwm2m_engine_get_res_buf(const char *pathstr, void **buffer_ptr, uint16_t *b
 		return -EINVAL;
 	}
 
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	/* look up resource obj */
 	ret = path_to_objs(&path, NULL, NULL, NULL, &res_inst);
 	if (ret < 0) {
+		k_mutex_unlock(&registry_lock);
 		return ret;
 	}
 
 	if (!res_inst) {
 		LOG_ERR("res instance %d not found", path.res_inst_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
@@ -718,6 +770,7 @@ int lwm2m_engine_get_res_buf(const char *pathstr, void **buffer_ptr, uint16_t *b
 		*data_flags = res_inst->data_flags;
 	}
 
+	k_mutex_unlock(&registry_lock);
 	return 0;
 }
 
@@ -750,15 +803,17 @@ static int lwm2m_engine_get(const char *pathstr, void *buf, uint16_t buflen)
 		LOG_ERR("path must have at least 3 parts");
 		return -EINVAL;
 	}
-
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	/* look up resource obj */
 	ret = path_to_objs(&path, &obj_inst, &obj_field, &res, &res_inst);
 	if (ret < 0) {
+		k_mutex_unlock(&registry_lock);
 		return ret;
 	}
 
 	if (!res_inst) {
 		LOG_ERR("res instance %d not found", path.res_inst_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
@@ -779,6 +834,7 @@ static int lwm2m_engine_get(const char *pathstr, void *buf, uint16_t buflen)
 
 		case LWM2M_RES_TYPE_OPAQUE:
 			if (data_len > buflen) {
+				k_mutex_unlock(&registry_lock);
 				return -ENOMEM;
 			}
 
@@ -832,10 +888,11 @@ static int lwm2m_engine_get(const char *pathstr, void *buf, uint16_t buflen)
 
 		default:
 			LOG_ERR("unknown obj data_type %d", obj_field->data_type);
+			k_mutex_unlock(&registry_lock);
 			return -EINVAL;
 		}
 	}
-
+	k_mutex_unlock(&registry_lock);
 	return 0;
 }
 
@@ -1056,22 +1113,25 @@ int lwm2m_engine_create_res_inst(const char *pathstr)
 		LOG_ERR("path must have 4 parts");
 		return -EINVAL;
 	}
-
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	ret = path_to_objs(&path, NULL, NULL, &res, &res_inst);
 	if (ret < 0) {
+		k_mutex_unlock(&registry_lock);
 		return ret;
 	}
 
 	if (!res) {
 		LOG_ERR("resource %u not found", path.res_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
 	if (res_inst && res_inst->res_inst_id != RES_INSTANCE_NOT_CREATED) {
 		LOG_ERR("res instance %u already exists", path.res_inst_id);
+		k_mutex_unlock(&registry_lock);
 		return -EINVAL;
 	}
-
+	k_mutex_unlock(&registry_lock);
 	return lwm2m_engine_allocate_resource_instance(res, &res_inst, path.res_inst_id);
 }
 
@@ -1090,14 +1150,16 @@ int lwm2m_engine_delete_res_inst(const char *pathstr)
 		LOG_ERR("path must have 4 parts");
 		return -EINVAL;
 	}
-
+	k_mutex_lock(&registry_lock, K_FOREVER);
 	ret = path_to_objs(&path, NULL, NULL, NULL, &res_inst);
 	if (ret < 0) {
+		k_mutex_unlock(&registry_lock);
 		return ret;
 	}
 
 	if (!res_inst) {
 		LOG_ERR("res instance %u not found", path.res_inst_id);
+		k_mutex_unlock(&registry_lock);
 		return -ENOENT;
 	}
 
@@ -1105,7 +1167,7 @@ int lwm2m_engine_delete_res_inst(const char *pathstr)
 	res_inst->max_data_len = 0U;
 	res_inst->data_len = 0U;
 	res_inst->res_inst_id = RES_INSTANCE_NOT_CREATED;
-
+	k_mutex_unlock(&registry_lock);
 	return 0;
 }
 /* Register callbacks */
@@ -1292,4 +1354,326 @@ bool lwm2m_engine_shall_report_obj_version(const struct lwm2m_engine_obj *obj)
 	}
 
 	return obj->version_major != 1 || obj->version_minor != 0;
+}
+
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+static sys_slist_t lwm2m_timed_cache_list;
+static struct lwm2m_time_series_resource lwm2m_cache_entries[CONFIG_LWM2M_MAX_CACHED_RESOURCES];
+
+static void lwm2m_cache_add_path_to_list(struct lwm2m_time_series_resource *new_entry)
+{
+	struct lwm2m_time_series_resource *prev = NULL;
+	struct lwm2m_time_series_resource *entry;
+
+	if (!sys_slist_is_empty(&lwm2m_timed_cache_list)) {
+
+		/* Keep list Alphabetical order */
+		SYS_SLIST_FOR_EACH_CONTAINER(&lwm2m_timed_cache_list, entry, node) {
+
+			if (strcmp(entry->path, new_entry->path) < 0) {
+				/* Current entry have  */
+				prev = entry;
+				continue;
+			}
+
+			if (prev) {
+				sys_slist_insert(&lwm2m_timed_cache_list, &prev->node,
+						 &new_entry->node);
+			} else {
+				sys_slist_prepend(&lwm2m_timed_cache_list, &new_entry->node);
+			}
+			return;
+		}
+	}
+
+	/* Add First or new tail entry */
+	sys_slist_append(&lwm2m_timed_cache_list, &new_entry->node);
+}
+
+static struct lwm2m_time_series_resource *lwm2m_cache_entry_allocate(char const *resource_path)
+{
+	int i;
+	struct lwm2m_time_series_resource *entry;
+
+	entry = lwm2m_cache_entry_get_by_string(resource_path);
+	if (entry) {
+		return entry;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(lwm2m_cache_entries); i++) {
+		if (lwm2m_cache_entries[i].path == NULL) {
+			lwm2m_cache_entries[i].path = resource_path;
+			lwm2m_cache_add_path_to_list(&lwm2m_cache_entries[i]);
+			return &lwm2m_cache_entries[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void lwm2m_engine_cache_write(struct lwm2m_engine_obj_field *obj_field, const char *pathstr,
+				     void *value)
+{
+	struct lwm2m_time_series_resource *cache_entry;
+	struct lwm2m_time_series_elem elements;
+
+	cache_entry = lwm2m_cache_entry_get_by_string(pathstr);
+	if (!cache_entry) {
+		return;
+	}
+
+	elements.t = time(NULL);
+
+	if (elements.t  <= 0) {
+		LOG_WRN("Time() not available");
+		return;
+	}
+
+	switch (obj_field->data_type) {
+	case LWM2M_RES_TYPE_U32:
+	case LWM2M_RES_TYPE_TIME:
+		elements.u32 = *(uint32_t *)value;
+		break;
+
+	case LWM2M_RES_TYPE_U16:
+		elements.u16 = *(uint16_t *)value;
+		break;
+
+	case LWM2M_RES_TYPE_U8:
+		elements.u8 = *(uint8_t *)value;
+		break;
+
+	case LWM2M_RES_TYPE_S64:
+		elements.i64 = *(int64_t *)value;
+		break;
+
+	case LWM2M_RES_TYPE_S32:
+		elements.i32 = *(int32_t *)value;
+		break;
+
+	case LWM2M_RES_TYPE_S16:
+		elements.i16 = *(int16_t *)value;
+		break;
+
+	case LWM2M_RES_TYPE_S8:
+		elements.i8 = *(int8_t *)value;
+		break;
+
+	case LWM2M_RES_TYPE_BOOL:
+		elements.b = *(bool *)value;
+		break;
+
+	default:
+		elements.f = *(double *)value;
+		break;
+	}
+
+	if (!lwm2m_cache_write(cache_entry, &elements)) {
+		LOG_WRN("Data cache full");
+	}
+}
+#endif /* CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT */
+
+struct lwm2m_time_series_resource *lwm2m_cache_entry_get_by_string(char const *resource_path)
+{
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	if (!sys_slist_is_empty(&lwm2m_timed_cache_list)) {
+		int ret;
+		struct lwm2m_time_series_resource *entry;
+
+		/* Keep list Alphabetical order */
+		SYS_SLIST_FOR_EACH_CONTAINER(&lwm2m_timed_cache_list, entry, node) {
+			ret = strcmp(entry->path, resource_path);
+			if (ret == 0) {
+				return entry;
+			} else if (ret > 0) {
+				return NULL;
+			}
+		}
+	}
+#endif /* CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT */
+	return NULL;
+}
+
+struct lwm2m_time_series_resource *lwm2m_cache_entry_get_by_object(struct lwm2m_obj_path *obj_path)
+{
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	char obj_path_str[25];
+	char const *resource_path;
+
+	if (!obj_path || obj_path->level < LWM2M_PATH_LEVEL_RESOURCE) {
+		LOG_ERR("Path level wrong for cache %u", obj_path->level);
+		return NULL;
+	}
+
+	/* Decode path to string */
+	resource_path = lwm2m_path_log_buf(obj_path_str, obj_path);
+
+	return lwm2m_cache_entry_get_by_string(resource_path);
+#else
+	return NULL;
+#endif /* CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT */
+}
+
+int lwm2m_engine_enable_cache(char const *resource_path, struct lwm2m_time_series_elem *data_cache,
+			    size_t cache_len)
+{
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	struct lwm2m_obj_path path;
+	struct lwm2m_engine_obj_inst *obj_inst;
+	struct lwm2m_engine_obj_field *obj_field;
+	struct lwm2m_engine_res_inst *res_inst = NULL;
+	struct lwm2m_time_series_resource *cache_entry;
+	int ret = 0;
+	size_t cache_entry_size = sizeof(struct lwm2m_time_series_elem);
+
+	/* translate path -> path_obj */
+	ret = lwm2m_string_to_path(resource_path, &path, '/');
+	if (ret < 0) {
+		return ret;
+	}
+
+	if (path.level < 3) {
+		LOG_ERR("path must have at least 3 parts");
+		return -EINVAL;
+	}
+
+	/* look up resource obj */
+	ret = path_to_objs(&path, &obj_inst, &obj_field, NULL, &res_inst);
+	if (ret < 0) {
+		return ret;
+	}
+
+	if (!res_inst) {
+		LOG_ERR("res instance %d not found", path.res_inst_id);
+		return -ENOENT;
+	}
+
+	switch (obj_field->data_type) {
+	case LWM2M_RES_TYPE_U32:
+	case LWM2M_RES_TYPE_TIME:
+	case LWM2M_RES_TYPE_U16:
+	case LWM2M_RES_TYPE_U8:
+	case LWM2M_RES_TYPE_S64:
+	case LWM2M_RES_TYPE_S32:
+	case LWM2M_RES_TYPE_S16:
+	case LWM2M_RES_TYPE_S8:
+	case LWM2M_RES_TYPE_BOOL:
+	case LWM2M_RES_TYPE_FLOAT:
+		/* Support only fixed width resource types */
+		cache_entry = lwm2m_cache_entry_allocate(resource_path);
+		break;
+	default:
+		cache_entry = NULL;
+		break;
+	}
+
+	if (!cache_entry) {
+		return -ENODATA;
+	}
+
+	ring_buf_init(&cache_entry->rb, cache_entry_size * cache_len, (uint8_t *)data_cache);
+
+	return 0;
+#else
+	LOG_ERR("LwM2M resource cache is only supported for "
+		"CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT");
+	return -ENOTSUP;
+#endif /* CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT */
+}
+
+int lwm2m_engine_data_cache_init(void)
+{
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	int i;
+
+	sys_slist_init(&lwm2m_timed_cache_list);
+
+	for (i = 0; i < ARRAY_SIZE(lwm2m_cache_entries); i++) {
+		lwm2m_cache_entries[i].path = NULL;
+	}
+#endif
+	return 0;
+}
+
+bool lwm2m_cache_write(struct lwm2m_time_series_resource *cache_entry,
+		       struct lwm2m_time_series_elem *buf)
+{
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	uint32_t length;
+	uint8_t *buf_ptr;
+	uint32_t element_size = sizeof(struct lwm2m_time_series_elem);
+
+	if (ring_buf_space_get(&cache_entry->rb) < element_size) {
+		/* No space  */
+		if (IS_ENABLED(CONFIG_LWM2M_CACHE_DROP_LATEST)) {
+			return false;
+		}
+		/* Free entry */
+		length = ring_buf_get_claim(&cache_entry->rb, &buf_ptr, element_size);
+		ring_buf_get_finish(&cache_entry->rb, length);
+	}
+
+	length = ring_buf_put_claim(&cache_entry->rb, &buf_ptr, element_size);
+
+	if (length != element_size) {
+		ring_buf_put_finish(&cache_entry->rb, 0);
+		LOG_ERR("Allocation failed %u", length);
+		return false;
+	}
+
+	ring_buf_put_finish(&cache_entry->rb, length);
+	/* Store data */
+	memcpy(buf_ptr, buf, element_size);
+	return true;
+#else
+	return NULL;
+#endif
+}
+
+bool lwm2m_cache_read(struct lwm2m_time_series_resource *cache_entry,
+		      struct lwm2m_time_series_elem *buf)
+{
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	uint32_t length;
+	uint8_t *buf_ptr;
+	uint32_t element_size = sizeof(struct lwm2m_time_series_elem);
+
+	if (ring_buf_is_empty(&cache_entry->rb)) {
+		return false;
+	}
+
+	length = ring_buf_get_claim(&cache_entry->rb, &buf_ptr, element_size);
+
+	if (length != element_size) {
+		LOG_ERR("Cache read fail %u", length);
+		ring_buf_get_finish(&cache_entry->rb, 0);
+		return false;
+	}
+
+	/* Read Data */
+	memcpy(buf, buf_ptr, element_size);
+	ring_buf_get_finish(&cache_entry->rb, length);
+	return true;
+
+#else
+	return NULL;
+#endif
+}
+
+size_t lwm2m_cache_size(struct lwm2m_time_series_resource *cache_entry)
+{
+#if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
+	uint32_t bytes_available;
+
+	if (ring_buf_is_empty(&cache_entry->rb)) {
+		return 0;
+	}
+
+	bytes_available = ring_buf_size_get(&cache_entry->rb);
+
+	return (bytes_available / sizeof(struct lwm2m_time_series_elem));
+#else
+	return 0;
+#endif
 }

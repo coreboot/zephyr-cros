@@ -302,8 +302,8 @@ events, setup a callback function:
 			LOG_DBG("Registration complete");
 			break;
 
-		case LWM2M_RD_CLIENT_EVENT_REG_UPDATE_FAILURE:
-			LOG_DBG("Registration update failure!");
+		case LWM2M_RD_CLIENT_EVENT_REG_TIMEOUT:
+			LOG_DBG("Registration timeout!");
 			break;
 
 		case LWM2M_RD_CLIENT_EVENT_REG_UPDATE_COMPLETE:
@@ -411,6 +411,83 @@ value of 1 is ok here).
 
 For a more detailed LwM2M client sample see: :ref:`lwm2m-client-sample`.
 
+Multi-thread usage
+******************
+Writing a value to a resource can be done using functions like lwm2m_engine_set_u8. When writing
+to multiple resources, the function lwm2m_registry_lock will ensure that the
+client halts until all writing operations are finished:
+
+.. code-block:: c
+
+  lwm2m_registry_lock();
+  lwm2m_engine_set_u32("1/0/1", 60);
+  lwm2m_engine_set_u8("5/0/3", 0);
+  lwm2m_engine_set_float("3303/0/5700", &value);
+  lwm2m_registry_unlock();
+
+This is especially useful if the server is composite-observing the resources being
+written to. Locking will then ensure that the client only updates and sends notifications
+to the server after all operations are done, resulting in fewer messages in general.
+
+Support for time series data
+****************************
+
+LwM2M version 1.1 adds support for SenML CBOR and SenML JSON data formats. These data formats add
+support for time series data. Time series formats can be used for READ, NOTIFY and SEND operations.
+When data cache is enabled for a resource, each write will create a timestamped entry in a cache,
+and its content is then returned as a content in in READ, NOTIFY or SEND operation for a given
+resource.
+
+Data cache is only supported for resources with a fixed data size.
+
+Supported resource types:
+
+* Signed and unsigned 8-64-bit integers
+* Float
+* Boolean
+
+Enabling and configuring
+========================
+
+Enable data cache by selecting :kconfig:option:`CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT`.
+Application needs to allocate an array of :c:struct:`lwm2m_time_series_elem` structures and then
+enable the cache by calling :c:func:`lwm2m_engine_enable_cache` for a given resource. Earch resource
+must be enabled separately and each resource needs their own storage.
+
+.. code-block:: c
+
+  /* Allocate data cache storage */
+  static struct lwm2m_time_series_elem temperature_cache[10];
+  /* Enable data cache */
+  lwm2m_engine_enable_cache(LWM2M_PATH(IPSO_OBJECT_TEMP_SENSOR_ID, 0, SENSOR_VALUE_RID),
+          temperature_cache, ARRAY_SIZE(temperature_cache));
+
+LwM2M engine have room for four resources that have cache enabled. Limit can be increased by
+changing :kconfig:option:`CONFIG_LWM2M_MAX_CACHED_RESOURCES`. This affects a static memory usage of
+engine.
+
+Data caches depends on one of the SenML data formats
+:kconfig:option:`CONFIG_LWM2M_RW_SENML_CBOR_SUPPORT` or
+:kconfig:option:`CONFIG_LWM2M_RW_SENML_JSON_SUPPORT` and needs :kconfig:option:`CONFIG_POSIX_CLOCK`
+so it can request a timestamp from the system and :kconfig:option:`CONFIG_RING_BUFFER` for ring
+buffer.
+
+Read and Write operations
+=========================
+
+Full content of data cache is written into a payload when any READ, SEND or NOTIFY operation
+internally reads the content of a given resource. This has a side effect that any read callbacks
+registered for a that resource are ignored when cache is enabled.
+Data is written into a cache when any of the ``lwm2m_engine_set_*`` functions are called. To filter
+the data entering the cache, application may register a validation callback using
+:c:func:`lwm2m_engine_register_validate_callback`.
+
+Limitations
+===========
+
+Cache size should be manually set so small that the content can fit normal packets sizes.
+When cache is full, new values are dropped.
+
 LwM2M engine and application events
 ***********************************
 
@@ -454,7 +531,7 @@ The events are prefixed with ``LWM2M_RD_CLIENT_EVENT_``.
    * - 4
      - REGISTRATION_FAILURE
      - Registration to LwM2M server failed.
-       Occurs if there is a timeout or failure in the registration.
+       Occurs if there is a failure in the registration.
      - Retry registration
    * - 5
      - REGISTRATION_COMPLETE
@@ -463,10 +540,10 @@ The events are prefixed with ``LWM2M_RD_CLIENT_EVENT_``.
        or when session resumption is used.
      - No actions needed
    * - 6
-     - REG_UPDATE_FAILURE
-     - Registration update failed.
-       Occurs if there is a timeout during registration update.
-       NOTE: If registration update fails without a timeout,
+     - REG_TIMEOUT
+     - Registration or registration update timeout.
+       Occurs if there is a timeout during registration.
+       NOTE: If registration fails without a timeout,
        a full registration is triggered automatically and
        no registration update failure event is generated.
      - No actions needed, client proceeds to re-registration automatically.

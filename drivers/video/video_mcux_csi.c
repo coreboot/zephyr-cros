@@ -6,7 +6,7 @@
 
 #define DT_DRV_COMPAT nxp_imx_csi
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 
 #include <fsl_csi.h>
 
@@ -16,6 +16,7 @@
 
 #include <zephyr/drivers/video.h>
 #include <zephyr/drivers/pinctrl.h>
+#include <zephyr/irq.h>
 
 struct video_mcux_csi_config {
 	CSI_Type *base;

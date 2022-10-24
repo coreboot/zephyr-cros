@@ -12,9 +12,12 @@
 #ifndef ZEPHYR_INCLUDE_ESPI_H_
 #define ZEPHYR_INCLUDE_ESPI_H_
 
+#include <errno.h>
+
 #include <zephyr/sys/__assert.h>
 #include <zephyr/types.h>
 #include <zephyr/device.h>
+#include <zephyr/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +40,7 @@ enum espi_io_mode {
 };
 
 /**
+ * @code
  *+----------------------------------------------------------------------+
  *|                                                                      |
  *|  eSPI host                           +-------------+                 |
@@ -82,7 +86,7 @@ enum espi_io_mode {
  *|       CH0         |     CH1      |      CH2      |    CH3             |
  *|   eSPI endpoint   |    VWIRE     |      OOB      |   Flash            |
  *+-----------------------------------------------------------------------+
- *
+ * @endcode
  */
 
 /**
@@ -225,6 +229,27 @@ enum espi_vwire_signal {
 	ESPI_VWIRE_SIGNAL_SCI,
 	ESPI_VWIRE_SIGNAL_DNX_ACK,
 	ESPI_VWIRE_SIGNAL_SUS_ACK,
+	/*
+	 * Virtual wire GPIOs that can be sent from slave to master for
+	 * platform specific usage.
+	 */
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_0,
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_1,
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_2,
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_3,
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_4,
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_5,
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_6,
+	ESPI_VWIRE_SIGNAL_SLV_GPIO_7,
+
+	/* USB-C port over current */
+	ESPI_VWIRE_SIGNAL_OCB_0,
+	ESPI_VWIRE_SIGNAL_OCB_1,
+	ESPI_VWIRE_SIGNAL_OCB_2,
+	ESPI_VWIRE_SIGNAL_OCB_3,
+
+	/* Number of Virtual Wires */
+	ESPI_VWIRE_SIGNAL_COUNT
 };
 
 /* eSPI LPC peripherals. */
@@ -459,6 +484,7 @@ __subsystem struct espi_driver_api {
  * will be used by eSPI master to determine minimum common capabilities with
  * eSPI slave then send via SET_CONFIGURATION command.
  *
+ * @code
  * +--------+   +---------+     +------+          +---------+   +---------+
  * |  eSPI  |   |  eSPI   |     | eSPI |          |  eSPI   |   |  eSPI   |
  * |  slave |   | driver  |     |  bus |          |  driver |   |  host   |
@@ -482,6 +508,7 @@ __subsystem struct espi_driver_api {
  *     |              |            |  accept           |             |
  *     |              |            +------------------>+             |
  *     +              +            +                   +             +
+ * @endcode
  *
  * @param dev Pointer to the device structure for the driver instance.
  * @param cfg the device runtime configuration for the eSPI controller.
@@ -850,6 +877,7 @@ static inline int z_impl_espi_flash_erase(const struct device *dev,
 /**
  * Callback model
  *
+ * @code
  *+-------+                  +-------------+   +------+     +---------+
  *|  App  |                  | eSPI driver |   |  HW  |     |eSPI Host|
  *+---+---+                  +-------+-----+   +---+--+     +----+----+
@@ -905,6 +933,7 @@ static inline int z_impl_espi_flash_erase(const struct device *dev,
  *    <------------------------------+             |             |
  *    | App executes                 |             |             |
  *    + power mgmt policy            |             |             |
+ * @endcode
  */
 
 /**

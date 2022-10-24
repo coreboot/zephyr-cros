@@ -51,8 +51,10 @@ class Filters:
     TESTSUITE = 'testsuite filter'
     # filters realted to platform definition
     PLATFORM = 'Platform related filter'
-    # in case a testcase was quarantined.
+    # in case a test suite was quarantined.
     QUARENTINE = 'Quarantine filter'
+    # in case a test suite is skipped intentionally .
+    SKIP = 'Skip filter'
 
 
 class TestPlan:
@@ -371,16 +373,27 @@ class TestPlan:
                         if not "@" in platform.name:
                             tmp_dir = os.listdir(os.path.dirname(file))
                             for item in tmp_dir:
-                                result = re.match(f"{platform.name}_(?P<revision>.*)\\.conf", item)
-                                if result:
-                                    revision = result.group("revision")
-                                    yaml_file = f"{platform.name}_{revision}.yaml"
-                                    if yaml_file not in tmp_dir:
-                                        platform_revision = copy.deepcopy(platform)
-                                        revision = revision.replace("_", ".")
-                                        platform_revision.name = f"{platform.name}@{revision}"
-                                        platform_revision.default = False
-                                        self.platforms.append(platform_revision)
+                                # Need to make sure the revision matches
+                                # the permitted patterns as described in
+                                # cmake/modules/extensions.cmake.
+                                revision_patterns = ["[A-Z]",
+                                                     "[0-9]+",
+                                                     "(0|[1-9][0-9]*)(_[0-9]+)*(_[0-9]+)*"]
+
+                                for pattern in revision_patterns:
+                                    result = re.match(f"{platform.name}_(?P<revision>{pattern})\\.conf", item)
+                                    if result:
+                                        revision = result.group("revision")
+                                        yaml_file = f"{platform.name}_{revision}.yaml"
+                                        if yaml_file not in tmp_dir:
+                                            platform_revision = copy.deepcopy(platform)
+                                            revision = revision.replace("_", ".")
+                                            platform_revision.name = f"{platform.name}@{revision}"
+                                            platform_revision.default = False
+                                            self.platforms.append(platform_revision)
+
+                                        break
+
 
                 except RuntimeError as e:
                     logger.error("E: %s: can't load: %s" % (file, e))
@@ -652,7 +665,7 @@ class TestPlan:
                     instance.add_filter("Not part of integration platforms", Filters.TESTSUITE)
 
                 if ts.skip:
-                    instance.add_filter("Skip filter", Filters.TESTSUITE)
+                    instance.add_filter("Skip filter", Filters.SKIP)
 
                 if tag_filter and not ts.tags.intersection(tag_filter):
                     instance.add_filter("Command line testsuite tag filter", Filters.CMD_LINE)
@@ -773,7 +786,7 @@ class TestPlan:
                 and "Quarantine" not in filtered_instance.reason:
                 # Do not treat this as error if filter type is command line
                 filters = {t['type'] for t in filtered_instance.filters}
-                if Filters.CMD_LINE in filters:
+                if Filters.CMD_LINE in filters or Filters.SKIP in filters:
                     continue
                 filtered_instance.status = "error"
                 filtered_instance.reason += " but is one of the integration platforms"

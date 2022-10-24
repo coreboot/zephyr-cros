@@ -28,6 +28,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/stm32_clock_control.h>
 #include <zephyr/drivers/pinctrl.h>
+#include <zephyr/irq.h>
 
 #if defined(CONFIG_PTP_CLOCK_STM32_HAL)
 #include <zephyr/drivers/ptp_clock.h>
@@ -86,8 +87,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 static ETH_DMADescTypeDef dma_rx_desc_tab[ETH_RXBUFNB] __eth_stm32_desc;
 static ETH_DMADescTypeDef dma_tx_desc_tab[ETH_TXBUFNB] __eth_stm32_desc;
-static uint8_t dma_rx_buffer[ETH_RXBUFNB][ETH_RX_BUF_SIZE] __eth_stm32_buf;
-static uint8_t dma_tx_buffer[ETH_TXBUFNB][ETH_TX_BUF_SIZE] __eth_stm32_buf;
+static uint8_t dma_rx_buffer[ETH_RXBUFNB][ETH_STM32_RX_BUF_SIZE] __eth_stm32_buf;
+static uint8_t dma_tx_buffer[ETH_TXBUFNB][ETH_STM32_TX_BUF_SIZE] __eth_stm32_buf;
 
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
 static ETH_TxPacketConfig tx_config;
@@ -194,7 +195,7 @@ static int eth_tx(const struct device *dev, struct net_pkt *pkt)
 	k_mutex_lock(&dev_data->tx_mutex, K_FOREVER);
 
 	total_len = net_pkt_get_len(pkt);
-	if (total_len > ETH_TX_BUF_SIZE) {
+	if (total_len > ETH_STM32_TX_BUF_SIZE) {
 		LOG_ERR("PKT too big");
 		res = -EIO;
 		goto error;
@@ -798,10 +799,10 @@ static int eth_initialize(const struct device *dev)
 		(clock_control_subsys_t *)&cfg->pclken_tx);
 	ret |= clock_control_on(dev_data->clock,
 		(clock_control_subsys_t *)&cfg->pclken_rx);
-#if !defined(CONFIG_SOC_SERIES_STM32H7X)
+#if DT_INST_CLOCKS_HAS_NAME(0, mac_clk_ptp)
 	ret |= clock_control_on(dev_data->clock,
 		(clock_control_subsys_t *)&cfg->pclken_ptp);
-#endif /* !defined(CONFIG_SOC_SERIES_STM32H7X) */
+#endif
 
 	if (ret) {
 		LOG_ERR("Failed to enable ethernet clock");
@@ -825,7 +826,7 @@ static int eth_initialize(const struct device *dev)
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
 	heth->Init.TxDesc = dma_tx_desc_tab;
 	heth->Init.RxDesc = dma_rx_desc_tab;
-	heth->Init.RxBuffLen = ETH_RX_BUF_SIZE;
+	heth->Init.RxBuffLen = ETH_STM32_RX_BUF_SIZE;
 #endif /* CONFIG_SOC_SERIES_STM32H7X */
 
 	hal_ret = HAL_ETH_Init(heth);
@@ -846,7 +847,7 @@ static int eth_initialize(const struct device *dev)
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
 	heth->Instance->MACTSCR |= ETH_MACTSCR_TSENALL;
 #else
-	heth->Instance->PTPTSCR |= ETH_PTPTSSR_TSSARFE;
+	heth->Instance->PTPTSCR |= ETH_PTPTSCR_TSSARFE;
 #endif /* CONFIG_SOC_SERIES_STM32H7X */
 #endif /* CONFIG_PTP_CLOCK_STM32_HAL */
 
@@ -956,7 +957,7 @@ static void eth_iface_init(struct net_if *iface)
 
 	ethernet_init(iface);
 
-	net_if_flag_set(iface, NET_IF_NO_AUTO_START);
+	net_if_carrier_off(iface);
 
 	if (is_first_init) {
 		const struct eth_stm32_hal_dev_cfg *cfg = dev->config;
@@ -1069,10 +1070,10 @@ static const struct eth_stm32_hal_dev_cfg eth0_config = {
 		      .enr = DT_INST_CLOCKS_CELL_BY_NAME(0, mac_clk_tx, bits)},
 	.pclken_rx = {.bus = DT_INST_CLOCKS_CELL_BY_NAME(0, mac_clk_rx, bus),
 		      .enr = DT_INST_CLOCKS_CELL_BY_NAME(0, mac_clk_rx, bits)},
-#if !defined(CONFIG_SOC_SERIES_STM32H7X)
+#if DT_INST_CLOCKS_HAS_NAME(0, mac_clk_ptp)
 	.pclken_ptp = {.bus = DT_INST_CLOCKS_CELL_BY_NAME(0, mac_clk_ptp, bus),
 		       .enr = DT_INST_CLOCKS_CELL_BY_NAME(0, mac_clk_ptp, bits)},
-#endif /* !CONFIG_SOC_SERIES_STM32H7X */
+#endif
 	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(0),
 };
 
@@ -1301,7 +1302,7 @@ static const struct ptp_clock_driver_api api = {
 
 static int ptp_stm32_init(const struct device *port)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(mac));
+	const struct device *const dev = DEVICE_DT_GET(DT_NODELABEL(mac));
 	struct eth_stm32_hal_dev_data *eth_dev_data = dev->data;
 	const struct eth_stm32_hal_dev_cfg *eth_cfg = dev->config;
 	struct ptp_context *ptp_context = port->data;
@@ -1395,7 +1396,7 @@ static int ptp_stm32_init(const struct device *port)
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
 	heth->Instance->MACTSCR |= ETH_MACTSCR_TSCTRLSSR;
 #else
-	heth->Instance->PTPTSCR |= ETH_PTPTSSR_TSSSR;
+	heth->Instance->PTPTSCR |= ETH_PTPTSCR_TSSSR;
 #endif /* CONFIG_SOC_SERIES_STM32H7X */
 
 	/* Initialize timestamp */

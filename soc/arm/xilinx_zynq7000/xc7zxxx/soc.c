@@ -3,13 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/arch/cpu.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/sys/util.h>
 
+#include <zephyr/arch/arm/aarch32/cortex_a_r/cmsis.h>
 #include <zephyr/arch/arm/aarch32/mmu/arm_mmu.h>
+#include <zephyr/arch/arm/aarch32/nmi.h>
 #include "soc.h"
 
 /* System Level Control Registers (SLCR) */
@@ -36,20 +39,6 @@ static const struct arm_mmu_region mmu_regions[] = {
 			      DT_REG_SIZE(DT_CHOSEN(zephyr_ocm)),
 			      MT_STRONGLY_ORDERED | MPERM_R | MPERM_W),
 	/* ARM Arch timer, GIC are covered by the MPCore mapping */
-
-/* UARTs */
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(uart0), okay)
-	MMU_REGION_FLAT_ENTRY("uart0",
-			      DT_REG_ADDR(DT_NODELABEL(uart0)),
-			      DT_REG_SIZE(DT_NODELABEL(uart0)),
-			      MT_DEVICE | MATTR_SHARED | MPERM_R | MPERM_W),
-#endif
-#if DT_NODE_HAS_STATUS(DT_NODELABEL(uart1), okay)
-	MMU_REGION_FLAT_ENTRY("uart1",
-			      DT_REG_ADDR(DT_NODELABEL(uart1)),
-			      DT_REG_SIZE(DT_NODELABEL(uart1)),
-			      MT_DEVICE | MATTR_SHARED | MPERM_R | MPERM_W),
-#endif
 
 /* GEMs */
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(gem0), okay)

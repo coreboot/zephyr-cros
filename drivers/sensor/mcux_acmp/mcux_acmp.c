@@ -11,8 +11,10 @@
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/sensor/mcux_acmp.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/kernel.h>
 #include <fsl_acmp.h>
 #include <zephyr/drivers/pinctrl.h>
+#include <zephyr/irq.h>
 
 LOG_MODULE_REGISTER(mcux_acmp, CONFIG_SENSOR_LOG_LEVEL);
 

@@ -5,7 +5,7 @@
  */
 
 #include <stdlib.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/init.h>
 #include <errno.h>
 #include <zephyr/sys/math_extras.h>
@@ -53,6 +53,28 @@ void *malloc(size_t size)
 
 	return ret;
 }
+
+/* Compile in when C11 */
+#if __STDC_VERSION__ >= 201112L
+void *aligned_alloc(size_t alignment, size_t size)
+{
+	int lock_ret;
+
+	lock_ret = sys_mutex_lock(&z_malloc_heap_mutex, K_FOREVER);
+	__ASSERT_NO_MSG(lock_ret == 0);
+
+	void *ret = sys_heap_aligned_alloc(&z_malloc_heap,
+					   alignment,
+					   size);
+	if (ret == NULL && size != 0) {
+		errno = ENOMEM;
+	}
+
+	(void) sys_mutex_unlock(&z_malloc_heap_mutex);
+
+	return ret;
+}
+#endif /* __STDC_VERSION__ >= 201112L */
 
 static int malloc_prepare(const struct device *unused)
 {

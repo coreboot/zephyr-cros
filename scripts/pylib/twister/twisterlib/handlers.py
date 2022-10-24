@@ -2,6 +2,7 @@
 # vim: set syntax=python ts=4 :
 #
 # Copyright (c) 20180-2022 Intel Corporation
+# Copyright 2022 NXP
 # SPDX-License-Identifier: Apache-2.0
 
 import math
@@ -16,17 +17,13 @@ import subprocess
 import threading
 import select
 import re
+import psutil
 from twisterlib.environment import ZEPHYR_BASE
 
 try:
     import serial
 except ImportError:
     print("Install pyserial python module with pip to use --device-testing option.")
-
-try:
-    import psutil
-except ImportError:
-    print("Install psutil python module with pip to run in Qemu.")
 
 try:
     import pty
@@ -172,7 +169,7 @@ class BinaryHandler(Handler):
             os.unlink(self.pid_fn)
             self.pid_fn = None  # clear so we don't try to kill the binary twice
             try:
-                os.kill(pid, signal.SIGTERM)
+                os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
 
@@ -195,11 +192,11 @@ class BinaryHandler(Handler):
             reader_t.start()
             reader_t.join(this_timeout)
             if not reader_t.is_alive():
-                line = self.line
-                logger.debug("OUTPUT: {0}".format(line.decode('utf-8').rstrip()))
-                log_out_fp.write(line.decode('utf-8'))
+                line_decoded = self.line.decode('utf-8', "replace")
+                logger.debug("OUTPUT: {0}".format(line_decoded.rstrip()))
+                log_out_fp.write(line_decoded)
                 log_out_fp.flush()
-                harness.handle(line.decode('utf-8').rstrip())
+                harness.handle(line_decoded.rstrip())
                 if harness.state:
                     if not timeout_extended or harness.capture_coverage:
                         timeout_extended = True
@@ -286,7 +283,7 @@ class BinaryHandler(Handler):
         # FIXME: This is needed when killing the simulator, the console is
         # garbled and needs to be reset. Did not find a better way to do that.
         if sys.stdout.isatty():
-            subprocess.call(["stty", "sane"])
+            subprocess.call(["stty", "sane"], stdin=sys.stdout)
 
         if harness.is_pytest:
             harness.pytest_run(self.log)
@@ -321,15 +318,12 @@ class DeviceHandler(Handler):
         """
         super().__init__(instance, type_str)
 
-    def monitor_serial(self, ser, halt_fileno, harness):
+    def monitor_serial(self, ser, halt_event, harness):
         if harness.is_pytest:
             harness.handle(None)
             return
 
         log_out_fp = open(self.log, "wt")
-
-        ser_fileno = ser.fileno()
-        readlist = [halt_fileno, ser_fileno]
 
         if self.options.coverage:
             # Set capture_coverage to True to indicate that right after
@@ -340,14 +334,16 @@ class DeviceHandler(Handler):
         ser.flush()
 
         while ser.isOpen():
-            readable, _, _ = select.select(readlist, [], [], self.timeout)
-
-            if halt_fileno in readable:
+            if halt_event.is_set():
                 logger.debug('halted')
                 ser.close()
                 break
-            if ser_fileno not in readable:
-                continue  # Timeout.
+
+            if not ser.in_waiting:
+                # no incoming bytes are waiting to be read from the serial
+                # input buffer, let other threads run
+                time.sleep(0.001)
+                continue
 
             serial_line = None
             try:
@@ -482,8 +478,6 @@ class DeviceHandler(Handler):
                         command.append("--tool-opt=-SelectEmuBySN  %s" % (board_id))
                     elif runner == "stm32cubeprogrammer":
                         command.append("--tool-opt=sn=%s" % (board_id))
-                    elif runner == "intel_adsp":
-                        command.append("--pty")
 
                     # Receive parameters from runner_params field.
                     if hardware.runner_params:
@@ -531,16 +525,29 @@ class DeviceHandler(Handler):
 
         ser.flush()
 
+        # turns out the ser.flush() is not enough to clear serial leftover from last case
+        # explicitly readline() can do it reliably
+        old_timeout = ser.timeout
+        # wait for 1s if no serial output
+        ser.timeout = 1
+        # or read 1000 lines at most
+        # if the leftovers are more than 1000 lines, user should realize that once
+        # saw the caught ones and fix it.
+        leftover_lines = ser.readlines(1000)
+        for line in leftover_lines:
+            logger.debug(f"leftover log of previous test: {line}")
+        ser.timeout = old_timeout
+
         harness_name = self.instance.testsuite.harness.capitalize()
         harness_import = HarnessImporter(harness_name)
         harness = harness_import.instance
         harness.configure(self.instance)
-        read_pipe, write_pipe = os.pipe()
-        start_time = time.time()
+        halt_monitor_evt = threading.Event()
 
         t = threading.Thread(target=self.monitor_serial, daemon=True,
-                             args=(ser, read_pipe, harness))
+                             args=(ser, halt_monitor_evt, harness))
         t.start()
+        start_time = time.time()
 
         d_log = "{}/device.log".format(self.instance.build_dir)
         logger.debug('Flash command: %s', command)
@@ -559,10 +566,10 @@ class DeviceHandler(Handler):
                         flash_error = True
                         with open(d_log, "w") as dlog_fp:
                             dlog_fp.write(stderr.decode())
-                        os.write(write_pipe, b'x')  # halt the thread
+                        halt_monitor_evt.set()
                 except subprocess.TimeoutExpired:
                     logger.warning("Flash operation timed out.")
-                    proc.kill()
+                    self.terminate(proc)
                     (stdout, stderr) = proc.communicate()
                     self.instance.status = "error"
                     self.instance.reason = "Device issue (Timeout)"
@@ -572,15 +579,26 @@ class DeviceHandler(Handler):
                 dlog_fp.write(stderr.decode())
 
         except subprocess.CalledProcessError:
-            os.write(write_pipe, b'x')  # halt the thread
+            halt_monitor_evt.set()
+            self.instance.status = "error"
+            self.instance.reason = "Device issue (Flash error)"
+            flash_error = True
 
         if post_flash_script:
             self.run_custom_script(post_flash_script, 30)
 
         if not flash_error:
             t.join(self.timeout)
-            if t.is_alive():
-                logger.debug("Timed out while monitoring serial output on {}".format(self.instance.platform.name))
+        else:
+            # When the flash error is due exceptions,
+            # twister tell the monitor serial thread
+            # to close the serial. But it is necessary
+            # for this thread being run first and close
+            # have the change to close the serial.
+            t.join(0.1)
+
+        if t.is_alive():
+            logger.debug("Timed out while monitoring serial output on {}".format(self.instance.platform.name))
 
         if ser.isOpen():
             ser.close()
@@ -589,9 +607,6 @@ class DeviceHandler(Handler):
             ser_pty_process.terminate()
             outs, errs = ser_pty_process.communicate()
             logger.debug("Process {} terminated outs: {} errs {}".format(serial_pty, outs, errs))
-
-        os.close(write_pipe)
-        os.close(read_pipe)
 
         handler_time = time.time() - start_time
 
@@ -830,7 +845,7 @@ class QEMUHandler(Handler):
         logger.debug("Spawning QEMUHandler Thread for %s" % self.name)
         self.thread.start()
         if sys.stdout.isatty():
-            subprocess.call(["stty", "sane"])
+            subprocess.call(["stty", "sane"], stdin=sys.stdout)
 
         logger.debug("Running %s (%s)" % (self.name, self.type_str))
         command = [self.generator_cmd]

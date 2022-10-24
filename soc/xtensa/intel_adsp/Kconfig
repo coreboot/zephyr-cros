@@ -17,14 +17,50 @@ config SOC_FAMILY
 # Select SoC Part No. and configuration options
 source "soc/xtensa/intel_adsp/*/Kconfig.soc"
 
-config CAVS_IPC
-	bool
-	default y if !SOF
+DT_COMPAT_INTEL_ADSP_HOST_IPC := intel,adsp-host-ipc
+DT_COMPAT_INTEL_ADSP_IDC := intel,adsp-idc
+
+config INTEL_ADSP_IPC
+	bool "Driver for the host IPC interrupt delivery"
+	default $(dt_compat_enabled,$(DT_COMPAT_INTEL_ADSP_HOST_IPC)) if !SOF
+	default $(dt_compat_enabled,$(DT_COMPAT_INTEL_ADSP_IDC)) if !SOF
 	help
 	  Driver for the host IPC interrupt delivery mechanism.
 	  Currently SOF has its own driver for this hardware.
 
-config CAVS_CLOCK
+config MEMORY_WIN_0_SIZE
+	int "Size of memory window 0"
+	default 8192
+	help
+	  Size of memory window 0.
+
+	  This window is used for firmware status & outbox/uplink mbox.
+
+config MEMORY_WIN_1_SIZE
+	int "Size of memory window 1"
+	default 8192
+	help
+	  Size of memory window 1.
+
+	  This window is used for inbox/downlink mbox.
+
+config MEMORY_WIN_2_SIZE
+	int "Size of memory window 2"
+	default 8192
+	help
+	  Size of memory window 2.
+
+	  This window is used for debug.
+
+config MEMORY_WIN_3_SIZE
+	int "Size of memory window 3"
+	default 8192
+	help
+	  Size of memory window 3.
+
+	  This window is used for trace.
+
+config ADSP_CLOCK
 	bool
 	help
 	  Driver for the CAVS clocks. Allow type of clock (and
@@ -39,22 +75,6 @@ config HP_SRAM_RESERVE
 	  addresses here.  The SOF application also makes direct use
 	  of this region, so be very careful changing this value.
 
-config ADSP_WIN0_OFFSET
-	int "Byte offset of host window zero"
-	default 16384
-	help
-	  Offset of the first host shared memory window (used for the
-	  "firmware status register" at boot) within the reserved
-	  region at the start of HP-SRAM.
-
-config ADSP_WIN3_OFFSET
-	int "Byte offset of host window three"
-	default 40960
-	help
-	  Offset of the fourth host shared memory window (used for
-	  printk/log output) within the reserved region at the start
-	  of HP-SRAM.
-
 config ADSP_TRACE_SIMCALL
 	bool "Emit SIMCALL output in addition to window tracing"
 	help
@@ -62,5 +82,19 @@ config ADSP_TRACE_SIMCALL
 	  instruction to emit the passed data to the standard output
 	  of an enclosing simulator process.  All window contents will
 	  remain identical.
+
+config ADSP_NEED_POWER_ON_CACHE
+	bool
+	help
+	  Need to power cache SRAM banks on.
+
+config ADSP_INIT_HPSRAM
+	bool
+	default y
+	help
+	  Need to init HP SRAM.
+
+config ADSP_DISABLE_L2CACHE_AT_BOOT
+	bool
 
 endif # SOC_FAMILY_INTEL_ADSP

@@ -19,21 +19,19 @@
 #include <zephyr/net/net_pkt.h>
 #include <zephyr/toolchain.h>
 
-#define IEEE802154_MTU		     127
-#define IEEE802154_MIN_LENGTH	     3
-/*
- * See IEEE 802.15.4-2006, section 7.2.1.4 - all further references
- * refer to IEEE 802.15.4-2006 unless otherwise specified.
+/* All specification references in this file refer to IEEE 802.15.4-2006
+ * unless otherwise noted.
+ *
+ * Note: All structs and attributes (e.g. PAN id, ext address and short
+ * address) in this file that directly represent IEEE 802.15.4 frames
+ * are in LITTLE ENDIAN, see section 4, especially section 4.3.
  */
-#define IEEE802154_BROADCAST_ADDRESS 0xFFFF
-#define IEEE802154_BROADCAST_PAN_ID  0xFFFF
+
+#define IEEE802154_MIN_LENGTH	     3
 /* ACK packet size is the minimum size, see section 7.2.2.3 */
 #define IEEE802154_ACK_PKT_LENGTH    IEEE802154_MIN_LENGTH
-#define IEEE802154_MFR_LENGTH	     2
 
 #define IEEE802154_FCF_SEQ_LENGTH     3
-#define IEEE802154_EXT_ADDR_LENGTH    8
-#define IEEE802154_SHORT_ADDR_LENGTH  2
 #define IEEE802154_SIMPLE_ADDR_LENGTH 1
 #define IEEE802154_PAN_ID_LENGTH      2
 
@@ -48,15 +46,16 @@
 #define IEEE802154_BEACON_GTS_RX	  1
 #define IEEE802154_BEACON_GTS_TX	  0
 
-/* See section 7.2.1.1.1 */
+/* See section 7.2.1.1.1 and IEEE 802.15.4-2020, section 7.2.2.2 */
 enum ieee802154_frame_type {
 	IEEE802154_FRAME_TYPE_BEACON = 0x0,
 	IEEE802154_FRAME_TYPE_DATA = 0x1,
 	IEEE802154_FRAME_TYPE_ACK = 0x2,
 	IEEE802154_FRAME_TYPE_MAC_COMMAND = 0x3,
-	IEEE802154_FRAME_TYPE_LLDN = 0x4,
+	IEEE802154_FRAME_TYPE_RESERVED = 0x4,
 	IEEE802154_FRAME_TYPE_MULTIPURPOSE = 0x5,
-	IEEE802154_FRAME_TYPE_RESERVED = 0x6,
+	IEEE802154_FRAME_TYPE_FRAK = 0x6,
+	IEEE802154_FRAME_TYPE_EXTENDED = 0x7,
 };
 
 /* See section 7.2.1.1.6 */
@@ -389,7 +388,7 @@ struct ieee802154_cmd_coord_realign {
 	uint16_t coordinator_short_addr;
 	uint8_t channel;
 	uint16_t short_addr;
-	uint8_t channel_page; /* Optional */
+	uint8_t channel_page; /* optional */
 } __packed;
 
 #define IEEE802154_CMD_COORD_REALIGN_LENGTH 3
@@ -459,16 +458,16 @@ struct ieee802154_mpdu {
 struct ieee802154_frame_params {
 	struct {
 		union {
-			uint8_t *ext_addr;
-			uint16_t short_addr;
+			uint8_t *ext_addr; /* in big endian */
+			uint16_t short_addr; /* in CPU byte order */
 		};
 
 		uint16_t len;
-		uint16_t pan_id;
+		uint16_t pan_id; /* in CPU byte order */
 	} dst;
 
-	uint16_t short_addr;
-	uint16_t pan_id;
+	uint16_t short_addr; /* in CPU byte order */
+	uint16_t pan_id; /* in CPU byte order */
 } __packed;
 
 #ifdef CONFIG_NET_L2_IEEE802154_SECURITY
@@ -481,10 +480,11 @@ struct ieee802154_fcf_seq *ieee802154_validate_fc_seq(uint8_t *buf, uint8_t **p_
 
 bool ieee802154_validate_frame(uint8_t *buf, uint8_t length, struct ieee802154_mpdu *mpdu);
 
-uint8_t ieee802154_compute_header_and_authtag_size(struct net_if *iface, struct net_linkaddr *dst);
+uint8_t ieee802154_compute_header_and_authtag_size(struct net_if *iface, struct net_linkaddr *dst,
+						   struct net_linkaddr *src);
 
 bool ieee802154_create_data_frame(struct ieee802154_context *ctx, struct net_linkaddr *dst,
-				  struct net_buf *frag, uint8_t hdr_size);
+				  struct net_linkaddr *src, struct net_buf *buf, uint8_t hdr_len);
 
 struct net_pkt *ieee802154_create_mac_cmd_frame(struct net_if *iface, enum ieee802154_cfi type,
 						struct ieee802154_frame_params *params);

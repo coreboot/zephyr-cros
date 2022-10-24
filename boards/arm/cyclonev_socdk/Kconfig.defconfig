@@ -15,8 +15,6 @@ config I2C_DW_CLOCK_SPEED
 endif # I2C_DW
 
 if USB_DEVICE_STACK
-config USB_DW
-	default y
 config USB_DW_USB_2_0
 	default y
 config USB_DEVICE_DRIVER
@@ -27,5 +25,14 @@ if SPI_DW
 config SPI_DW_FIFO_DEPTH
 	default 256
 endif # SPI_DW
+
+if NETWORKING
+
+config NET_L2_ETHERNET
+	default y
+config TEST_RANDOM_GENERATOR
+	default y
+
+endif # NETWORKING
 
 endif # BOARD_CVSXDEVKIT

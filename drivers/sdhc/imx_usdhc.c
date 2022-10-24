@@ -7,7 +7,7 @@
 
 #define DT_DRV_COMPAT nxp_imx_usdhc
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/sdhc.h>
 #include <zephyr/sd/sd_spec.h>
@@ -27,6 +27,7 @@ LOG_MODULE_REGISTER(usdhc, CONFIG_SDHC_LOG_LEVEL);
 
 #include <fsl_usdhc.h>
 #include <fsl_cache.h>
+#include <zephyr/irq.h>
 
 enum transfer_callback_status {
 	TRANSFER_CMD_COMPLETE = BIT(0),

@@ -12,7 +12,7 @@
 #include <zephyr/drivers/interrupt_controller/intc_esp32.h>
 #include <soc.h>
 #include <zephyr/device.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/spinlock.h>
 #include <zephyr/kernel_structs.h>
 
@@ -38,7 +38,7 @@ struct cpustart_rec {
 
 volatile struct cpustart_rec *start_rec;
 static void *appcpu_top;
-static bool cpus_active[CONFIG_MP_NUM_CPUS];
+static bool cpus_active[CONFIG_MP_MAX_NUM_CPUS];
 static struct k_spinlock loglock;
 
 extern void z_sched_ipi(void);
@@ -194,6 +194,26 @@ void esp_appcpu_start(void *entry_point)
 	DPORT_APPCPU_CTRL_A |= DPORT_APPCPU_RESETTING;
 	DPORT_APPCPU_CTRL_A &= ~DPORT_APPCPU_RESETTING;
 
+
+	/* extracted from SMP LOG above, THIS IS REQUIRED FOR AMP RELIABLE
+	 * OPERATION AS WELL, PLEASE DON'T touch on the dummy write below!
+	 *
+	 * Note that the logging done here is ACTUALLY REQUIRED FOR RELIABLE
+	 * OPERATION!  At least one particular board will experience spurious
+	 * hangs during initialization (usually the APPCPU fails to start at
+	 * all) without these calls present.  It's not just time -- careful
+	 * use of k_busy_wait() (and even hand-crafted timer loops using the
+	 * Xtensa timer SRs directly) that duplicates the timing exactly still
+	 * sees hangs.  Something is happening inside the ROM UART code that
+	 * magically makes the startup sequence reliable.
+	 *
+	 * Leave this in place until the sequence is understood better.
+	 *
+	 */
+	esp_rom_uart_tx_one_char('\r');
+	esp_rom_uart_tx_one_char('\r');
+	esp_rom_uart_tx_one_char('\n');
+
 	/* Seems weird that you set the boot address AFTER starting
 	 * the CPU, but this is how they do it...
 	 */
@@ -235,12 +255,12 @@ void arch_start_cpu(int cpu_num, k_thread_stack_t *stack, int sz,
 
 	sr.cpu = cpu_num;
 	sr.fn = fn;
-	sr.stack_top = Z_THREAD_STACK_BUFFER(stack) + sz;
+	sr.stack_top = Z_KERNEL_STACK_BUFFER(stack) + sz;
 	sr.arg = arg;
 	sr.vecbase = vb;
 	sr.alive = &alive_flag;
 
-	appcpu_top = Z_THREAD_STACK_BUFFER(stack) + sz;
+	appcpu_top = Z_KERNEL_STACK_BUFFER(stack) + sz;
 
 	start_rec = &sr;
 

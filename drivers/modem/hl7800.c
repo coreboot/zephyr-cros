@@ -16,7 +16,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_MODEM_LOG_LEVEL);
 #include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/device.h>
 #include <zephyr/init.h>
@@ -1346,7 +1346,7 @@ uint32_t mdm_hl7800_log_filter_set(uint32_t level)
 
 #ifdef CONFIG_LOG
 	new_log_level =
-		log_filter_set(NULL, CONFIG_LOG_DOMAIN_ID,
+		log_filter_set(NULL, Z_LOG_LOCAL_DOMAIN_ID,
 			       log_source_id_get(STRINGIFY(LOG_MODULE_NAME)),
 			       level);
 #endif
@@ -3201,17 +3201,16 @@ static void iface_status_work_cb(struct k_work *work)
 	switch (ictx.network_state) {
 	case HL7800_HOME_NETWORK:
 	case HL7800_ROAMING:
-		if (ictx.iface && !net_if_is_up(ictx.iface)) {
+		if (ictx.iface) {
 			LOG_DBG("HL7800 iface UP");
-			net_if_up(ictx.iface);
+			net_if_carrier_on(ictx.iface);
 		}
 		break;
 	case HL7800_OUT_OF_COVERAGE:
 	default:
-		if (ictx.iface && net_if_is_up(ictx.iface) &&
-		    (ictx.low_power_mode != HL7800_LPM_PSM)) {
+		if (ictx.iface && (ictx.low_power_mode != HL7800_LPM_PSM)) {
 			LOG_DBG("HL7800 iface DOWN");
-			net_if_down(ictx.iface);
+			net_if_carrier_off(ictx.iface);
 		}
 		break;
 	}
@@ -4680,9 +4679,9 @@ static void mdm_vgpio_work_cb(struct k_work *item)
 				set_sleep_state(ictx.desired_sleep_level);
 			}
 		}
-		if (ictx.iface && ictx.initialized && net_if_is_up(ictx.iface) &&
+		if (ictx.iface && ictx.initialized &&
 		    ictx.low_power_mode != HL7800_LPM_PSM) {
-			net_if_down(ictx.iface);
+			net_if_carrier_off(ictx.iface);
 		}
 	}
 	hl7800_unlock();
@@ -5061,8 +5060,8 @@ static int modem_reset_and_configure(void)
 #endif
 
 	ictx.restarting = true;
-	if (ictx.iface && net_if_is_up(ictx.iface)) {
-		net_if_down(ictx.iface);
+	if (ictx.iface) {
+		net_if_carrier_off(ictx.iface);
 	}
 
 	hl7800_stop_rssi_work();
@@ -5436,8 +5435,8 @@ static int hl7800_power_off(void)
 		return ret;
 	}
 	/* bring the iface down */
-	if (ictx.iface && net_if_is_up(ictx.iface)) {
-		net_if_down(ictx.iface);
+	if (ictx.iface) {
+		net_if_carrier_off(ictx.iface);
 	}
 	LOG_INF("Modem powered off");
 	return ret;
@@ -6020,10 +6019,10 @@ int32_t mdm_hl7800_update_fw(char *file_path)
 		goto err;
 	}
 
-	if (ictx.iface && net_if_is_up(ictx.iface)) {
+	if (ictx.iface) {
 		LOG_DBG("HL7800 iface DOWN");
 		hl7800_stop_rssi_work();
-		net_if_down(ictx.iface);
+		net_if_carrier_off(ictx.iface);
 		notify_all_tcp_sockets_closed();
 	}
 
@@ -6046,7 +6045,9 @@ done:
 static int hl7800_init(const struct device *dev)
 {
 	int i, ret = 0;
-
+	struct k_work_queue_config cfg = {
+		.name = "hl7800_workq",
+	};
 	ARG_UNUSED(dev);
 
 	LOG_DBG("HL7800 Init");
@@ -6059,7 +6060,8 @@ static int hl7800_init(const struct device *dev)
 	if (ictx.iface == NULL) {
 		return -EIO;
 	}
-	net_if_flag_set(ictx.iface, NET_IF_NO_AUTO_START);
+
+	net_if_carrier_off(ictx.iface);
 
 	/* init sockets */
 	for (i = 0; i < MDM_MAX_SOCKETS; i++) {
@@ -6079,7 +6081,7 @@ static int hl7800_init(const struct device *dev)
 	/* initialize the work queue */
 	k_work_queue_start(&hl7800_workq, hl7800_workq_stack,
 			   K_THREAD_STACK_SIZEOF(hl7800_workq_stack),
-			   WORKQ_PRIORITY, NULL);
+			   WORKQ_PRIORITY, &cfg);
 
 	/* init work tasks */
 	k_work_init_delayable(&ictx.rssi_query_work, hl7800_rssi_query_work);

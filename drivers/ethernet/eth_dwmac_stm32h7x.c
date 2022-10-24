@@ -18,12 +18,13 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define DT_DRV_COMPAT st_stm32_ethernet
 
 #include <sys/types.h>
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/net/ethernet.h>
 #include <ethernet/eth.h>
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/stm32_clock_control.h>
 #include <zephyr/drivers/pinctrl.h>
+#include <zephyr/irq.h>
 
 #include "eth_dwmac_priv.h"
 

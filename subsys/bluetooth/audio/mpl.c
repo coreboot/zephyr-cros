@@ -474,12 +474,14 @@ static int add_icon_object(struct mpl_mediaplayer *pl)
 	add_param.type.uuid_16.val = BT_UUID_16(icon_type)->val;
 
 	ret = bt_ots_obj_add(bt_mcs_get_ots(), &add_param);
-
-	if (ret) {
+	if (ret < 0) {
 		BT_WARN("Unable to add icon object, error %d", ret);
 		obj.busy = false;
+
+		return ret;
 	}
-	return ret;
+
+	return 0;
 }
 
 /* Add a track segments object to the OTS */
@@ -507,11 +509,14 @@ static int add_current_track_segments_object(struct mpl_mediaplayer *pl)
 	add_param.type.uuid_16.val = BT_UUID_16(segs_type)->val;
 
 	ret = bt_ots_obj_add(bt_mcs_get_ots(), &add_param);
-	if (ret) {
+	if (ret < 0) {
 		BT_WARN("Unable to add track segments object: %d", ret);
 		obj.busy = false;
+
+		return ret;
 	}
-	return ret;
+
+	return 0;
 }
 
 /* Add a single track to the OTS */
@@ -546,13 +551,14 @@ static int add_track_object(struct mpl_track *track)
 	add_param.type.uuid_16.val = BT_UUID_16(track_type)->val;
 
 	ret = bt_ots_obj_add(bt_mcs_get_ots(), &add_param);
-
-	if (ret) {
+	if (ret < 0) {
 		BT_WARN("Unable to add track object: %d", ret);
 		obj.busy = false;
+
+		return ret;
 	}
 
-	return ret;
+	return 0;
 }
 
 /* Add the parent group to the OTS */
@@ -580,11 +586,14 @@ static int add_parent_group_object(struct mpl_mediaplayer *pl)
 	add_param.type.uuid_16.val = BT_UUID_16(group_type)->val;
 
 	ret = bt_ots_obj_add(bt_mcs_get_ots(), &add_param);
-	if (ret) {
+	if (ret < 0) {
 		BT_WARN("Unable to add parent group object");
 		obj.busy = false;
+
+		return ret;
 	}
-	return ret;
+
+	return 0;
 }
 
 /* Add a single group to the OTS */
@@ -620,13 +629,14 @@ static int add_group_object(struct mpl_group *group)
 	add_param.type.uuid_16.val = BT_UUID_16(group_type)->val;
 
 	ret = bt_ots_obj_add(bt_mcs_get_ots(), &add_param);
-
-	if (ret) {
+	if (ret < 0) {
 		BT_WARN("Unable to add group object: %d", ret);
 		obj.busy = false;
+
+		return ret;
 	}
 
-	return ret;
+	return 0;
 }
 
 /* Add all tracks of a group to the OTS */
@@ -2771,6 +2781,7 @@ int media_proxy_pl_init(void)
 	pl.calls.get_playing_orders_supported = get_playing_orders_supported;
 	pl.calls.get_media_state              = get_media_state;
 	pl.calls.send_command                 = send_command;
+	pl.calls.get_commands_supported       = get_commands_supported;
 #ifdef CONFIG_BT_MPL_OBJECTS
 	pl.calls.send_search                  = send_search;
 	pl.calls.get_search_results_id        = get_search_results_id;

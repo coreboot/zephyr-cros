@@ -1,11 +1,5 @@
 .. _bin-blobs:
 
-.. warning::
-
-   This page documents Zephyr's support for binary blobs. The tooling and
-   infrastructure for this purpose are still incomplete, and so this page may
-   refer to future additions.
-
 Binary Blobs
 ************
 
@@ -42,22 +36,21 @@ Blobs must be hosted on the Internet and managed by third-party infrastructure.
 Two potential examples are Git repositories and web servers managed by
 individual hardware vendors.
 
-The Zephyr Project will not host binary blobs in its Git repositories or
+The Zephyr Project does not host binary blobs in its Git repositories or
 anywhere else.
 
 Fetching blobs
 ==============
 
-Blobs will be fetched from official third-party sources via a west extension
-command which users will be able to run to this effect. The extension command
-implementation will be hosted in the main zephyr repository. This is required to
-give the project overall control over the mechanism used to fetch the blobs.
+Blobs are fetched from official third-party sources by the :ref:`west blobs
+command <west-blobs>` command.
 
-The blobs themselves must be specified in the :file:`module.yml` files included
-in separate Zephyr :ref:`module repositories <modules>` maintained by their
-respective vendors.  This means that in order to submit a binary blob to the
-upstream Zephyr distribution, a module repository must exist first or be created
-as part of the submission process.
+The blobs themselves must be specified in the :ref:`module.yml
+<modules-bin-blobs>` files included in separate Zephyr :ref:`module repositories
+<modules>` maintained by their respective vendors.  This means that in order to
+include a reference to a binary blob to the upstream Zephyr distribution, a
+module repository must exist first or be created as part of the submission
+process.
 
 Each blob which may be fetched must be individually identified in the
 corresponding :file:`module.yml` file. A specification for a blob must contain:
@@ -66,19 +59,21 @@ corresponding :file:`module.yml` file. A specification for a blob must contain:
 - Version information
 - A reference to vendor-provided documentation
 - The blob’s :ref:`type <bin-blobs-types>`, which must be one of the allowed types
-- A checksum for the blob, which the west extension checks after downloading.
+- A checksum for the blob, which ``west blobs`` checks after downloading.
   This is required for reproducibility and to allow bisecting issues as blobs
   change using Git and west
 - License text applicable to the blob or a reference to such text, in SPDX
   format
 
-The west extension used to fetch blobs will accept command line arguments that
-will allow the user to select the module or modules to fetch blobs from, as well
-as obtaining information and metadata on available blobs. This is required for
-user control and a uniform user experience regardless of the blob vendor.
+See the :ref:`corresponding section <modules-bin-blobs>` for a more formal
+definition of the fields.
 
-The west extension will only fetch and download the binary blobs themselves. Any
-accompanying code must be present in the corresponding module repository.
+The :ref:`west blobs <west-blobs>` command can be used to list metadata of
+available blobs and to fetch blobs from user-selected modules.
+
+The ``west blobs`` command only fetches and stores the binary blobs themselves.
+Any accompanying code, including interface header files for the blobs, must be
+present in the corresponding module repository.
 
 Tainting
 ========
@@ -227,5 +222,29 @@ the integration of such blob for the foreseeable future.
 Submission and review process
 =============================
 
-This section will be updated once the standard format for describing binary
-blobs is agreed upon.
+For references to binary blobs to be included in the project, they must be
+reviewed and accepted by the Technical Steering Committee (TSC). This process is
+only required for new binary blobs, updates to binary blobs follow the
+:ref:`module update procedure <modules_changes>`.
+
+A request for integration with binary blobs must be made by creating a new
+issue in the Zephyr project issue tracking system on GitHub with details
+about the blobs and the functionality they provide to the project.
+
+Follow the steps below to begin the submission process:
+
+#. Make sure to read through the :ref:`bin-blobs` section in
+   detail, so that you are informed of the criteria used by the TSC in order to
+   approve or reject a request
+#. Use the :github:`New Binary Blobs Issue
+   <new?assignees=&labels=RFC&template=bin-blobs.md&title=>` to open an issue
+#. Fill out all required sections, making sure you provide enough detail for the
+   TSC to assess the merit of the request. Additionally you must also create a Pull
+   Request that demonstrates the integration of the binary blobs and then
+   link to it from the issue
+#. Wait for feedback from the TSC, respond to any additional questions added as
+   GitHub issue comments
+
+If, after consideration by the TSC, the submission of the binary blob(s) is
+approved, the submission process is complete and the binary blob(s) can be
+integrated.

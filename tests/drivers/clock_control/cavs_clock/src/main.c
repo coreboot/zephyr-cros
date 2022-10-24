@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <zephyr/ztest.h>
-#include <zephyr/drivers/clock_control/clock_control_cavs.h>
+#include <zephyr/drivers/clock_control/clock_control_adsp.h>
 #include <zephyr/drivers/clock_control.h>
 
 static void check_clocks(struct cavs_clock_info *clocks, uint32_t freq_idx)
 {
 	int i;
+	unsigned int num_cpus = arch_num_cpus();
 
-	for (i = 0; i < CONFIG_MP_NUM_CPUS; i++) {
+	for (i = 0; i < num_cpus; i++) {
 		zassert_equal(clocks[i].current_freq, freq_idx, "");
 	}
 }
 
-static void test_cavs_clock_driver(void)
+ZTEST(cavs_clock_control, test_cavs_clock_driver)
 {
 	struct cavs_clock_info *clocks = cavs_clocks_get();
 
@@ -34,10 +35,10 @@ static void test_cavs_clock_driver(void)
 #endif
 }
 
-static void test_cavs_clock_control(void)
+ZTEST(cavs_clock_control, test_cavs_clock_control)
 {
 	struct cavs_clock_info *clocks = cavs_clocks_get();
-	const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(clkctl));
+	const struct device *const dev = DEVICE_DT_GET(DT_NODELABEL(clkctl));
 
 	zassert_not_null(clocks, "");
 
@@ -55,13 +56,4 @@ static void test_cavs_clock_control(void)
 	check_clocks(clocks, CAVS_CLOCK_FREQ_WOVCRO);
 #endif
 }
-
-void test_main(void)
-{
-	ztest_test_suite(cavs_clock_control,
-			 ztest_unit_test(test_cavs_clock_control),
-			 ztest_unit_test(test_cavs_clock_driver)
-			);
-
-	ztest_run_test_suite(cavs_clock_control);
-}
+ZTEST_SUITE(cavs_clock_control, NULL, NULL, NULL, NULL, NULL);

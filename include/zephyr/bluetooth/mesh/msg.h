@@ -17,12 +17,14 @@
  * @{
  */
 
-#include <zephyr/zephyr.h>
+#include <zephyr/kernel.h>
 #include <zephyr/net/buf.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct bt_mesh_model;
 
 /** Length of a short Mesh MIC. */
 #define BT_MESH_MIC_SHORT 4

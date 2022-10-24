@@ -13,6 +13,8 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/clock_control.h>
+#include <zephyr/irq.h>
+#include <zephyr/kernel.h>
 #include <zephyr/pm/policy.h>
 #ifdef CONFIG_PINCTRL
 #include <zephyr/drivers/pinctrl.h>
@@ -303,6 +305,7 @@ static void mcux_lpuart_irq_rx_enable(const struct device *dev)
 	uint32_t mask = kLPUART_RxDataRegFullInterruptEnable;
 
 	LPUART_EnableInterrupts(config->base, mask);
+	LPUART_EnableRx(config->base, true);
 }
 
 static void mcux_lpuart_irq_rx_disable(const struct device *dev)
@@ -310,6 +313,7 @@ static void mcux_lpuart_irq_rx_disable(const struct device *dev)
 	const struct mcux_lpuart_config *config = dev->config;
 	uint32_t mask = kLPUART_RxDataRegFullInterruptEnable;
 
+	LPUART_EnableRx(config->base, false);
 	LPUART_DisableInterrupts(config->base, mask);
 }
 
@@ -841,10 +845,8 @@ static void mcux_lpuart_async_tx_timeout(struct k_work *work)
 static void mcux_lpuart_isr(const struct device *dev)
 {
 	struct mcux_lpuart_data *data = dev->data;
-#if CONFIG_PM || CONFIG_UART_ASYNC_API
 	const struct mcux_lpuart_config *config = dev->config;
 	const uint32_t status = LPUART_GetStatusFlags(config->base);
-#endif
 
 #if CONFIG_PM
 	if (status & kLPUART_TransmissionCompleteFlag) {
@@ -864,6 +866,10 @@ static void mcux_lpuart_isr(const struct device *dev)
 #if CONFIG_UART_INTERRUPT_DRIVEN
 	if (data->callback) {
 		data->callback(dev, data->cb_data);
+	}
+
+	if (status & kLPUART_RxOverrunFlag) {
+		LPUART_ClearStatusFlags(config->base, kLPUART_RxOverrunFlag);
 	}
 #endif
 

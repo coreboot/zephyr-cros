@@ -13,6 +13,7 @@
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/irq.h>
 #include <soc.h>
 #include <stm32_ll_rcc.h>
 
@@ -46,7 +47,7 @@ typedef void (*irq_config_func_t)(const struct device *dev);
 
 #if STM32_SDMMC_USE_DMA
 
-uint32_t table_priority[] = {
+static const uint32_t table_priority[] = {
 	DMA_PRIORITY_LOW,
 	DMA_PRIORITY_MEDIUM,
 	DMA_PRIORITY_HIGH,
@@ -151,6 +152,15 @@ static int stm32_sdmmc_clock_enable(struct stm32_sdmmc_priv *priv)
 	LL_RCC_SetSDMMCClockSource(LL_RCC_SDMMC1_CLKSOURCE_PLLSAI1);
 #endif
 
+#if defined(CONFIG_SOC_SERIES_STM32L5X) || \
+	defined(CONFIG_SOC_SERIES_STM32U5X)
+	/* By default the SDMMC clock source is set to 0 --> 48MHz, must be enabled */
+	LL_RCC_HSI48_Enable();
+	while (!LL_RCC_HSI48_IsReady()) {
+	}
+#endif /* CONFIG_SOC_SERIES_STM32L5X ||
+	* CONFIG_SOC_SERIES_STM32U5X
+	*/
 	clock = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 
 	/* Enable the APB clock for stm32_sdmmc */
@@ -272,7 +282,7 @@ static int stm32_sdmmc_access_init(struct disk_info *disk)
 
 	err = HAL_SD_Init(&priv->hsd);
 	if (err != HAL_OK) {
-		LOG_ERR("failed to init stm32_sdmmc");
+		LOG_ERR("failed to init stm32_sdmmc (ErrorCode 0x%X)", priv->hsd.ErrorCode);
 		return -EIO;
 	}
 
@@ -556,7 +566,7 @@ static int stm32_sdmmc_pwr_uninit(struct stm32_sdmmc_priv *priv)
 static int disk_stm32_sdmmc_init(const struct device *dev)
 {
 	struct stm32_sdmmc_priv *priv = dev->data;
-	const struct device *clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
+	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 	int err;
 
 	if (!device_is_ready(clk)) {
