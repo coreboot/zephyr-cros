@@ -1,26 +1,29 @@
 /*
- * Copyright (c) 2020 Siddharth Chandrasekaran <siddharth@embedjournal.com>
+ * Copyright (c) 2020 Siddharth Chandrasekaran <sidcha.dev@gmail.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <ctype.h>
+#include <stdio.h>
 
 #include <zephyr/device.h>
 #include <zephyr/sys/crc.h>
 #include <zephyr/logging/log.h>
 
-#ifdef CONFIG_OSDP_SC_ENABLED
-#include <zephyr/crypto/crypto.h>
-#include <zephyr/random/rand32.h>
-#endif
-
 #include "osdp_common.h"
 
 LOG_MODULE_DECLARE(osdp, CONFIG_OSDP_LOG_LEVEL);
 
-void osdp_dump(const char *head, uint8_t *buf, int len)
+void __printf_like(3, 4) osdp_dump(uint8_t *buf, int len, const char *fmt, ...)
 {
+	va_list args;
+	char head[32];
+
+	va_start(args, fmt);
+	vsnprintf(head, sizeof(head), fmt, args);
+	va_end(args);
+
 	LOG_HEXDUMP_DBG(buf, len, head);
 }
 
@@ -31,53 +34,19 @@ uint16_t osdp_compute_crc16(const uint8_t *buf, size_t len)
 
 int64_t osdp_millis_now(void)
 {
-	return (int64_t) k_uptime_get();
+	return (int64_t)k_uptime_get();
 }
 
 int64_t osdp_millis_since(int64_t last)
 {
 	int64_t tmp = last;
 
-	return (int64_t) k_uptime_delta(&tmp);
+	return (int64_t)k_uptime_delta(&tmp);
 }
 
-struct osdp_cmd *osdp_cmd_alloc(struct osdp_pd *pd)
+void osdp_keyset_complete(struct osdp_pd *pd)
 {
-	struct osdp_cmd *cmd = NULL;
-
-	if (k_mem_slab_alloc(&pd->cmd.slab, (void **)&cmd, K_MSEC(100))) {
-		LOG_ERR("Memory allocation time-out");
-		return NULL;
-	}
-	return cmd;
-}
-
-void osdp_cmd_free(struct osdp_pd *pd, struct osdp_cmd *cmd)
-{
-	k_mem_slab_free(&pd->cmd.slab, (void **)&cmd);
-}
-
-void osdp_cmd_enqueue(struct osdp_pd *pd, struct osdp_cmd *cmd)
-{
-	sys_slist_append(&pd->cmd.queue, &cmd->node);
-}
-
-int osdp_cmd_dequeue(struct osdp_pd *pd, struct osdp_cmd **cmd)
-{
-	sys_snode_t *node;
-
-	node = sys_slist_peek_head(&pd->cmd.queue);
-	if (node == NULL) {
-		return -1;
-	}
-	sys_slist_remove(&pd->cmd.queue, NULL, node);
-	*cmd = CONTAINER_OF(node, struct osdp_cmd, node);
-	return 0;
-}
-
-struct osdp_cmd *osdp_cmd_get_last(struct osdp_pd *pd)
-{
-	return (struct osdp_cmd *)sys_slist_peek_tail(&pd->cmd.queue);
+	cp_keyset_complete(pd);
 }
 
 #ifdef CONFIG_OSDP_SC_ENABLED
@@ -85,28 +54,21 @@ struct osdp_cmd *osdp_cmd_get_last(struct osdp_pd *pd)
 void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 {
 	const struct device *dev;
-	struct cipher_ctx ctx = {
-		.keylen = 16,
-		.key.bit_stream = key,
-		.flags = CAP_NO_IV_PREFIX
-	};
+	struct cipher_ctx ctx = { .keylen = 16, .key.bit_stream = key, .flags = CAP_NO_IV_PREFIX };
 	struct cipher_pkt encrypt = {
-		.in_buf = data,
-		.in_len = len,
-		.out_buf = data,
-		.out_len = len
+		.in_buf = data, .in_len = len, .out_buf = data, .out_len = len
 	};
-
 	dev = device_get_binding(CONFIG_OSDP_CRYPTO_DRV_NAME);
+	struct crypto_driver_api *api = (struct crypto_driver_api *) dev->api;
+	ctx.flags = api->query_hw_caps(dev);
+
 	if (dev == NULL) {
 		LOG_ERR("Failed to get crypto dev binding!");
 		return;
 	}
 
 	if (iv != NULL) {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_CBC,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_CBC,
 					 CRYPTO_CIPHER_OP_ENCRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -115,9 +77,7 @@ void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 			LOG_ERR("CBC ENCRYPT - Failed");
 		}
 	} else {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_ECB,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_ECB,
 					 CRYPTO_CIPHER_OP_ENCRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -132,28 +92,22 @@ void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 {
 	const struct device *dev;
-	struct cipher_ctx ctx = {
-		.keylen = 16,
-		.key.bit_stream = key,
-		.flags = CAP_NO_IV_PREFIX
-	};
+	struct cipher_ctx ctx = { .keylen = 16, .key.bit_stream = key, .flags = CAP_NO_IV_PREFIX };
 	struct cipher_pkt decrypt = {
-		.in_buf = data,
-		.in_len = len,
-		.out_buf = data,
-		.out_len = len
+		.in_buf = data, .in_len = len, .out_buf = data, .out_len = len
 	};
 
 	dev = device_get_binding(CONFIG_OSDP_CRYPTO_DRV_NAME);
+	struct crypto_driver_api *api = (struct crypto_driver_api *) dev->api;
+	ctx.flags = api->query_hw_caps(dev);
+		
 	if (dev == NULL) {
 		LOG_ERR("Failed to get crypto dev binding!");
 		return;
 	}
 
 	if (iv != NULL) {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_CBC,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_CBC,
 					 CRYPTO_CIPHER_OP_DECRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -162,9 +116,7 @@ void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 			LOG_ERR("CBC DECRYPT - Failed");
 		}
 	} else {
-		if (cipher_begin_session(dev, &ctx,
-					 CRYPTO_CIPHER_ALGO_AES,
-					 CRYPTO_CIPHER_MODE_ECB,
+		if (cipher_begin_session(dev, &ctx, CRYPTO_CIPHER_ALGO_AES, CRYPTO_CIPHER_MODE_ECB,
 					 CRYPTO_CIPHER_OP_DECRYPT)) {
 			LOG_ERR("Failed at cipher_begin_session");
 			return;
@@ -178,23 +130,63 @@ void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 
 void osdp_fill_random(uint8_t *buf, int len)
 {
-	sys_csrand_get(buf, len);
-}
-
-uint32_t osdp_get_sc_status_mask(void)
-{
-	int i;
-	uint32_t mask = 0;
-	struct osdp_pd *pd;
-	struct osdp *ctx = osdp_get_ctx();
-
-	for (i = 0; i < NUM_PD(ctx); i++) {
-		pd = TO_PD(ctx, i);
-		if (ISSET_FLAG(pd, PD_FLAG_SC_ACTIVE)) {
-			mask |= 1 << i;
-		}
-	}
-	return mask;
+	memset(buf, len, 0);
+	//sys_csrand_get(buf, len);
 }
 
 #endif /* CONFIG_OSDP_SC_ENABLED */
+
+void osdp_get_sc_status_mask(uint8_t *bitmask)
+{
+	int i, pos;
+	uint8_t *mask = bitmask;
+	struct osdp_pd *pd;
+	struct osdp *ctx = osdp_get_ctx();
+
+	*mask = 0;
+	for (i = 0; i < NUM_PD(ctx); i++) {
+		pos = i & 0x07;
+		if (i && pos == 0) {
+			mask++;
+			*mask = 0;
+		}
+		pd = osdp_to_pd(ctx, i);
+		if (sc_is_enabled(pd) && sc_is_active(pd)) {
+			*mask |= 1 << pos;
+		}
+	}
+}
+
+void osdp_get_status_mask(uint8_t *bitmask)
+{
+	int i, pos;
+	uint8_t *mask = bitmask;
+	struct osdp_pd *pd;
+	struct osdp *ctx = osdp_get_ctx();
+
+	*mask = 0;
+	for (i = 0; i < NUM_PD(ctx); i++) {
+		pos = i & 0x07;
+		if (i && pos == 0) {
+			mask++;
+			*mask = 0;
+		}
+		pd = osdp_to_pd(ctx, i);
+		if (ISSET_FLAG(pd, PD_FLAG_PD_MODE) || pd->state == OSDP_CP_STATE_ONLINE) {
+			*mask |= 1 << pos;
+		}
+	}
+}
+
+void osdp_set_command_complete_callback(osdp_command_complete_callback_t cb)
+{
+	struct osdp *ctx = osdp_get_ctx();
+
+	ctx->command_complete_callback = cb;
+}
+
+bool osdp_is_valid_baudrate(int baud_rate)
+{
+	return (baud_rate == 9600 || baud_rate == 19200 || baud_rate == 38400 || baud_rate == 57600 ||
+	    baud_rate == 115200 || baud_rate == 230400);
+}

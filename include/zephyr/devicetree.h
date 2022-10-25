@@ -1457,7 +1457,16 @@
  * @return node identifier for the node with the phandle at that index
  */
 #define DT_PHANDLE_BY_IDX(node_id, prop, idx) \
+<<<<<<< HEAD
 	DT_CAT6(node_id, _P_, prop, _IDX_, idx, _PH)
+=======
+	DT_CAT6(node_id, _P_, prop, _IDX_, idx, _PH)	
+/*
+ * Implementation note: using DT_CAT6 above defers concatenation until
+ * after expansion of each parameter. This is important when 'idx' is
+ * expandable to a number, but it isn't one "yet".
+ */
+>>>>>>> osdp-protocol-rebase-v2
 
 /**
  * @brief Get a node identifier for a phandle property's value
@@ -2067,8 +2076,12 @@
  * @return address of the idx-th register block
  */
 #define DT_REG_ADDR_BY_IDX(node_id, idx) \
+<<<<<<< HEAD
 	DT_CAT4(node_id, _REG_IDX_, idx, _VAL_ADDRESS)
 
+=======
+	DT_CAT(node_id, _REG_IDX_##idx##_VAL_ADDRESS)
+>>>>>>> osdp-protocol-rebase-v2
 /**
  * @brief Get the size of the register block at index @p idx
  *

@@ -3711,6 +3711,7 @@ int bt_enable(bt_ready_cb_t cb)
 
 #if defined(CONFIG_BT_RECV_WORKQ_BT)
 	/* RX thread */
+	k_work_queue_init(&bt_workq);
 	k_work_queue_start(&bt_workq, rx_thread_stack,
 			   CONFIG_BT_RX_STACK_SIZE,
 			   K_PRIO_COOP(CONFIG_BT_RX_PRIO), NULL);
