@@ -448,7 +448,7 @@ int lwm2m_send_message(struct lwm2m_message *msg)
 		coap_pending_cycle(msg->pending);
 	}
 
-	rc = send(msg->ctx->sock_fd, msg->cpkt.data, msg->cpkt.offset, 0);
+	rc = zsock_send(msg->ctx->sock_fd, msg->cpkt.data, msg->cpkt.offset, 0);
 
 	if (rc < 0) {
 		LOG_ERR("Failed to send packet, err %d", errno);
@@ -749,6 +749,7 @@ int lwm2m_write_handler(struct lwm2m_engine_obj_inst *obj_inst, struct lwm2m_eng
 	size_t total_size = 0;
 	int64_t temp64 = 0;
 	int32_t temp32 = 0;
+	time_t temp_time = 0;
 	int ret = 0;
 	bool last_block = true;
 	void *write_buf;
@@ -821,12 +822,22 @@ int lwm2m_write_handler(struct lwm2m_engine_obj_inst *obj_inst, struct lwm2m_eng
 			break;
 
 		case LWM2M_RES_TYPE_TIME:
-			ret = engine_get_time(&msg->in, &temp64);
+			ret = engine_get_time(&msg->in, &temp_time);
 			if (ret < 0) {
 				break;
 			}
-			*(uint32_t *)write_buf = temp64;
-			len = 4;
+
+			if (write_buf_len == sizeof(time_t)) {
+				*(time_t *)write_buf = temp_time;
+				len = sizeof(time_t);
+			} else if (write_buf_len == sizeof(uint32_t)) {
+				*(uint32_t *)write_buf = (uint32_t)temp_time;
+				len = sizeof(uint32_t);
+			} else {
+				LOG_ERR("Time resource buf len not supported %d", write_buf_len);
+				ret = -EINVAL;
+			}
+
 			break;
 
 		case LWM2M_RES_TYPE_U32:
@@ -1002,7 +1013,16 @@ static int lwm2m_read_resource_data(struct lwm2m_message *msg, void *data_ptr, s
 		break;
 
 	case LWM2M_RES_TYPE_TIME:
-		ret = engine_put_time(&msg->out, &msg->path, (int64_t) *(uint32_t *)data_ptr);
+		if (data_len == sizeof(time_t)) {
+			ret = engine_put_time(&msg->out, &msg->path, *(time_t *)data_ptr);
+		} else if (data_len == sizeof(uint32_t)) {
+			ret = engine_put_time(&msg->out, &msg->path,
+					      (time_t) *((uint32_t *)data_ptr));
+		} else {
+			LOG_ERR("Resource time length not supported %d", data_len);
+			ret = -EINVAL;
+		}
+
 		break;
 
 	case LWM2M_RES_TYPE_BOOL:
@@ -1083,7 +1103,7 @@ static int lwm2m_read_cached_data(struct lwm2m_message *msg,
 			break;
 
 		case LWM2M_RES_TYPE_TIME:
-			ret = engine_put_time(&msg->out, &msg->path, (int64_t)buf.u32);
+			ret = engine_put_time(&msg->out, &msg->path, buf.time);
 			break;
 
 		default:
@@ -2645,7 +2665,7 @@ int lwm2m_parse_peerinfo(char *url, struct lwm2m_ctx *client_ctx, bool is_firmwa
 {
 	struct http_parser_url parser;
 #if defined(CONFIG_LWM2M_DNS_SUPPORT)
-	struct addrinfo *res, hints = {0};
+	struct zsock_addrinfo *res, hints = {0};
 #endif
 	int ret;
 	uint16_t off, len;
@@ -2730,7 +2750,7 @@ int lwm2m_parse_peerinfo(char *url, struct lwm2m_ctx *client_ctx, bool is_firmwa
 		hints.ai_family = AF_UNSPEC;
 #endif /* defined(CONFIG_NET_IPV6) && defined(CONFIG_NET_IPV4) */
 		hints.ai_socktype = SOCK_DGRAM;
-		ret = getaddrinfo(url + off, NULL, &hints, &res);
+		ret = zsock_getaddrinfo(url + off, NULL, &hints, &res);
 		if (ret != 0) {
 			LOG_ERR("Unable to resolve address");
 			/* DNS error codes don't align with normal errors */
@@ -2740,7 +2760,7 @@ int lwm2m_parse_peerinfo(char *url, struct lwm2m_ctx *client_ctx, bool is_firmwa
 
 		memcpy(&client_ctx->remote_addr, res->ai_addr, sizeof(client_ctx->remote_addr));
 		client_ctx->remote_addr.sa_family = res->ai_family;
-		freeaddrinfo(res);
+		zsock_freeaddrinfo(res);
 #else
 		goto cleanup;
 #endif /* CONFIG_LWM2M_DNS_SUPPORT */

@@ -40,6 +40,8 @@ static uint8_t pack_bt_codec_cc(const struct bt_codec *codec, uint8_t cc[])
 		 * and that based on the Kconfigs we can assume that the length
 		 * will always fit in `cc`
 		 */
+		cc[len++] = data->data_len + 1;
+		cc[len++] = data->type;
 		(void)memcpy(cc + len, data->data, data->data_len);
 		len += data->data_len;
 	}
@@ -89,7 +91,7 @@ void bt_audio_stream_attach(struct bt_conn *conn,
 
 #if defined(CONFIG_BT_AUDIO_UNICAST) || defined(CONFIG_BT_AUDIO_BROADCAST_SOURCE)
 int bt_audio_stream_send(struct bt_audio_stream *stream, struct net_buf *buf,
-			 uint32_t seq_num, uint32_t ts)
+			 uint16_t seq_num, uint32_t ts)
 {
 	struct bt_audio_ep *ep;
 

@@ -8,8 +8,8 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/net/buf.h>
 #include <zephyr/mgmt/mcumgr/smp.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
 #include <mgmt/mgmt.h>
+#include <smp/smp.h>
 #include "../../../../../../subsys/mgmt/mcumgr/smp_reassembly.h"
 
 static struct smp_transport smpt;
@@ -73,8 +73,7 @@ ZTEST(smp_reassembly, test_first)
 	/* This will normally be done by packet processing and should not be done by hand:
 	 * release the buffer to the pool
 	 */
-	mcumgr_buf_free(backup);
-
+	smp_packet_free(backup);
 }
 
 ZTEST(smp_reassembly, test_drops)
@@ -156,7 +155,7 @@ ZTEST(smp_reassembly, test_collection)
 	/* This will normally be done by packet processing and should not be done by hand:
 	 * release the buffer to the pool
 	 */
-	mcumgr_buf_free(backup);
+	smp_packet_free(backup);
 }
 
 ZTEST(smp_reassembly, test_no_packet_started)

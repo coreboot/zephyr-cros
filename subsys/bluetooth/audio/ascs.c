@@ -20,11 +20,12 @@
 #include <zephyr/bluetooth/gatt.h>
 #include "zephyr/bluetooth/iso.h"
 #include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/capabilities.h>
+#include <zephyr/bluetooth/audio/pacs.h>
 
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_ASCS)
 #define LOG_MODULE_NAME bt_ascs
 #include "common/log.h"
+#include "common/assert.h"
 
 #include "../host/hci_core.h"
 #include "../host/conn_internal.h"
@@ -314,7 +315,7 @@ static void ascs_codec_data_add(struct net_buf_simple *buf, const char *prefix,
 
 		BT_DBG("#%u: %s type 0x%02x len %u", i, prefix, d->type,
 		       d->data_len);
-		BT_HEXDUMP_DBG(d->data, d->data_len, prefix);
+		LOG_HEXDUMP_DBG(d->data, d->data_len, prefix);
 
 		cc = net_buf_simple_add(buf, sizeof(*cc));
 		cc->len = d->data_len + sizeof(cc->type);
@@ -873,6 +874,26 @@ BT_CONN_CB_DEFINE(conn_cb) = {
 	.disconnected = disconnected,
 };
 
+static void audio_iso_init(struct bt_audio_iso *audio_iso)
+{
+	/* Setup points for both sink and source
+	 * This is due to the limitation in the ISO API where pointers like
+	 * the `qos->tx` shall be initialized before the CIS is connected if
+	 * ever want to use it for TX, and ditto for RX. They cannot be
+	 * initialized after the CIS has been connected
+	 */
+	audio_iso->iso_chan.ops = &ascs_iso_ops;
+	audio_iso->iso_chan.qos = &audio_iso->iso_qos;
+
+	audio_iso->iso_chan.qos->tx = &audio_iso->source_io_qos;
+	audio_iso->iso_chan.qos->tx->path = &audio_iso->source_path;
+	audio_iso->iso_chan.qos->tx->path->cc = audio_iso->source_path_cc;
+
+	audio_iso->iso_chan.qos->rx = &audio_iso->sink_io_qos;
+	audio_iso->iso_chan.qos->rx->path = &audio_iso->sink_path;
+	audio_iso->iso_chan.qos->rx->path->cc = audio_iso->sink_path_cc;
+}
+
 static struct bt_audio_iso *audio_iso_get_or_new(struct bt_ascs *ascs, uint8_t cig_id,
 						 uint8_t cis_id)
 {
@@ -900,6 +921,8 @@ static struct bt_audio_iso *audio_iso_get_or_new(struct bt_ascs *ascs, uint8_t c
 			return audio_iso;
 		}
 	}
+
+	audio_iso_init(free_audio_iso);
 
 	return free_audio_iso;
 }
@@ -1008,12 +1031,6 @@ static int ascs_ep_stream_bind_audio_iso(struct bt_audio_stream *stream,
 			BT_WARN("Bound with source_stream %p already", audio_iso->source_stream);
 			return -EADDRINUSE;
 		}
-
-		audio_iso->iso_chan.ops = &ascs_iso_ops;
-		audio_iso->iso_chan.qos = &audio_iso->iso_qos;
-		audio_iso->iso_chan.qos->tx = &audio_iso->source_io_qos;
-		audio_iso->iso_chan.qos->tx->path = &audio_iso->source_path;
-		audio_iso->iso_chan.qos->tx->path->cc = audio_iso->source_path_cc;
 	} else if (dir == BT_AUDIO_DIR_SINK) {
 		if (audio_iso->sink_stream == NULL) {
 			audio_iso->sink_stream = stream;
@@ -1021,12 +1038,6 @@ static int ascs_ep_stream_bind_audio_iso(struct bt_audio_stream *stream,
 			BT_WARN("Bound with sink_stream %p already", audio_iso->sink_stream);
 			return -EADDRINUSE;
 		}
-
-		audio_iso->iso_chan.ops = &ascs_iso_ops;
-		audio_iso->iso_chan.qos = &audio_iso->iso_qos;
-		audio_iso->iso_chan.qos->rx = &audio_iso->sink_io_qos;
-		audio_iso->iso_chan.qos->rx->path = &audio_iso->sink_path;
-		audio_iso->iso_chan.qos->rx->path->cc = audio_iso->sink_path_cc;
 	} else {
 		__ASSERT(false, "Invalid dir: %u", dir);
 	}
@@ -1174,7 +1185,7 @@ static bool ascs_codec_config_store(struct bt_data *data, void *user_data)
 	cdata->data.data = cdata->value;
 	(void)memcpy(cdata->value, data->data, data->data_len);
 
-	BT_HEXDUMP_DBG(cdata->value, data->data_len, "data");
+	LOG_HEXDUMP_DBG(cdata->value, data->data_len, "data");
 
 	codec->data_count++;
 
@@ -1186,12 +1197,12 @@ struct codec_lookup_id_data {
 	struct bt_codec *codec;
 };
 
-static bool codec_lookup_id(const struct bt_audio_capability *capability, void *user_data)
+static bool codec_lookup_id(const struct bt_pacs_cap *cap, void *user_data)
 {
 	struct codec_lookup_id_data *data = user_data;
 
-	if (capability->codec->id == data->id) {
-		data->codec = capability->codec;
+	if (cap->codec->id == data->id) {
+		data->codec = cap->codec;
 
 		return false;
 	}
@@ -1215,7 +1226,7 @@ static int ascs_ep_set_codec(struct bt_audio_ep *ep, uint8_t id, uint16_t cid,
 	BT_DBG("ep %p dir %u codec id 0x%02x cid 0x%04x vid 0x%04x len %u",
 	       ep, ep->dir, id, cid, vid, len);
 
-	bt_audio_foreach_capability(ep->dir, codec_lookup_id, &lookup_data);
+	bt_pacs_cap_foreach(ep->dir, codec_lookup_id, &lookup_data);
 
 	if (lookup_data.codec == NULL) {
 		return -ENOENT;

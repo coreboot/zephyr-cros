@@ -81,39 +81,39 @@ const struct isotp_fc_opts fc_opts_single = {
 };
 const struct isotp_msg_id rx_addr = {
 	.std_id = 0x10,
-	.id_type = CAN_STANDARD_IDENTIFIER,
+	.ide = 0,
 	.use_ext_addr = 0
 };
 const struct isotp_msg_id tx_addr = {
 	.std_id = 0x11,
-	.id_type = CAN_STANDARD_IDENTIFIER,
+	.ide = 0,
 	.use_ext_addr = 0
 };
 
 const struct isotp_msg_id rx_addr_ext = {
 	.std_id = 0x10,
-	.id_type = CAN_STANDARD_IDENTIFIER,
+	.ide = 0,
 	.use_ext_addr = 1,
 	.ext_addr = EXT_ADDR
 };
 
 const struct isotp_msg_id tx_addr_ext = {
 	.std_id = 0x11,
-	.id_type = CAN_STANDARD_IDENTIFIER,
+	.ide = 0,
 	.use_ext_addr = 1,
 	.ext_addr = EXT_ADDR
 };
 
 const struct isotp_msg_id rx_addr_fixed = {
 	.ext_id = 0x18DA0201,
-	.id_type = CAN_EXTENDED_IDENTIFIER,
+	.ide = 1,
 	.use_ext_addr = 0,
 	.use_fixed_addr = 1
 };
 
 const struct isotp_msg_id tx_addr_fixed = {
 	.ext_id = 0x18DA0102,
-	.id_type = CAN_EXTENDED_IDENTIFIER,
+	.ide = 1,
 	.use_ext_addr = 0,
 	.use_fixed_addr = 1
 };
@@ -233,9 +233,7 @@ static void send_frame_series(struct frame_desired *frames, size_t length,
 {
 	int i, ret;
 	struct can_frame frame = {
-		.id_type = (id > 0x7FF) ? CAN_EXTENDED_IDENTIFIER :
-			CAN_STANDARD_IDENTIFIER,
-		.rtr = CAN_DATAFRAME,
+		.flags = (id > 0x7FF) ? CAN_FRAME_IDE :	0,
 		.id = id
 	};
 	struct frame_desired *desired = frames;
@@ -283,12 +281,9 @@ static int add_rx_msgq(uint32_t id, uint32_t mask)
 {
 	int filter_id;
 	struct can_filter filter = {
-		.id_type = (id > 0x7FF) ? CAN_EXTENDED_IDENTIFIER :
-			CAN_STANDARD_IDENTIFIER,
-		.rtr = CAN_DATAFRAME,
+		.flags = CAN_FILTER_DATA | ((id > 0x7FF) ? CAN_FILTER_IDE : 0),
 		.id = id,
-		.rtr_mask = 1,
-		.id_mask = mask
+		.mask = mask
 	};
 
 	filter_id = can_add_rx_filter_msgq(can_dev, &frame_msgq, &filter);

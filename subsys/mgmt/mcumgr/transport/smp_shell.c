@@ -12,15 +12,15 @@
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
 #include <zephyr/net/buf.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
+#include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_uart.h>
+#include <zephyr/drivers/uart.h>
+#include <syscalls/uart.h>
 #include "mgmt/mgmt.h"
+#include "smp/smp.h"
 #include <zephyr/mgmt/mcumgr/serial.h>
 #include <zephyr/mgmt/mcumgr/smp.h>
 #include <zephyr/mgmt/mcumgr/smp_shell.h>
-#include <zephyr/drivers/uart.h>
-#include "syscalls/uart.h"
-#include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_uart.h>
 #include "../smp_internal.h"
 
 #include <zephyr/logging/log.h>
@@ -183,7 +183,7 @@ static int smp_shell_tx_pkt(struct net_buf *nb)
 	int rc;
 
 	rc = mcumgr_serial_tx_pkt(nb->data, nb->len, smp_shell_tx_raw);
-	mcumgr_buf_free(nb);
+	smp_packet_free(nb);
 
 	return rc;
 }

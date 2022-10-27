@@ -12,9 +12,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
 #include <zephyr/net/buf.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
 #include <zephyr/drivers/console/uart_mcumgr.h>
 #include "mgmt/mgmt.h"
+#include "smp/smp.h"
 #include <zephyr/mgmt/mcumgr/serial.h>
 #include <zephyr/mgmt/mcumgr/smp.h>
 #include "../smp_internal.h"
@@ -84,7 +84,7 @@ static int smp_uart_tx_pkt(struct net_buf *nb)
 	int rc;
 
 	rc = uart_mcumgr_send(nb->data, nb->len);
-	mcumgr_buf_free(nb);
+	smp_packet_free(nb);
 
 	return rc;
 }

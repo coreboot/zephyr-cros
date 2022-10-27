@@ -7,7 +7,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/net/buf.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
 #include <zephyr/mgmt/mcumgr/smp.h>
 #include <mgmt/mgmt.h>
 #include <smp/smp.h>
@@ -54,7 +53,7 @@ int smp_reassembly_collect(struct smp_transport *smpt, const void *buf, uint16_t
 				return -EOVERFLOW;
 			}
 
-			smpt->__reassembly.current = mcumgr_buf_alloc();
+			smpt->__reassembly.current = smp_packet_alloc();
 			if (smpt->__reassembly.current != NULL) {
 				smpt->__reassembly.expected = expected;
 			} else {
@@ -103,7 +102,7 @@ int smp_reassembly_drop(struct smp_transport *smpt)
 		return -EINVAL;
 	}
 
-	mcumgr_buf_free(smpt->__reassembly.current);
+	smp_packet_free(smpt->__reassembly.current);
 	smpt->__reassembly.expected = 0;
 	smpt->__reassembly.current = NULL;
 
