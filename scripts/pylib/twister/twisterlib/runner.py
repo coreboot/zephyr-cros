@@ -24,6 +24,7 @@ from twisterlib.cmakecache import CMakeCache
 from twisterlib.environment import canonical_zephyr_base
 from twisterlib.jobserver import GNUMakeJobClient, GNUMakeJobServer, JobClient
 from twisterlib.log_helper import log_command
+from twisterlib.testinstance import TestInstance
 
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
