@@ -884,6 +884,7 @@ class TwisterRunner:
         self.duts = None
         self.jobs = 1
         self.results = None
+        self.jobserver = None
 
     def run(self):
 
@@ -905,7 +906,16 @@ class TwisterRunner:
             self.jobs = multiprocessing.cpu_count() * 2
         else:
             self.jobs = multiprocessing.cpu_count()
-        logger.info("JOBS: %d" % self.jobs)
+        if os.name == "posix":
+            self.jobserver = GNUMakeJobClient.from_environ(jobs=self.options.jobs)
+            if not self.jobserver:
+                self.jobserver = GNUMakeJobServer(self.jobs)
+            elif self.jobserver.jobs:
+                self.jobs = self.jobserver.jobs
+        # TODO: Implement this on windows also
+        else:
+            self.jobserver = JobClient()
+        logger.info("JOBS: %d", self.jobs)
 
         self.update_counting_before_pipeline()
 
@@ -998,8 +1008,8 @@ class TwisterRunner:
                 else:
                     pipeline.put({"op": "cmake", "test": instance})
 
-    def pipeline_mgr(self, pipeline, done_queue, lock, results, jobserver):
-        with jobserver.get_job():
+    def pipeline_mgr(self, pipeline, done_queue, lock, results):
+        with self.jobserver.get_job():
             while True:
                 try:
                     task = pipeline.get_nowait()
@@ -1007,7 +1017,7 @@ class TwisterRunner:
                     break
                 else:
                     instance = task['test']
-                    pb = ProjectBuilder(instance, self.env, jobserver)
+                    pb = ProjectBuilder(instance, self.env, self.jobserver)
                     pb.duts = self.duts
                     pb.process(pipeline, done_queue, task, lock, results)
 
@@ -1021,19 +1031,10 @@ class TwisterRunner:
         logger.info("Added initial list of jobs to queue")
 
         processes = []
-        if os.name == "posix":
-            jobserver = GNUMakeJobClient.from_environ(jobs=self.options.jobs)
-            if not jobserver:
-                jobserver = GNUMakeJobServer(self.jobs)
-            else:
-                self.jobs = jobserver.jobs
-        # TODO: Implement this on windows also
-        else:
-            jobserver = JobClient()
 
         for job in range(self.jobs):
             logger.debug(f"Launch process {job}")
-            p = Process(target=self.pipeline_mgr, args=(pipeline, done, lock, self.results, jobserver, ))
+            p = Process(target=self.pipeline_mgr, args=(pipeline, done, lock, self.results, ))
             processes.append(p)
             p.start()
 
