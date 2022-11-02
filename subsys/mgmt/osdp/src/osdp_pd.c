@@ -620,40 +620,40 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			LOG_ERR("Keyset with SC inactive");
 			break;
 		}
+		
 		/* only key_type == 1 (SCBK) */
-		if (buf[pos] != 1 || buf[pos + 1] > OSDP_CMD_KEYSET_KEY_MAX_LEN) {
-			LOG_ERR("Keyset invalid type/len: %d/%d", buf[pos], buf[pos + 1]);
+		if (buf[pos] != 1) {
+			LOG_ERR("Keyset invalid type: %d", buf[pos]);
 			break;
 		}
 
-		cmd.id = OSDP_CMD_KEYSET;
-		cmd.keyset.type = buf[pos++];
-		cmd.keyset.length = buf[pos++];
-		memcpy(cmd.keyset.data, buf + pos, cmd.keyset.length);
-
-		ret = OSDP_PD_ERR_NONE;
-		if (pd->command_callback) {
+		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+			if (!pd->command_callback) {
+				break;
+			}
+			if (buf[pos + 1] > OSDP_CMD_KEYSET_KEY_MAX_LEN) {
+				LOG_ERR("Keyset invalid len: %d", buf[pos + 1]);
+				break;
+			}
+			cmd.id = OSDP_CMD_KEYSET;
+			cmd.keyset.type = buf[pos++];
+			cmd.keyset.length = buf[pos++];
+			memcpy(cmd.keyset.data, buf + pos, cmd.keyset.length);
 			ret = pd->command_callback(pd->command_callback_arg, &cmd);
+			if (ret != 0) {
+				pd->reply_id = REPLY_NAK;
+				pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
+				ret = OSDP_PD_ERR_REPLY;
+			}
 		} else {
+			if (buf[pos + 1] != 16) {
+				LOG_ERR("Keyset invalid len: %d", buf[pos + 1]);
+				break;
+			}
+			memcpy(pd->sc.scbk, &buf[pos + 2], 16);
 			LOG_ERR("Keyset without a command callback! The SC new "
 				"SCBK will be lost when the PD reboots.");
 		}
-		if (ret != 0) {
-			pd->reply_id = REPLY_NAK;
-			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
-			ret = OSDP_PD_ERR_REPLY;
-			break;
-		}
-
-		// TODO: 
-		// 1. If App is keeping key than this module does not need the copy
-		// 2. key_len == 16 is supported by this module
-		// 3. Add install mode check here ... s
-		// pd->reply_id = REPLY_NAK;
-		// 			pd->ephemeral_data[0] = OSDP_PD_NAK_SC_COND;
-		// 			return OSDP_ERR_PKT_NACK;
-
-		memcpy(pd->sc.scbk, cmd.keyset.data, 16);
 		CLEAR_FLAG(pd, PD_FLAG_SC_USE_SCBKD);
 		CLEAR_FLAG(pd, PD_FLAG_INSTALL_MODE);
 		sc_deactivate(pd);
@@ -665,46 +665,46 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 		if (!pd_cmd_cap_ok(pd, NULL)) {
 			ret = OSDP_PD_ERR_REPLY;
 			break;
-		}
-		if (pd->cap[tmp].compliance_level == 0) {
-			pd->reply_id = REPLY_NAK;
-			pd->ephemeral_data[0] = OSDP_PD_NAK_SC_UNSUP;
+		}		
+		if (len != CMD_CHLNG_DATA_LEN) {
 			break;
 		}
-		if (len != CMD_CHLNG_DATA_LEN || !pd->command_callback) {
-			break;
-		}
-		cmd.id = OSDP_CMD_CHLNG;
-		cmd.chlng.key_type = ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD) ? 0 : 1;
-		memcpy(cmd.chlng.random_number, &buf[pos], 8U);
-		ret = pd->command_callback(pd->command_callback_arg, &cmd);
-		if (ret < 0) {
-			pd->reply_id = REPLY_NAK;
-			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
-			ret = OSDP_PD_ERR_REPLY;
-			break;
-		}
-		sc_deactivate(pd);
-		if (ret > 0) {
-			// use data provided by app
-			memcpy(pd->ephemeral_data, &cmd, sizeof(struct osdp_cmd));
+		
+		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+			if (!pd->command_callback) {
+				break;
+			}
+			cmd.id = OSDP_CMD_CHLNG;
+			cmd.chlng.key_type = ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD) ? 0 : 1;
+			memcpy(cmd.chlng.random_number, &buf[pos], CMD_CHLNG_DATA_LEN);
+			ret = pd->command_callback(pd->command_callback_arg, &cmd);	
+			if (ret > 0) {
+				// use data provided by app
+				memcpy(pd->ephemeral_data, &cmd, sizeof(struct osdp_cmd));
+			} else {
+				pd->reply_id = REPLY_NAK;
+				pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
+				ret = OSDP_PD_ERR_REPLY;
+				break;
+			}
 		} else {
-			// use internal module data 
 			if (!ISSET_FLAG(pd, PD_FLAG_INSTALL_MODE) && ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD)) {
 				pd->reply_id = REPLY_NAK;
 				pd->ephemeral_data[0] = OSDP_PD_NAK_SC_COND;
 				ret = OSDP_PD_ERR_REPLY;
 				break;
 			}
+			// use internal module data 
 			for (i = 0; i < CMD_CHLNG_DATA_LEN; i++) {
 				pd->sc.cp_random[i] = buf[pos++];
 			}
 		}
+		sc_deactivate(pd);
 		pd->reply_id = REPLY_CCRYPT;
 		ret = OSDP_PD_ERR_NONE;
 		break;
 	case CMD_SCRYPT:
-		if (len != CMD_SCRYPT_DATA_LEN || !pd->command_callback) {
+		if (len != CMD_SCRYPT_DATA_LEN) {
 			break;
 		}
 		if (!pd_cmd_cap_ok(pd, NULL)) {
@@ -717,19 +717,24 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			LOG_WRN("Out of order CMD_SCRYPT; has CP gone rogue?");
 			break;
 		}
-		cmd.id = OSDP_CMD_SCRYPT;
-		memcpy(cmd.scrypt.crypotogram, &buf[pos], 16U);
-		ret = pd->command_callback(pd->command_callback_arg, &cmd);
-		if (ret < 0) {
-			pd->reply_id = REPLY_NAK;
-			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
-			ret = OSDP_PD_ERR_REPLY;
-			break;
-		}
-		if (ret > 0) {
-			memcpy(pd->ephemeral_data, &cmd, sizeof(struct osdp_cmd));
+		
+		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+			if (!pd->command_callback) {
+				break;
+			}
+			cmd.id = OSDP_CMD_SCRYPT;
+			memcpy(cmd.scrypt.crypotogram, &buf[pos], CMD_SCRYPT_DATA_LEN);
+			ret = pd->command_callback(pd->command_callback_arg, &cmd);
+			if (ret > 0) {
+				memcpy(pd->ephemeral_data, &cmd, sizeof(struct osdp_cmd));
+			}
+			else {
+				pd->reply_id = REPLY_NAK;
+				pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
+				ret = OSDP_PD_ERR_REPLY;
+				break;
+			}
 		} else {
-			((struct osdp_cmd *)pd->ephemeral_data)->id = OSDP_CMD_SENTINEL;
 			for (i = 0; i < CMD_SCRYPT_DATA_LEN; i++) {
 				pd->sc.cp_cryptogram[i] = buf[pos++];
 			}
@@ -946,8 +951,8 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 		}
 		assert_len(REPLY_CCRYPT_LEN, max_len);
 		buf[len++] = pd->reply_id;
-		cmd = (struct osdp_cmd *)pd->ephemeral_data;
-		if (cmd->id == OSDP_CMD_CHLNG) {
+		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+			cmd = (struct osdp_cmd *)pd->ephemeral_data;
 			memcpy(&buf[len], cmd->data, 32U);			
 			len += 32U;
 		} else {
@@ -977,8 +982,8 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 		buf[len++] = pd->reply_id;
 		smb[0] = 3; /* length */
 		smb[1] = SCS_14; /* type */
-		cmd = (struct osdp_cmd *)pd->ephemeral_data;
-		if (cmd->id == OSDP_CMD_SCRYPT) {
+		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {			
+			cmd = (struct osdp_cmd *)pd->ephemeral_data;
 			memcpy(pd->sc.r_mac, cmd->data, 16U);
 			memcpy(pd->sc.s_mac1, cmd->data + 16U, 16U);
 			memcpy(pd->sc.s_mac2, cmd->data + 32U, 16U);
@@ -1280,8 +1285,7 @@ int osdp_setup(struct osdp *ctx, const struct osdp_cfg *cfg)
 			LOG_WRN("SCBK not provided. PD is in INSTALL_MODE");
 			SET_FLAG(pd, PD_FLAG_INSTALL_MODE);
 			SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);
-		} else {
-			
+		} else {			
 			memcpy(pd->sc.scbk, cfg->key, 16);
 		}
 		SET_FLAG(pd, PD_FLAG_SC_CAPABLE);
