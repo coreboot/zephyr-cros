@@ -606,9 +606,6 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 		ret = OSDP_PD_ERR_NONE;
 		break;
 	case CMD_KEYSET:
-		if (len != CMD_KEYSET_DATA_LEN) {
-			break;
-		}
 		if (!pd_cmd_cap_ok(pd, NULL)) {
 			ret = OSDP_PD_ERR_REPLY;
 			break;
@@ -623,15 +620,17 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			LOG_ERR("Keyset with SC inactive");
 			break;
 		}
-		/* only key_type == 1 (SCBK) and key_len == 16 is supported */
-		if (buf[pos] != 1 || buf[pos + 1] != 16) {
-			LOG_ERR("Keyset invalid len/type: %d/%d", buf[pos], buf[pos + 1]);
+		/* only key_type == 1 (SCBK) */
+		if (buf[pos] != 1 || buf[pos + 1] > OSDP_CMD_KEYSET_KEY_MAX_LEN) {
+			LOG_ERR("Keyset invalid type/len: %d/%d", buf[pos], buf[pos + 1]);
 			break;
 		}
+
 		cmd.id = OSDP_CMD_KEYSET;
 		cmd.keyset.type = buf[pos++];
 		cmd.keyset.length = buf[pos++];
-		memcpy(cmd.keyset.data, buf + pos, 16);
+		memcpy(cmd.keyset.data, buf + pos, cmd.keyset.length);
+
 		ret = OSDP_PD_ERR_NONE;
 		if (pd->command_callback) {
 			ret = pd->command_callback(pd->command_callback_arg, &cmd);
@@ -645,6 +644,15 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			ret = OSDP_PD_ERR_REPLY;
 			break;
 		}
+
+		// TODO: 
+		// 1. If App is keeping key than this module does not need the copy
+		// 2. key_len == 16 is supported by this module
+		// 3. Add install mode check here ... s
+		// pd->reply_id = REPLY_NAK;
+		// 			pd->ephemeral_data[0] = OSDP_PD_NAK_SC_COND;
+		// 			return OSDP_ERR_PKT_NACK;
+
 		memcpy(pd->sc.scbk, cmd.keyset.data, 16);
 		CLEAR_FLAG(pd, PD_FLAG_SC_USE_SCBKD);
 		CLEAR_FLAG(pd, PD_FLAG_INSTALL_MODE);
@@ -667,11 +675,7 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 		cmd.id = OSDP_CMD_CHLNG;
-		if (ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD)) {
-			cmd.chlng.key_type = 0;
-		} else {
-			cmd.chlng.key_type = 1;
-		}
+		cmd.chlng.key_type = ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD) ? 0 : 1;
 		memcpy(cmd.chlng.random_number, &buf[pos], 8U);
 		ret = pd->command_callback(pd->command_callback_arg, &cmd);
 		if (ret < 0) {
@@ -680,15 +684,18 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			ret = OSDP_PD_ERR_REPLY;
 			break;
 		}
-		// TODO: we should be unique if we want app / module to establish secure channel
 		sc_deactivate(pd);
 		if (ret > 0) {
 			// use data provided by app
-
 			memcpy(pd->ephemeral_data, &cmd, sizeof(struct osdp_cmd));
 		} else {
-			// use internal module data
-			((struct osdp_cmd *)pd->ephemeral_data)->id = OSDP_CMD_SENTINEL;
+			// use internal module data 
+			if (!ISSET_FLAG(pd, PD_FLAG_INSTALL_MODE) && ISSET_FLAG(pd, PD_FLAG_SC_USE_SCBKD)) {
+				pd->reply_id = REPLY_NAK;
+				pd->ephemeral_data[0] = OSDP_PD_NAK_SC_COND;
+				ret = OSDP_PD_ERR_REPLY;
+				break;
+			}
 			for (i = 0; i < CMD_CHLNG_DATA_LEN; i++) {
 				pd->sc.cp_random[i] = buf[pos++];
 			}
@@ -1272,7 +1279,7 @@ int osdp_setup(struct osdp *ctx, const struct osdp_cfg *cfg)
 		if (cfg->key == NULL) {			
 			LOG_WRN("SCBK not provided. PD is in INSTALL_MODE");
 			SET_FLAG(pd, PD_FLAG_INSTALL_MODE);
-			SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);			
+			SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);
 		} else {
 			
 			memcpy(pd->sc.scbk, cfg->key, 16);
