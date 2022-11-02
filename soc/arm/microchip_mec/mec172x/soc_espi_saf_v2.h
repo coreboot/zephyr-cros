@@ -13,9 +13,8 @@
 
 #include <stdint.h>
 #include <zephyr/sys/util.h>
-#include <soc.h>
 
-#define MCHP_SAF_MAX_FLASH_DEVICES 2U
+#define MCHP_SAF_MAX_FLASH_DEVICES		2U
 
 /*
  * SAF hardware state machine timings
@@ -25,59 +24,84 @@
  * consecutive read timeout is in AHB clock periods.
  * suspend check delay is in AHB clock(48MHz) periods.
  */
-#define MCHP_SAF_FLASH_POLL_TIMEOUT 0x28000U
-#define MCHP_SAF_FLASH_POLL_INTERVAL 0U
-#define MCHP_SAF_FLASH_SUS_RSM_INTERVAL 8U
-#define MCHP_SAF_FLASH_CONSEC_READ_TIMEOUT 2U
-#define MCHP_SAF_FLASH_SUS_CHK_DELAY 0U
+#define MCHP_SAF_FLASH_POLL_TIMEOUT		0x28000u
+#define MCHP_SAF_FLASH_POLL_INTERVAL		0u
+#define MCHP_SAF_FLASH_SUS_RSM_INTERVAL		8u
+#define MCHP_SAF_FLASH_CONSEC_READ_TIMEOUT	2u
+#define MCHP_SAF_FLASH_SUS_CHK_DELAY		0u
 
 /* Default SAF Map of eSPI TAG numbers to master numbers */
-#define MCHP_SAF_TAG_MAP0_DFLT 0x23221100
-#define MCHP_SAF_TAG_MAP1_DFLT 0x77677767
-#define MCHP_SAF_TAG_MAP2_DFLT 0x00000005
+#define MCHP_SAF_TAG_MAP0_DFLT			0x23221100u
+#define MCHP_SAF_TAG_MAP1_DFLT			0x77677767u
+#define MCHP_SAF_TAG_MAP2_DFLT			0x00000005u
 
 /*
  * Default QMSPI clock divider and chip select timing.
- * QMSPI master clock is 48MHz AHB clock.
+ * QMSPI master clock is either 96 or 48 MHz depending upon
+ * Boot-ROM OTP configuration.
  */
-#define MCHP_SAF_QMSPI_CLK_DIV 2U
-#define MCHP_SAF_QMSPI_CS_TIMING 0x03000101U
+#define MCHP_SAF_QMSPI_CLK_DIV			4u
+
+/* SAF V2 implements dynamically changing the QMSPI clock
+ * divider for SPI read vs all other SPI commands.
+ */
+#define MCHP_SAF_CS_CLK_DIV(read, other)	\
+	(((uint32_t)(read) & 0xffffu) | (((uint32_t)(other) & 0xffffu) << 16))
+
+#define MCHP_SAF_CS0_CLK_DIV MCHP_SAF_CS_CLK_DIV(4, 4)
+#define MCHP_SAF_CS1_CLK_DIV MCHP_SAF_CS_CLK_DIV(4, 4)
+
+#define MCHP_SAF_QMSPI_CS_TIMING		0x03000101u
 
 /* SAF QMSPI programming */
 
-#define MCHP_SAF_QMSPI_NUM_FLASH_DESCR 6U
-#define MCHP_SAF_QMSPI_CS0_START_DESCR 0U
-#define MCHP_SAF_QMSPI_CS1_START_DESCR \
+#define MCHP_SAF_QMSPI_NUM_FLASH_DESCR		6u
+#define MCHP_SAF_QMSPI_CS0_START_DESCR		0u
+#define MCHP_SAF_QMSPI_CS1_START_DESCR		\
 	(MCHP_SAF_QMSPI_CS0_START_DESCR + MCHP_SAF_QMSPI_NUM_FLASH_DESCR)
 
 /* SAF engine requires start indices of descriptor chains */
-#define MCHP_SAF_CM_EXIT_START_DESCR  12U
-#define MCHP_SAF_CM_EXIT_LAST_DESCR   13U
-#define MCHP_SAF_POLL_STS_START_DESCR 14U
-#define MCHP_SAF_POLL_STS_END_DESCR   15U
-#define MCHP_SAF_NUM_GENERIC_DESCR    4U
+#define MCHP_SAF_CM_EXIT_START_DESCR		12u
+#define MCHP_SAF_CM_EXIT_LAST_DESCR		13u
+#define MCHP_SAF_POLL_STS_START_DESCR		14u
+#define MCHP_SAF_POLL_STS_END_DESCR		15u
+#define MCHP_SAF_NUM_GENERIC_DESCR		4u
 
 /* QMSPI descriptors 12-15 for all SPI flash devices */
-/* #define SAF_QMSPI_DESCR12 0x0002D40E */
 
-/*
- * QMSPI descriptors 12-13 are exit continuous mode
- */
+/* QMSPI descriptors 12-13 are exit continuous mode */
 #define MCHP_SAF_EXIT_CM_DESCR12 \
-		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_ONES | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE | \
-		 MCHP_QMSPI_C_XFR_UNITS_1 | \
-		 MCHP_QMSPI_C_NEXT_DESCR(13) | \
+		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_ONES |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_NEXT_DESCR(13) |				\
 		 MCHP_QMSPI_C_XFR_NUNITS(1))
 
-#define MCHP_SAF_EXIT_CM_DESCR13 \
-		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE | \
-		 MCHP_QMSPI_C_XFR_UNITS_1 | \
-		 MCHP_QMSPI_C_NEXT_DESCR(0) | \
-		 MCHP_QMSPI_C_XFR_NUNITS(9) | \
+#define MCHP_SAF_EXIT_CM_DESCR13					\
+		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN |		\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE |		\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_NEXT_DESCR(0) |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(9) |				\
+		 MCHP_QMSPI_C_DESCR_LAST)
+
+#define MCHP_SAF_EXIT_CM_DUAL_DESCR12 \
+		(MCHP_QMSPI_C_IFM_2X | MCHP_QMSPI_C_TX_ONES |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_NEXT_DESCR(13) |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(1))
+
+#define MCHP_SAF_EXIT_CM_DUAL_DESCR13					\
+		(MCHP_QMSPI_C_IFM_2X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN |		\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE |		\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_NEXT_DESCR(0) |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(5) |				\
 		 MCHP_QMSPI_C_DESCR_LAST)
 
 /*
@@ -85,28 +109,28 @@
  * Transmit one byte opcode at 1X (no DMA).
  * Receive two bytes at 1X (no DMA).
  */
-#define MCHP_SAF_POLL_DESCR14 \
-		(MCHP_QMSPI_C_IFM_1X | MCHP_QMSPI_C_TX_DATA | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE | \
-		 MCHP_QMSPI_C_XFR_UNITS_1 | \
-		 MCHP_QMSPI_C_NEXT_DESCR(15) | \
+#define MCHP_SAF_POLL_DESCR14						\
+		(MCHP_QMSPI_C_IFM_1X | MCHP_QMSPI_C_TX_DATA |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_NEXT_DESCR(15) |				\
 		 MCHP_QMSPI_C_XFR_NUNITS(1))
 
-#define MCHP_SAF_POLL_DESCR15 \
-		(MCHP_QMSPI_C_IFM_1X | MCHP_QMSPI_C_TX_DIS | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE | \
-		 MCHP_QMSPI_C_XFR_UNITS_1 | \
-		 MCHP_QMSPI_C_NEXT_DESCR(0) | \
-		 MCHP_QMSPI_C_XFR_NUNITS(2) | \
+#define MCHP_SAF_POLL_DESCR15						\
+		(MCHP_QMSPI_C_IFM_1X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN |		\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE |		\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_NEXT_DESCR(0) |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(2) |				\
 		 MCHP_QMSPI_C_DESCR_LAST)
 
 
 /* SAF Pre-fetch optimization mode */
 #define MCHP_SAF_PREFETCH_MODE MCHP_SAF_FL_CFG_MISC_PFOE_DFLT
 
-#define MCHP_SAF_CFG_MISC_PREFETCH_EXPEDITED 0x03U
+#define MCHP_SAF_CFG_MISC_PREFETCH_EXPEDITED	0x03U
 
 /*
  * SAF Opcode 32-bit register value.
@@ -129,8 +153,8 @@
  *	op2 = SPI flash op0 mode byte value for continuous mode
  *	op3 = SPI flash read STATUS2 opcode
  */
-#define MCHP_SAF_OPCODE_REG_VAL(op0, op1, op2, op3) \
-	(((uint32_t)(op0)&0xffU) | (((uint32_t)(op1)&0xffU) << 8) | \
+#define MCHP_SAF_OPCODE_REG_VAL(op0, op1, op2, op3)			\
+	(((uint32_t)(op0)&0xffU) | (((uint32_t)(op1)&0xffU) << 8) |	\
 	 (((uint32_t)(op2)&0xffU) << 16) | (((uint32_t)(op3)&0xffU) << 24))
 
 /*
@@ -140,8 +164,9 @@
  * s = Index of QMSPI descriptor in continuous mode read chain that
  *     contains the data length field.
  */
-#define MCHP_SAF_CS_CFG_DESCR_IDX_REG_VAL(e, r, s) (((uint32_t)(e)&0xfU) | \
-	(((uint32_t)(r)&0xfU) << 8) | (((uint32_t)(s)&0xfU) << 12))
+#define MCHP_SAF_CS_CFG_DESCR_IDX_REG_VAL(e, r, s)			\
+	(((uint32_t)(e)&0xfU) | (((uint32_t)(r)&0xfU) << 8) |		\
+		(((uint32_t)(s)&0xfU) << 12))
 
 /* W25Q128 SPI flash device connected size in bytes */
 #define MCHP_W25Q128_SIZE (16U * 1024U * 1024U)
@@ -151,55 +176,98 @@
  * Example: W25Q128
  */
 /* Continuous mode read: transmit-quad 24-bit address and mode byte */
-#define MCHP_W25Q128_CM_RD_D0 \
-		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DATA | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE | \
+#define MCHP_W25Q128_CM_RD_D0						\
+		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DATA |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
 		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(4))
 
 /* Continuous mode read: transmit-quad 4 dummy clocks with I/O tri-stated */
-#define MCHP_W25Q128_CM_RD_D1 \
-		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE | \
+#define MCHP_W25Q128_CM_RD_D1						\
+		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
 		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(2))
 
 /* Continuous mode read: read N bytes */
-#define MCHP_W25Q128_CM_RD_D2 \
-		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN | \
-		 MCHP_QMSPI_C_RX_DMA_4B | MCHP_QMSPI_C_CLOSE | \
-		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(0) | \
-		 MCHP_QMSPI_C_DESCR_LAST)
+#define MCHP_W25Q128_CM_RD_D2						\
+		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN |		\
+		 MCHP_QMSPI_C_RX_LDMA_CH0 | MCHP_QMSPI_C_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(0) | MCHP_QMSPI_C_DESCR_LAST)
+
+/* Continuous Mode: 24-bit address plus mode byte */
+#define MCHP_W25Q128_CM_RD_DUAL_D0					\
+		(MCHP_QMSPI_C_IFM_2X | MCHP_QMSPI_C_TX_DATA |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(4))
+
+/* Continuous mode read: read N bytes */
+#define MCHP_W25Q128_CM_RD_DUAL_D1					\
+		(MCHP_QMSPI_C_IFM_2X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN |		\
+		 MCHP_QMSPI_C_RX_LDMA_CH0 | MCHP_QMSPI_C_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(0) | MCHP_QMSPI_C_DESCR_LAST)
+
+/* Continuous mode Dual D2. Not used */
+#define MCHP_W25Q128_CM_RD_DUAL_D2					0
 
 /* Enter Continuous mode: transmit-single CM quad read opcode */
-#define MCHP_W25Q128_ENTER_CM_D0 \
-		(MCHP_QMSPI_C_IFM_1X | MCHP_QMSPI_C_TX_DATA | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE | \
+#define MCHP_W25Q128_ENTER_CM_D0					\
+		(MCHP_QMSPI_C_IFM_1X | MCHP_QMSPI_C_TX_DATA |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
 		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(1))
 
 /* Enter Continuous mode: transmit-quad 24-bit address and mode byte  */
-#define MCHP_W25Q128_ENTER_CM_D1 \
-		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DATA | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE | \
+#define MCHP_W25Q128_ENTER_CM_D1					\
+		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DATA |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
 		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(4))
 
 /* Enter Continuous mode: read-quad 3 bytes */
-#define MCHP_W25Q128_ENTER_CM_D2 \
-		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS | \
-		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS | \
-		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE | \
-		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(3) | \
-		 MCHP_QMSPI_C_DESCR_LAST)
+#define MCHP_W25Q128_ENTER_CM_D2					\
+		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE |		\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(3) | MCHP_QMSPI_C_DESCR_LAST)
 
-#define MCHP_W25Q128_OPA MCHP_SAF_OPCODE_REG_VAL(0x06U, 0x75U, 0x7aU, 0x05U)
-#define MCHP_W25Q128_OPB MCHP_SAF_OPCODE_REG_VAL(0x20U, 0x52U, 0xd8U, 0x02U)
-#define MCHP_W25Q128_OPC MCHP_SAF_OPCODE_REG_VAL(0xebU, 0xffU, 0xa5U, 0x35U)
+/* Enter Continuous mode: transmit-single CM dual read opcode */
+#define MCHP_W25Q128_ENTER_CM_DUAL_D0					\
+		(MCHP_QMSPI_C_IFM_1X | MCHP_QMSPI_C_TX_DATA |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(1))
+
+/* Enter Continuous mode: transmit-dual 24-bit address and mode byte  */
+#define MCHP_W25Q128_ENTER_CM_DUAL_D1					\
+		(MCHP_QMSPI_C_IFM_2X | MCHP_QMSPI_C_TX_DATA |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_NO_CLOSE |	\
+		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(4))
+
+/* Enter Continuous mode: read-dual 3 bytes */
+#define MCHP_W25Q128_ENTER_CM_DUAL_D2					\
+		(MCHP_QMSPI_C_IFM_2X | MCHP_QMSPI_C_TX_DIS |		\
+		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_DIS |	\
+		 MCHP_QMSPI_C_RX_DMA_DIS | MCHP_QMSPI_C_CLOSE |		\
+		 MCHP_QMSPI_C_XFR_UNITS_1 |				\
+		 MCHP_QMSPI_C_XFR_NUNITS(3) | MCHP_QMSPI_C_DESCR_LAST)
+
+#define MCHP_W25Q128_OPA MCHP_SAF_OPCODE_REG_VAL(0x06u, 0x75u, 0x7au, 0x05u)
+#define MCHP_W25Q128_OPB MCHP_SAF_OPCODE_REG_VAL(0x20u, 0x52u, 0xd8u, 0x02u)
+#define MCHP_W25Q128_OPC MCHP_SAF_OPCODE_REG_VAL(0xebu, 0xffu, 0xa5u, 0x35u)
+#define MCHP_W25Q128_OPD MCHP_SAF_OPCODE_REG_VAL(0xb9u, 0xabu, 0u, 0u)
+
+#define MCHP_W25Q128_DUAL_OPC MCHP_SAF_OPCODE_REG_VAL(0xbbu, 0xffu, 0xa5u, 0x35u)
 
 /* W25Q128 STATUS2 bit[7] == 0 part is NOT in suspend state */
-#define MCHP_W25Q128_POLL2_MASK 0xff7fU
+#define MCHP_W25Q128_POLL2_MASK			0xff7fU
 
 /*
  * SAF Flash Continuous Mode Prefix register value
@@ -210,9 +278,20 @@
  * A zero value means the SPI flash does not require a prefix
  * command.
  */
-#define MCHP_W25Q128_CONT_MODE_PREFIX_VAL 0U
+#define MCHP_W25Q128_CONT_MODE_PREFIX_VAL	0u
 
-#define MCHP_W25Q128_FLAGS 0U
+/* SAF Flash power down/up activity timeout in 32KHz units */
+#define MCHP_W25Q128_PD_TIMEOUT_32K		0x10u
+
+/* SAF Flash minimum time between power up and down events in
+ * 48MHz time units (~20 ns)
+ */
+#define MCHP_W25Q128_PD_EVENT_INTERVAL		0x4ffu
+
+#define MCHP_SAF_PD_EVENT_INTERVAL_25US		1279u
+
+
+#define MCHP_W25Q128_FLAGS			0U
 
 
 /* W25Q256 SPI flash device connected size in bytes */
@@ -239,7 +318,7 @@
 #define MCHP_W25Q256_CM_RD_D2 \
 		(MCHP_QMSPI_C_IFM_4X | MCHP_QMSPI_C_TX_DIS | \
 		 MCHP_QMSPI_C_TX_DMA_DIS | MCHP_QMSPI_C_RX_EN | \
-		 MCHP_QMSPI_C_RX_DMA_4B | MCHP_QMSPI_C_CLOSE | \
+		 MCHP_QMSPI_C_RX_LDMA_CH0 | MCHP_QMSPI_C_CLOSE | \
 		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(0) | \
 		 MCHP_QMSPI_C_DESCR_LAST)
 
@@ -265,9 +344,10 @@
 		 MCHP_QMSPI_C_XFR_UNITS_1 | MCHP_QMSPI_C_XFR_NUNITS(3) | \
 		 MCHP_QMSPI_C_DESCR_LAST)
 
-#define MCHP_W25Q256_OPA SAF_OPCODE_REG_VAL(0x06U, 0x75U, 0x7aU, 0x05U)
-#define MCHP_W25Q256_OPB SAF_OPCODE_REG_VAL(0x20U, 0x52U, 0xd8U, 0x02U)
-#define MCHP_W25Q256_OPC SAF_OPCODE_REG_VAL(0xebU, 0xffU, 0xa5U, 0x35U)
+#define MCHP_W25Q256_OPA MCHP_SAF_OPCODE_REG_VAL(0x06U, 0x75U, 0x7aU, 0x05U)
+#define MCHP_W25Q256_OPB MCHP_SAF_OPCODE_REG_VAL(0x20U, 0x52U, 0xd8U, 0x02U)
+#define MCHP_W25Q256_OPC MCHP_SAF_OPCODE_REG_VAL(0xebU, 0xffU, 0xa5U, 0x35U)
+#define MCHP_W25Q256_OPD MCHP_SAF_OPCODE_REG_VAL(0xb9U, 0xabU, 0U, 0U)
 
 #define MCHP_W25Q256_POLL2_MASK 0xff7fU
 
@@ -279,9 +359,15 @@
 #define MCHP_CS0_CFG_DESCR_IDX_REG_VAL \
 		MCHP_SAF_CS_CFG_DESCR_IDX_REG_VAL(3U, 0U, 2U)
 
+#define MCHP_CS0_CFG_DESCR_IDX_REG_VAL_DUAL \
+		MCHP_SAF_CS_CFG_DESCR_IDX_REG_VAL(3U, 0U, 1U)
+
 /* SAF Flash Config CS1 QMSPI descriptor indices */
 #define MCHP_CS1_CFG_DESCR_IDX_REG_VAL \
 		MCHP_SAF_CS_CFG_DESCR_IDX_REG_VAL(9U, 6U, 8U)
+
+#define MCHP_CS1_CFG_DESCR_IDX_REG_VAL_DUAL \
+		MCHP_SAF_CS_CFG_DESCR_IDX_REG_VAL(9U, 6U, 7U)
 
 #define MCHP_SAF_HW_CFG_FLAG_FREQ 0x01U
 #define MCHP_SAF_HW_CFG_FLAG_CSTM 0x02U
@@ -298,42 +384,65 @@
  */
 #define MCHP_SAF_HW_CFG_TAGMAP_USE BIT(31)
 
+#define MCHP_SAF_VER_1			0
+#define MCHP_SAF_VER_2			1
+
 struct espi_saf_hw_cfg {
-	uint32_t qmspi_freq_hz;
-	uint32_t qmspi_cs_timing;
-	uint8_t  qmspi_cpha;
+	uint8_t  version;
 	uint8_t  flags;
+	uint8_t  rsvd1;
+	uint8_t  qmspi_cpha;
+	uint32_t qmspi_cs_timing;
+	uint16_t flash_pd_timeout;
+	uint16_t flash_pd_min_interval;
 	uint32_t generic_descr[MCHP_SAF_NUM_GENERIC_DESCR];
 	uint32_t tag_map[MCHP_ESPI_SAF_TAGMAP_MAX];
 };
 
 /*
  * SAF local flash configuration.
+ * Version: 0 = V1, 1 = V2(this version)
+ * miscellaneous configuration flags
  * SPI flash device size in bytes
  * SPI opcodes for SAF Opcode A register
  * SPI opcodes for SAF Opcode B register
  * SPI opcodes for SAF Opcode C register
- * QMSPI descriptors describing SPI opcode transmit and
- * data read.
- * SAF controller Poll2 Mast value specific for this flash device
+ * SPI opcodes for SAF Opcode D register: power down/up and
+ *     RPMC continuous mode read
+ * SAF controller Poll2 Mask value specific for this flash device
  * SAF continuous mode prefix register value for those flashes requiring
  * a prefix byte transmitted before the enter continuous mode command.
  * Start QMSPI descriptor numbers.
- * miscellaneous flags.
+ * Power down timeout count in units of 32 KHz ticks.
+ * Minimum interval between power down/up commands in 48 MHz units.
+ * QMSPI descriptors describing SPI opcode transmit and data read.
  */
 
 /* Flags */
-#define MCHP_FLASH_FLAG_ADDR32 BIT(0)
+#define MCHP_FLASH_FLAG_ADDR32			BIT(0)
+#define MCHP_FLASH_FLAG_V1_MSK			0xffu
+#define MCHP_FLASH_FLAG_V2_MSK			0xff00u
+#define MCHP_FLASH_FLAG_V2_PD_CS0_EN		BIT(8)
+#define MCHP_FLASH_FLAG_V2_PD_CS1_EN		BIT(9)
+#define MCHP_FLASH_FLAG_V2_PD_CS0_EC_WK_EN	BIT(10)
+#define MCHP_FLASH_FLAG_V2_PD_CS1_EC_WK_EN	BIT(11)
 
 struct espi_saf_flash_cfg {
+	uint8_t  version;
+	uint8_t  rsvd1;
+	uint16_t flags;
 	uint32_t flashsz;
+	uint8_t  rd_freq_mhz;
+	uint8_t  freq_mhz;
+	uint8_t  rsvd2[2];
 	uint32_t opa;
 	uint32_t opb;
 	uint32_t opc;
+	uint32_t opd;
 	uint16_t poll2_mask;
 	uint16_t cont_prefix;
 	uint16_t cs_cfg_descr_ids;
-	uint16_t flags;
+	uint16_t rsvd3;
 	uint32_t descr[MCHP_SAF_QMSPI_NUM_FLASH_DESCR];
 };
 
@@ -344,7 +453,7 @@ struct espi_saf_flash_cfg {
  * SPI start address. 20-bits = bits[31:12] of SPI address
  * SPI limit address. 20-bits = bits[31:12] of last SPI address
  * 8-bit bit map of eSPI master write-erase permission
- * 8-bit bit map of eSPI master read permission
+ * 8-bit bit map of eSPI maste read permission
  * eSPI master numbers 0 - 7 correspond to bits 0 - 7.
  *
  * Protection region lock:
