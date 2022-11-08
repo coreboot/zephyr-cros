@@ -92,6 +92,7 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
 #define LOG_MODULE_NAME bt_ctlr_hci
 #include "common/log.h"
+#include "common/bt_str.h"
 #include "hal/debug.h"
 
 #define STR_NULL_TERMINATOR 0x00
@@ -4096,14 +4097,6 @@ static void le_cis_request(struct pdu_data *pdu_data,
 	struct node_rx_conn_iso_req *req;
 	void *node;
 
-	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
-	    !(le_event_mask & BT_EVT_MASK_LE_CIS_REQ)) {
-		return;
-	}
-
-	sep = meta_evt(buf, BT_HCI_EVT_LE_CIS_REQ, sizeof(*sep));
-	sep->acl_handle = sys_cpu_to_le16(node_rx->hdr.handle);
-
 	/* Check for pdu field being aligned before accessing CIS established
 	 * event.
 	 */
@@ -4111,6 +4104,15 @@ static void le_cis_request(struct pdu_data *pdu_data,
 	LL_ASSERT(IS_PTR_ALIGNED(node, struct node_rx_conn_iso_estab));
 
 	req = node;
+	if (!(ll_feat_get() & BIT64(BT_LE_FEAT_BIT_ISO_CHANNELS)) ||
+	    !(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CIS_REQ)) {
+		ll_cis_reject(req->cis_handle, BT_HCI_ERR_UNSUPP_REMOTE_FEATURE);
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CIS_REQ, sizeof(*sep));
+	sep->acl_handle = sys_cpu_to_le16(node_rx->hdr.handle);
 	sep->cis_handle = sys_cpu_to_le16(req->cis_handle);
 	sep->cig_id = req->cig_id;
 	sep->cis_id = req->cis_id;

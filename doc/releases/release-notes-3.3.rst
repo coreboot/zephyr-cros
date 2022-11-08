@@ -249,6 +249,11 @@ Drivers and Sensors
 Networking
 **********
 
+IPv4 packet fragmentation support has been added, this allows large packets to
+be split up before sending or reassembled during receive for packets that are
+larger than the network device MTU. This is disabled by default but can be
+enabled with :kconfig:option:`CONFIG_NET_IPV4_FRAGMENT`.
+
 USB
 ***
 
@@ -279,6 +284,9 @@ Libraries / Subsystems
   * A MCUmgr issue with Bluetooth transport that could cause a deadlock of the
     mcumgr thread if the remote device disconnected before the output message
     was sent has been fixed.
+  * A MCUmgr img_mgmt bug whereby the state of an image upload could persist
+    when it was no longer valid (e.g. after an image erase command) has been
+    fixed.
 
 * LwM2M
 

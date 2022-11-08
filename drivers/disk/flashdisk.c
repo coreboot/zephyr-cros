@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(flashdisk, CONFIG_FLASHDISK_LOG_LEVEL);
 
 struct flashdisk_data {
 	struct disk_info info;
+	struct k_mutex lock;
 	const unsigned int area_id;
 	const off_t offset;
 	uint8_t *const cache;
@@ -28,11 +29,10 @@ struct flashdisk_data {
 	const size_t size;
 	const size_t sector_size;
 	size_t page_size;
+	off_t cached_addr;
+	bool cache_valid;
+	bool cache_dirty;
 };
-
-/* calculate number of blocks required for a given size */
-#define GET_NUM_BLOCK(total_size, block_size) \
-	((total_size + block_size - 1) / block_size)
 
 #define GET_SIZE_TO_BOUNDARY(start, block_size) \
 	(block_size - (start & (block_size - 1)))
@@ -62,13 +62,14 @@ static int disk_flash_access_init(struct disk_info *disk)
 		return rc;
 	}
 
+	k_mutex_lock(&ctx->lock, K_FOREVER);
+
 	disk->dev = flash_area_get_device(fap);
 
 	rc = flash_get_page_info_by_offs(disk->dev, ctx->offset, &page);
 	if (rc < 0) {
 		LOG_ERR("Error %d while getting page info", rc);
-		flash_area_close(fap);
-		return rc;
+		goto end;
 	}
 
 	ctx->page_size = page.size;
@@ -79,11 +80,23 @@ static int disk_flash_access_init(struct disk_info *disk)
 	if (ctx->page_size > ctx->cache_size) {
 		LOG_ERR("Cache too small (%zu needs %zu)",
 			ctx->cache_size, ctx->page_size);
-		flash_area_close(fap);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto end;
 	}
 
-	return 0;
+	if (ctx->cache_valid && ctx->cache_dirty) {
+		LOG_ERR("Discarding %s dirty cache", disk->name);
+		ctx->cache_valid = false;
+	}
+
+	rc = 0;
+end:
+	if (rc < 0) {
+		flash_area_close(fap);
+	}
+	k_mutex_unlock(&ctx->lock);
+
+	return rc;
 }
 
 static bool sectors_in_range(struct flashdisk_data *ctx,
@@ -109,8 +122,9 @@ static int disk_flash_access_read(struct disk_info *disk, uint8_t *buff,
 	struct flashdisk_data *ctx;
 	off_t fl_addr;
 	uint32_t remaining;
+	uint32_t offset;
 	uint32_t len;
-	uint32_t num_read;
+	int rc = 0;
 
 	ctx = CONTAINER_OF(disk, struct flashdisk_data, info);
 
@@ -120,100 +134,109 @@ static int disk_flash_access_read(struct disk_info *disk, uint8_t *buff,
 
 	fl_addr = ctx->offset + start_sector * ctx->sector_size;
 	remaining = (sector_count * ctx->sector_size);
-	len = ctx->page_size;
-	num_read = GET_NUM_BLOCK(remaining, ctx->page_size);
 
-	for (uint32_t i = 0; i < num_read; i++) {
-		if (remaining < ctx->page_size) {
+	k_mutex_lock(&ctx->lock, K_FOREVER);
+
+	/* Operate on page addresses to easily check for cached data */
+	offset = fl_addr & (ctx->page_size - 1);
+	fl_addr = ROUND_DOWN(fl_addr, ctx->page_size);
+
+	/* Read up to page boundary on first iteration */
+	len = ctx->page_size - offset;
+	while (remaining) {
+		if (remaining < len) {
 			len = remaining;
 		}
 
-		if (flash_read(disk->dev, fl_addr, buff, len) < 0) {
-			return -EIO;
+		if (ctx->cache_valid && ctx->cached_addr == fl_addr) {
+			memcpy(buff, &ctx->cache[offset], len);
+		} else if (flash_read(disk->dev, fl_addr + offset, buff, len) < 0) {
+			rc = -EIO;
+			goto end;
 		}
 
-		fl_addr += len;
-		buff += len;
+		fl_addr += ctx->page_size;
 		remaining -= len;
+		buff += len;
+
+		/* Try to read whole page on next iteration */
+		len = ctx->page_size;
+		offset = 0;
 	}
 
-	return 0;
+end:
+	k_mutex_unlock(&ctx->lock);
+
+	return rc;
 }
 
-/* This performs read-copy into an output buffer */
-static int read_copy_flash_block(struct disk_info *disk,
-				 off_t start_addr,
-				 uint32_t size,
-				 const void *src_buff,
-				 uint8_t *dest_buff)
+static int flashdisk_cache_commit(struct flashdisk_data *ctx)
 {
-	struct flashdisk_data *ctx;
-	off_t fl_addr;
-	uint32_t offset;
-	uint32_t remaining;
-
-	ctx = CONTAINER_OF(disk, struct flashdisk_data, info);
-
-	/* adjust offset if starting address is not erase-aligned address */
-	offset = start_addr & (ctx->page_size - 1);
-
-	/* align starting address to page boundary */
-	fl_addr = ROUND_DOWN(start_addr, ctx->page_size);
-
-	if (offset > 0) {
-		/* read page contents prior to user data */
-		if (flash_read(disk->dev, fl_addr, dest_buff, offset) < 0) {
-			return -EIO;
-		}
+	if (!ctx->cache_valid || !ctx->cache_dirty) {
+		/* Either no cached data or cache matches flash data */
+		return 0;
 	}
 
-	/* write user data in page buffer */
-	memcpy(dest_buff + offset, src_buff, size);
-
-	remaining = ctx->page_size - (offset + size);
-	if (remaining) {
-		/* read page contents after user data */
-		if (flash_read(disk->dev, start_addr + size,
-				&dest_buff[offset + size], remaining) < 0) {
-			return -EIO;
-		}
-	}
-
-	return 0;
-}
-
-static int overwrite_flash_block(struct disk_info *disk, off_t fl_addr,
-				 const void *buff)
-{
-	struct flashdisk_data *ctx;
-
-	ctx = CONTAINER_OF(disk, struct flashdisk_data, info);
-
-	if (flash_erase(disk->dev, fl_addr, ctx->page_size) < 0) {
+	if (flash_erase(ctx->info.dev, ctx->cached_addr, ctx->page_size) < 0) {
 		return -EIO;
 	}
 
 	/* write data to flash */
-	if (flash_write(disk->dev, fl_addr, buff, ctx->page_size) < 0) {
+	if (flash_write(ctx->info.dev, ctx->cached_addr, ctx->cache, ctx->page_size) < 0) {
 		return -EIO;
 	}
 
+	ctx->cache_dirty = false;
 	return 0;
+}
+
+static int flashdisk_cache_load(struct flashdisk_data *ctx, off_t fl_addr)
+{
+	int rc;
+
+	__ASSERT_NO_MSG((fl_addr & (ctx->page_size - 1)) == 0);
+
+	if (ctx->cache_valid) {
+		if (ctx->cached_addr == fl_addr) {
+			/* Page is already cached */
+			return 0;
+		}
+		/* Different page is in cache, commit it first */
+		rc = flashdisk_cache_commit(ctx);
+		if (rc < 0) {
+			/* Failed to commit dirty page, abort */
+			return rc;
+		}
+	}
+
+	/* Load page into cache */
+	ctx->cache_valid = false;
+	ctx->cache_dirty = false;
+	ctx->cached_addr = fl_addr;
+	rc = flash_read(ctx->info.dev, fl_addr, ctx->cache, ctx->page_size);
+	if (rc == 0) {
+		/* Successfully loaded into cache, mark as valid */
+		ctx->cache_valid = true;
+		return 0;
+	}
+
+	return -EIO;
 }
 
 /* input size is either less or equal to a block size (ctx->page_size)
  * and write data never spans across adjacent blocks.
  */
-static int update_flash_block(struct disk_info *disk, off_t start_addr,
-			      uint32_t size, const void *buff)
+static int flashdisk_cache_write(struct flashdisk_data *ctx, off_t start_addr,
+				uint32_t size, const void *buff)
 {
-	struct flashdisk_data *ctx;
-	off_t fl_addr;
 	int rc;
+	off_t fl_addr;
+	uint32_t offset;
 
-	ctx = CONTAINER_OF(disk, struct flashdisk_data, info);
+	/* adjust offset if starting address is not erase-aligned address */
+	offset = start_addr & (ctx->page_size - 1);
 
-	/* always align starting address for flash write operation */
+	/* always align starting address for flash cache operations */
 	fl_addr = ROUND_DOWN(start_addr, ctx->page_size);
 
 	/* when writing full page the address must be page aligned
@@ -221,17 +244,21 @@ static int update_flash_block(struct disk_info *disk, off_t start_addr,
 	 */
 	__ASSERT_NO_MSG(fl_addr + ctx->page_size >= start_addr + size);
 
-	if (size == ctx->page_size) {
-		rc = overwrite_flash_block(disk, fl_addr, buff);
-	} else {
-		/* partial block, perform read-copy with user data */
-		rc = read_copy_flash_block(disk, start_addr, size, buff, ctx->cache);
-		if (rc == 0) {
-			rc = overwrite_flash_block(disk, fl_addr, ctx->cache);
-		}
+	rc = flashdisk_cache_load(ctx, fl_addr);
+	if (rc < 0) {
+		return rc;
 	}
 
-	return rc == 0 ? 0 : -EIO;
+	/* Do not mark cache as dirty if data to be written matches cache.
+	 * If cache is already dirty, copy data to cache without compare.
+	 */
+	if (ctx->cache_dirty || memcmp(&ctx->cache[offset], buff, size)) {
+		/* Update cache and mark it as dirty */
+		memcpy(&ctx->cache[offset], buff, size);
+		ctx->cache_dirty = true;
+	}
+
+	return 0;
 }
 
 static int disk_flash_access_write(struct disk_info *disk, const uint8_t *buff,
@@ -241,6 +268,7 @@ static int disk_flash_access_write(struct disk_info *disk, const uint8_t *buff,
 	off_t fl_addr;
 	uint32_t remaining;
 	uint32_t size;
+	int rc = 0;
 
 	ctx = CONTAINER_OF(disk, struct flashdisk_data, info);
 
@@ -250,6 +278,8 @@ static int disk_flash_access_write(struct disk_info *disk, const uint8_t *buff,
 
 	fl_addr = ctx->offset + start_sector * ctx->sector_size;
 	remaining = (sector_count * ctx->sector_size);
+
+	k_mutex_lock(&ctx->lock, K_FOREVER);
 
 	/* check if start address is erased-aligned address  */
 	if (fl_addr & (ctx->page_size - 1)) {
@@ -261,18 +291,19 @@ static int disk_flash_access_write(struct disk_info *disk, const uint8_t *buff,
 		block_bnd = block_bnd & ~(ctx->page_size - 1);
 		if ((fl_addr + remaining) <= block_bnd) {
 			/* not over block boundary (a partial block also) */
-			if (update_flash_block(disk, fl_addr, remaining, buff) < 0) {
-				return -EIO;
+			if (flashdisk_cache_write(ctx, fl_addr, remaining, buff) < 0) {
+				rc = -EIO;
 			}
-			return 0;
+			goto end;
 		}
 
 		/* write goes over block boundary */
 		size = GET_SIZE_TO_BOUNDARY(fl_addr, ctx->page_size);
 
 		/* write first partial block */
-		if (update_flash_block(disk, fl_addr, size, buff) < 0) {
-			return -EIO;
+		if (flashdisk_cache_write(ctx, fl_addr, size, buff) < 0) {
+			rc = -EIO;
+			goto end;
 		}
 
 		fl_addr += size;
@@ -286,8 +317,9 @@ static int disk_flash_access_write(struct disk_info *disk, const uint8_t *buff,
 			break;
 		}
 
-		if (update_flash_block(disk, fl_addr, ctx->page_size, buff) < 0) {
-			return -EIO;
+		if (flashdisk_cache_write(ctx, fl_addr, ctx->page_size, buff) < 0) {
+			rc = -EIO;
+			goto end;
 		}
 
 		fl_addr += ctx->page_size;
@@ -297,23 +329,31 @@ static int disk_flash_access_write(struct disk_info *disk, const uint8_t *buff,
 
 	/* remaining partial block */
 	if (remaining) {
-		if (update_flash_block(disk, fl_addr, remaining, buff) < 0) {
-			return -EIO;
+		if (flashdisk_cache_write(ctx, fl_addr, remaining, buff) < 0) {
+			rc = -EIO;
+			goto end;
 		}
 	}
+
+end:
+	k_mutex_unlock(&ctx->lock);
 
 	return 0;
 }
 
 static int disk_flash_access_ioctl(struct disk_info *disk, uint8_t cmd, void *buff)
 {
+	int rc;
 	struct flashdisk_data *ctx;
 
 	ctx = CONTAINER_OF(disk, struct flashdisk_data, info);
 
 	switch (cmd) {
 	case DISK_IOCTL_CTRL_SYNC:
-		return 0;
+		k_mutex_lock(&ctx->lock, K_FOREVER);
+		rc = flashdisk_cache_commit(ctx);
+		k_mutex_unlock(&ctx->lock);
+		return rc;
 	case DISK_IOCTL_GET_SECTOR_COUNT:
 		*(uint32_t *)buff = ctx->size / ctx->sector_size;
 		return 0;
@@ -321,7 +361,9 @@ static int disk_flash_access_ioctl(struct disk_info *disk, uint8_t cmd, void *bu
 		*(uint32_t *)buff = ctx->sector_size;
 		return 0;
 	case DISK_IOCTL_GET_ERASE_BLOCK_SZ: /* in sectors */
+		k_mutex_lock(&ctx->lock, K_FOREVER);
 		*(uint32_t *)buff = ctx->page_size / ctx->sector_size;
+		k_mutex_unlock(&ctx->lock);
 		return 0;
 	default:
 		break;
@@ -377,6 +419,8 @@ static int disk_flash_init(const struct device *dev)
 
 	for (int i = 0; i < ARRAY_SIZE(flash_disks); i++) {
 		int rc;
+
+		k_mutex_init(&flash_disks[i].lock);
 
 		rc = disk_access_register(&flash_disks[i].info);
 		if (rc < 0) {

@@ -11,8 +11,8 @@
 #include "mocks/conn.h"
 #include "mocks/hci_core.h"
 #include "mocks/keys_help_utils.h"
-#include "host_mocks/print_utils.h"
 #include "testing_common_defs.h"
+#include "common/bt_str.h"
 
 DEFINE_FFF_GLOBALS;
 
