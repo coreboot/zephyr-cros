@@ -432,9 +432,10 @@ int osdp_phy_decode_packet(struct osdp_pd *pd, uint8_t *buf, int len,
 			 * PD we extract it from the command itself. But this
 			 * usage of SCBKD is allowed only when the PD is in
 			 * install mode (indicated by PD_FLAG_INSTALL_MODE).
-			 * Since secure channel for PD can be established at 
-			 * application level, then only set flag here and verify
-			 * instal mode during command processing. 
+			 * Since secure channel for PD can be established at
+			 * application level, then only set SCBKD related
+			 * flag here and verify instal mode conditions during
+			 * command processing.
 			 */
 			if (pkt->data[2] == 0) {
 				SET_FLAG(pd, PD_FLAG_SC_USE_SCBKD);	

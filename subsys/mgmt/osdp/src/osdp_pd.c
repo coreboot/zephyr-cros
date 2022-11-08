@@ -627,7 +627,7 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 
-		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+		if (IS_ENABLED(CONFIG_OSDP_SC_EXT)) {
 			if (!pd->command_callback) {
 				break;
 			}
@@ -670,7 +670,7 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 		
-		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+		if (IS_ENABLED(CONFIG_OSDP_SC_EXT)) {
 			if (!pd->command_callback) {
 				break;
 			}
@@ -718,7 +718,7 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 			break;
 		}
 		
-		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+		if (IS_ENABLED(CONFIG_OSDP_SC_EXT)) {
 			if (!pd->command_callback) {
 				break;
 			}
@@ -951,9 +951,9 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 		}
 		assert_len(REPLY_CCRYPT_LEN, max_len);
 		buf[len++] = pd->reply_id;
-		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {
+		if (IS_ENABLED(CONFIG_OSDP_SC_EXT)) {
 			cmd = (struct osdp_cmd *)pd->ephemeral_data;
-			memcpy(&buf[len], cmd->data, 32U);			
+			memcpy(&buf[len], cmd->data, 32U);
 			len += 32U;
 		} else {
 			osdp_fill_random(pd->sc.pd_random, 8);
@@ -982,7 +982,7 @@ static int pd_build_reply(struct osdp_pd *pd, uint8_t *buf, int max_len)
 		buf[len++] = pd->reply_id;
 		smb[0] = 3; /* length */
 		smb[1] = SCS_14; /* type */
-		if (IS_ENABLED(CONFIG_OSDP_PD_SC_EXT)) {			
+		if (IS_ENABLED(CONFIG_OSDP_SC_EXT)) {
 			cmd = (struct osdp_cmd *)pd->ephemeral_data;
 			memcpy(pd->sc.r_mac, cmd->data, 16U);
 			memcpy(pd->sc.s_mac1, cmd->data + 16U, 16U);

@@ -33,13 +33,6 @@ config OSDP_PD_ADDRESS
 
 if OSDP_SC_ENABLED
 
-config OSDP_PD_SC_EXT
-	bool "OSDP Secure Channel establihed externally"
-	default n
-	help
-	  If enabled, application takes responisibility for establishing secure channel.
-	  Otherwise secure channel is establihed by module internally. 
-
 config OSDP_PD_SCBK
 	string "Secure Channel Base Key (SCBK)"
 	default "NONE"

@@ -74,9 +74,23 @@ config OSDP_SKIP_MARK_BYTE
 	  completely disable sending/expecting a mark byte to work with
 	  such non-conforming devices.
 
+choice
+	prompt "Secure channel commands processing"
+	config OSDP_SC_INT
+		bool "Internal (Zephyr OSDP module)"
+		depends on CSPRING_ENABLED
+		help
+		  If enabled Zephyr OSDP module takes responsibility for establishing secure channel.
+	config OSDP_SC_EXT
+		bool "External (host application)"
+		depends on OSDP_MODE_PD
+		help
+		  If enabled host application takes responsibility for establishing secure channel (for now only PD).
+endchoice
+
 config OSDP_SC_ENABLED
 	bool "OSDP Secure Channel"
-	depends on CSPRING_ENABLED
+	depends on OSDP_SC_INT || OSDP_SC_EXT
 	default y
 	select HID_CRYPTO
 	select HID_CRYPTO_MBEDTLS_SHIM
