@@ -321,9 +321,13 @@ static void bg_thread_main(void *unused1, void *unused2, void *unused3)
 	z_mem_manage_boot_finish();
 #endif /* CONFIG_MMU */
 
+#ifdef CONFIG_CPP_MAIN
+	extern int main(void);
+#else
 	extern void main(void);
+#endif
 
-	main();
+	(void)main();
 
 	/* Mark nonessential since main() has no more work to do */
 	z_main_thread.base.user_options &= ~K_ESSENTIAL;
@@ -343,7 +347,7 @@ static void init_idle_thread(int i)
 
 #ifdef CONFIG_THREAD_NAME
 
-#if CONFIG_MP_NUM_CPUS > 1
+#if CONFIG_MP_MAX_NUM_CPUS > 1
 	char tname[8];
 	snprintk(tname, 8, "idle %02d", i);
 #else

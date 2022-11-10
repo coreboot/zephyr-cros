@@ -170,7 +170,6 @@
 /boards/riscv/rv32m1_vega/                @dleach02
 /boards/riscv/beaglev_starlight_jh7100/   @rajnesh-kanwal
 /boards/riscv/adp_xc7k_ae350/             @cwshu @kevinwang821020 @jimmyzhe
-/boards/riscv/gd32*/                      @gmarull
 /boards/riscv/longan_nano/                @soburi
 /boards/riscv/neorv32/                    @henrikbrixandersen
 /boards/shields/                          @erwango
@@ -335,7 +334,6 @@
 /drivers/led_strip/                       @mbolivar-nordic
 /drivers/lora/                            @Mani-Sadhasivam
 /drivers/mbox/                            @carlocaione
-/drivers/memc/                            @gmarull
 /drivers/misc/                            @tejlmand
 /drivers/misc/ft8xx/                      @hubertmis
 /drivers/mm/                              @dcpleung
@@ -358,7 +356,6 @@
 /drivers/pwm/*rpi_pico*                   @burumaj
 /drivers/pwm/*rv32m1*                     @henrikbrixandersen
 /drivers/pwm/*sam0*                       @nzmichaelh
-/drivers/pwm/*stm32*                      @gmarull
 /drivers/pwm/*test*                       @JordanYates
 /drivers/pwm/*xlnx*                       @henrikbrixandersen
 /drivers/pwm/pwm_capture.c                @henrikbrixandersen
@@ -446,8 +443,6 @@
 /drivers/i2c/i2c_dw*                      @dcpleung
 /drivers/i2c/*tca954x*                    @kurddt
 /drivers/*/*xec*                          @franciscomunoz @albertofloyd @sjvasanth1
-/drivers/mipi_dsi/                        @gmarull
-/drivers/mipi_dsi/mipi_dsi.c              @gmarull
 /drivers/w1/                              @str4t0m
 /drivers/watchdog/*gecko*                 @oanerer
 /drivers/watchdog/*sifive*                @katsuster
@@ -631,6 +626,7 @@
 /include/zephyr/net/coap*.h                      @rlubos
 /include/zephyr/net/lwm2m*.h                     @rlubos
 /include/zephyr/net/mqtt.h                       @rlubos
+/include/zephyr/net/mqtt_sn.h                    @rlubos @BeckmaR
 /include/zephyr/net/net_pkt_filter.h             @npitre
 /include/zephyr/posix/                           @pfalcon
 /include/zephyr/pm/pm.h                          @nashif @ceolin
@@ -685,6 +681,7 @@
 /samples/net/dns_resolve/                 @rlubos @tbursztyka @pfalcon
 /samples/net/lwm2m_client/                @rlubos
 /samples/net/mqtt_publisher/              @rlubos
+/samples/net/mqtt_sn_publisher/           @rlubos @BeckmaR
 /samples/net/sockets/coap_*/              @rlubos
 /samples/net/sockets/                     @rlubos @tbursztyka @pfalcon
 /samples/sensor/                          @MaureenHelm
@@ -781,6 +778,7 @@ scripts/build/gen_image_info.py           @tejlmand
 /subsys/net/lib/lwm2m/                    @rlubos
 /subsys/net/lib/config/                   @rlubos @tbursztyka @pfalcon
 /subsys/net/lib/mqtt/                     @rlubos
+/subsys/net/lib/mqtt_sn/                  @rlubos @BeckmaR
 /subsys/net/lib/coap/                     @rlubos
 /subsys/net/lib/sockets/socketpair.c      @cfriedt
 /subsys/net/lib/sockets/                  @rlubos @tbursztyka @pfalcon
@@ -808,6 +806,8 @@ scripts/build/gen_image_info.py           @tejlmand
 /tests/bluetooth/controller/              @cvinayak @thoh-ot @kruithofa @erbr-ot @sjanc @ppryga
 /tests/bluetooth/bsim_bt/                 @alwa-nordic @jhedberg @Vudentz @wopu-ot
 /tests/bluetooth/bsim_bt/bsim_test_audio/ @jhedberg @Vudentz @wopu-ot @Thalley
+/tests/bluetooth/bsim_bt/bsim_test_mesh/  @jhedberg @Vudentz @wopu-ot @PavelVPV
+/tests/bluetooth/mesh_shell/              @jhedberg @Vudentz @sjanc @PavelVPV
 /tests/bluetooth/tester/                  @alwa-nordic @jhedberg @Vudentz @sjanc
 /tests/posix/                             @pfalcon
 /tests/crypto/                            @ceolin
@@ -829,6 +829,8 @@ scripts/build/gen_image_info.py           @tejlmand
 /tests/net/lib/                           @rlubos @tbursztyka @pfalcon
 /tests/net/lib/http_header_fields/        @rlubos @tbursztyka
 /tests/net/lib/mqtt_packet/               @rlubos
+/tests/net/lib/mqtt_sn_packet/            @rlubos @BeckmaR
+/tests/net/lib/mqtt_sn_client/            @rlubos @BeckmaR
 /tests/net/lib/coap/                      @rlubos
 /tests/net/npf/                           @npitre
 /tests/net/socket/socketpair/             @cfriedt

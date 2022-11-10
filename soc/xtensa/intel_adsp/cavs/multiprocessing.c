@@ -17,7 +17,7 @@
 	 (0x1 << 24) | /* "ROM control version" = 1 */	  \
 	 (0x2 << 0))   /* "Core wake version" = 2 */
 
-#define IDC_ALL_CORES (BIT(CONFIG_MP_NUM_CPUS) - 1)
+#define IDC_CORE_MASK(num_cpus) (BIT(num_cpus) - 1)
 
 #define CAVS15_ROM_IDC_DELAY 500
 
@@ -73,7 +73,7 @@ void soc_start_core(int cpu_num)
 	 * such that the standard system bootstrap out of IMR can
 	 * place it there.  But this is fine for now.
 	 */
-	void **lpsram = z_soc_uncached_ptr((void *)LP_SRAM_BASE);
+	void **lpsram = z_soc_uncached_ptr((__sparse_force void __sparse_cache *)LP_SRAM_BASE);
 	uint8_t tramp[] = {
 		0x06, 0x01, 0x00, /* J <PC+8>  (jump to L32R) */
 		0,                /* (padding to align entry_addr) */
@@ -113,7 +113,7 @@ void soc_start_core(int cpu_num)
 	unsigned int num_cpus = arch_num_cpus();
 
 	for (int c = 0; c < num_cpus; c++) {
-		IDC[c].busy_int |= IDC_ALL_CORES;
+		IDC[c].busy_int |= IDC_CORE_MASK(num_cpus);
 	}
 
 	/* Send power-up message to the other core.  Start address
@@ -172,8 +172,8 @@ __imr void soc_mp_init(void)
 	unsigned int num_cpus = arch_num_cpus();
 
 	for (int core = 0; core < num_cpus; core++) {
-		IDC[core].busy_int |= IDC_ALL_CORES;
-		IDC[core].done_int &= ~IDC_ALL_CORES;
+		IDC[core].busy_int |= IDC_CORE_MASK(num_cpus);
+		IDC[core].done_int &= ~IDC_CORE_MASK(num_cpus);
 
 		/* Also unmask the IDC interrupt for every core in the
 		 * L2 mask register.

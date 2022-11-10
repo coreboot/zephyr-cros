@@ -1,28 +1,48 @@
 /*
  * Copyright (c) 2018-2021 mcumgr authors
+ * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 /** SMP - Simple Management Protocol. */
 
+#include <zephyr/sys/byteorder.h>
 #include <assert.h>
 #include <string.h>
 
 #include <zephyr/net/buf.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
 #include <zephyr/mgmt/mcumgr/smp.h>
 #include "mgmt/mgmt.h"
 #include <zcbor_common.h>
+#include <zcbor_decode.h>
 #include <zcbor_encode.h>
 #include "smp/smp.h"
 #include "../../../smp_internal.h"
 
+static void cbor_nb_reader_init(struct cbor_nb_reader *cnr, struct net_buf *nb)
+{
+	/* Skip the smp_hdr */
+	void *new_ptr = net_buf_pull(nb, sizeof(struct smp_hdr));
+
+	cnr->nb = nb;
+	zcbor_new_decode_state(cnr->zs, ARRAY_SIZE(cnr->zs), new_ptr,
+			       cnr->nb->len, 1);
+}
+
+static void cbor_nb_writer_init(struct cbor_nb_writer *cnw, struct net_buf *nb)
+{
+	net_buf_reset(nb);
+	cnw->nb = nb;
+	cnw->nb->len = sizeof(struct smp_hdr);
+	zcbor_new_encode_state(cnw->zs, 2, nb->data + sizeof(struct smp_hdr),
+			       net_buf_tailroom(nb), 0);
+}
+
 /**
  * Converts a request opcode to its corresponding response opcode.
  */
-static uint8_t
-smp_rsp_op(uint8_t req_op)
+static uint8_t smp_rsp_op(uint8_t req_op)
 {
 	if (req_op == MGMT_OP_READ) {
 		return MGMT_OP_READ_RSP;
@@ -31,43 +51,41 @@ smp_rsp_op(uint8_t req_op)
 	}
 }
 
-static void
-smp_make_rsp_hdr(const struct mgmt_hdr *req_hdr, struct mgmt_hdr *rsp_hdr, size_t len)
+static void smp_make_rsp_hdr(const struct smp_hdr *req_hdr, struct smp_hdr *rsp_hdr, size_t len)
 {
-	*rsp_hdr = (struct mgmt_hdr) {
-		.nh_len = len,
+	*rsp_hdr = (struct smp_hdr) {
+		.nh_len = sys_cpu_to_be16(len),
 		.nh_flags = 0,
 		.nh_op = smp_rsp_op(req_hdr->nh_op),
-		.nh_group = req_hdr->nh_group,
+		.nh_group = sys_cpu_to_be16(req_hdr->nh_group),
 		.nh_seq = req_hdr->nh_seq,
 		.nh_id = req_hdr->nh_id,
 	};
-	mgmt_hton_hdr(rsp_hdr);
 }
 
-static int
-smp_read_hdr(const struct net_buf *nb, struct mgmt_hdr *dst_hdr)
+static int smp_read_hdr(const struct net_buf *nb, struct smp_hdr *dst_hdr)
 {
 	if (nb->len < sizeof(*dst_hdr)) {
 		return MGMT_ERR_EINVAL;
 	}
 
 	memcpy(dst_hdr, nb->data, sizeof(*dst_hdr));
+	dst_hdr->nh_len = sys_be16_to_cpu(dst_hdr->nh_len);
+	dst_hdr->nh_group = sys_be16_to_cpu(dst_hdr->nh_group);
+
 	return 0;
 }
 
-static inline int
-smp_write_hdr(struct smp_streamer *streamer, const struct mgmt_hdr *src_hdr)
+static inline int smp_write_hdr(struct smp_streamer *streamer, const struct smp_hdr *src_hdr)
 {
 	memcpy(streamer->writer->nb->data, src_hdr, sizeof(*src_hdr));
 	return 0;
 }
 
-static int
-smp_build_err_rsp(struct smp_streamer *streamer, const struct mgmt_hdr *req_hdr, int status,
-		  const char *rc_rsn)
+static int smp_build_err_rsp(struct smp_streamer *streamer, const struct smp_hdr *req_hdr,
+			     int status, const char *rc_rsn)
 {
-	struct mgmt_hdr rsp_hdr;
+	struct smp_hdr rsp_hdr;
 	struct cbor_nb_writer *nbw = streamer->writer;
 	zcbor_state_t *zsp = nbw->zs;
 	bool ok;
@@ -110,9 +128,8 @@ smp_build_err_rsp(struct smp_streamer *streamer, const struct mgmt_hdr *req_hdr,
  *
  * @return A MGMT_ERR_[...] error code.
  */
-static int
-smp_handle_single_payload(struct mgmt_ctxt *cbuf, const struct mgmt_hdr *req_hdr,
-			  bool *handler_found)
+static int smp_handle_single_payload(struct mgmt_ctxt *cbuf, const struct smp_hdr *req_hdr,
+				     bool *handler_found)
 {
 	const struct mgmt_handler *handler;
 	mgmt_handler_fn handler_fn;
@@ -167,12 +184,11 @@ smp_handle_single_payload(struct mgmt_ctxt *cbuf, const struct mgmt_hdr *req_hdr
  *
  * @return A MGMT_ERR_[...] error code.
  */
-static int
-smp_handle_single_req(struct smp_streamer *streamer, const struct mgmt_hdr *req_hdr,
-		      bool *handler_found, const char **rsn)
+static int smp_handle_single_req(struct smp_streamer *streamer, const struct smp_hdr *req_hdr,
+				 bool *handler_found, const char **rsn)
 {
 	struct mgmt_ctxt cbuf;
-	struct mgmt_hdr rsp_hdr;
+	struct smp_hdr rsp_hdr;
 	struct cbor_nb_writer *nbw = streamer->writer;
 	struct cbor_nb_reader *nbr = streamer->reader;
 	zcbor_state_t *zsp = nbw->zs;
@@ -208,9 +224,8 @@ smp_handle_single_req(struct smp_streamer *streamer, const struct mgmt_hdr *req_
  * @param rsn		The text explanation to @status encoded as "rsn" into CBOR
  *			response.
  */
-static void
-smp_on_err(struct smp_streamer *streamer, const struct mgmt_hdr *req_hdr,
-		   void *req, void *rsp, int status, const char *rsn)
+static void smp_on_err(struct smp_streamer *streamer, const struct smp_hdr *req_hdr,
+		       void *req, void *rsp, int status, const char *rsn)
 {
 	int rc;
 
@@ -257,10 +272,9 @@ smp_on_err(struct smp_streamer *streamer, const struct mgmt_hdr *req_hdr,
  *         is not enough bytes to process header, or other MGMT_ERR_[...] code on
  *         failure.
  */
-int
-smp_process_request_packet(struct smp_streamer *streamer, void *vreq)
+int smp_process_request_packet(struct smp_streamer *streamer, void *vreq)
 {
-	struct mgmt_hdr req_hdr;
+	struct smp_hdr req_hdr;
 	struct mgmt_evt_op_cmd_done_arg cmd_done_arg;
 	void *rsp;
 	struct net_buf *req = vreq;
@@ -283,7 +297,6 @@ smp_process_request_packet(struct smp_streamer *streamer, void *vreq)
 		} else {
 			valid_hdr = true;
 		}
-		mgmt_ntoh_hdr(&req_hdr);
 		/* Does buffer contain whole message? */
 		if (req->len < (req_hdr.nh_len + MGMT_HDR_SIZE)) {
 			rc = MGMT_ERR_ECORRUPT;

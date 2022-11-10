@@ -25,6 +25,12 @@
 #include "common/log.h"
 #include "common/assert.h"
 
+#if defined(CONFIG_BT_DEBUG_ISO_DATA)
+#define BT_ISO_DATA_DBG(fmt, ...) BT_DBG(fmt, ##__VA_ARGS__)
+#else
+#define BT_ISO_DATA_DBG(fmt, ...)
+#endif /* CONFIG_BT_DEBUG_ISO_DATA */
+
 #define iso_chan(_iso) ((_iso)->iso.chan);
 
 #if defined(CONFIG_BT_ISO_UNICAST) || defined(CONFIG_BT_ISO_SYNC_RECEIVER)
@@ -94,7 +100,7 @@ void hci_iso(struct net_buf *buf)
 	struct bt_conn *iso;
 	uint8_t flags;
 
-	BT_DBG("buf %p", buf);
+	BT_ISO_DATA_DBG("buf %p", buf);
 
 	BT_ASSERT(buf->len >= sizeof(*hdr));
 
@@ -106,7 +112,8 @@ void hci_iso(struct net_buf *buf)
 	iso(buf)->handle = bt_iso_handle(handle);
 	iso(buf)->index = BT_CONN_INDEX_INVALID;
 
-	BT_DBG("handle %u len %u flags %u", iso(buf)->handle, len, flags);
+	BT_ISO_DATA_DBG("handle %u len %u flags %u",
+			iso(buf)->handle, len, flags);
 
 	if (buf->len != len) {
 		BT_ERR("ISO data length mismatch (%u != %u)", buf->len, len);
@@ -207,7 +214,7 @@ static int hci_le_setup_iso_data_path(const struct bt_conn *iso, uint8_t dir,
 		return -EINVAL;
 	}
 
-	buf = bt_hci_cmd_create(BT_HCI_OP_LE_SETUP_ISO_PATH, sizeof(*cp));
+	buf = bt_hci_cmd_create(BT_HCI_OP_LE_SETUP_ISO_PATH, sizeof(*cp) + path->cc_len);
 	if (!buf) {
 		return -ENOBUFS;
 	}
@@ -582,10 +589,8 @@ void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags)
 	pb = bt_iso_flags_pb(flags);
 	ts = bt_iso_flags_ts(flags);
 
-	if (IS_ENABLED(CONFIG_BT_DEBUG_ISO_DATA)) {
-		BT_DBG("handle %u len %u flags 0x%02x pb 0x%02x ts 0x%02x",
-		       iso->handle, buf->len, flags, pb, ts);
-	}
+	BT_ISO_DATA_DBG("handle %u len %u flags 0x%02x pb 0x%02x ts 0x%02x",
+			iso->handle, buf->len, flags, pb, ts);
 
 	/* When the PB_Flag does not equal 0b00, the fields Time_Stamp,
 	 * Packet_Sequence_Number, Packet_Status_Flag and ISO_SDU_Length
@@ -629,9 +634,9 @@ void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags)
 			iso_info(buf)->flags = 0;
 		}
 
-		BT_DBG("%s, len %u total %u flags 0x%02x timestamp %u",
-		       pb == BT_ISO_START ? "Start" : "Single", buf->len, len,
-		       flags, iso_info(buf)->ts);
+		BT_ISO_DATA_DBG("%s, len %u total %u flags 0x%02x timestamp %u",
+				pb == BT_ISO_START ? "Start" : "Single",
+				buf->len, len, flags, iso_info(buf)->ts);
 
 		if (iso->rx) {
 			BT_ERR("Unexpected ISO %s fragment",
@@ -663,7 +668,8 @@ void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags)
 			return;
 		}
 
-		BT_DBG("Cont, len %u rx_len %u", buf->len, iso->rx_len);
+		BT_ISO_DATA_DBG("Cont, len %u rx_len %u",
+				buf->len, iso->rx_len);
 
 		if (buf->len > net_buf_tailroom(iso->rx)) {
 			BT_ERR("Not enough buffer space for ISO data");
@@ -681,7 +687,7 @@ void bt_iso_recv(struct bt_conn *iso, struct net_buf *buf, uint8_t flags)
 		/* The ISO_Data_Load field contains the last fragment of an
 		 * SDU.
 		 */
-		BT_DBG("End, len %u rx_len %u", buf->len, iso->rx_len);
+		BT_ISO_DATA_DBG("End, len %u rx_len %u", buf->len, iso->rx_len);
 
 		if (iso->rx == NULL) {
 			BT_ERR("Unexpected ISO end fragment");
@@ -752,9 +758,7 @@ int bt_iso_chan_send(struct bt_iso_chan *chan, struct net_buf *buf,
 		return -EINVAL;
 	}
 
-	if (IS_ENABLED(CONFIG_BT_DEBUG_ISO_DATA)) {
-		BT_DBG("chan %p len %zu", chan, net_buf_frags_len(buf));
-	}
+	BT_ISO_DATA_DBG("chan %p len %zu", chan, net_buf_frags_len(buf));
 
 	if (chan->state != BT_ISO_STATE_CONNECTED) {
 		BT_DBG("Not connected");
@@ -2524,7 +2528,6 @@ int bt_iso_big_terminate(struct bt_iso_big *big)
 {
 	struct bt_iso_chan *bis;
 	int err;
-	bool broadcaster;
 
 	if (!atomic_test_bit(big->flags, BT_BIG_INITIALIZED) || !big->num_bis) {
 		BT_DBG("BIG not initialized");
@@ -2534,10 +2537,8 @@ int bt_iso_big_terminate(struct bt_iso_big *big)
 	bis = SYS_SLIST_PEEK_HEAD_CONTAINER(&big->bis_channels, bis, node);
 	__ASSERT(bis != NULL, "bis was NULL");
 
-	/* They all have the same QOS dir so we can just check the first */
-	broadcaster = bis->qos->tx ? true : false;
-
-	if (IS_ENABLED(CONFIG_BT_ISO_BROADCASTER) && broadcaster) {
+	if (IS_ENABLED(CONFIG_BT_ISO_BROADCASTER) &&
+	    bis->iso->iso.info.type == BT_ISO_CHAN_TYPE_BROADCASTER) {
 		err = hci_le_terminate_big(big);
 
 		/* Wait for BT_HCI_EVT_LE_BIG_TERMINATE before cleaning up
@@ -2548,7 +2549,8 @@ int bt_iso_big_terminate(struct bt_iso_big *big)
 				bt_iso_chan_set_state(bis, BT_ISO_STATE_DISCONNECTING);
 			}
 		}
-	} else if (IS_ENABLED(CONFIG_BT_ISO_SYNC_RECEIVER)) {
+	} else if (IS_ENABLED(CONFIG_BT_ISO_SYNC_RECEIVER) &&
+		   bis->iso->iso.info.type == BT_ISO_CHAN_TYPE_SYNC_RECEIVER) {
 		err = hci_le_big_sync_term(big);
 
 		if (!err) {

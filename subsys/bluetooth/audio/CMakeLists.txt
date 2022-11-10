@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 zephyr_library()
-zephyr_library_sources(audio.c)
+zephyr_library_sources(
+	audio.c
+	audio_iso.c
+)
 
 if (CONFIG_BT_VOCS OR CONFIG_BT_VOCS_CLIENT)
 	zephyr_library_sources(vocs.c)
@@ -49,7 +52,6 @@ zephyr_library_sources_ifdef(CONFIG_BT_ASCS ascs.c)
 zephyr_library_sources_ifdef(CONFIG_BT_PACS pacs.c)
 zephyr_library_sources_ifdef(CONFIG_BT_AUDIO_STREAM stream.c codec.c)
 zephyr_library_sources_ifdef(CONFIG_BT_AUDIO_UNICAST_SERVER unicast_server.c)
-zephyr_library_sources_ifdef(CONFIG_BT_AUDIO_CAPABILITY capabilities.c)
 zephyr_library_sources_ifdef(CONFIG_BT_AUDIO_UNICAST_CLIENT unicast_client.c)
 zephyr_library_sources_ifdef(CONFIG_BT_AUDIO_BROADCAST_SOURCE broadcast_source.c)
 zephyr_library_sources_ifdef(CONFIG_BT_AUDIO_BROADCAST_SINK broadcast_sink.c)

@@ -679,7 +679,7 @@ static uint32_t policy_get_request_data_object(const struct device *dev)
 	struct usbc_port_data *data = dev->data;
 
 	/* This callback must be implemented */
-	__ASSERT(data->policy_cb_get_request_data_object != NULL,
+	__ASSERT(data->policy_cb_get_rdo != NULL,
 		 "Callback pointer should not be NULL");
 
 	return data->policy_cb_get_rdo(dev);
@@ -1432,13 +1432,11 @@ static void pe_send_not_supported_entry(void *obj)
 
 	LOG_INF("PE_Not_Supported");
 
-	/* Request the Protocol Layer to send a Not_Supported Message. */
+	/* Request the Protocol Layer to send a Not_Supported or Reject Message. */
 	if (prl_get_rev(dev, PD_PACKET_SOP) > PD_REV20) {
 		send_ctrl_msg(dev, PD_PACKET_SOP, PD_CTRL_NOT_SUPPORTED);
-	}
-	/* Ignore unsupported messages from PD REV2.0 devices */
-	else {
-		pe_set_state(dev, PE_SNK_READY);
+	} else {
+		send_ctrl_msg(dev, PD_PACKET_SOP, PD_CTRL_REJECT);
 	}
 }
 

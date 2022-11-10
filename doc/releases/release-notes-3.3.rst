@@ -23,6 +23,18 @@ Changes in this release
   and :kconfig:option:`CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER` have been
   added to enable the PAST implementation rather than
   :kconfig:option:`CONFIG_BT_CONN`.
+* Flashdisk: :kconfig:option:`CONFIG_DISK_FLASH_VOLUME_NAME`,
+  :kconfig:option:`CONFIG_DISK_FLASH_DEV_NAME`,
+  :kconfig:option:`CONFIG_DISK_FLASH_START`,
+  :kconfig:option:`CONFIG_DISK_FLASH_MAX_RW_SIZE`,
+  :kconfig:option:`CONFIG_DISK_ERASE_BLOCK_SIZE`,
+  :kconfig:option:`CONFIG_DISK_FLASH_ERASE_ALIGNMENT`,
+  :kconfig:option:`CONFIG_DISK_VOLUME_SIZE` and
+  :kconfig:option:`CONFIG_DISK_FLASH_SECTOR_SIZE` Kconfig options have been
+  removed in favor of new :dtcompatible:`zephyr,flash-disk` devicetree binding.
+
+- Starting from this release ``zephyr-`` prefixed tags won't be created
+  anymore. The project will continue using ``v`` tags, for example ``v3.3.0``.
 
 Removed APIs in this release
 ============================
@@ -104,7 +116,12 @@ Bluetooth
 
 * Host
 
+  * Fixed missing calls to bt_le_per_adv_sync_cb.term when deleting a periodic
+    advertising sync object.
+
 * Mesh
+
+  * Change default advertiser to be extended advertiser.
 
 * Controller
 
@@ -232,11 +249,22 @@ Drivers and Sensors
 Networking
 **********
 
+IPv4 packet fragmentation support has been added, this allows large packets to
+be split up before sending or reassembled during receive for packets that are
+larger than the network device MTU. This is disabled by default but can be
+enabled with :kconfig:option:`CONFIG_NET_IPV4_FRAGMENT`.
+
 USB
 ***
 
 Devicetree
 **********
+
+* Bindings
+
+  * New:
+
+    * :dtcompatible:`zephyr,flash-disk`
 
 Libraries / Subsystems
 **********************
@@ -256,6 +284,9 @@ Libraries / Subsystems
   * A MCUmgr issue with Bluetooth transport that could cause a deadlock of the
     mcumgr thread if the remote device disconnected before the output message
     was sent has been fixed.
+  * A MCUmgr img_mgmt bug whereby the state of an image upload could persist
+    when it was no longer valid (e.g. after an image erase command) has been
+    fixed.
 
 * LwM2M
 

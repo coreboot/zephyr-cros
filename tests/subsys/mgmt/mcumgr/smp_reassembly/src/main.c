@@ -8,9 +8,10 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/net/buf.h>
 #include <zephyr/mgmt/mcumgr/smp.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
 #include <mgmt/mgmt.h>
+#include <smp/smp.h>
 #include "../../../../../../subsys/mgmt/mcumgr/smp_reassembly.h"
+#include "../../../../../../subsys/mgmt/mcumgr/smp_internal.h"
 
 static struct smp_transport smpt;
 static uint8_t buff[CONFIG_MCUMGR_BUF_SIZE];
@@ -31,7 +32,7 @@ void smp_rx_req(struct smp_transport *smpt, struct net_buf *nb)
 ZTEST(smp_reassembly, test_first)
 {
 	smp_reassembly_init(&smpt);
-	struct mgmt_hdr *mh = (struct mgmt_hdr *)buff;
+	struct smp_hdr *mh = (struct smp_hdr *)buff;
 	int frag_used;
 	int ret;
 	int expected;
@@ -42,16 +43,16 @@ ZTEST(smp_reassembly, test_first)
 		      "Expected -ENOSR error");
 	/* Len not enough to read expected size from header */
 	zassert_equal(-ENODATA,
-		      smp_reassembly_collect(&smpt, buff, sizeof(struct mgmt_hdr) - 1),
+		      smp_reassembly_collect(&smpt, buff, sizeof(struct smp_hdr) - 1),
 		      "Expected -ENODATA error");
 	/* Length extracted from header, plus size of header, is bigger than buffer */
-	mh->nh_len = sys_cpu_to_be16(CONFIG_MCUMGR_BUF_SIZE - sizeof(struct mgmt_hdr) + 1);
+	mh->nh_len = sys_cpu_to_be16(CONFIG_MCUMGR_BUF_SIZE - sizeof(struct smp_hdr) + 1);
 	zassert_equal(-ENOSR,
-		      smp_reassembly_collect(&smpt, buff, sizeof(struct mgmt_hdr) + 1),
+		      smp_reassembly_collect(&smpt, buff, sizeof(struct smp_hdr) + 1),
 		      "Expected -ENOSR error");
 
 	/* Successfully alloc buffer */
-	mh->nh_len = sys_cpu_to_be16(TEST_FRAME_SIZE - sizeof(struct mgmt_hdr));
+	mh->nh_len = sys_cpu_to_be16(TEST_FRAME_SIZE - sizeof(struct smp_hdr));
 	frag_used = 40;
 	expected = TEST_FRAME_SIZE - frag_used;
 	ret = smp_reassembly_collect(&smpt, buff, frag_used);
@@ -73,19 +74,18 @@ ZTEST(smp_reassembly, test_first)
 	/* This will normally be done by packet processing and should not be done by hand:
 	 * release the buffer to the pool
 	 */
-	mcumgr_buf_free(backup);
-
+	smp_packet_free(backup);
 }
 
 ZTEST(smp_reassembly, test_drops)
 {
-	struct mgmt_hdr *mh = (struct mgmt_hdr *)buff;
+	struct smp_hdr *mh = (struct smp_hdr *)buff;
 	int frag_used;
 	int ret;
 	int expected;
 
 	/* Collect one buffer and drop it */
-	mh->nh_len = sys_cpu_to_be16(TEST_FRAME_SIZE - sizeof(struct mgmt_hdr));
+	mh->nh_len = sys_cpu_to_be16(TEST_FRAME_SIZE - sizeof(struct smp_hdr));
 	frag_used = 40;
 	expected = TEST_FRAME_SIZE - frag_used;
 	ret = smp_reassembly_collect(&smpt, buff, frag_used);
@@ -99,7 +99,7 @@ ZTEST(smp_reassembly, test_drops)
 
 ZTEST(smp_reassembly, test_collection)
 {
-	struct mgmt_hdr *mh = (struct mgmt_hdr *)buff;
+	struct smp_hdr *mh = (struct smp_hdr *)buff;
 	int pkt_used;
 	int ret;
 	int expected;
@@ -112,7 +112,7 @@ ZTEST(smp_reassembly, test_collection)
 
 	/** Collect fragments **/
 	/* First fragment with header */
-	mh->nh_len = sys_cpu_to_be16(TEST_FRAME_SIZE - sizeof(struct mgmt_hdr));
+	mh->nh_len = sys_cpu_to_be16(TEST_FRAME_SIZE - sizeof(struct smp_hdr));
 	frag = 40;
 	ret = smp_reassembly_collect(&smpt, buff, frag);
 	expected = TEST_FRAME_SIZE - frag;
@@ -156,7 +156,7 @@ ZTEST(smp_reassembly, test_collection)
 	/* This will normally be done by packet processing and should not be done by hand:
 	 * release the buffer to the pool
 	 */
-	mcumgr_buf_free(backup);
+	smp_packet_free(backup);
 }
 
 ZTEST(smp_reassembly, test_no_packet_started)
@@ -179,7 +179,7 @@ ZTEST(smp_reassembly, test_no_packet_started)
 
 ZTEST(smp_reassembly, test_ud)
 {
-	struct mgmt_hdr *mh = (struct mgmt_hdr *)buff;
+	struct smp_hdr *mh = (struct smp_hdr *)buff;
 	int frag_used;
 	int ret;
 	int expected;
@@ -192,7 +192,7 @@ ZTEST(smp_reassembly, test_ud)
 	/* After collecting first fragment */
 	mh->nh_len = sys_cpu_to_be16(TEST_FRAME_SIZE);
 	frag_used = 40;
-	expected = TEST_FRAME_SIZE - frag_used + sizeof(struct mgmt_hdr);
+	expected = TEST_FRAME_SIZE - frag_used + sizeof(struct smp_hdr);
 	ret = smp_reassembly_collect(&smpt, buff, frag_used);
 	zassert_equal(expected, ret,
 		      "Expected is %d should be %d\n", ret, expected);

@@ -32,7 +32,7 @@
 #include <zephyr/bluetooth/sdp.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/capabilities.h>
+#include <zephyr/bluetooth/audio/pacs.h>
 #include <zephyr/bluetooth/audio/csis.h>
 
 #include <zephyr/shell/shell.h>
@@ -729,6 +729,11 @@ static int cmd_init(const struct shell *sh, size_t argc, char *argv[])
 	}
 
 	return err;
+}
+
+static int cmd_disable(const struct shell *sh, size_t argc, char *argv[])
+{
+	return bt_disable();
 }
 
 #ifdef CONFIG_SETTINGS
@@ -3491,6 +3496,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_scan_filter_clear_cmds,
 SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 	SHELL_CMD_ARG(init, NULL, "[no-settings-load], [sync]",
 		      cmd_init, 1, 2),
+	SHELL_CMD_ARG(disable, NULL, HELP_NONE, cmd_disable, 1, 0),
 #if defined(CONFIG_SETTINGS)
 	SHELL_CMD_ARG(settings-load, NULL, HELP_NONE, cmd_settings_load, 1, 0),
 #endif
@@ -3651,6 +3657,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 #endif /* CONFIG_BT_HCI_MESH_EXT */
 
 #if defined(CONFIG_BT_LL_SW_SPLIT)
+	SHELL_CMD(ll-addr, NULL, "<random|public>", cmd_ll_addr_read),
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 #if defined(CONFIG_BT_BROADCASTER)
 	SHELL_CMD_ARG(advx, NULL,

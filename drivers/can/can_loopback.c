@@ -46,9 +46,9 @@ struct can_loopback_data {
 		      CONFIG_CAN_LOOPBACK_TX_THREAD_STACK_SIZE);
 };
 
-static void dispatch_frame(const struct device *dev,
-			   const struct can_frame *frame,
-			   struct can_loopback_filter *filter)
+static void receive_frame(const struct device *dev,
+			  const struct can_frame *frame,
+			  struct can_loopback_filter *filter)
 {
 	struct can_frame frame_tmp = *frame;
 
@@ -72,18 +72,23 @@ static void tx_thread(void *arg1, void *arg2, void *arg3)
 
 	while (1) {
 		k_msgq_get(&data->tx_msgq, &frame, K_FOREVER);
+		frame.cb(dev, 0, frame.cb_arg);
+
+		if (!data->loopback) {
+			continue;
+		}
+
 		k_mutex_lock(&data->mtx, K_FOREVER);
 
 		for (int i = 0; i < CONFIG_CAN_MAX_FILTER; i++) {
 			filter = &data->filters[i];
-			if (filter->rx_cb &&
+			if (filter->rx_cb != NULL &&
 			    can_utils_filter_match(&frame.frame, &filter->filter)) {
-				dispatch_frame(dev, &frame.frame, filter);
+				receive_frame(dev, &frame.frame, filter);
 			}
 		}
 
 		k_mutex_unlock(&data->mtx);
-		frame.cb(dev, 0, frame.cb_arg);
 	}
 }
 
@@ -134,17 +139,17 @@ static int can_loopback_send(const struct device *dev,
 		return -ENETDOWN;
 	}
 
-	if (!data->loopback) {
-		return 0;
-	}
-
 	loopback_frame.frame = *frame;
 	loopback_frame.cb = callback;
 	loopback_frame.cb_arg = user_data;
 
 	ret = k_msgq_put(&data->tx_msgq, &loopback_frame, timeout);
+	if (ret < 0) {
+		LOG_DBG("TX queue full (err %d)", ret);
+		return -EAGAIN;
+	}
 
-	return  ret ? -EAGAIN : 0;
+	return 0;
 }
 
 
@@ -197,6 +202,11 @@ static int can_loopback_add_rx_filter(const struct device *dev, can_rx_callback_
 static void can_loopback_remove_rx_filter(const struct device *dev, int filter_id)
 {
 	struct can_loopback_data *data = dev->data;
+
+	if (filter_id >= ARRAY_SIZE(data->filters)) {
+		LOG_ERR("filter ID %d out-of-bounds", filter_id);
+		return;
+	}
 
 	LOG_DBG("Remove filter ID: %d", filter_id);
 	k_mutex_lock(&data->mtx, K_FOREVER);

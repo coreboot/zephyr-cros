@@ -7,6 +7,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/kernel.h>
 #include <zephyr/types.h>
 
 #include "ascs_internal.h"
@@ -30,24 +31,6 @@ struct bt_audio_unicast_group;
 struct bt_audio_broadcast_source;
 struct bt_audio_broadcast_sink;
 struct bt_audio_ep;
-
-struct bt_audio_iso {
-	struct bt_iso_chan iso_chan;
-	struct bt_iso_chan_qos iso_qos;
-	struct bt_iso_chan_io_qos sink_io_qos;
-	struct bt_iso_chan_io_qos source_io_qos;
-	struct bt_iso_chan_path sink_path;
-	/* TODO: The sink/source path CC will basically be a duplicate of
-	 * bt_codec.data, but since struct bt_codec stores the information as an
-	 * array of bt_codec_data, and ISO expect a uint8_t array, we need to
-	 * duplicate the data. This should be optimized.
-	 */
-	uint8_t sink_path_cc[CONFIG_BT_CODEC_MAX_DATA_COUNT * CONFIG_BT_CODEC_MAX_DATA_LEN];
-	struct bt_iso_chan_path	source_path;
-	uint8_t source_path_cc[CONFIG_BT_CODEC_MAX_DATA_COUNT * CONFIG_BT_CODEC_MAX_DATA_LEN];
-	struct bt_audio_stream *sink_stream;
-	struct bt_audio_stream *source_stream;
-};
 
 struct bt_audio_ep {
 	uint8_t  dir;
@@ -80,6 +63,9 @@ struct bt_audio_ep {
 	struct bt_audio_unicast_group *unicast_group;
 	struct bt_audio_broadcast_source *broadcast_source;
 	struct bt_audio_broadcast_sink *broadcast_sink;
+
+	/* ASCS ASE Control Point Work */
+	struct k_work work;
 };
 
 struct bt_audio_unicast_group {

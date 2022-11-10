@@ -21,7 +21,7 @@
 
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/capabilities.h>
+#include <zephyr/bluetooth/audio/pacs.h>
 
 #include "bt.h"
 
@@ -684,11 +684,11 @@ static const struct bt_audio_unicast_server_cb unicast_server_cb = {
 	.release = lc3_release,
 };
 
-static struct bt_audio_capability caps_sink = {
+static struct bt_pacs_cap cap_sink = {
 	.codec = &lc3_codec,
 };
 
-static struct bt_audio_capability caps_source = {
+static struct bt_pacs_cap cap_source = {
 	.codec = &lc3_codec,
 };
 
@@ -1028,8 +1028,77 @@ static int cmd_qos(const struct shell *sh, size_t argc, char *argv[])
 	return 0;
 }
 
+static uint16_t strmeta(const char *name)
+{
+	if (strcmp(name, "Unspecified") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED;
+	} else if (strcmp(name, "Conversational") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_CONVERSATIONAL;
+	} else if (strcmp(name, "Media") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_MEDIA;
+	} else if (strcmp(name, "Game") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_GAME;
+	} else if (strcmp(name, "Instructional") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_INSTRUCTIONAL;
+	} else if (strcmp(name, "VoiceAssistants") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_VOICE_ASSISTANTS;
+	} else if (strcmp(name, "Live") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_LIVE;
+	} else if (strcmp(name, "SoundEffects") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_SOUND_EFFECTS;
+	} else if (strcmp(name, "Notifications") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_NOTIFICATIONS;
+	} else if (strcmp(name, "Ringtone") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_RINGTONE;
+	} else if (strcmp(name, "Alerts") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_ALERTS;
+	} else if (strcmp(name, "EmergencyAlarm") == 0) {
+		return BT_AUDIO_CONTEXT_TYPE_EMERGENCY_ALARM;
+	}
+
+	return 0u;
+}
+
+static int handle_metadata_update(const char *meta_str,
+				  struct bt_codec_data *meta_out[],
+				  size_t *meta_count_out)
+{
+	static struct bt_codec_data meta[CONFIG_BT_CODEC_MAX_METADATA_COUNT];
+	size_t meta_count;
+
+	/* We create a copy of the preset meta, as the presets cannot be modified */
+	meta_count = default_preset->preset.codec.meta_count;
+	(void)memset(meta, 0, sizeof(meta));
+	for (size_t i = 0U; i < meta_count; i++) {
+		(void)memcpy(meta[i].value,
+			     default_preset->preset.codec.meta[i].data.data,
+			     default_preset->preset.codec.meta[i].data.data_len);
+		meta[i].data.data_len = default_preset->preset.codec.meta[i].data.data_len;
+		meta[i].data.data = meta[i].value;
+	}
+
+	if (meta_str != NULL) {
+		uint16_t context;
+
+		context = strmeta(meta_str);
+		if (context == 0) {
+			return -ENOEXEC;
+		}
+
+		/* TODO: Check the type and only overwrite the streaming context */
+		sys_put_le16(context, meta[0].value);
+	}
+
+	*meta_count_out = meta_count;
+	*meta_out = meta;
+
+	return 0;
+}
+
 static int cmd_enable(const struct shell *sh, size_t argc, char *argv[])
 {
+	struct bt_codec_data *meta;
+	size_t meta_count;
 	int err;
 
 	if (default_stream == NULL) {
@@ -1037,9 +1106,18 @@ static int cmd_enable(const struct shell *sh, size_t argc, char *argv[])
 		return -ENOEXEC;
 	}
 
-	err = bt_audio_stream_enable(default_stream,
-				     default_preset->preset.codec.meta,
-				     default_preset->preset.codec.meta_count);
+	if (argc > 1) {
+		err = handle_metadata_update(argv[1], &meta, &meta_count);
+	} else {
+		err = handle_metadata_update(NULL, &meta, &meta_count);
+	}
+
+	if (err != 0) {
+		shell_error(sh, "Unable to handle metadata update: %d", err);
+		return err;
+	}
+
+	err = bt_audio_stream_enable(default_stream, meta, meta_count);
 	if (err) {
 		shell_error(sh, "Unable to enable Channel");
 		return -ENOEXEC;
@@ -1051,39 +1129,10 @@ static int cmd_enable(const struct shell *sh, size_t argc, char *argv[])
 #define MAX_META_DATA \
 	(CONFIG_BT_CODEC_MAX_METADATA_COUNT * sizeof(struct bt_codec_data))
 
-static uint16_t strmeta(const char *name)
-{
-	if (!strcmp(name, "Unspecified")) {
-		return BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED;
-	} else if (!strcmp(name, "Conversational")) {
-		return BT_AUDIO_CONTEXT_TYPE_CONVERSATIONAL;
-	} else if (!strcmp(name, "Media")) {
-		return BT_AUDIO_CONTEXT_TYPE_MEDIA;
-	} else if (!strcmp(name, "Game")) {
-		return BT_AUDIO_CONTEXT_TYPE_GAME;
-	} else if (!strcmp(name, "Instructional")) {
-		return BT_AUDIO_CONTEXT_TYPE_INSTRUCTIONAL;
-	} else if (!strcmp(name, "VoiceAssistants")) {
-		return BT_AUDIO_CONTEXT_TYPE_VOICE_ASSISTANTS;
-	} else if (!strcmp(name, "Live")) {
-		return BT_AUDIO_CONTEXT_TYPE_LIVE;
-	} else if (!strcmp(name, "SoundEffects")) {
-		return BT_AUDIO_CONTEXT_TYPE_SOUND_EFFECTS;
-	} else if (!strcmp(name, "Notifications")) {
-		return BT_AUDIO_CONTEXT_TYPE_NOTIFICATIONS;
-	} else if (!strcmp(name, "Ringtone")) {
-		return BT_AUDIO_CONTEXT_TYPE_RINGTONE;
-	} else if (!strcmp(name, "Alerts")) {
-		return BT_AUDIO_CONTEXT_TYPE_ALERTS;
-	} else if (!strcmp(name, "EmergencyAlarm")) {
-		return BT_AUDIO_CONTEXT_TYPE_EMERGENCY_ALARM;
-	}
-
-	return 0u;
-}
-
 static int cmd_metadata(const struct shell *sh, size_t argc, char *argv[])
 {
+	struct bt_codec_data *meta;
+	size_t meta_count;
 	int err;
 
 	if (default_stream == NULL) {
@@ -1092,16 +1141,14 @@ static int cmd_metadata(const struct shell *sh, size_t argc, char *argv[])
 	}
 
 	if (argc > 1) {
-		uint16_t context;
+		err = handle_metadata_update(argv[1], &meta, &meta_count);
+	} else {
+		err = handle_metadata_update(NULL, &meta, &meta_count);
+	}
 
-		context = strmeta(argv[1]);
-		if (context == 0) {
-			shell_error(sh, "Invalid context");
-			return -ENOEXEC;
-		}
-
-		sys_put_le16(context,
-			     default_preset->preset.codec.meta[0].value);
+	if (err != 0) {
+		shell_error(sh, "Unable to handle metadata update: %d", err);
+		return err;
 	}
 
 	err = bt_audio_stream_metadata(default_stream,
@@ -1697,7 +1744,7 @@ static int cmd_set_loc(const struct shell *sh, size_t argc, char *argv[])
 	}
 
 	loc = shell_strtoul(argv[2], 16, &err);
-	err = bt_audio_capability_set_location(dir, loc);
+	err = bt_pacs_set_location(dir, loc);
 	if (err) {
 		shell_error(ctx_shell, "Set available contexts err %d", err);
 		return -ENOEXEC;
@@ -1727,7 +1774,7 @@ static int cmd_context(const struct shell *sh, size_t argc, char *argv[])
 		return err;
 	}
 
-	err = bt_audio_capability_set_available_contexts(dir, ctx);
+	err = bt_pacs_set_available_contexts(dir, ctx);
 	if (err) {
 		shell_error(ctx_shell, "Set available contexts err %d", err);
 		return err;
@@ -1753,33 +1800,29 @@ static int cmd_init(const struct shell *sh, size_t argc, char *argv[])
 
 	if (IS_ENABLED(CONFIG_BT_AUDIO_UNICAST_SERVER) ||
 	    IS_ENABLED(CONFIG_BT_AUDIO_BROADCAST_SINK)) {
-		bt_audio_capability_register(BT_AUDIO_DIR_SINK, &caps_sink);
+		bt_pacs_cap_register(BT_AUDIO_DIR_SINK, &cap_sink);
 	}
 
 	if (IS_ENABLED(CONFIG_BT_AUDIO_UNICAST_SERVER)) {
-		bt_audio_capability_register(BT_AUDIO_DIR_SOURCE, &caps_source);
+		bt_pacs_cap_register(BT_AUDIO_DIR_SOURCE, &cap_source);
 	}
 
-	if (IS_ENABLED(CONFIG_BT_AUDIO_CAPABILITY)) {
-		if (IS_ENABLED(CONFIG_BT_PAC_SNK_LOC)) {
-			err = bt_audio_capability_set_location(BT_AUDIO_DIR_SINK,
-							       LOCATION);
-			__ASSERT(err == 0, "Failed to set sink location");
+	if (IS_ENABLED(CONFIG_BT_PAC_SNK_LOC)) {
+		err = bt_pacs_set_location(BT_AUDIO_DIR_SINK, LOCATION);
+		__ASSERT(err == 0, "Failed to set sink location");
 
-			err = bt_audio_capability_set_available_contexts(BT_AUDIO_DIR_SINK,
-									 CONTEXT);
-			__ASSERT(err == 0, "Failed to set sink available contexts");
-		}
+		err = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SINK,
+						     CONTEXT);
+		__ASSERT(err == 0, "Failed to set sink available contexts");
+	}
 
-		if (IS_ENABLED(CONFIG_BT_PAC_SRC_LOC)) {
-			err = bt_audio_capability_set_location(BT_AUDIO_DIR_SOURCE,
-							       LOCATION);
-			__ASSERT(err == 0, "Failed to set source location");
+	if (IS_ENABLED(CONFIG_BT_PAC_SRC_LOC)) {
+		err = bt_pacs_set_location(BT_AUDIO_DIR_SOURCE, LOCATION);
+		__ASSERT(err == 0, "Failed to set source location");
 
-			err = bt_audio_capability_set_available_contexts(BT_AUDIO_DIR_SOURCE,
-									 CONTEXT);
-			__ASSERT(err == 0, "Failed to set source available contexts");
-		}
+		err = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SOURCE,
+						     CONTEXT);
+		__ASSERT(err == 0, "Failed to set source available contexts");
 	}
 
 #if defined(CONFIG_BT_AUDIO_UNICAST)
@@ -1818,20 +1861,15 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 	int ret, len;
 	struct net_buf *buf;
 
-	if (default_stream->iso->qos->tx == NULL) {
-		shell_error(sh, "Stream %p cannot send", default_stream);
-		return -ENOEXEC;
-	}
-
 	if (argc > 1) {
 		len = hex2bin(argv[1], strlen(argv[1]), data, sizeof(data));
-		if (len > default_stream->iso->qos->tx->sdu) {
+		if (len > default_preset->preset.qos.sdu) {
 			shell_print(sh, "Unable to send: len %d > %u MTU",
-				    len, default_stream->iso->qos->tx->sdu);
+				    len, default_preset->preset.qos.sdu);
 			return -ENOEXEC;
 		}
 	} else {
-		len = MIN(default_stream->iso->qos->tx->sdu, sizeof(data));
+		len = MIN(default_preset->preset.qos.sdu, sizeof(data));
 		memset(data, 0xff, len);
 	}
 
@@ -1927,10 +1965,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(audio_cmds,
 	SHELL_CMD_ARG(stop_sine, NULL, "Stop sending a LC3 encoded sine wave",
 			   cmd_stop_sine, 1, 0),
 #endif /* CONFIG_LIBLC3 */
-	SHELL_COND_CMD_ARG(CONFIG_BT_AUDIO_CAPABILITY, set_location, NULL,
+	SHELL_COND_CMD_ARG(CONFIG_BT_PACS, set_location, NULL,
 			   "<direction: sink, source> <location bitmask>",
 			   cmd_set_loc, 3, 0),
-	SHELL_COND_CMD_ARG(CONFIG_BT_AUDIO_CAPABILITY, add_context, NULL,
+	SHELL_COND_CMD_ARG(CONFIG_BT_PACS, add_context, NULL,
 			   "<direction: sink, source> <context bitmask>",
 			   cmd_context, 3, 0),
 	SHELL_SUBCMD_SET_END
@@ -1977,10 +2015,10 @@ ssize_t audio_ad_data_add(struct bt_data *data_array, const size_t data_array_si
 		};
 		enum bt_audio_context snk_context, src_context;
 
-		snk_context = bt_audio_capability_get_available_contexts(BT_AUDIO_DIR_SINK);
+		snk_context = bt_pacs_get_available_contexts(BT_AUDIO_DIR_SINK);
 		sys_put_le16(snk_context, &ad_bap_announcement[3]);
 
-		src_context = bt_audio_capability_get_available_contexts(BT_AUDIO_DIR_SOURCE);
+		src_context = bt_pacs_get_available_contexts(BT_AUDIO_DIR_SOURCE);
 		sys_put_le16(snk_context, &ad_bap_announcement[5]);
 
 		/* Metadata length */

@@ -7,7 +7,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/net/buf.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
 #include <zephyr/mgmt/mcumgr/smp.h>
 #include <mgmt/mgmt.h>
 #include <smp/smp.h>
@@ -35,15 +34,15 @@ int smp_reassembly_collect(struct smp_transport *smpt, const void *buf, uint16_t
 		 * Collecting the first fragment: need to allocate buffer for it and prepare
 		 * the reassembly context.
 		 */
-		if (len >= sizeof(struct mgmt_hdr)) {
-			uint16_t expected = sys_be16_to_cpu(((struct mgmt_hdr *)buf)->nh_len);
+		if (len >= sizeof(struct smp_hdr)) {
+			uint16_t expected = sys_be16_to_cpu(((struct smp_hdr *)buf)->nh_len);
 
 			/*
 			 * The length field in the header does not count the header size,
 			 * but the reassembly does so the size needs to be added to the number of
 			 * expected bytes.
 			 */
-			expected += sizeof(struct mgmt_hdr);
+			expected += sizeof(struct smp_hdr);
 
 			/* Joining net_bufs not supported yet */
 			if (len > CONFIG_MCUMGR_BUF_SIZE || expected > CONFIG_MCUMGR_BUF_SIZE) {
@@ -54,7 +53,7 @@ int smp_reassembly_collect(struct smp_transport *smpt, const void *buf, uint16_t
 				return -EOVERFLOW;
 			}
 
-			smpt->__reassembly.current = mcumgr_buf_alloc();
+			smpt->__reassembly.current = smp_packet_alloc();
 			if (smpt->__reassembly.current != NULL) {
 				smpt->__reassembly.expected = expected;
 			} else {
@@ -103,7 +102,7 @@ int smp_reassembly_drop(struct smp_transport *smpt)
 		return -EINVAL;
 	}
 
-	mcumgr_buf_free(smpt->__reassembly.current);
+	smp_packet_free(smpt->__reassembly.current);
 	smpt->__reassembly.expected = 0;
 	smpt->__reassembly.current = NULL;
 

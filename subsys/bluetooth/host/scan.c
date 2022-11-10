@@ -25,6 +25,7 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_CORE)
 #define LOG_MODULE_NAME bt_scan
 #include "common/log.h"
+#include "common/bt_str.h"
 
 static bt_le_scan_cb_t *scan_dev_found_cb;
 static sys_slist_t scan_cbs = SYS_SLIST_STATIC_INIT(&scan_cbs);
@@ -855,6 +856,29 @@ static int per_adv_sync_terminate(uint16_t handle)
 				    NULL);
 }
 
+static void per_adv_sync_terminated(struct bt_le_per_adv_sync *per_adv_sync,
+				    uint8_t reason)
+{
+	/* Terminate the PA sync and notify app */
+	const struct bt_le_per_adv_sync_term_info term_info = {
+		.addr = &per_adv_sync->addr,
+		.sid = per_adv_sync->sid,
+		.reason = reason,
+	};
+	struct bt_le_per_adv_sync_cb *listener;
+
+	/* Deleting before callback, so the caller will be able
+	 * to restart sync in the callback.
+	 */
+	per_adv_sync_delete(per_adv_sync);
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&pa_sync_cbs, listener, node) {
+		if (listener->term) {
+			listener->term(per_adv_sync, &term_info);
+		}
+	}
+}
+
 void bt_hci_le_per_adv_sync_established(struct net_buf *buf)
 {
 	struct bt_hci_evt_le_per_adv_sync_established *evt =
@@ -904,26 +928,20 @@ void bt_hci_le_per_adv_sync_established(struct net_buf *buf)
 
 	if (unexpected_evt || evt->status != BT_HCI_ERR_SUCCESS) {
 		if (pending_per_adv_sync) {
-			struct bt_le_per_adv_sync_term_info term_info;
+			const uint8_t reason = unexpected_evt ? BT_HCI_ERR_UNSPECIFIED
+							      : evt->status;
 
-			/* Terminate the pending PA sync and notify app */
-			term_info.addr = &evt->adv_addr;
-			term_info.sid = evt->sid;
-			term_info.reason = unexpected_evt ? BT_HCI_ERR_UNSPECIFIED : evt->status;
-
-			/* Deleting before callback, so the caller will be able
-			 * to restart sync in the callback.
-			 */
-			per_adv_sync_delete(pending_per_adv_sync);
-
-			SYS_SLIST_FOR_EACH_CONTAINER(&pa_sync_cbs,
-						     listener,
-						     node) {
-				if (listener->term) {
-					listener->term(pending_per_adv_sync,
-						       &term_info);
-				}
+			if (atomic_test_bit(pending_per_adv_sync->flags,
+					    BT_PER_ADV_SYNC_SYNCING_USE_LIST)) {
+				/* Update the addr and sid for the callback
+				 * Already set if not using the sync list
+				 */
+				bt_addr_le_copy(&pending_per_adv_sync->addr,
+						&evt->adv_addr);
+				pending_per_adv_sync->sid = evt->sid;
 			}
+
+			per_adv_sync_terminated(pending_per_adv_sync, reason);
 		}
 		return;
 	}
@@ -979,9 +997,7 @@ void bt_hci_le_per_adv_sync_lost(struct net_buf *buf)
 {
 	struct bt_hci_evt_le_per_adv_sync_lost *evt =
 		(struct bt_hci_evt_le_per_adv_sync_lost *)buf->data;
-	struct bt_le_per_adv_sync_term_info term_info;
 	struct bt_le_per_adv_sync *per_adv_sync;
-	struct bt_le_per_adv_sync_cb *listener;
 
 	per_adv_sync = bt_hci_get_per_adv_sync(sys_le16_to_cpu(evt->handle));
 
@@ -991,22 +1007,8 @@ void bt_hci_le_per_adv_sync_lost(struct net_buf *buf)
 		return;
 	}
 
-	term_info.addr = &per_adv_sync->addr;
-	term_info.sid = per_adv_sync->sid;
 	/* There is no status in the per. adv. sync lost event */
-	term_info.reason = BT_HCI_ERR_UNSPECIFIED;
-
-	/* Deleting before callback, so the caller will be able to restart
-	 * sync in the callback
-	 */
-	per_adv_sync_delete(per_adv_sync);
-
-
-	SYS_SLIST_FOR_EACH_CONTAINER(&pa_sync_cbs, listener, node) {
-		if (listener->term) {
-			listener->term(per_adv_sync, &term_info);
-		}
-	}
+	per_adv_sync_terminated(per_adv_sync, BT_HCI_ERR_UNSPECIFIED);
 }
 
 #if defined(CONFIG_BT_CONN)
@@ -1557,7 +1559,8 @@ int bt_le_per_adv_sync_delete(struct bt_le_per_adv_sync *per_adv_sync)
 		err = bt_le_per_adv_sync_terminate(per_adv_sync);
 
 		if (!err) {
-			per_adv_sync_delete(per_adv_sync);
+			per_adv_sync_terminated(per_adv_sync,
+						BT_HCI_ERR_LOCALHOST_TERM_CONN);
 		}
 	} else if (get_pending_per_adv_sync() == per_adv_sync) {
 		err = bt_le_per_adv_sync_create_cancel(per_adv_sync);

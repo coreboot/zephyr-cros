@@ -9,7 +9,6 @@
 
 #include <inttypes.h>
 #include <zephyr/sys/slist.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,24 +60,6 @@ extern "C" {
 #define MGMT_EVT_OP_CMD_RECV	0x01
 #define MGMT_EVT_OP_CMD_STATUS	0x02
 #define MGMT_EVT_OP_CMD_DONE	0x03
-
-struct mgmt_hdr {
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	uint8_t  nh_op:3;		/* MGMT_OP_[...] */
-	uint8_t  _res1:5;
-#endif
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-	uint8_t  _res1:5;
-	uint8_t  nh_op:3;		/* MGMT_OP_[...] */
-#endif
-	uint8_t  nh_flags;		/* Reserved for future flags */
-	uint16_t nh_len;		/* Length of the payload */
-	uint16_t nh_group;		/* MGMT_GROUP_ID_[...] */
-	uint8_t  nh_seq;		/* Sequence number */
-	uint8_t  nh_id;			/* Message ID within group */
-};
-
-#define nmgr_hdr mgmt_hdr
 
 /*
  * MGMT_EVT_OP_CMD_STATUS argument
@@ -206,20 +187,6 @@ void mgmt_unregister_group(struct mgmt_group *group);
  *		NULL on failure.
  */
 const struct mgmt_handler *mgmt_find_handler(uint16_t group_id, uint16_t command_id);
-
-/**
- * @brief Byte-swaps an mcumgr header from network to host byte order.
- *
- * @param hdr The mcumgr header to byte-swap.
- */
-void mgmt_ntoh_hdr(struct mgmt_hdr *hdr);
-
-/**
- * @brief Byte-swaps an mcumgr header from host to network byte order.
- *
- * @param hdr The mcumgr header to byte-swap.
- */
-void mgmt_hton_hdr(struct mgmt_hdr *hdr);
 
 /**
  * @brief Register event callback function.
