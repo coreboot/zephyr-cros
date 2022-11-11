@@ -436,7 +436,7 @@ static int do_registration_reply_cb(const struct coap_packet *response,
 {
 	struct coap_option options[2];
 	uint8_t code;
-	int ret;
+	int ret = -EINVAL;
 
 	code = coap_header_get_code(response);
 	LOG_DBG("Registration callback (code:%u.%u)",
@@ -448,8 +448,9 @@ static int do_registration_reply_cb(const struct coap_packet *response,
 		ret = coap_find_options(response, COAP_OPTION_LOCATION_PATH,
 					options, 2);
 		if (ret < 2) {
-			LOG_ERR("Unexpected endpoint data returned.");
-			return -EINVAL;
+			LOG_ERR("Unexpected endpoint data returned. ret = %d", ret);
+			ret = -EINVAL;
+			goto fail;
 		}
 
 		/* option[0] should be "rd" */
@@ -459,7 +460,8 @@ static int do_registration_reply_cb(const struct coap_packet *response,
 				    "%u (expected %zu)\n",
 				    options[1].len,
 				    sizeof(client.server_ep));
-			return -EINVAL;
+			ret = -EINVAL;
+			goto fail;
 		}
 
 		/* remember the last reg time */
@@ -478,10 +480,10 @@ static int do_registration_reply_cb(const struct coap_packet *response,
 	LOG_ERR("Failed with code %u.%u (%s). Not Retrying.",
 		COAP_RESPONSE_CODE_CLASS(code), COAP_RESPONSE_CODE_DETAIL(code),
 		code2str(code));
-
+fail:
 	sm_handle_failure_state(ENGINE_IDLE);
 
-	return 0;
+	return ret;
 }
 
 static void do_registration_timeout_cb(struct lwm2m_message *msg)
@@ -1352,11 +1354,12 @@ int lwm2m_rd_client_stop(struct lwm2m_ctx *client_ctx,
 
 	LOG_INF("Stop LWM2M Client: %s", client.ep_name);
 
+	k_mutex_unlock(&client.mutex);
 
 	while (get_sm_state() != ENGINE_IDLE) {
 		k_sleep(K_MSEC(STATE_MACHINE_UPDATE_INTERVAL_MS / 2));
 	}
-	k_mutex_unlock(&client.mutex);
+
 	return 0;
 }
 

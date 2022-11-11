@@ -524,6 +524,7 @@ class TestPlan:
                 if status in ["error", "failed"]:
                     instance.status = None
                     instance.reason = None
+                    instance.retries += 1
                 # test marked as passed (built only) but can run when
                 # --test-only is used. Reset status to capture new results.
                 elif status == 'passed' and instance.run and self.options.test_only:
@@ -556,7 +557,9 @@ class TestPlan:
 
         toolchain = self.env.toolchain
         platform_filter = self.options.platform
-        exclude_platform = self.options.exclude_platform
+        # temporary workaround for exclusion of boards. setting twister in
+        # board yaml file to False does not really work. Need a better solution for the future.
+        exclude_platform = ['mec15xxevb_assy6853','mec1501modular_assy6885'] + self.options.exclude_platform
         testsuite_filter = self.run_individual_testsuite
         arch_filter = self.options.arch
         tag_filter = self.options.tag

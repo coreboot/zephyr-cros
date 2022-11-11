@@ -39,7 +39,6 @@ struct regulator_data {
 	struct onoff_sync_service srv;
 	const struct voltage_range *voltages;
 	const struct current_range *current_levels;
-	uint8_t reg_offset;
 };
 
 struct regulator_config {
@@ -54,6 +53,7 @@ struct regulator_config {
 	uint8_t enable_mask;
 	uint8_t enable_val;
 	bool enable_inverted;
+	bool boot_on;
 	uint8_t ilim_reg;
 	uint8_t ilim_mask;
 	struct i2c_dt_spec i2c;
@@ -74,11 +74,8 @@ static int regulator_read_register(const struct device *dev,
 	uint8_t reg, uint8_t *out)
 {
 	const struct regulator_config *conf = dev->config;
-	struct regulator_data *data = dev->data;
 	int ret;
 
-	/* Apply mode offset to register */
-	reg += data->reg_offset;
 	ret = i2c_reg_read_byte_dt(&conf->i2c, reg, out);
 	LOG_DBG("READ 0x%x: 0x%x", reg, *out);
 	return ret;
@@ -92,7 +89,6 @@ static int regulator_modify_register(const struct device *dev,
 		uint8_t reg, uint8_t reg_mask, uint8_t reg_val)
 {
 	const struct regulator_config *conf = dev->config;
-	struct regulator_data *data = dev->data;
 	uint8_t reg_current;
 	int rc;
 
@@ -101,13 +97,75 @@ static int regulator_modify_register(const struct device *dev,
 		return rc;
 	}
 
-	/* Apply mode offset to register */
-	reg += data->reg_offset;
 	reg_current &= ~reg_mask;
 	reg_current |= (reg_val & reg_mask);
 	LOG_DBG("WRITE 0x%02X to 0x%02X at I2C addr 0x%02X", reg_current,
 		reg, conf->i2c.addr);
 	return i2c_reg_write_byte_dt(&conf->i2c, reg, reg_current);
+}
+
+/*
+ * Internal helper function- gets the voltage from a regulator, with an
+ * offset applied to the vsel_reg. Useful to support reading voltages
+ * in another target mode
+ */
+static int regulator_get_voltage_offset(const struct device *dev, uint32_t off)
+{
+	const struct regulator_config *config = dev->config;
+	struct regulator_data *data = dev->data;
+	int rc, i = 0;
+	uint8_t raw_reg;
+
+	rc = regulator_read_register(dev, config->vsel_reg + off, &raw_reg);
+	if (rc) {
+		return rc;
+	}
+	raw_reg &= config->vsel_mask;
+	/* Locate the voltage value in the voltage table */
+	while (i < config->num_voltages &&
+		raw_reg != data->voltages[i].reg_val){
+		i++;
+	}
+	if (i == config->num_voltages) {
+		LOG_WRN("Regulator vsel reg has unknown value");
+		return -EIO;
+	}
+	return data->voltages[i].uV;
+}
+
+/**
+ * Internal helper function- sets the voltage for a regulator, with an
+ * offset applied to the vsel_reg. Useful to support setting voltages in
+ * another target mode.
+ */
+static int regulator_set_voltage_offset(const struct device *dev, int min_uV,
+	int max_uV, uint32_t off)
+{
+	const struct regulator_config *config = dev->config;
+	struct regulator_data *data = dev->data;
+	int i = 0;
+
+	if (!regulator_is_supported_voltage(dev, min_uV, max_uV) ||
+		min_uV > max_uV) {
+		return -EINVAL;
+	}
+	/* Find closest supported voltage */
+	while (i < config->num_voltages && min_uV > data->voltages[i].uV) {
+		i++;
+	}
+	if (data->voltages[i].uV > max_uV) {
+		LOG_DBG("Regulator could not satisfy voltage range, too narrow");
+		return -EINVAL;
+	}
+	if (i == config->num_voltages) {
+		LOG_WRN("Regulator could not locate supported voltage,"
+				"but voltage is in range.");
+		return -EINVAL;
+	}
+	LOG_DBG("Setting regulator %s to %duV", dev->name,
+			data->voltages[i].uV);
+	return regulator_modify_register(dev, config->vsel_reg + off,
+			config->vsel_mask, data->voltages[i].reg_val);
 }
 
 
@@ -166,32 +224,9 @@ int regulator_is_supported_voltage(const struct device *dev,
  */
 int regulator_set_voltage(const struct device *dev, int min_uV, int max_uV)
 {
-	const struct regulator_config *config = dev->config;
-	struct regulator_data *data = dev->data;
-	int i = 0;
-
-	if (!regulator_is_supported_voltage(dev, min_uV, max_uV) ||
-		min_uV > max_uV) {
-		return -EINVAL;
-	}
-	/* Find closest supported voltage */
-	while (i < config->num_voltages && min_uV > data->voltages[i].uV) {
-		i++;
-	}
-	if (data->voltages[i].uV > max_uV) {
-		LOG_DBG("Regulator could not satisfy voltage range, too narrow");
-		return -EINVAL;
-	}
-	if (i == config->num_voltages) {
-		LOG_WRN("Regulator could not locate supported voltage,"
-				"but voltage is in range.");
-		return -EINVAL;
-	}
-	LOG_DBG("Setting regulator %s to %duV", dev->name,
-			data->voltages[i].uV);
-	return regulator_modify_register(dev, config->vsel_reg,
-			config->vsel_mask, data->voltages[i].reg_val);
+	return regulator_set_voltage_offset(dev, min_uV, max_uV, 0);
 }
+
 
 /**
  * Part of the extended regulator consumer API
@@ -199,26 +234,7 @@ int regulator_set_voltage(const struct device *dev, int min_uV, int max_uV)
  */
 int regulator_get_voltage(const struct device *dev)
 {
-	const struct regulator_config *config = dev->config;
-	struct regulator_data *data = dev->data;
-	int rc, i = 0;
-	uint8_t raw_reg;
-
-	rc = regulator_read_register(dev, config->vsel_reg, &raw_reg);
-	if (rc) {
-		return rc;
-	}
-	raw_reg &= config->vsel_mask;
-	/* Locate the voltage value in the voltage table */
-	while (i < config->num_voltages &&
-		raw_reg != data->voltages[i].reg_val){
-		i++;
-	}
-	if (i == config->num_voltages) {
-		LOG_WRN("Regulator vsel reg has unknown value");
-		return -EIO;
-	}
-	return data->voltages[i].uV;
+	return regulator_get_voltage_offset(dev, 0);
 }
 
 /**
@@ -279,16 +295,133 @@ int regulator_get_current_limit(const struct device *dev)
 }
 
 /*
+ * Part of the extended regulator consumer API.
+ * sets the target voltage for a given regulator mode. This mode does
+ * not need to be the active mode. This API can be used to configure
+ * voltages for a mode, then the regulator can be switched to that mode
+ * with the regulator_set_mode api
+ */
+int regulator_set_mode_voltage(const struct device *dev, uint32_t mode,
+	uint32_t min_uV, uint32_t max_uV)
+{
+	const struct regulator_config *config = dev->config;
+	uint8_t i, sel_off;
+
+	if (config->num_modes == 0) {
+		return -ENOTSUP;
+	}
+
+	/* Search for mode ID in allowed modes. */
+	for (i = 0 ; i < config->num_modes; i++) {
+		if (config->allowed_modes[i] == mode) {
+			break;
+		}
+	}
+	if (i == config->num_modes) {
+		/* Mode was not found */
+		return -EINVAL;
+	}
+	sel_off = ((mode & PMIC_MODE_OFFSET_MASK) >> PMIC_MODE_OFFSET_SHIFT);
+	return regulator_set_voltage_offset(dev, min_uV, max_uV, sel_off);
+}
+
+/*
+ * Part of the extended regulator consumer API.
+ * Disables the regulator in a given mode. Does not implement the
+ * onoff service, as this is incompatible with multiple mode operation
+ */
+int regulator_mode_disable(const struct device *dev, uint32_t mode)
+{
+	const struct regulator_config *config = dev->config;
+	uint8_t i, sel_off, dis_val;
+
+	if (config->num_modes == 0) {
+		return -ENOTSUP;
+	}
+
+	/* Search for mode ID in allowed modes. */
+	for (i = 0 ; i < config->num_modes; i++) {
+		if (config->allowed_modes[i] == mode) {
+			break;
+		}
+	}
+	if (i == config->num_modes) {
+		/* Mode was not found */
+		return -EINVAL;
+	}
+	sel_off = ((mode & PMIC_MODE_OFFSET_MASK) >> PMIC_MODE_OFFSET_SHIFT);
+	dis_val = config->enable_inverted ? config->enable_val : 0;
+	return regulator_modify_register(dev, config->enable_reg + sel_off,
+			config->enable_mask, dis_val);
+}
+
+/*
+ * Part of the extended regulator consumer API.
+ * Enables the regulator in a given mode. Does not implement the
+ * onoff service, as this is incompatible with multiple mode operation
+ */
+int regulator_mode_enable(const struct device *dev, uint32_t mode)
+{
+	const struct regulator_config *config = dev->config;
+	uint8_t i, sel_off, en_val;
+
+	if (config->num_modes == 0) {
+		return -ENOTSUP;
+	}
+
+	/* Search for mode ID in allowed modes. */
+	for (i = 0 ; i < config->num_modes; i++) {
+		if (config->allowed_modes[i] == mode) {
+			break;
+		}
+	}
+	if (i == config->num_modes) {
+		/* Mode was not found */
+		return -EINVAL;
+	}
+	sel_off = ((mode & PMIC_MODE_OFFSET_MASK) >> PMIC_MODE_OFFSET_SHIFT);
+	en_val = config->enable_inverted ? 0 : config->enable_val;
+	return regulator_modify_register(dev, config->enable_reg + sel_off,
+			config->enable_mask, en_val);
+}
+
+/*
+ * Part of the extended regulator consumer API.
+ * gets the target voltage for a given regulator mode. This mode does
+ * not need to be the active mode. This API can be used to read voltages
+ * from a regulator mode other than the default.
+ */
+int regulator_get_mode_voltage(const struct device *dev, uint32_t mode)
+{
+	const struct regulator_config *config = dev->config;
+	uint8_t i, sel_off;
+
+	if (config->num_modes == 0) {
+		return -ENOTSUP;
+	}
+
+	/* Search for mode ID in allowed modes. */
+	for (i = 0 ; i < config->num_modes; i++) {
+		if (config->allowed_modes[i] == mode) {
+			break;
+		}
+	}
+	if (i == config->num_modes) {
+		/* Mode was not found */
+		return -EINVAL;
+	}
+	sel_off = ((mode & PMIC_MODE_OFFSET_MASK) >> PMIC_MODE_OFFSET_SHIFT);
+	return regulator_get_voltage_offset(dev, sel_off);
+}
+
+/*
  * Part of the extended regulator consumer API
  * switches the regulator to a given mode. This API will apply a mode for
- * the regulator, and also configure the remainder of the regulator APIs,
- * such as those disabling, changing voltage/current targets, or querying
- * voltage/current targets to target that mode.
+ * the regulator.
  */
 int regulator_set_mode(const struct device *dev, uint32_t mode)
 {
 	const struct regulator_config *config = dev->config;
-	struct regulator_data *data = dev->data;
 	int rc;
 	uint8_t i, sel_off;
 
@@ -310,26 +443,13 @@ int regulator_set_mode(const struct device *dev, uint32_t mode)
 	/* Configure mode */
 	if (mode & PMIC_MODE_FLAG_MODESEL_MULTI_REG) {
 		/* Select mode with offset calculation */
-		/* Set reg_offset here so it takes effect for the write
-		 * to modesel_reg
-		 */
-		data->reg_offset = sel_off;
-		rc = regulator_modify_register(dev, config->modesel_reg,
+		rc = regulator_modify_register(dev,
+			config->modesel_reg + sel_off,
 			mode & PMIC_MODE_SELECTOR_MASK, config->modesel_mask);
 	} else {
 		/* Select mode without offset to modesel_reg */
-		/* Clear register offset */
-		data->reg_offset = 0;
 		rc = regulator_modify_register(dev, config->modesel_reg,
 			mode & PMIC_MODE_SELECTOR_MASK, config->modesel_mask);
-		if (rc) {
-			return rc;
-		}
-		/* Since we did not use a register offset when selecting the
-		 * mode, but we now are targeting a specific mode's bank
-		 * of registers, we must still set the register offset here
-		 */
-		data->reg_offset = sel_off;
 	}
 	return rc;
 }
@@ -351,7 +471,7 @@ static int enable_regulator(const struct device *dev, struct onoff_client *cli)
 	en_val = config->enable_inverted ? 0 : config->enable_val;
 	rc = regulator_modify_register(dev, config->enable_reg,
 			config->enable_mask, en_val);
-	if (rc) {
+	if (rc != 0) {
 		return onoff_sync_finalize(&data->srv, key, NULL, rc, false);
 	}
 	return onoff_sync_finalize(&data->srv, key, cli, rc, true);
@@ -370,21 +490,20 @@ static int disable_regulator(const struct device *dev)
 	if (rc == 0) {
 		rc = -EINVAL;
 		return onoff_sync_finalize(&data->srv, key, NULL, rc, false);
+	} else if (rc == 1) {
+		/* Disable regulator */
+		dis_val = config->enable_inverted ? config->enable_val : 0;
+		rc = regulator_modify_register(dev, config->enable_reg,
+				config->enable_mask, dis_val);
 	}
-	dis_val = config->enable_inverted ? config->enable_val : 0;
-	rc = regulator_modify_register(dev, config->enable_reg,
-			config->enable_mask, dis_val);
-	if (rc) {
-		/* Error writing configs */
-		return onoff_sync_finalize(&data->srv, key, NULL, rc, true);
-	}
-	return onoff_sync_finalize(&data->srv, key, NULL, rc, true);
+	return onoff_sync_finalize(&data->srv, key, NULL, rc, false);
 }
 
 static int pmic_reg_init(const struct device *dev)
 {
 	const struct regulator_config *config = dev->config;
 	struct regulator_data *data = dev->data;
+	int rc  = 0;
 
 	/* Cast the voltage array set at compile time to the voltage range
 	 * struct
@@ -396,10 +515,13 @@ static int pmic_reg_init(const struct device *dev)
 	if (!device_is_ready(config->i2c.bus)) {
 		return -ENODEV;
 	}
-	if (config->initial_mode) {
-		return regulator_set_mode(dev, config->initial_mode);
+	if (config->boot_on) {
+		rc = enable_regulator(dev, NULL);
 	}
-	return 0;
+	if (config->initial_mode) {
+		rc = regulator_set_mode(dev, config->initial_mode);
+	}
+	return rc;
 }
 
 
@@ -423,9 +545,7 @@ static const struct regulator_driver_api api = {
 		DT_PROP(node, voltage_range);							\
 	static uint16_t pmic_reg_##ord##_allowed_modes[] =					\
 		DT_PROP_OR(DT_PARENT(node), regulator_allowed_modes, {});			\
-	static struct regulator_data pmic_reg_##ord##_data = {					\
-		.reg_offset = 0,								\
-	};											\
+	static struct regulator_data pmic_reg_##ord##_data;					\
 	static struct regulator_config pmic_reg_##ord##_cfg = {					\
 		.vsel_mask = DT_PROP(node, vsel_mask),						\
 		.vsel_reg = DT_PROP(node, vsel_reg),						\
@@ -439,6 +559,7 @@ static const struct regulator_driver_api api = {
 		.ilim_reg = DT_PROP_OR(node, ilim_reg, 0),					\
 		.ilim_mask = DT_PROP_OR(node, ilim_mask, 0),					\
 		.enable_inverted = DT_PROP(node, enable_inverted),				\
+		.boot_on = DT_PROP_OR(node, regulator_boot_on, false),				\
 		.num_modes = ARRAY_SIZE(pmic_reg_##ord##_allowed_modes),			\
 		.initial_mode = DT_PROP_OR(DT_PARENT(node), regulator_initial_mode, 0),		\
 		.i2c = I2C_DT_SPEC_GET(DT_PARENT(node)),					\

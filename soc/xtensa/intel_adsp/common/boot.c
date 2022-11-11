@@ -89,6 +89,10 @@ static __imr void parse_module(struct sof_man_fw_header *hdr,
 		switch (mod->segment[i].flags.r.type) {
 		case SOF_MAN_SEGMENT_TEXT:
 		case SOF_MAN_SEGMENT_DATA:
+			if (mod->segment[i].flags.r.load == 0) {
+				continue;
+			}
+
 			bias = mod->segment[i].file_offset -
 				SOF_MAN_ELF_TEXT_OFFSET;
 
@@ -132,7 +136,6 @@ __imr void parse_manifest(void)
 
 extern void hp_sram_init(uint32_t memory_size);
 extern void lp_sram_init(void);
-extern void hp_sram_pm_banks(uint32_t banks);
 
 __imr void boot_core0(void)
 {

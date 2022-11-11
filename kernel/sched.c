@@ -279,7 +279,7 @@ static void signal_pending_ipi(void)
 	 * this code.
 	 */
 #if defined(CONFIG_SMP) && defined(CONFIG_SCHED_IPI_SUPPORTED)
-	if (CONFIG_MP_NUM_CPUS > 1) {
+	if (arch_num_cpus() > 1) {
 		if (_kernel.pending_ipi) {
 			_kernel.pending_ipi = false;
 			arch_sched_ipi();
@@ -593,7 +593,9 @@ static bool thread_active_elsewhere(struct k_thread *thread)
 #ifdef CONFIG_SMP
 	int currcpu = _current_cpu->id;
 
-	for (int i = 0; i < CONFIG_MP_NUM_CPUS; i++) {
+	unsigned int num_cpus = arch_num_cpus();
+
+	for (int i = 0; i < num_cpus; i++) {
 		if ((i != currcpu) &&
 		    (_kernel.cpus[i].current == thread)) {
 			return true;
@@ -606,7 +608,7 @@ static bool thread_active_elsewhere(struct k_thread *thread)
 static void flag_ipi(void)
 {
 #if defined(CONFIG_SMP) && defined(CONFIG_SCHED_IPI_SUPPORTED)
-	if (CONFIG_MP_NUM_CPUS > 1) {
+	if (arch_num_cpus() > 1) {
 		_kernel.pending_ipi = true;
 	}
 #endif
@@ -1291,7 +1293,9 @@ void init_ready_q(struct _ready_q *rq)
 void z_sched_init(void)
 {
 #ifdef CONFIG_SCHED_CPU_MASK_PIN_ONLY
-	for (int i = 0; i < CONFIG_MP_NUM_CPUS; i++) {
+	unsigned int num_cpus = arch_num_cpus();
+
+	for (int i = 0; i < num_cpus; i++) {
 		init_ready_q(&_kernel.cpus[i].ready_q);
 	}
 #else
@@ -1607,7 +1611,7 @@ static inline int z_vrfy_k_is_preempt_thread(void)
 #ifdef CONFIG_SCHED_CPU_MASK
 # ifdef CONFIG_SMP
 /* Right now we use a single byte for this mask */
-BUILD_ASSERT(CONFIG_MP_NUM_CPUS <= 8, "Too many CPUs for mask word");
+BUILD_ASSERT(CONFIG_MP_MAX_NUM_CPUS <= 8, "Too many CPUs for mask word");
 # endif
 
 

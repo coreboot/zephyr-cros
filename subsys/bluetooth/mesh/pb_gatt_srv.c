@@ -17,6 +17,7 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_PROV)
 #define LOG_MODULE_NAME bt_mesh_pb_gatt_srv
 #include "common/log.h"
+#include "common/bt_str.h"
 
 #include "mesh.h"
 #include "adv.h"
@@ -269,7 +270,8 @@ int bt_mesh_pb_gatt_srv_adv_start(void)
 {
 	BT_DBG("");
 
-	if (!service_registered || bt_mesh_is_provisioned()) {
+	if (!service_registered || bt_mesh_is_provisioned() ||
+	    bt_mesh_proxy_conn_count_get() == CONFIG_BT_MAX_CONN) {
 		return -ENOTSUP;
 	}
 

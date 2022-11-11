@@ -9,7 +9,7 @@
 
 #include <inttypes.h>
 #include <zephyr/sys/slist.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
+#include <smp/smp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,24 +62,6 @@ extern "C" {
 #define MGMT_EVT_OP_CMD_STATUS	0x02
 #define MGMT_EVT_OP_CMD_DONE	0x03
 
-struct mgmt_hdr {
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	uint8_t  nh_op:3;		/* MGMT_OP_[...] */
-	uint8_t  _res1:5;
-#endif
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-	uint8_t  _res1:5;
-	uint8_t  nh_op:3;		/* MGMT_OP_[...] */
-#endif
-	uint8_t  nh_flags;		/* Reserved for future flags */
-	uint16_t nh_len;		/* Length of the payload */
-	uint16_t nh_group;		/* MGMT_GROUP_ID_[...] */
-	uint8_t  nh_seq;		/* Sequence number */
-	uint8_t  nh_id;			/* Message ID within group */
-};
-
-#define nmgr_hdr mgmt_hdr
-
 /*
  * MGMT_EVT_OP_CMD_STATUS argument
  */
@@ -128,18 +110,6 @@ typedef void *(*mgmt_alloc_rsp_fn)(const void *src_buf, void *arg);
  */
 typedef void (*mgmt_reset_buf_fn)(void *buf, void *arg);
 
-/**
- * @brief Context required by command handlers for parsing requests and writing
- *		responses.
- */
-struct mgmt_ctxt {
-	struct cbor_nb_writer *cnbe;
-	struct cbor_nb_reader *cnbd;
-#ifdef CONFIG_MGMT_VERBOSE_ERR_RESPONSE
-	const char *rc_rsn;
-#endif
-};
-
 #ifdef CONFIG_MGMT_VERBOSE_ERR_RESPONSE
 #define MGMT_CTXT_SET_RC_RSN(mc, rsn) ((mc->rc_rsn) = (rsn))
 #define MGMT_CTXT_RC_RSN(mc) ((mc)->rc_rsn)
@@ -157,7 +127,7 @@ struct mgmt_ctxt {
  *
  * @return 0 if a response was successfully encoded, MGMT_ERR_[...] code on failure.
  */
-typedef int (*mgmt_handler_fn)(struct mgmt_ctxt *ctxt);
+typedef int (*mgmt_handler_fn)(struct smp_streamer *ctxt);
 
 /**
  * @brief Read handler and write handler for a single command ID.
@@ -206,20 +176,6 @@ void mgmt_unregister_group(struct mgmt_group *group);
  *		NULL on failure.
  */
 const struct mgmt_handler *mgmt_find_handler(uint16_t group_id, uint16_t command_id);
-
-/**
- * @brief Byte-swaps an mcumgr header from network to host byte order.
- *
- * @param hdr The mcumgr header to byte-swap.
- */
-void mgmt_ntoh_hdr(struct mgmt_hdr *hdr);
-
-/**
- * @brief Byte-swaps an mcumgr header from host to network byte order.
- *
- * @param hdr The mcumgr header to byte-swap.
- */
-void mgmt_hton_hdr(struct mgmt_hdr *hdr);
 
 /**
  * @brief Register event callback function.

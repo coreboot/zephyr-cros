@@ -9,13 +9,13 @@
 #include <stdio.h>
 
 #include <zephyr/stats/stats.h>
-#include <zephyr/mgmt/mcumgr/buf.h>
-#include <mgmt/mgmt.h>
-#include <stat_mgmt/stat_mgmt_config.h>
-#include <stat_mgmt/stat_mgmt.h>
 #include <zcbor_common.h>
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
+#include <mgmt/mgmt.h>
+#include <smp/smp.h>
+#include <stat_mgmt/stat_mgmt_config.h>
+#include <stat_mgmt/stat_mgmt.h>
 
 static struct mgmt_handler stat_mgmt_handlers[];
 
@@ -113,11 +113,11 @@ stat_mgmt_cb_encode(zcbor_state_t *zse, struct stat_mgmt_entry *entry)
  * Command handler: stat show
  */
 static int
-stat_mgmt_show(struct mgmt_ctxt *ctxt)
+stat_mgmt_show(struct smp_streamer *ctxt)
 {
 	struct zcbor_string value = { 0 };
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	char stat_name[STAT_MGMT_MAX_NAME_LEN];
 	bool ok;
 	size_t counter = 0;
@@ -179,10 +179,10 @@ stat_mgmt_show(struct mgmt_ctxt *ctxt)
  * Command handler: stat list
  */
 static int
-stat_mgmt_list(struct mgmt_ctxt *ctxt)
+stat_mgmt_list(struct smp_streamer *ctxt)
 {
 	const struct stats_hdr *cur = NULL;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
 	bool ok;
 	size_t counter = 0;
 

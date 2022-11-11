@@ -1,26 +1,28 @@
 /*
  * Copyright (c) 2018-2021 mcumgr authors
  * Copyright (c) 2022 Laird Connectivity
+ * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <assert.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/fs/fs.h>
 #include <limits.h>
 #include <string.h>
-#include <zephyr/sys/util.h>
+#include <errno.h>
 #include <zcbor_common.h>
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
-#include "zcbor_bulk/zcbor_bulk_priv.h"
-#include <zephyr/mgmt/mcumgr/buf.h>
 #include <zephyr/fs/fs.h>
+#include <smp/smp.h>
 #include "mgmt/mgmt.h"
 #include "fs_mgmt/fs_mgmt.h"
-#include "fs_mgmt/fs_mgmt_impl.h"
 #include "fs_mgmt/fs_mgmt_config.h"
 #include "fs_mgmt/hash_checksum_mgmt.h"
+#include "zcbor_bulk/zcbor_bulk_priv.h"
 
 #if defined(CONFIG_FS_MGMT_CHECKSUM_IEEE_CRC32)
 #include "fs_mgmt/hash_checksum_crc32.h"
@@ -29,7 +31,6 @@
 #if defined(CONFIG_FS_MGMT_HASH_SHA256)
 #include "fs_mgmt/hash_checksum_sha256.h"
 #endif
-
 
 #ifdef CONFIG_FS_MGMT_CHECKSUM_HASH
 /* Define default hash/checksum */
@@ -55,6 +56,8 @@ LOG_MODULE_REGISTER(fs_mgmt);
 
 #define HASH_CHECKSUM_TYPE_SIZE 8
 
+#define HASH_CHECKSUM_SUPPORTED_COLUMNS_MAX 4
+
 static struct {
 	/** Whether an upload is currently in progress. */
 	bool uploading;
@@ -68,15 +71,46 @@ static struct {
 
 static const struct mgmt_handler fs_mgmt_handlers[];
 
+#if defined(CONFIG_FS_MGMT_CHECKSUM_HASH)
+/* Hash/checksum iterator information passing structure */
+struct hash_checksum_iterator_info {
+	zcbor_state_t *zse;
+	bool ok;
+};
+#endif
+
 #ifdef CONFIG_FS_MGMT_FILE_ACCESS_HOOK
 static fs_mgmt_on_evt_cb fs_evt_cb;
 #endif
 
+static int fs_mgmt_filelen(const char *path, size_t *out_len)
+{
+	struct fs_dirent dirent;
+	int rc;
+
+	rc = fs_stat(path, &dirent);
+
+	if (rc == -EINVAL) {
+		return MGMT_ERR_EINVAL;
+	} else if (rc == -ENOENT) {
+		return MGMT_ERR_ENOENT;
+	} else if (rc != 0) {
+		return MGMT_ERR_EUNKNOWN;
+	}
+
+	if (dirent.type != FS_DIR_ENTRY_FILE) {
+		return MGMT_ERR_EUNKNOWN;
+	}
+
+	*out_len = dirent.size;
+
+	return 0;
+}
+
 /**
  * Encodes a file upload response.
  */
-static bool
-fs_mgmt_file_rsp(zcbor_state_t *zse, int rc, uint64_t off)
+static bool fs_mgmt_file_rsp(zcbor_state_t *zse, int rc, uint64_t off)
 {
 	bool ok;
 
@@ -88,20 +122,54 @@ fs_mgmt_file_rsp(zcbor_state_t *zse, int rc, uint64_t off)
 	return ok;
 }
 
+static int fs_mgmt_read(const char *path, size_t offset, size_t len,
+			void *out_data, size_t *out_len)
+{
+	struct fs_file_t file;
+	ssize_t bytes_read;
+	int rc;
+
+	fs_file_t_init(&file);
+	rc = fs_open(&file, path, FS_O_READ);
+	if (rc != 0) {
+		return MGMT_ERR_ENOENT;
+	}
+
+	rc = fs_seek(&file, offset, FS_SEEK_SET);
+	if (rc != 0) {
+		goto done;
+	}
+
+	bytes_read = fs_read(&file, out_data, len);
+	if (bytes_read < 0) {
+		goto done;
+	}
+
+	*out_len = bytes_read;
+
+done:
+	fs_close(&file);
+
+	if (rc < 0) {
+		return MGMT_ERR_EUNKNOWN;
+	}
+
+	return 0;
+}
+
 /**
  * Command handler: fs file (read)
  */
-static int
-fs_mgmt_file_download(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_download(struct smp_streamer *ctxt)
 {
 	uint8_t file_data[FS_MGMT_DL_CHUNK_SIZE];
 	char path[CONFIG_FS_MGMT_PATH_SIZE + 1];
 	uint64_t off = ULLONG_MAX;
-	size_t bytes_read;
+	size_t bytes_read = 0;
 	size_t file_len;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	bool ok;
 	struct zcbor_string name = { 0 };
 	size_t decoded;
@@ -136,15 +204,14 @@ fs_mgmt_file_download(struct mgmt_ctxt *ctxt)
 	 * length.
 	 */
 	if (off == 0) {
-		rc = fs_mgmt_impl_filelen(path, &file_len);
+		rc = fs_mgmt_filelen(path, &file_len);
 		if (rc != 0) {
 			return rc;
 		}
 	}
 
 	/* Read the requested chunk from the file. */
-	rc = fs_mgmt_impl_read(path, off, FS_MGMT_DL_CHUNK_SIZE,
-						   file_data, &bytes_read);
+	rc = fs_mgmt_read(path, off, FS_MGMT_DL_CHUNK_SIZE, file_data, &bytes_read);
 	if (rc != 0) {
 		return rc;
 	}
@@ -159,11 +226,73 @@ fs_mgmt_file_download(struct mgmt_ctxt *ctxt)
 	return ok ? MGMT_ERR_EOK : MGMT_ERR_EMSGSIZE;
 }
 
+static int fs_mgmt_write(const char *path, size_t offset,
+			 const void *data, size_t len)
+{
+	struct fs_file_t file;
+	int rc;
+	size_t file_size = 0;
+
+	if (offset == 0) {
+		rc = fs_mgmt_filelen(path, &file_size);
+	}
+
+	fs_file_t_init(&file);
+	rc = fs_open(&file, path, FS_O_CREATE | FS_O_WRITE);
+	if (rc != 0) {
+		return MGMT_ERR_EUNKNOWN;
+	}
+
+	if (offset == 0 && file_size > 0) {
+		/* Offset is 0 and existing file exists with data, attempt to truncate the file
+		 * size to 0
+		 */
+		rc = fs_truncate(&file, 0);
+
+		if (rc == -ENOTSUP) {
+			/* Truncation not supported by filesystem, therefore close file, delete
+			 * it then re-open it
+			 */
+			fs_close(&file);
+
+			rc = fs_unlink(path);
+			if (rc < 0 && rc != -ENOENT) {
+				return rc;
+			}
+
+			rc = fs_open(&file, path, FS_O_CREATE | FS_O_WRITE);
+		}
+
+		if (rc < 0) {
+			/* Failed to truncate file */
+			return MGMT_ERR_EUNKNOWN;
+		}
+	} else if (offset > 0) {
+		rc = fs_seek(&file, offset, FS_SEEK_SET);
+		if (rc != 0) {
+			goto done;
+		}
+	}
+
+	rc = fs_write(&file, data, len);
+	if (rc < 0) {
+		goto done;
+	}
+
+done:
+	fs_close(&file);
+
+	if (rc < 0) {
+		return MGMT_ERR_EUNKNOWN;
+	}
+
+	return 0;
+}
+
 /**
  * Command handler: fs file (write)
  */
-static int
-fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_upload(struct smp_streamer *ctxt)
 {
 	char file_name[CONFIG_FS_MGMT_PATH_SIZE + 1];
 	unsigned long long len = ULLONG_MAX;
@@ -171,8 +300,8 @@ fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
 	size_t new_off;
 	bool ok;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	struct zcbor_string name = { 0 };
 	struct zcbor_string file_data = { 0 };
 	size_t decoded = 0;
@@ -234,7 +363,7 @@ fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
 
 	if (file_data.len > 0) {
 		/* Write the data chunk to the file. */
-		rc = fs_mgmt_impl_write(file_name, off, file_data.value, file_data.len);
+		rc = fs_mgmt_write(file_name, off, file_data.value, file_data.len);
 		if (rc != 0) {
 			return rc;
 		}
@@ -255,14 +384,13 @@ fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
 /**
  * Command handler: fs stat (read)
  */
-static int
-fs_mgmt_file_status(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_status(struct smp_streamer *ctxt)
 {
 	char path[CONFIG_FS_MGMT_PATH_SIZE + 1];
 	size_t file_len;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	bool ok;
 	struct zcbor_string name = { 0 };
 	size_t decoded;
@@ -283,7 +411,7 @@ fs_mgmt_file_status(struct mgmt_ctxt *ctxt)
 	path[name.len] = '\0';
 
 	/* Retrieve file size */
-	rc = fs_mgmt_impl_filelen(path, &file_len);
+	rc = fs_mgmt_filelen(path, &file_len);
 
 	/* Encode the response. */
 	if (rc == 0) {
@@ -308,8 +436,7 @@ fs_mgmt_file_status(struct mgmt_ctxt *ctxt)
 /**
  * Command handler: fs hash/checksum (read)
  */
-static int
-fs_mgmt_file_hash_checksum(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_hash_checksum(struct smp_streamer *ctxt)
 {
 	char path[CONFIG_FS_MGMT_PATH_SIZE + 1];
 	char type_arr[HASH_CHECKSUM_TYPE_SIZE + 1] = FS_MGMT_CHECKSUM_HASH_DEFAULT;
@@ -318,8 +445,8 @@ fs_mgmt_file_hash_checksum(struct mgmt_ctxt *ctxt)
 	uint64_t off = 0;
 	size_t file_len;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	bool ok;
 	struct zcbor_string type = { 0 };
 	struct zcbor_string name = { 0 };
@@ -359,7 +486,7 @@ fs_mgmt_file_hash_checksum(struct mgmt_ctxt *ctxt)
 	}
 
 	/* Check provided offset is valid for target file */
-	rc = fs_mgmt_impl_filelen(path, &file_len);
+	rc = fs_mgmt_filelen(path, &file_len);
 
 	if (rc != 0) {
 		return MGMT_ERR_ENOENT;
@@ -449,6 +576,52 @@ fs_mgmt_file_hash_checksum(struct mgmt_ctxt *ctxt)
 
 	return MGMT_ERR_EOK;
 }
+
+#if defined(CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_CMD)
+/* Callback for supported hash/checksum types to encode details on one type into CBOR map */
+static void supported_hash_checksum_callback(const struct hash_checksum_mgmt_group *group,
+					     void *user_data)
+{
+	struct hash_checksum_iterator_info *ctx = (struct hash_checksum_iterator_info *)user_data;
+
+	if (!ctx->ok) {
+		return;
+	}
+
+	ctx->ok = zcbor_tstr_encode_ptr(ctx->zse, group->group_name, strlen(group->group_name))	&&
+		  zcbor_map_start_encode(ctx->zse, HASH_CHECKSUM_SUPPORTED_COLUMNS_MAX)		&&
+		  zcbor_tstr_put_lit(ctx->zse, "format")					&&
+		  zcbor_uint32_put(ctx->zse, (uint32_t)group->byte_string)			&&
+		  zcbor_tstr_put_lit(ctx->zse, "size")						&&
+		  zcbor_uint32_put(ctx->zse, (uint32_t)group->output_size)			&&
+		  zcbor_map_end_encode(ctx->zse, HASH_CHECKSUM_SUPPORTED_COLUMNS_MAX);
+}
+
+/**
+ * Command handler: fs supported hash/checksum (read)
+ */
+static int
+fs_mgmt_supported_hash_checksum(struct mgmt_ctxt *ctxt)
+{
+	zcbor_state_t *zse = ctxt->cnbe->zs;
+	struct hash_checksum_iterator_info ctx = {
+		.zse = zse,
+	};
+
+	ctx.ok = zcbor_tstr_put_lit(zse, "types");
+
+	zcbor_map_start_encode(zse, CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_MAX_TYPES);
+
+	hash_checksum_mgmt_find_handlers(supported_hash_checksum_callback, &ctx);
+
+	if (!ctx.ok ||
+	    !zcbor_map_end_encode(zse, CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_MAX_TYPES)) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	return MGMT_ERR_EOK;
+}
+#endif
 #endif
 
 static const struct mgmt_handler fs_mgmt_handlers[] = {
@@ -467,6 +640,12 @@ static const struct mgmt_handler fs_mgmt_handlers[] = {
 		.mh_read = fs_mgmt_file_hash_checksum,
 		.mh_write = NULL,
 	},
+#if defined(CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_CMD)
+	[FS_MGMT_ID_SUPPORTED_HASH_CHECKSUM] = {
+		.mh_read = fs_mgmt_supported_hash_checksum,
+		.mh_write = NULL,
+	},
+#endif
 #endif
 };
 
@@ -478,8 +657,7 @@ static struct mgmt_group fs_mgmt_group = {
 	.mg_group_id = MGMT_GROUP_ID_FS,
 };
 
-void
-fs_mgmt_register_group(void)
+void fs_mgmt_register_group(void)
 {
 	mgmt_register_group(&fs_mgmt_group);
 

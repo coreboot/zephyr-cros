@@ -179,7 +179,8 @@ int dw_dma_config(const struct device *dev, uint32_t channel,
 
 	/* default channel config */
 	chan_data->direction = cfg->channel_direction;
-
+	chan_data->cfg_lo = 0;
+	chan_data->cfg_hi = 0;
 
 	/* setup a list of lli structs. we don't need to allocate */
 	chan_data->lli = &dev_data->lli_pool[channel][0]; /* TODO allocate here */
@@ -554,7 +555,7 @@ int dw_dma_stop(const struct device *dev, uint32_t channel)
 	chan_data->state = DW_DMA_IDLE;
 
 out:
-	return 0;
+	return ret;
 }
 
 int dw_dma_resume(const struct device *dev, uint32_t channel)
