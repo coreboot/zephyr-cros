@@ -37,7 +37,7 @@ static const pthread_attr_t init_pthread_attrs = {
 };
 
 static struct posix_thread posix_thread_pool[CONFIG_MAX_PTHREAD_COUNT];
-PTHREAD_MUTEX_DEFINE(pthread_pool_lock);
+static struct k_spinlock pthread_pool_lock;
 
 pthread_t pthread_self(void)
 {
@@ -149,8 +149,11 @@ static void zephyr_thread_wrapper(void *arg1, void *arg2, void *arg3)
 int pthread_create(pthread_t *newthread, const pthread_attr_t *attr,
 		   void *(*threadroutine)(void *), void *arg)
 {
+	int rv;
 	int32_t prio;
+	k_spinlock_key_t key;
 	uint32_t pthread_num;
+	k_spinlock_key_t cancel_key;
 	pthread_condattr_t cond_attr;
 	struct posix_thread *thread;
 
@@ -164,7 +167,7 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr,
 		return EINVAL;
 	}
 
-	pthread_mutex_lock(&pthread_pool_lock);
+	key = k_spin_lock(&pthread_pool_lock);
 	for (pthread_num = 0;
 	    pthread_num < CONFIG_MAX_PTHREAD_COUNT; pthread_num++) {
 		thread = &posix_thread_pool[pthread_num];
@@ -173,25 +176,26 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr,
 			break;
 		}
 	}
-	pthread_mutex_unlock(&pthread_pool_lock);
+	k_spin_unlock(&pthread_pool_lock, key);
 
 	if (pthread_num >= CONFIG_MAX_PTHREAD_COUNT) {
 		return EAGAIN;
 	}
 
+	rv = pthread_mutex_init(&thread->state_lock, NULL);
+	if (rv != 0) {
+		key = k_spin_lock(&pthread_pool_lock);
+		thread->state = PTHREAD_EXITED;
+		k_spin_unlock(&pthread_pool_lock, key);
+		return rv;
+	}
+
 	prio = posix_to_zephyr_priority(attr->priority, attr->schedpolicy);
 
-	/*
-	 * Ignore return value, as we know that Zephyr implementation
-	 * cannot fail.
-	 */
-	(void)pthread_mutex_init(&thread->state_lock, NULL);
-	(void)pthread_mutex_init(&thread->cancel_lock, NULL);
-
-	pthread_mutex_lock(&thread->cancel_lock);
+	cancel_key = k_spin_lock(&thread->cancel_lock);
 	thread->cancel_state = (1 << _PTHREAD_CANCEL_POS) & attr->flags;
 	thread->cancel_pending = 0;
-	pthread_mutex_unlock(&thread->cancel_lock);
+	k_spin_unlock(&thread->cancel_lock, cancel_key);
 
 	pthread_mutex_lock(&thread->state_lock);
 	thread->state = attr->detachstate;
@@ -215,6 +219,8 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr,
  */
 int pthread_setcancelstate(int state, int *oldstate)
 {
+	bool cancel_pending;
+	k_spinlock_key_t cancel_key;
 	struct posix_thread *pthread = to_posix_thread(pthread_self());
 
 	if (state != PTHREAD_CANCEL_ENABLE &&
@@ -222,13 +228,13 @@ int pthread_setcancelstate(int state, int *oldstate)
 		return EINVAL;
 	}
 
+	cancel_key = k_spin_lock(&pthread->cancel_lock);
 	*oldstate = pthread->cancel_state;
-
-	pthread_mutex_lock(&pthread->cancel_lock);
 	pthread->cancel_state = state;
-	pthread_mutex_unlock(&pthread->cancel_lock);
+	cancel_pending = pthread->cancel_pending;
+	k_spin_unlock(&pthread->cancel_lock, cancel_key);
 
-	if (state == PTHREAD_CANCEL_ENABLE && pthread->cancel_pending) {
+	if (state == PTHREAD_CANCEL_ENABLE && cancel_pending) {
 		pthread_exit((void *)PTHREAD_CANCELED);
 	}
 
@@ -244,15 +250,16 @@ int pthread_cancel(pthread_t pthread)
 {
 	struct posix_thread *thread = to_posix_thread(pthread);
 	int cancel_state;
+	k_spinlock_key_t cancel_key;
 
 	if ((thread == NULL) || (thread->state == PTHREAD_TERMINATED)) {
 		return ESRCH;
 	}
 
-	pthread_mutex_lock(&thread->cancel_lock);
+	cancel_key = k_spin_lock(&thread->cancel_lock);
 	thread->cancel_pending = 1;
 	cancel_state = thread->cancel_state;
-	pthread_mutex_unlock(&thread->cancel_lock);
+	k_spin_unlock(&thread->cancel_lock, cancel_key);
 
 	if (cancel_state == PTHREAD_CANCEL_ENABLE) {
 		pthread_mutex_lock(&thread->state_lock);
@@ -364,18 +371,19 @@ int pthread_once(pthread_once_t *once, void (*init_func)(void))
  */
 void pthread_exit(void *retval)
 {
+	k_spinlock_key_t cancel_key;
 	struct posix_thread *self = to_posix_thread(pthread_self());
 	pthread_key_obj *key_obj;
 	pthread_thread_data *thread_spec_data;
 	sys_snode_t *node_l;
 
 	/* Make a thread as cancelable before exiting */
-	pthread_mutex_lock(&self->cancel_lock);
+	cancel_key = k_spin_lock(&self->cancel_lock);
 	if (self->cancel_state == PTHREAD_CANCEL_DISABLE) {
 		self->cancel_state = PTHREAD_CANCEL_ENABLE;
 	}
 
-	pthread_mutex_unlock(&self->cancel_lock);
+	k_spin_unlock(&self->cancel_lock, cancel_key);
 
 	pthread_mutex_lock(&self->state_lock);
 	if (self->state == PTHREAD_JOINABLE) {
@@ -397,6 +405,8 @@ void pthread_exit(void *retval)
 	}
 
 	pthread_mutex_unlock(&self->state_lock);
+	pthread_mutex_destroy(&self->state_lock);
+
 	k_thread_abort((k_tid_t)self);
 }
 
@@ -435,6 +445,10 @@ int pthread_join(pthread_t thread, void **status)
 	}
 
 	pthread_mutex_unlock(&pthread->state_lock);
+	if (pthread->state == PTHREAD_EXITED) {
+		pthread_mutex_destroy(&pthread->state_lock);
+	}
+
 	return ret;
 }
 

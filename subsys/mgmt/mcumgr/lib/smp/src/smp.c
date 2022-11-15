@@ -20,6 +20,10 @@
 #include "smp/smp.h"
 #include "../../../smp_internal.h"
 
+#ifdef CONFIG_MCUMGR_MGMT_NOTIFICATION_HOOKS
+#include <zephyr/mgmt/mcumgr/mgmt/callbacks.h>
+#endif
+
 static void cbor_nb_reader_init(struct cbor_nb_reader *cnr, struct net_buf *nb)
 {
 	/* Skip the smp_hdr */
@@ -128,12 +132,15 @@ static int smp_build_err_rsp(struct smp_streamer *streamer, const struct smp_hdr
  *
  * @return A MGMT_ERR_[...] error code.
  */
-static int smp_handle_single_payload(struct mgmt_ctxt *cbuf, const struct smp_hdr *req_hdr,
+static int smp_handle_single_payload(struct smp_streamer *cbuf, const struct smp_hdr *req_hdr,
 				     bool *handler_found)
 {
 	const struct mgmt_handler *handler;
 	mgmt_handler_fn handler_fn;
 	int rc;
+#if defined(CONFIG_MCUMGR_SMP_COMMAND_STATUS_HOOKS)
+	struct mgmt_evt_op_cmd_arg cmd_recv;
+#endif
 
 	handler = mgmt_find_handler(req_hdr->nh_group, req_hdr->nh_id);
 	if (handler == NULL) {
@@ -155,14 +162,21 @@ static int smp_handle_single_payload(struct mgmt_ctxt *cbuf, const struct smp_hd
 
 	if (handler_fn) {
 		*handler_found = true;
-		zcbor_map_start_encode(cbuf->cnbe->zs, CONFIG_MGMT_MAX_MAIN_MAP_ENTRIES);
-		mgmt_evt(MGMT_EVT_OP_CMD_RECV, req_hdr->nh_group, req_hdr->nh_id, NULL);
+		zcbor_map_start_encode(cbuf->writer->zs, CONFIG_MGMT_MAX_MAIN_MAP_ENTRIES);
+
+#if defined(CONFIG_MCUMGR_SMP_COMMAND_STATUS_HOOKS)
+		cmd_recv.group = req_hdr->nh_group;
+		cmd_recv.id = req_hdr->nh_id;
+		cmd_recv.err = MGMT_ERR_EOK;
+
+		(void)mgmt_callback_notify(MGMT_EVT_OP_CMD_RECV, &cmd_recv, sizeof(cmd_recv));
+#endif
 
 		MGMT_CTXT_SET_RC_RSN(cbuf, NULL);
 		rc = handler_fn(cbuf);
 
 		/* End response payload. */
-		if (!zcbor_map_end_encode(cbuf->cnbe->zs, CONFIG_MGMT_MAX_MAIN_MAP_ENTRIES) &&
+		if (!zcbor_map_end_encode(cbuf->writer->zs, CONFIG_MGMT_MAX_MAIN_MAP_ENTRIES) &&
 		    rc == 0) {
 			rc = MGMT_ERR_EMSGSIZE;
 		}
@@ -187,20 +201,15 @@ static int smp_handle_single_payload(struct mgmt_ctxt *cbuf, const struct smp_hd
 static int smp_handle_single_req(struct smp_streamer *streamer, const struct smp_hdr *req_hdr,
 				 bool *handler_found, const char **rsn)
 {
-	struct mgmt_ctxt cbuf;
 	struct smp_hdr rsp_hdr;
 	struct cbor_nb_writer *nbw = streamer->writer;
-	struct cbor_nb_reader *nbr = streamer->reader;
 	zcbor_state_t *zsp = nbw->zs;
 	int rc;
 
-	cbuf.cnbe = nbw;
-	cbuf.cnbd = nbr;
-
 	/* Process the request and write the response payload. */
-	rc = smp_handle_single_payload(&cbuf, req_hdr, handler_found);
+	rc = smp_handle_single_payload(streamer, req_hdr, handler_found);
 	if (rc != 0) {
-		*rsn = MGMT_CTXT_RC_RSN(&cbuf);
+		*rsn = MGMT_CTXT_RC_RSN(cbuf);
 		return rc;
 	}
 
@@ -275,13 +284,16 @@ static void smp_on_err(struct smp_streamer *streamer, const struct smp_hdr *req_
 int smp_process_request_packet(struct smp_streamer *streamer, void *vreq)
 {
 	struct smp_hdr req_hdr;
-	struct mgmt_evt_op_cmd_done_arg cmd_done_arg;
 	void *rsp;
 	struct net_buf *req = vreq;
 	bool valid_hdr = false;
 	bool handler_found = false;
 	int rc = 0;
 	const char *rsn = NULL;
+
+#if defined(CONFIG_MCUMGR_SMP_COMMAND_STATUS_HOOKS)
+	struct mgmt_evt_op_cmd_arg cmd_done_arg;
+#endif
 
 	rsp = NULL;
 
@@ -328,18 +340,28 @@ int smp_process_request_packet(struct smp_streamer *streamer, void *vreq)
 		/* Trim processed request to free up space for subsequent responses. */
 		net_buf_pull(req, req_hdr.nh_len);
 
+#if defined(CONFIG_MCUMGR_SMP_COMMAND_STATUS_HOOKS)
+		cmd_done_arg.group = req_hdr.nh_group;
+		cmd_done_arg.id = req_hdr.nh_id;
 		cmd_done_arg.err = MGMT_ERR_EOK;
-		mgmt_evt(MGMT_EVT_OP_CMD_DONE, req_hdr.nh_group, req_hdr.nh_id,
-				 &cmd_done_arg);
+
+		(void)mgmt_callback_notify(MGMT_EVT_OP_CMD_DONE, &cmd_done_arg,
+					   sizeof(cmd_done_arg));
+#endif
 	}
 
 	if (rc != 0 && valid_hdr) {
 		smp_on_err(streamer, &req_hdr, req, rsp, rc, rsn);
 
 		if (handler_found) {
+#if defined(CONFIG_MCUMGR_SMP_COMMAND_STATUS_HOOKS)
+			cmd_done_arg.group = req_hdr.nh_group;
+			cmd_done_arg.id = req_hdr.nh_id;
 			cmd_done_arg.err = rc;
-			mgmt_evt(MGMT_EVT_OP_CMD_DONE, req_hdr.nh_group, req_hdr.nh_id,
-				 &cmd_done_arg);
+
+			(void)mgmt_callback_notify(MGMT_EVT_OP_CMD_DONE, &cmd_done_arg,
+						   sizeof(cmd_done_arg));
+#endif
 		}
 
 		return rc;
