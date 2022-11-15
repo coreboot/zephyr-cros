@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2018-2021 mcumgr authors
  * Copyright (c) 2022 Laird Connectivity
+ * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -31,6 +32,10 @@
 #include "fs_mgmt/hash_checksum_sha256.h"
 #endif
 
+#if defined(CONFIG_MCUMGR_MGMT_NOTIFICATION_HOOKS)
+#include <zephyr/mgmt/mcumgr/mgmt/callbacks.h>
+#endif
+
 #ifdef CONFIG_FS_MGMT_CHECKSUM_HASH
 /* Define default hash/checksum */
 #if defined(CONFIG_FS_MGMT_CHECKSUM_IEEE_CRC32)
@@ -55,6 +60,8 @@ LOG_MODULE_REGISTER(fs_mgmt);
 
 #define HASH_CHECKSUM_TYPE_SIZE 8
 
+#define HASH_CHECKSUM_SUPPORTED_COLUMNS_MAX 4
+
 static struct {
 	/** Whether an upload is currently in progress. */
 	bool uploading;
@@ -68,8 +75,12 @@ static struct {
 
 static const struct mgmt_handler fs_mgmt_handlers[];
 
-#ifdef CONFIG_FS_MGMT_FILE_ACCESS_HOOK
-static fs_mgmt_on_evt_cb fs_evt_cb;
+#if defined(CONFIG_FS_MGMT_CHECKSUM_HASH)
+/* Hash/checksum iterator information passing structure */
+struct hash_checksum_iterator_info {
+	zcbor_state_t *zse;
+	bool ok;
+};
 #endif
 
 static int fs_mgmt_filelen(const char *path, size_t *out_len)
@@ -149,7 +160,7 @@ done:
 /**
  * Command handler: fs file (read)
  */
-static int fs_mgmt_file_download(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_download(struct smp_streamer *ctxt)
 {
 	uint8_t file_data[FS_MGMT_DL_CHUNK_SIZE];
 	char path[CONFIG_FS_MGMT_PATH_SIZE + 1];
@@ -157,8 +168,8 @@ static int fs_mgmt_file_download(struct mgmt_ctxt *ctxt)
 	size_t bytes_read = 0;
 	size_t file_len;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	bool ok;
 	struct zcbor_string name = { 0 };
 	size_t decoded;
@@ -167,6 +178,13 @@ static int fs_mgmt_file_download(struct mgmt_ctxt *ctxt)
 		ZCBOR_MAP_DECODE_KEY_VAL(off, zcbor_uint64_decode, &off),
 		ZCBOR_MAP_DECODE_KEY_VAL(name, zcbor_tstr_decode, &name),
 	};
+
+#if defined(CONFIG_MCUMGR_GRP_FS_FILE_ACCESS_HOOK)
+	struct fs_mgmt_file_access file_access_data = {
+		.upload = false,
+		.filename = path,
+	};
+#endif
 
 	ok = zcbor_map_decode_bulk(zsd, fs_download_decode,
 		ARRAY_SIZE(fs_download_decode), &decoded) == 0;
@@ -178,14 +196,13 @@ static int fs_mgmt_file_download(struct mgmt_ctxt *ctxt)
 	memcpy(path, name.value, name.len);
 	path[name.len] = '\0';
 
-#ifdef CONFIG_FS_MGMT_FILE_ACCESS_HOOK
-	if (fs_evt_cb != NULL) {
-		/* Send request to application to check if access should be allowed or not */
-		rc = fs_evt_cb(false, path);
+#if defined(CONFIG_MCUMGR_GRP_FS_FILE_ACCESS_HOOK)
+	/* Send request to application to check if access should be allowed or not */
+	rc = mgmt_callback_notify(MGMT_EVT_OP_FS_MGMT_FILE_ACCESS, &file_access_data,
+				  sizeof(file_access_data));
 
-		if (rc != 0) {
-			return rc;
-		}
+	if (rc != MGMT_ERR_EOK) {
+		return rc;
 	}
 #endif
 
@@ -281,7 +298,7 @@ done:
 /**
  * Command handler: fs file (write)
  */
-static int fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_upload(struct smp_streamer *ctxt)
 {
 	char file_name[CONFIG_FS_MGMT_PATH_SIZE + 1];
 	unsigned long long len = ULLONG_MAX;
@@ -289,8 +306,8 @@ static int fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
 	size_t new_off;
 	bool ok;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	struct zcbor_string name = { 0 };
 	struct zcbor_string file_data = { 0 };
 	size_t decoded = 0;
@@ -301,6 +318,13 @@ static int fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
 		ZCBOR_MAP_DECODE_KEY_VAL(data, zcbor_bstr_decode, &file_data),
 		ZCBOR_MAP_DECODE_KEY_VAL(len, zcbor_uint64_decode, &len),
 	};
+
+#if defined(CONFIG_MCUMGR_GRP_FS_FILE_ACCESS_HOOK)
+	struct fs_mgmt_file_access file_access_data = {
+		.upload = false,
+		.filename = file_name,
+	};
+#endif
 
 	ok = zcbor_map_decode_bulk(zsd, fs_upload_decode,
 		ARRAY_SIZE(fs_upload_decode), &decoded) == 0;
@@ -313,14 +337,13 @@ static int fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
 	memcpy(file_name, name.value, name.len);
 	file_name[name.len] = '\0';
 
-#ifdef CONFIG_FS_MGMT_FILE_ACCESS_HOOK
-	if (fs_evt_cb != NULL) {
-		/* Send request to application to check if access should be allowed or not */
-		rc = fs_evt_cb(true, file_name);
+#if defined(CONFIG_MCUMGR_GRP_FS_FILE_ACCESS_HOOK)
+	/* Send request to application to check if access should be allowed or not */
+	rc = mgmt_callback_notify(MGMT_EVT_OP_FS_MGMT_FILE_ACCESS, &file_access_data,
+				  sizeof(file_access_data));
 
-		if (rc != 0) {
-			return rc;
-		}
+	if (rc != MGMT_ERR_EOK) {
+		return rc;
 	}
 #endif
 
@@ -373,13 +396,13 @@ static int fs_mgmt_file_upload(struct mgmt_ctxt *ctxt)
 /**
  * Command handler: fs stat (read)
  */
-static int fs_mgmt_file_status(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_status(struct smp_streamer *ctxt)
 {
 	char path[CONFIG_FS_MGMT_PATH_SIZE + 1];
 	size_t file_len;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	bool ok;
 	struct zcbor_string name = { 0 };
 	size_t decoded;
@@ -425,7 +448,7 @@ static int fs_mgmt_file_status(struct mgmt_ctxt *ctxt)
 /**
  * Command handler: fs hash/checksum (read)
  */
-static int fs_mgmt_file_hash_checksum(struct mgmt_ctxt *ctxt)
+static int fs_mgmt_file_hash_checksum(struct smp_streamer *ctxt)
 {
 	char path[CONFIG_FS_MGMT_PATH_SIZE + 1];
 	char type_arr[HASH_CHECKSUM_TYPE_SIZE + 1] = FS_MGMT_CHECKSUM_HASH_DEFAULT;
@@ -434,8 +457,8 @@ static int fs_mgmt_file_hash_checksum(struct mgmt_ctxt *ctxt)
 	uint64_t off = 0;
 	size_t file_len;
 	int rc;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 	bool ok;
 	struct zcbor_string type = { 0 };
 	struct zcbor_string name = { 0 };
@@ -565,6 +588,52 @@ static int fs_mgmt_file_hash_checksum(struct mgmt_ctxt *ctxt)
 
 	return MGMT_ERR_EOK;
 }
+
+#if defined(CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_CMD)
+/* Callback for supported hash/checksum types to encode details on one type into CBOR map */
+static void supported_hash_checksum_callback(const struct hash_checksum_mgmt_group *group,
+					     void *user_data)
+{
+	struct hash_checksum_iterator_info *ctx = (struct hash_checksum_iterator_info *)user_data;
+
+	if (!ctx->ok) {
+		return;
+	}
+
+	ctx->ok = zcbor_tstr_encode_ptr(ctx->zse, group->group_name, strlen(group->group_name))	&&
+		  zcbor_map_start_encode(ctx->zse, HASH_CHECKSUM_SUPPORTED_COLUMNS_MAX)		&&
+		  zcbor_tstr_put_lit(ctx->zse, "format")					&&
+		  zcbor_uint32_put(ctx->zse, (uint32_t)group->byte_string)			&&
+		  zcbor_tstr_put_lit(ctx->zse, "size")						&&
+		  zcbor_uint32_put(ctx->zse, (uint32_t)group->output_size)			&&
+		  zcbor_map_end_encode(ctx->zse, HASH_CHECKSUM_SUPPORTED_COLUMNS_MAX);
+}
+
+/**
+ * Command handler: fs supported hash/checksum (read)
+ */
+static int
+fs_mgmt_supported_hash_checksum(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zse = ctxt->writer->zs;
+	struct hash_checksum_iterator_info itr_ctx = {
+		.zse = zse,
+	};
+
+	itr_ctx.ok = zcbor_tstr_put_lit(zse, "types");
+
+	zcbor_map_start_encode(zse, CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_MAX_TYPES);
+
+	hash_checksum_mgmt_find_handlers(supported_hash_checksum_callback, &itr_ctx);
+
+	if (!itr_ctx.ok ||
+	    !zcbor_map_end_encode(zse, CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_MAX_TYPES)) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	return MGMT_ERR_EOK;
+}
+#endif
 #endif
 
 static const struct mgmt_handler fs_mgmt_handlers[] = {
@@ -583,6 +652,12 @@ static const struct mgmt_handler fs_mgmt_handlers[] = {
 		.mh_read = fs_mgmt_file_hash_checksum,
 		.mh_write = NULL,
 	},
+#if defined(CONFIG_MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_CMD)
+	[FS_MGMT_ID_SUPPORTED_HASH_CHECKSUM] = {
+		.mh_read = fs_mgmt_supported_hash_checksum,
+		.mh_write = NULL,
+	},
+#endif
 #endif
 };
 
@@ -609,10 +684,3 @@ void fs_mgmt_register_group(void)
 #endif
 #endif
 }
-
-#ifdef CONFIG_FS_MGMT_FILE_ACCESS_HOOK
-void fs_mgmt_register_evt_cb(fs_mgmt_on_evt_cb cb)
-{
-	fs_evt_cb = cb;
-}
-#endif

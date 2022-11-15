@@ -39,6 +39,16 @@ Changes in this release
 Removed APIs in this release
 ============================
 
+* Removed :kconfig:option:`CONFIG_COUNTER_RTC_STM32_LSE_DRIVE*`
+  This should now be configured using the ``driving_capability`` property of
+  LSE clock
+
+* Removed :kconfig:option:`CONFIG_COUNTER_RTC_STM32_LSE_BYPASS`
+  This should now be configured using the new ``lse_bypass`` property of
+  LSE clock
+
+* Removed :kconfig:option:`CONFIG_COUNTER_RTC_STM32_BACKUP_DOMAIN_RESET`
+
 Deprecated in this release
 ==========================
 
@@ -85,8 +95,18 @@ Deprecated in this release
 
   NOTE: Only functions are marked as ``__deprecated``, type definitions are not.
 
+* STM32 RTC source clock should now be configured using devicetree.
+  Related Kconfig :kconfig:option:`CONFIG_COUNTER_RTC_STM32_CLOCK_LSI` and
+  :kconfig:option:`CONFIG_COUNTER_RTC_STM32_CLOCK_LSE` options are now
+  deprecated.
+
 Stable API changes in this release
 ==================================
+
+* MCUmgr events have been reworked to use a single, unified callback system.
+  This allows better customisation of the callbacks with a lower flash size.
+  Applications using the existing callback system will need to be upgraded to
+  use the new API by following the :ref:`migration guide <mcumgr_cb_migration>`
 
 New APIs in this release
 ========================
@@ -169,6 +189,8 @@ Drivers and Sensors
 * Clock control
 
 * Counter
+
+  * STM32 RTC based counter should now be configured using device tree.
 
 * Crypto
 
@@ -266,6 +288,10 @@ Devicetree
 
     * :dtcompatible:`zephyr,flash-disk`
 
+    * STM32 SoCs:
+
+      * :dtcompatible: `st,stm32-lse-clock`: new ``lse-bypass`` property
+
 Libraries / Subsystems
 **********************
 
@@ -287,6 +313,20 @@ Libraries / Subsystems
   * A MCUmgr img_mgmt bug whereby the state of an image upload could persist
     when it was no longer valid (e.g. after an image erase command) has been
     fixed.
+  * MCUmgr fs_mgmt command has been added that allows querying/listing the
+    supported hash/checksum types.
+  * MCUmgr Bluetooth transport will now clear unprocessed commands sent if a
+    remote device disconnects instead of processing them.
+  * A new MCUmgr transport function pointer has been added which needs
+    registering in ``smp_transport_init`` for removing invalid packets for
+    connection-orientated transports. If this is unimplemented, the function
+    pointer can be set to NULL.
+  * MCUmgr command handler definitions have changed, the ``mgmt_ctxt`` struct
+    has been replaced with the ``smp_streamer`` struct, the zcbor objects need
+    to replace ``cnbe`` object access with ``writer`` and ``cnbd`` object
+    access with ``reader`` to successfully build.
+  * MCUmgr callback system has been reworked with a unified singular interface
+    which supports status passing to the handler (:ref:`mcumgr_callbacks`).
 
 * LwM2M
 

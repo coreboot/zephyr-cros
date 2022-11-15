@@ -88,7 +88,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 6d48547251d471ecdca9560f297296a1f33ad16c
+      revision: 53b8bc406a40e2166679cf1a3381f9eb5de96082
       path: modules/hal/nxp
       groups:
         - hal
@@ -131,7 +131,6 @@ manifest:
     - name: hal_telink
       revision: 38573af589173259801ae6c2b34b7d4c9e626746
       path: modules/hal/telink
-      submodules: true
       groups:
         - hal
     - name: hal_ti
