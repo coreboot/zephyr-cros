@@ -748,6 +748,22 @@ Release Notes:
   labels:
     - "area: Flash"
 
+"Drivers: FPGA":
+  status: maintained
+  maintainers:
+    - cfriedt
+  collaborators:
+    - tgorochowik
+    - fkokosinski
+    - msierszulski
+  files:
+    - drivers/fpga/
+    - dts/bindings/fpga/
+    - include/zephyr/drivers/fpga.h
+    - samples/drivers/fpga/
+  labels:
+    - "area: FPGA"
+
 "Drivers: GPIO":
   status: maintained
   maintainers:
@@ -1521,6 +1537,21 @@ Networking:
     - tests/net/lib/mqtt_*/
     - samples/net/cloud/mqtt_azure/
     - samples/net/mqtt_publisher/
+  files-exclude:
+    - tests/net/lib/mqtt_sn*/
+  labels:
+    - "area: Networking"
+
+"Networking: MQTT-SN":
+  status: maintained
+  maintainers:
+    - rlubos
+  collaborators:
+    - BeckmaR
+  files:
+    - subsys/net/lib/mqtt_sn/
+    - tests/net/lib/mqtt_sn*/
+    - samples/net/mqtt_sn_publisher/
   labels:
     - "area: Networking"
 
@@ -1864,6 +1895,7 @@ Microchip SAM Platforms:
   maintainers:
     - nandojve
   collaborators:
+    - attie-argentum
     - mnkp
     - stephanosio
   files:
@@ -1914,6 +1946,7 @@ STM32 Platforms:
   collaborators:
     - ABOSTM
     - FRASTM
+    - gautierg-st
     - GeorgeCGV
   files:
     - boards/arm/nucleo_*/

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 mcumgr authors
+ * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -19,6 +20,10 @@
 #include <mgmt/mgmt.h>
 #include "smp/smp.h"
 #include "zcbor_bulk/zcbor_bulk_priv.h"
+
+#ifdef CONFIG_MCUMGR_MGMT_NOTIFICATION_HOOKS
+#include <zephyr/mgmt/mcumgr/mgmt/callbacks.h>
+#endif
 
 /* The value here sets how many "characteristics" that describe image is
  * encoded into a map per each image (like bootable flags, and so on).
@@ -183,7 +188,10 @@ img_mgmt_state_confirm(void)
 		rc = MGMT_ERR_EUNKNOWN;
 	}
 
-	img_mgmt_dfu_confirmed();
+#if defined(CONFIG_MCUMGR_GRP_IMG_STATUS_HOOKS)
+	(void)mgmt_callback_notify(MGMT_EVT_OP_IMG_MGMT_DFU_CONFIRMED, NULL, 0);
+#endif
+
 err:
 	return 0;
 }
@@ -192,7 +200,7 @@ err:
  * Command handler: image state read
  */
 int
-img_mgmt_state_read(struct mgmt_ctxt *ctxt)
+img_mgmt_state_read(struct smp_streamer *ctxt)
 {
 	char vers_str[IMG_MGMT_VER_MAX_STR_LEN];
 	uint8_t hash[IMAGE_HASH_LEN]; /* SHA256 hash */
@@ -200,7 +208,7 @@ img_mgmt_state_read(struct mgmt_ctxt *ctxt)
 	uint32_t flags;
 	uint8_t state_flags;
 	int i;
-	zcbor_state_t *zse = ctxt->cnbe->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
 	bool ok;
 	struct zcbor_string zhash = { .value = hash, .len = IMAGE_HASH_LEN };
 
@@ -260,7 +268,7 @@ img_mgmt_state_read(struct mgmt_ctxt *ctxt)
  * Command handler: image state write
  */
 int
-img_mgmt_state_write(struct mgmt_ctxt *ctxt)
+img_mgmt_state_write(struct smp_streamer *ctxt)
 {
 	bool confirm = false;
 	int slot;
@@ -274,7 +282,7 @@ img_mgmt_state_write(struct mgmt_ctxt *ctxt)
 		ZCBOR_MAP_DECODE_KEY_VAL(confirm, zcbor_bool_decode, &confirm)
 	};
 
-	zcbor_state_t *zsd = ctxt->cnbd->zs;
+	zcbor_state_t *zsd = ctxt->reader->zs;
 
 	ok = zcbor_map_decode_bulk(zsd, image_list_decode,
 		ARRAY_SIZE(image_list_decode), &decoded) == 0;

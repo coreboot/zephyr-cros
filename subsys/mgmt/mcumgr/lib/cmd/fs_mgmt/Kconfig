@@ -115,6 +115,21 @@ config FS_MGMT_HASH_SHA256
 	help
 	  Enable SHA256 hash support for mcumgr.
 
+config MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_CMD
+	bool "Supported hash/checksum command"
+	help
+	  Enable the supported hash/checksum command which will return details on
+	  supported hash and checksum types that can be used.
+
+config MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_MAX_TYPES
+	int "Predicted maximum number of types to return on supported list"
+	default 10
+	depends on MCUMGR_GRP_FS_CHECKSUM_HASH_SUPPORTED_CMD
+	help
+	  This is used for defining CBOR map holding supported hash/checksum info.
+	  The value does not affect memory allocation, it is used by zcbor to
+	  figure out how to encode map depending on its predicted size.
+
 endif
 
 config FS_MGMT_PATH_SIZE
@@ -125,8 +140,9 @@ config FS_MGMT_PATH_SIZE
 	  of this size gets allocated on the stack during handling of file upload
 	  and download commands.
 
-config FS_MGMT_FILE_ACCESS_HOOK
+config MCUMGR_GRP_FS_FILE_ACCESS_HOOK
 	bool "File read/write access hook"
+	depends on MCUMGR_MGMT_NOTIFICATION_HOOKS
 	help
 	  Allows applications to control file read and write access by
 	  registering for a callback which is then triggered whenever a file

@@ -270,6 +270,15 @@ void bt_le_ext_adv_foreach(void (*func)(struct bt_le_ext_adv *adv, void *data),
 #endif /* defined(CONFIG_BT_EXT_ADV) */
 }
 
+void bt_adv_reset_adv_pool(void)
+{
+#if defined(CONFIG_BT_EXT_ADV)
+	(void)memset(&adv_pool, 0, sizeof(adv_pool));
+#endif /* defined(CONFIG_BT_EXT_ADV) */
+
+	(void)memset(&bt_dev.adv, 0, sizeof(bt_dev.adv));
+}
+
 static struct bt_le_ext_adv *adv_get_legacy(void)
 {
 #if defined(CONFIG_BT_EXT_ADV)
@@ -1921,7 +1930,7 @@ void bt_hci_le_adv_set_terminated(struct net_buf *buf)
 	struct bt_hci_evt_le_adv_set_terminated *evt;
 	struct bt_le_ext_adv *adv;
 	uint16_t conn_handle;
-#if (CONFIG_BT_ID_MAX > 1) && (CONFIG_BT_EXT_ADV_MAX_ADV_SET > 1)
+#if defined(CONFIG_BT_CONN) && (CONFIG_BT_EXT_ADV_MAX_ADV_SET > 1)
 	bool was_adv_enabled;
 #endif
 
@@ -1940,13 +1949,13 @@ void bt_hci_le_adv_set_terminated(struct net_buf *buf)
 
 	(void)bt_le_lim_adv_cancel_timeout(adv);
 
-#if (CONFIG_BT_ID_MAX > 1) && (CONFIG_BT_EXT_ADV_MAX_ADV_SET > 1)
+#if defined(CONFIG_BT_CONN) && (CONFIG_BT_EXT_ADV_MAX_ADV_SET > 1)
 	was_adv_enabled = atomic_test_bit(adv->flags, BT_ADV_ENABLED);
 #endif
 
 	atomic_clear_bit(adv->flags, BT_ADV_ENABLED);
 
-#if (CONFIG_BT_ID_MAX > 1) && (CONFIG_BT_EXT_ADV_MAX_ADV_SET > 1)
+#if defined(CONFIG_BT_CONN) && (CONFIG_BT_EXT_ADV_MAX_ADV_SET > 1)
 	bt_dev.adv_conn_id = adv->id;
 	for (int i = 0; i < ARRAY_SIZE(bt_dev.cached_conn_complete); i++) {
 		if (bt_dev.cached_conn_complete[i].valid &&

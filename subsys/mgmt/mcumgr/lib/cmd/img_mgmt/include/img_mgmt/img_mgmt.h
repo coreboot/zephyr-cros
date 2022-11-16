@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 mcumgr authors
+ * Copyright (c) 2022 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,6 +12,7 @@
 #include "img_mgmt_config.h"
 #include "image.h"
 #include "mgmt/mgmt.h"
+#include "smp/smp.h"
 #include <zcbor_common.h>
 
 struct image_version;
@@ -71,7 +73,7 @@ struct img_mgmt_upload_req {
 	struct zcbor_string img_data;
 	struct zcbor_string data_sha;
 	bool upgrade;			/* Only allow greater version numbers. */
-} __packed;
+};
 
 /** Global state for upload in progress. */
 struct img_mgmt_state {
@@ -84,7 +86,7 @@ struct img_mgmt_state {
 	/** Hash of image data; used for resumption of a partial upload. */
 	uint8_t data_sha_len;
 	uint8_t data_sha[IMG_MGMT_DATA_SHA_LEN];
-} __packed;
+};
 
 /** Describes what to do during processing of an upload request. */
 struct img_mgmt_upload_action {
@@ -102,7 +104,7 @@ struct img_mgmt_upload_action {
 	/** "rsn" string to be sent as explanation for "rc" code */
 	const char *rc_rsn;
 #endif
-} __packed;
+};
 
 /**
  * @brief Registers the image management command handler group.
@@ -191,53 +193,6 @@ int img_mgmt_state_set_pending(int slot, int permanent);
  */
 int img_mgmt_state_confirm(void);
 
-/** @brief Generic callback function for events */
-typedef void (*img_mgmt_dfu_cb)(void);
-
-/** Callback function pointers */
-struct img_mgmt_dfu_callbacks_t {
-	img_mgmt_dfu_cb dfu_started_cb;
-	img_mgmt_dfu_cb dfu_stopped_cb;
-	img_mgmt_dfu_cb dfu_pending_cb;
-	img_mgmt_dfu_cb dfu_confirmed_cb;
-};
-
-/** @typedef img_mgmt_upload_fn
- * @brief Application callback that is executed when an image upload request is
- * received.
- *
- * The callback's return code determines whether the upload request is accepted
- * or rejected.  If the callback returns 0, processing of the upload request
- * proceeds.  If the callback returns nonzero, the request is rejected with a
- * response containing an `rc` value equal to the return code.
- *
- * @param req		Image upload request structure
- * @param action	Image upload action structure
- *
- * @return	0 if the upload request should be accepted; nonzero to reject
- *		the request with the specified status.
- */
-typedef int (*img_mgmt_upload_fn)(const struct img_mgmt_upload_req req,
-				  const struct img_mgmt_upload_action action);
-
-/**
- * @brief Configures a callback that gets called whenever a valid image upload
- * request is received.
- *
- * The callback's return code determines whether the upload request is accepted
- * or rejected.  If the callback returns 0, processing of the upload request
- * proceeds.  If the callback returns nonzero, the request is rejected with a
- * response containing an `rc` value equal to the return code.
- *
- * @param cb	The callback to execute on rx of an upload request.
- */
-void img_mgmt_set_upload_cb(img_mgmt_upload_fn cb);
-void img_mgmt_register_callbacks(const struct img_mgmt_dfu_callbacks_t *cb_struct);
-void img_mgmt_dfu_stopped(void);
-void img_mgmt_dfu_started(void);
-void img_mgmt_dfu_pending(void);
-void img_mgmt_dfu_confirmed(void);
-
 /**
  * Compares two image version numbers in a semver-compatible way.
  *
@@ -253,7 +208,7 @@ int img_mgmt_vercmp(const struct image_version *a, const struct image_version *b
 #ifdef CONFIG_IMG_MGMT_VERBOSE_ERR
 #define IMG_MGMT_UPLOAD_ACTION_SET_RC_RSN(action, rsn) ((action)->rc_rsn = (rsn))
 #define IMG_MGMT_UPLOAD_ACTION_RC_RSN(action) ((action)->rc_rsn)
-int img_mgmt_error_rsp(struct mgmt_ctxt *ctxt, int rc, const char *rsn);
+int img_mgmt_error_rsp(struct smp_streamer *ctxt, int rc, const char *rsn);
 extern const char *img_mgmt_err_str_app_reject;
 extern const char *img_mgmt_err_str_hdr_malformed;
 extern const char *img_mgmt_err_str_magic_mismatch;
