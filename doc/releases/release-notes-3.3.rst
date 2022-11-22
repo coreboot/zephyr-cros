@@ -19,6 +19,7 @@ API Changes
 
 Changes in this release
 =======================
+
 * Bluetooth: :kconfig:option:`CONFIG_BT_PER_ADV_SYNC_TRANSFER_RECEIVER`
   and :kconfig:option:`CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER` have been
   added to enable the PAST implementation rather than
@@ -33,7 +34,10 @@ Changes in this release
   :kconfig:option:`CONFIG_DISK_FLASH_SECTOR_SIZE` Kconfig options have been
   removed in favor of new :dtcompatible:`zephyr,flash-disk` devicetree binding.
 
-- Starting from this release ``zephyr-`` prefixed tags won't be created
+* Regulator APIs previously located in ``<zephyr/drivers/regulator/consumer.h>``
+  are now part of ``<zerphyr/drivers/regulator.h>``.
+
+* Starting from this release ``zephyr-`` prefixed tags won't be created
   anymore. The project will continue using ``v`` tags, for example ``v3.3.0``.
 
 Removed APIs in this release
@@ -102,6 +106,18 @@ Deprecated in this release
 
 Stable API changes in this release
 ==================================
+
+* MCUmgr events have been reworked to use a single, unified callback system.
+  This allows better customisation of the callbacks with a lower flash size.
+  Applications using the existing callback system will need to be upgraded to
+  use the new API by following the :ref:`migration guide <mcumgr_cb_migration>`
+
+* :c:func:`net_pkt_get_frag`, :c:func:`net_pkt_get_reserve_tx_data` and
+  :c:func:`net_pkt_get_reserve_rx_data` functions are now requiring to specify
+  the minimum fragment length to allocate, so that they work correctly also in
+  case :kconfig:option:`CONFIG_NET_BUF_VARIABLE_DATA_SIZE` is enabled.
+  Applications using this APIs will need to be updated to provide the expected
+  fragment length.
 
 New APIs in this release
 ========================
@@ -210,6 +226,8 @@ Drivers and Sensors
 * Flash
 
   * NRF: Added CONFIG_SOC_FLASH_NRF_TIMEOUT_MULTIPLIER to allow tweaking the timeout of flash operations.
+
+  * spi_nor: Added property mxicy,mx25r-power-mode to jedec,spi-nor binding for controlling low power/high performance mode on Macronix MX25R* Ultra Low Power flash devices.
 
 * GPIO
 
@@ -320,6 +338,38 @@ Libraries / Subsystems
     has been replaced with the ``smp_streamer`` struct, the zcbor objects need
     to replace ``cnbe`` object access with ``writer`` and ``cnbd`` object
     access with ``reader`` to successfully build.
+  * MCUmgr callback system has been reworked with a unified singular interface
+    which supports status passing to the handler (:ref:`mcumgr_callbacks`).
+  * MCUmgr subsystem directory structure has been flattened and contents of the
+    lib subdirectory has been redistributed into following directories:
+
+    .. table::
+       :align: center
+
+       +----------------+-------------------------------------------+
+       | Subdirectory   | MCUmgr area                               |
+       +================+===========================================+
+       | mgmt           | MCUmgr management functions, group        |
+       |                | registration, and so on;                  |
+       +----------------+-------------------------------------------+
+       | smp            | Simple Management Protocol processing;    |
+       +----------------+-------------------------------------------+
+       | transport      | Transport support and transport API;      |
+       +----------------+-------------------------------------------+
+       | grp            | Command groups, formerly lib/cmd;         |
+       |                | each group, which has Zephyr built in     |
+       |                | support has its own directory here;       |
+       +----------------+-------------------------------------------+
+       | util           | Utilities used by various subareas of     |
+       |                | MCUmgr.                                   |
+       +----------------+-------------------------------------------+
+
+    Public API interfaces for above areas are now exported through zephyr_interface,
+    and headers for them reside in ``zephyr/mgmt/mcumgr/<mcumgr_subarea>/``.
+    For example to access mgmt API include ``<zephyr/mgmt/mcumgr/mgmt/mgmt.h>``.
+
+    Private headers for above areas can be accessed, when required, using paths:
+    ``mgmt/mcumgr/mgmt/<mcumgr_subarea>/``.
 
 * LwM2M
 
