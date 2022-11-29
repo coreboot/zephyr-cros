@@ -1,35 +1,26 @@
 #!/usr/bin/env python3
 
 # Copyright (c) 2018,2020 Intel Corporation
+# Copyright (c) 2022 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
+import argparse
 import collections
-import sys
-import subprocess
-import re
-import os
 from email.utils import parseaddr
 import logging
-import argparse
-from junitparser import TestCase, TestSuite, JUnitXml, Skipped, Error, Failure
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
 import tempfile
 import traceback
-import magic
 import shlex
-from pathlib import Path
+
+from junitparser import TestCase, TestSuite, JUnitXml, Skipped, Error, Failure
+import magic
 
 logger = None
-
-# This ends up as None when we're not running in a Zephyr tree
-ZEPHYR_BASE = os.environ.get('ZEPHYR_BASE')
-if not ZEPHYR_BASE:
-    # Let the user run this script as ./scripts/ci/check_compliance.py without
-    #  making them set ZEPHYR_BASE.
-    ZEPHYR_BASE = str(Path(__file__).resolve().parents[2])
-
-    # Propagate this decision to child processes.
-    os.environ['ZEPHYR_BASE'] = ZEPHYR_BASE
-
 
 def git(*args, cwd=None):
     # Helper for running a Git command. Returns the rstrip()ed stdout output.
@@ -39,26 +30,19 @@ def git(*args, cwd=None):
 
     git_cmd = ("git",) + args
     try:
-        git_process = subprocess.Popen(
-            git_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+        cp = subprocess.run(git_cmd, capture_output=True, cwd=cwd)
     except OSError as e:
         err(f"failed to run '{cmd2str(git_cmd)}': {e}")
 
-    stdout, stderr = git_process.communicate()
-    stdout = stdout.decode("utf-8")
-    stderr = stderr.decode("utf-8")
-    if git_process.returncode or stderr:
-        err(f"""\
-'{cmd2str(git_cmd)}' exited with status {git_process.returncode} and/or wrote
-to stderr.
+    if cp.returncode or cp.stderr:
+        err(f"'{cmd2str(git_cmd)}' exited with status {cp.returncode} and/or "
+            f"wrote to stderr.\n"
+            f"==stdout==\n"
+            f"{cp.stdout.decode('utf-8')}\n"
+            f"==stderr==\n"
+            f"{cp.stderr.decode('utf-8')}\n")
 
-==stdout==
-{stdout}
-==stderr==
-{stderr}""")
-
-    return stdout.rstrip()
-
+    return cp.stdout.decode("utf-8").rstrip()
 
 def get_shas(refspec):
     """
@@ -68,13 +52,16 @@ def get_shas(refspec):
     :return:
     """
     return git('rev-list',
-               '--max-count={}'.format(-1 if "." in refspec else 1),
-               refspec).split()
+               f'--max-count={-1 if "." in refspec else 1}', refspec).split()
 
+def get_files(filter=None, paths=None):
+    filter_arg = (f'--diff-filter={filter}',) if filter else ()
+    paths_arg = ('--', *paths) if paths else ()
+    return git('diff', '--name-only', *filter_arg, COMMIT_RANGE, *paths_arg)
 
 class FmtdFailure(Failure):
 
-    def __init__(self, severity, title, file, line, col=None, desc=""):
+    def __init__(self, severity, title, file, line=None, col=None, desc=""):
         self.severity = severity
         self.title = title
         self.file = file
@@ -84,9 +71,10 @@ class FmtdFailure(Failure):
         description = f':{desc}' if desc else ''
         msg_body = desc or title
 
-        txt = f'\n{title}{description}\nFile:{file}\nLine:{line}' + \
+        txt = f'\n{title}{description}\nFile:{file}' + \
+              (f'\nLine:{line}' if line else '') + \
               (f'\nColumn:{col}' if col else '')
-        msg = f'{file}:{line} {msg_body}'
+        msg = f'{file}' + (f':{line}' if line else '') + f' {msg_body}'
         typ = severity.lower()
 
         super().__init__(msg, typ)
@@ -109,11 +97,15 @@ class ComplianceTest:
       The path the test runs itself in. This is just informative and used in
       the message that gets printed when running the test.
 
-      The magic string "<git-top>" refers to the top-level repository
+      There are two magic strings that can be used instead of a path:
+      - The magic string "<zephyr-base>" can be used to refer to the
+      environment variable ZEPHYR_BASE or, when missing, the calculated base of
+      the zephyr tree
+      - The magic string "<git-top>" refers to the top-level repository
       directory. This avoids running 'git' to find the top-level directory
       before main() runs (class variable assignments run when the 'class ...'
       statement runs). That avoids swallowing errors, because main() reports
-      them to GitHub.
+      them to GitHub
     """
     def __init__(self):
         self.case = TestCase(type(self).name, "Guidelines")
@@ -133,7 +125,7 @@ class ComplianceTest:
         Raises an exception internally, so you do not need to put a 'return'
         after error().
         """
-        err = Error(msg or (type(self).name + " error"), type_)
+        err = Error(msg or f'{type(self).name} error', type_)
         self._result(err, text)
 
         raise EndTest
@@ -145,7 +137,7 @@ class ComplianceTest:
         Raises an exception internally, so you do not need to put a 'return'
         after skip().
         """
-        skpd = Skipped(msg or (type(self).name + " skipped"), type_)
+        skpd = Skipped(msg or f'{type(self).name} skipped', type_)
         self._result(skpd, text)
 
         raise EndTest
@@ -155,10 +147,10 @@ class ComplianceTest:
         Signals that the test failed, with message 'msg'. Can be called many
         times within the same test to report multiple failures.
         """
-        fail = Failure(msg or (type(self).name + " issues"), type_)
+        fail = Failure(msg or f'{type(self).name} issues', type_)
         self._result(fail, text)
 
-    def fmtd_failure(self, severity, title, file, line, col=None, desc=""):
+    def fmtd_failure(self, severity, title, file, line=None, col=None, desc=""):
         """
         Signals that the test failed, and store the information in a formatted
         standardized manner. Can be called many times within the same test to
@@ -188,24 +180,24 @@ class CheckPatch(ComplianceTest):
     path_hint = "<git-top>"
 
     def run(self):
-        # Default to Zephyr's checkpatch if ZEPHYR_BASE is set
-        checkpatch = os.path.join(ZEPHYR_BASE or GIT_TOP, 'scripts',
-                                  'checkpatch.pl')
+        checkpatch = os.path.join(ZEPHYR_BASE, 'scripts', 'checkpatch.pl')
         if not os.path.exists(checkpatch):
-            self.skip(checkpatch + " not found")
+            self.skip(f'{checkpatch} not found')
 
-        # git diff's output doesn't depend on the current (sub)directory
         diff = subprocess.Popen(('git', 'diff', COMMIT_RANGE),
-                                stdout=subprocess.PIPE)
+                                stdout=subprocess.PIPE,
+                                cwd=GIT_TOP)
         try:
-            subprocess.check_output((checkpatch, '--mailback', '--no-tree', '-'),
-                                    stdin=diff.stdout,
-                                    stderr=subprocess.STDOUT,
-                                    shell=True, cwd=GIT_TOP)
+            subprocess.run((checkpatch, '--mailback', '--no-tree', '-'),
+                           check=True,
+                           stdin=diff.stdout,
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT,
+                           shell=True, cwd=GIT_TOP)
 
         except subprocess.CalledProcessError as ex:
             output = ex.output.decode("utf-8")
-            regex = r'^\s*\S+:(\d+):\s*(ERROR|WARNING):(.+):(.+)(?:\n|\r\n?)+' \
+            regex = r'^\s*\S+:(\d+):\s*(ERROR|WARNING):(.+?):(.+)(?:\n|\r\n?)+' \
                     r'^\s*#(\d+):\s*FILE:\s*(.+):(\d+):'
 
             matches = re.findall(regex, output, re.MULTILINE)
@@ -224,7 +216,7 @@ class DevicetreeBindingsCheck(ComplianceTest):
     """
     name = "DevicetreeBindings"
     doc = "See https://docs.zephyrproject.org/latest/build/dts/bindings.html for more details."
-    path_hint = ZEPHYR_BASE
+    path_hint = "<zephyr-base>"
 
     def run(self, full=True):
         dts_yaml = self.parse_dt_bindings()
@@ -235,11 +227,9 @@ class DevicetreeBindingsCheck(ComplianceTest):
         """
         Returns a list of dts/bindings/**/*.yaml files
         """
-        if not ZEPHYR_BASE:
-            self.skip("Not a Zephyr tree (ZEPHYR_BASE unset)")
 
         dt_bindings = []
-        for file_name in git('diff', '--name-only', COMMIT_RANGE):
+        for file_name in get_files():
             if file_name.startswith('dts/bindings/') and file_name.endswith('.yaml'):
                 dt_bindings.append(file_name)
 
@@ -269,7 +259,7 @@ class KconfigCheck(ComplianceTest):
     """
     name = "Kconfig"
     doc = "See https://docs.zephyrproject.org/latest/guides/kconfig/index.html for more details."
-    path_hint = ZEPHYR_BASE
+    path_hint = "<zephyr-base>"
 
     def run(self, full=True):
         kconf = self.parse_kconfig()
@@ -297,9 +287,10 @@ class KconfigCheck(ComplianceTest):
         cmd = [sys.executable, zephyr_module_path,
                '--kconfig-out', modules_file]
         try:
-            _ = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as ex:
-            self.error(ex.output)
+            self.error(ex.output.decode("utf-8"))
 
         modules_dir = ZEPHYR_BASE + '/modules'
         modules = [name for name in os.listdir(modules_dir) if
@@ -326,14 +317,15 @@ class KconfigCheck(ComplianceTest):
         # Invoke the script directly using the Python executable since this is
         # not a module nor a pip-installed Python utility
         zephyr_drv_kconfig_path = os.path.join(ZEPHYR_BASE, "scripts", "dts",
-			                       "gen_driver_kconfig_dts.py")
+                                               "gen_driver_kconfig_dts.py")
         binding_path = os.path.join(ZEPHYR_BASE, "dts", "bindings")
         cmd = [sys.executable, zephyr_drv_kconfig_path,
                '--kconfig-out', kconfig_dts_file, '--bindings', binding_path]
         try:
-            _ = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as ex:
-            self.error(ex.output)
+            self.error(ex.output.decode("utf-8"))
 
 
     def parse_kconfig(self):
@@ -341,9 +333,6 @@ class KconfigCheck(ComplianceTest):
         Returns a kconfiglib.Kconfig object for the Kconfig files. We reuse
         this object for all tests to avoid having to reparse for each test.
         """
-        if not ZEPHYR_BASE:
-            self.skip("Not a Zephyr tree (ZEPHYR_BASE unset)")
-
         # Put the Kconfiglib path first to make sure no local Kconfiglib version is
         # used
         kconfig_path = os.path.join(ZEPHYR_BASE, "scripts", "kconfig")
@@ -392,6 +381,28 @@ class KconfigCheck(ComplianceTest):
             self.failure(str(e))
             raise EndTest
 
+    def get_defined_syms(self, kconf):
+        # Returns a set() with the names of all defined Kconfig symbols (with no
+        # 'CONFIG_' prefix). This is complicated by samples and tests defining
+        # their own Kconfig trees. For those, just grep for 'config FOO' to find
+        # definitions. Doing it "properly" with Kconfiglib is still useful for
+        # the main tree, because some symbols are defined using preprocessor
+        # macros.
+
+        # Warning: Needs to work with both --perl-regexp and the 're' module.
+        # (?:...) is a non-capturing group.
+        regex = r"^\s*(?:menu)?config\s*([A-Z0-9_]+)\s*(?:#|$)"
+
+        # Grep samples/ and tests/ for symbol definitions
+        grep_stdout = git("grep", "-I", "-h", "--perl-regexp", regex, "--",
+                          ":samples", ":tests", cwd=ZEPHYR_BASE)
+
+        # Symbols from the main Kconfig tree + grepped definitions from samples
+        # and tests
+        return set([sym.name for sym in kconf.unique_defined_syms]
+                   + re.findall(regex, grep_stdout, re.MULTILINE))
+
+
     def check_top_menu_not_too_long(self, kconf):
         """
         Checks that there aren't too many items in the top-level menu (which
@@ -409,11 +420,11 @@ class KconfigCheck(ComplianceTest):
             node = node.next
 
         if n_top_items > max_top_items:
-            self.failure("""
-Expected no more than {} potentially visible items (items with prompts) in the
-top-level Kconfig menu, found {} items. If you're deliberately adding new
-entries, then bump the 'max_top_items' variable in {}.
-""".format(max_top_items, n_top_items, __file__))
+            self.failure(f"""
+Expected no more than {max_top_items} potentially visible items (items with
+prompts) in the top-level Kconfig menu, found {n_top_items} items. If you're
+deliberately adding new entries, then bump the 'max_top_items' variable in
+{__file__}.""")
 
     def check_no_redefined_in_defconfig(self, kconf):
         # Checks that no symbols are (re)defined in defconfigs.
@@ -486,8 +497,7 @@ https://docs.zephyrproject.org/latest/guides/kconfig/tips.html#menuconfig-symbol
                                            if "undefined symbol" in warning)
 
         if undef_ref_warnings:
-            self.failure("Undefined Kconfig symbols:\n\n"
-                             + undef_ref_warnings)
+            self.failure(f"Undefined Kconfig symbols:\n\n {undef_ref_warnings}")
 
     def check_no_undef_outside_kconfig(self, kconf):
         """
@@ -518,7 +528,7 @@ https://docs.zephyrproject.org/latest/guides/kconfig/tips.html#menuconfig-symbol
         #
         #  - *, meant for comments like '#endif /* CONFIG_FOO_* */
 
-        defined_syms = get_defined_syms(kconf)
+        defined_syms = self.get_defined_syms(kconf)
 
         # Maps each undefined symbol to a list <filename>:<linenr> strings
         undef_to_locs = collections.defaultdict(list)
@@ -540,9 +550,9 @@ https://docs.zephyrproject.org/latest/guides/kconfig/tips.html#menuconfig-symbol
             for sym_name in re.findall(regex, line):
                 sym_name = sym_name[7:]  # Strip CONFIG_
                 if sym_name not in defined_syms and \
-                   sym_name not in UNDEF_KCONFIG_WHITELIST:
+                   sym_name not in self.UNDEF_KCONFIG_WHITELIST:
 
-                    undef_to_locs[sym_name].append("{}:{}".format(path, lineno))
+                    undef_to_locs[sym_name].append(f"{path}:{lineno}")
 
         if not undef_to_locs:
             return
@@ -553,13 +563,12 @@ https://docs.zephyrproject.org/latest/guides/kconfig/tips.html#menuconfig-symbol
         #
         #   CONFIG_ALSO_MISSING    arch/xtensa/core/fatal.c:273
         #   CONFIG_MISSING         arch/xtensa/core/fatal.c:264, subsys/fb/cfb.c:20
-        undef_desc = "\n".join(
-            "CONFIG_{:35} {}".format(sym_name, ", ".join(locs))
+        undef_desc = "\n".join(f"CONFIG_{sym_name:35} {', '.join(locs)}"
             for sym_name, locs in sorted(undef_to_locs.items()))
 
-        self.failure("""
+        self.failure(f"""
 Found references to undefined Kconfig symbols. If any of these are false
-positives, then add them to UNDEF_KCONFIG_WHITELIST in {} in the ci-tools repo.
+positives, then add them to UNDEF_KCONFIG_WHITELIST in {__file__}.
 
 If the reference is for a comment like /* CONFIG_FOO_* */ (or
 /* CONFIG_FOO_*_... */), then please use exactly that form (with the '*'). The
@@ -568,100 +577,83 @@ CI check knows not to flag it.
 More generally, a reference followed by $, @, {{, *, or ## will never be
 flagged.
 
-{}""".format(os.path.basename(__file__), undef_desc))
+{undef_desc}""")
 
+    # Many of these are symbols used as examples. Note that the list is sorted
+    # alphabetically, and skips the CONFIG_ prefix.
+    UNDEF_KCONFIG_WHITELIST = {
+        "ALSO_MISSING",
+        "APP_LINK_WITH_",
+        "APP_LOG_LEVEL", # Application log level is not detected correctly as
+                         # the option is defined using a template, so it can't
+                         # be grepped
+        "ARMCLANG_STD_LIBC",  # The ARMCLANG_STD_LIBC is defined in the
+                              # toolchain Kconfig which is sourced based on
+                              # Zephyr toolchain variant and therefore not
+                              # visible to compliance.
+        "BOOT_UPGRADE_ONLY", # Used in example adjusting MCUboot config, but
+                             # symbol is defined in MCUboot itself.
+        "CDC_ACM_PORT_NAME_",
+        "CLOCK_STM32_SYSCLK_SRC_",
+        "CMU",
+        "BT_6LOWPAN",  # Defined in Linux, mentioned in docs
+        "COUNTER_RTC_STM32_CLOCK_SRC",
+        "CRC",  # Used in TI CC13x2 / CC26x2 SDK comment
+        "DEEP_SLEEP",  # #defined by RV32M1 in ext/
+        "DESCRIPTION",
+        "ERR",
+        "ESP_DIF_LIBRARY",  # Referenced in CMake comment
+        "EXPERIMENTAL",
+        "FFT",  # Used as an example in cmake/extensions.cmake
+        "FLAG",  # Used as an example
+        "FOO",
+        "FOO_LOG_LEVEL",
+        "FOO_SETTING_1",
+        "FOO_SETTING_2",
+        "LSM6DSO_INT_PIN",
+        "MCUBOOT_LOG_LEVEL_WRN",        # Used in example adjusting MCUboot
+                                        # config,
+        "MCUBOOT_DOWNGRADE_PREVENTION", # but symbols are defined in MCUboot
+                                        # itself.
+        "MISSING",
+        "MODULES",
+        "MYFEATURE",
+        "MY_DRIVER_0",
+        "NORMAL_SLEEP",  # #defined by RV32M1 in ext/
+        "OPT",
+        "OPT_0",
+        "PEDO_THS_MIN",
+        "REG1",
+        "REG2",
+        "SAMPLE_MODULE_LOG_LEVEL",  # Used as an example in samples/subsys/logging
+        "SAMPLE_MODULE_LOG_LEVEL_DBG",  # Used in tests/subsys/logging/log_api
+        "LOG_BACKEND_MOCK_OUTPUT_DEFAULT", #Referenced in tests/subsys/logging/log_syst
+        "LOG_BACKEND_MOCK_OUTPUT_SYST", #Referenced in testcase.yaml of log_syst test
+        "SEL",
+        "SHIFT",
+        "SOC_WATCH",  # Issue 13749
+        "SOME_BOOL",
+        "SOME_INT",
+        "SOME_OTHER_BOOL",
+        "SOME_STRING",
+        "SRAM2",  # Referenced in a comment in samples/application_development
+        "STACK_SIZE",  # Used as an example in the Kconfig docs
+        "STD_CPP",  # Referenced in CMake comment
+        "TAGOIO_HTTP_POST_LOG_LEVEL",  # Used as in samples/net/cloud/tagoio
+        "TEST1",
+        "TYPE_BOOLEAN",
+        "USB_CONSOLE",
+        "USE_STDC_",
+        "WHATEVER",
+        "EXTRA_FIRMWARE_DIR", # Linux, in boards/xtensa/intel_adsp_cavs25/doc
+        "HUGETLBFS",          # Linux, in boards/xtensa/intel_adsp_cavs25/doc
+        "MODVERSIONS",        # Linux, in boards/xtensa/intel_adsp_cavs25/doc
+        "SECURITY_LOADPIN",   # Linux, in boards/xtensa/intel_adsp_cavs25/doc
+        "ZEPHYR_TRY_MASS_ERASE", # MCUBoot setting described in sysbuild
+                                 # documentation
+        "ZTEST_FAIL_TEST_",  # regex in tests/ztest/fail/CMakeLists.txt
+    }
 
-def get_defined_syms(kconf):
-    # Returns a set() with the names of all defined Kconfig symbols (with no
-    # 'CONFIG_' prefix). This is complicated by samples and tests defining
-    # their own Kconfig trees. For those, just grep for 'config FOO' to find
-    # definitions. Doing it "properly" with Kconfiglib is still useful for the
-    # main tree, because some symbols are defined using preprocessor macros.
-
-    # Warning: Needs to work with both --perl-regexp and the 're' module.
-    # (?:...) is a non-capturing group.
-    regex = r"^\s*(?:menu)?config\s*([A-Z0-9_]+)\s*(?:#|$)"
-
-    # Grep samples/ and tests/ for symbol definitions
-    grep_stdout = git("grep", "-I", "-h", "--perl-regexp", regex, "--",
-                      ":samples", ":tests", cwd=ZEPHYR_BASE)
-
-    # Symbols from the main Kconfig tree + grepped definitions from samples and
-    # tests
-    return set([sym.name for sym in kconf.unique_defined_syms]
-               + re.findall(regex, grep_stdout, re.MULTILINE))
-
-
-# Many of these are symbols used as examples. Note that the list is sorted
-# alphabetically, and skips the CONFIG_ prefix.
-UNDEF_KCONFIG_WHITELIST = {
-    "ALSO_MISSING",
-    "APP_LINK_WITH_",
-    "APP_LOG_LEVEL", # Application log level is not detected correctly as the
-                     # option is defined using a template, so it can't be
-                     # grepped
-    "ARMCLANG_STD_LIBC",  # The ARMCLANG_STD_LIBC is defined in the toolchain
-                          # Kconfig which is sourced based on Zephyr toolchain
-			  # variant and therefore not visible to compliance.
-    "BOOT_UPGRADE_ONLY", # Used in example adjusting MCUboot config, but symbol
-                         # is defined in MCUboot itself.
-    "CDC_ACM_PORT_NAME_",
-    "CLOCK_STM32_SYSCLK_SRC_",
-    "CMU",
-    "BT_6LOWPAN",  # Defined in Linux, mentioned in docs
-    "COUNTER_RTC_STM32_CLOCK_SRC",
-    "CRC",  # Used in TI CC13x2 / CC26x2 SDK comment
-    "DEEP_SLEEP",  # #defined by RV32M1 in ext/
-    "DESCRIPTION",
-    "ERR",
-    "ESP_DIF_LIBRARY",  # Referenced in CMake comment
-    "EXPERIMENTAL",
-    "FFT",  # Used as an example in cmake/extensions.cmake
-    "FLAG",  # Used as an example
-    "FOO",
-    "FOO_LOG_LEVEL",
-    "FOO_SETTING_1",
-    "FOO_SETTING_2",
-    "LSM6DSO_INT_PIN",
-    "MCUBOOT_LOG_LEVEL_WRN",        # Used in example adjusting MCUboot config,
-    "MCUBOOT_DOWNGRADE_PREVENTION", # but symbols are defined in MCUboot itself.
-    "MISSING",
-    "MODULES",
-    "MYFEATURE",
-    "MY_DRIVER_0",
-    "NORMAL_SLEEP",  # #defined by RV32M1 in ext/
-    "OPT",
-    "OPT_0",
-    "PEDO_THS_MIN",
-    "REG1",
-    "REG2",
-    "SAMPLE_MODULE_LOG_LEVEL",  # Used as an example in samples/subsys/logging
-    "SAMPLE_MODULE_LOG_LEVEL_DBG",  # Used in tests/subsys/logging/log_api
-    "LOG_BACKEND_MOCK_OUTPUT_DEFAULT", #Referenced in tests/subsys/logging/log_syst
-    "LOG_BACKEND_MOCK_OUTPUT_SYST", #Referenced in testcase.yaml of log_syst test
-    "SEL",
-    "SHIFT",
-    "SOC_WATCH",  # Issue 13749
-    "SOME_BOOL",
-    "SOME_INT",
-    "SOME_OTHER_BOOL",
-    "SOME_STRING",
-    "SRAM2",  # Referenced in a comment in samples/application_development
-    "STACK_SIZE",  # Used as an example in the Kconfig docs
-    "STD_CPP",  # Referenced in CMake comment
-    "TAGOIO_HTTP_POST_LOG_LEVEL",  # Used as in samples/net/cloud/tagoio
-    "TEST1",
-    "TYPE_BOOLEAN",
-    "USB_CONSOLE",
-    "USE_STDC_",
-    "WHATEVER",
-    "EXTRA_FIRMWARE_DIR", # Linux, in boards/xtensa/intel_adsp_cavs25/doc
-    "HUGETLBFS",          # Linux, in boards/xtensa/intel_adsp_cavs25/doc
-    "MODVERSIONS",        # Linux, in boards/xtensa/intel_adsp_cavs25/doc
-    "SECURITY_LOADPIN",   # Linux, in boards/xtensa/intel_adsp_cavs25/doc
-    "ZEPHYR_TRY_MASS_ERASE", # MCUBoot setting described in sysbuild documentation
-    "ZTEST_FAIL_TEST_",  # regex in tests/ztest/fail/CMakeLists.txt
-}
 
 class KconfigBasicCheck(KconfigCheck):
     """
@@ -672,7 +664,7 @@ class KconfigBasicCheck(KconfigCheck):
     """
     name = "KconfigBasic"
     doc = "See https://docs.zephyrproject.org/latest/guides/kconfig/index.html for more details."
-    path_hint = ZEPHYR_BASE
+    path_hint = "<zephyr-base>"
 
     def run(self):
         super().run(full=False)
@@ -712,9 +704,7 @@ class Codeowners(ComplianceTest):
 
                 match = re.match(r"^([^\s,]+)\s+[^\s]+", line)
                 if not match:
-                    self.failure(
-                        "Invalid CODEOWNERS line %d\n\t%s" %
-                        (lineno, line))
+                    self.failure(f"Invalid CODEOWNERS line {lineno}\n\t{line}")
                     continue
 
                 git_patrn = match.group(1)
@@ -725,8 +715,8 @@ class Codeowners(ComplianceTest):
                     files.append(str(abs_path.relative_to(top_path)))
 
                 if not files:
-                    self.failure("Path '{}' not found in the tree but is listed in "
-                                     "CODEOWNERS".format(git_patrn))
+                    self.failure(f"Path '{git_patrn}' not found in the tree"
+                                 f"but is listed in CODEOWNERS")
 
                 pattern2files[git_patrn] = files
 
@@ -751,18 +741,12 @@ class Codeowners(ComplianceTest):
         return ret
 
     def run(self):
-        # TODO: testing an old self.commit range that doesn't end
-        # with HEAD is most likely a mistake. Should warn, see
-        # https://github.com/zephyrproject-rtos/ci-tools/pull/24
         codeowners = os.path.join(GIT_TOP, "CODEOWNERS")
         if not os.path.exists(codeowners):
             self.skip("CODEOWNERS not available in this repo")
 
-        name_changes = git("diff", "--name-only", "--diff-filter=ARCD",
-                           COMMIT_RANGE)
-
-        owners_changes = git("diff", "--name-only", COMMIT_RANGE,
-                             "--", codeowners)
+        name_changes = get_files(filter="ARCD")
+        owners_changes = get_files(paths=(codeowners,))
 
         if not name_changes and not owners_changes:
             # TODO: 1. decouple basic and cheap CODEOWNERS syntax
@@ -776,9 +760,8 @@ class Codeowners(ComplianceTest):
         # The way git finds Renames and Copies is not "exact science",
         # however if one is missed then it will always be reported as an
         # Addition instead.
-        new_files = git("diff", "--name-only", "--diff-filter=ARC",
-                        COMMIT_RANGE).splitlines()
-        logger.debug("New files %s", new_files)
+        new_files = get_files(filter="ARC").splitlines()
+        logger.debug(f"New files {new_files}")
 
         # Convert to pathlib.Path string representation (e.g.,
         # backslashes 'dir1\dir2\' on Windows) to be consistent
@@ -790,10 +773,10 @@ class Codeowners(ComplianceTest):
             f_is_owned = False
 
             for git_pat, owned in patrn2files.items():
-                logger.debug("Scanning %s for %s", git_pat, newf)
+                logger.debug(f"Scanning {git_pat} for {newf}")
 
                 if newf in owned:
-                    logger.info("%s matches new file %s", git_pat, newf)
+                    logger.info(f"{git_pat} matches new file {newf}")
                     f_is_owned = True
                     # Unlike github, we don't care about finding any
                     # more specific owner.
@@ -804,9 +787,9 @@ class Codeowners(ComplianceTest):
 
         if new_not_owned:
             self.failure("New files added that are not covered in "
-                             "CODEOWNERS:\n\n" + "\n".join(new_not_owned) +
-                             "\n\nPlease add one or more entries in the "
-                             "CODEOWNERS file to cover those files")
+                         "CODEOWNERS:\n\n" + "\n".join(new_not_owned) +
+                         "\n\nPlease add one or more entries in the "
+                         "CODEOWNERS file to cover those files")
 
 
 class Nits(ComplianceTest):
@@ -820,8 +803,7 @@ class Nits(ComplianceTest):
 
     def run(self):
         # Loop through added/modified files
-        for fname in git("diff", "--name-only", "--diff-filter=d",
-                         COMMIT_RANGE).splitlines():
+        for fname in get_files(filter="d").splitlines():
             if "Kconfig" in fname:
                 self.check_kconfig_header(fname)
                 self.check_redundant_zephyr_source(fname)
@@ -847,8 +829,8 @@ class Nits(ComplianceTest):
         # 'Kconfig - yada yada' has a copy-pasted redundant filename at the
         # top. This probably means all of the header was copy-pasted.
         if re.match(r"\s*#\s*(K|k)config[\w.-]*\s*-", contents):
-            self.failure("""
-Please use this format for the header in '{}' (see
+            self.failure(f"""
+Please use this format for the header in '{fname}' (see
 https://docs.zephyrproject.org/latest/guides/kconfig/index.html#header-comments-and-other-nits):
 
     # <Overview of symbols defined in the file, preferably in plain English>
@@ -861,7 +843,7 @@ https://docs.zephyrproject.org/latest/guides/kconfig/index.html#header-comments-
 Skip the "Kconfig - " part of the first line, since it's clear that the comment
 is about Kconfig from context. The "# Kconfig - " is what triggers this
 failure.
-""".format(fname))
+""")
 
     def check_redundant_zephyr_source(self, fname):
         # Checks for 'source "$(ZEPHYR_BASE)/Kconfig[.zephyr]"', which can be
@@ -895,16 +877,14 @@ concatenated together, so no document separators are needed.""")
             contents = f.read()
 
         if not contents.endswith("\n"):
-            self.failure("Missing newline at end of '{}'. Check your text "
-                             "editor settings.".format(fname))
+            self.failure(f"Missing newline at end of '{fname}'. Check your text "
+                         f"editor settings.")
 
         if contents.startswith("\n"):
-            self.failure("Please remove blank lines at start of '{}'"
-                             .format(fname))
+            self.failure(f"Please remove blank lines at start of '{fname}'")
 
         if contents.endswith("\n\n"):
-            self.failure("Please remove blank lines at end of '{}'"
-                             .format(fname))
+            self.failure(f"Please remove blank lines at end of '{fname}'")
 
 
 class GitLint(ComplianceTest):
@@ -919,16 +899,15 @@ class GitLint(ComplianceTest):
     def run(self):
         # By default gitlint looks for .gitlint configuration only in
         # the current directory
-        proc = subprocess.Popen('gitlint --commits ' + COMMIT_RANGE,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                shell=True, cwd=GIT_TOP)
+        try:
+            subprocess.run('gitlint --commits ' + COMMIT_RANGE,
+                           check=True,
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT,
+                           shell=True, cwd=GIT_TOP)
 
-        msg = ""
-        if proc.wait() != 0:
-            msg = proc.stdout.read()
-
-        if msg != "":
-            self.failure(msg.decode("utf-8"))
+        except subprocess.CalledProcessError as ex:
+            self.failure(ex.output.decode("utf-8"))
 
 
 class PyLint(ComplianceTest):
@@ -946,12 +925,7 @@ class PyLint(ComplianceTest):
                                                 "pylintrc"))
 
         # List of files added/modified by the commit(s).
-        files = git(
-            "diff", "--name-only", "--diff-filter=d", COMMIT_RANGE, "--",
-            # Skip to work around crash in pylint 2.2.2:
-            # https://github.com/PyCQA/pylint/issues/2906
-            ":!boards/xtensa/intel_s1000_crb/support/create_board_img.py") \
-            .splitlines()
+        files = get_files(filter="d").splitlines()
 
         # Filter out everything but Python files. Keep filenames
         # relative (to GIT_TOP) to stay farther from any command line
@@ -1035,12 +1009,12 @@ class Identity(ComplianceTest):
                 if match:
                     signed.append(match.group(1))
 
-            error1 = "%s: author email (%s) needs to match one of the signed-off-by entries." % (
-                sha, author)
-            error2 = "%s: author email (%s) does not follow the syntax: First Last <email>." % (
-                sha, author)
-            error3 = "%s: author email (%s) must be a real email and cannot end in @users.noreply.github.com" % (
-                sha, author)
+            error1 = f"{sha}: author email ({author}) needs to match one of " \
+                     f"the signed-off-by entries."
+            error2 = f"{sha}: author email ({author}) does not follow the " \
+                     f"syntax: First Last <email>."
+            error3 = f"{sha}: author email ({author}) must be a real email " \
+                     f"and cannot end in @users.noreply.github.com"
             failure = None
             if author not in signed:
                 failure = error1
@@ -1056,6 +1030,29 @@ class Identity(ComplianceTest):
 
             if failure:
                 self.failure(failure)
+
+
+class BinaryFiles(ComplianceTest):
+    """
+    Check that the diff contains no binary files.
+    """
+    name = "BinaryFiles"
+    doc = "No binary files allowed."
+    path_hint = "<git-top>"
+
+    def run(self):
+        BINARY_ALLOW_PATHS = ("doc/", "boards/", "samples/")
+        # svg files are always detected as binary, see .gitattributes
+        BINARY_ALLOW_EXT = (".jpg", ".jpeg", ".png", ".svg")
+
+        for stat in git("diff", "--numstat", "--diff-filter=A",
+                        COMMIT_RANGE).splitlines():
+            added, deleted, fname = stat.split("\t")
+            if added == "-" and deleted == "-":
+                if (fname.startswith(BINARY_ALLOW_PATHS) and
+                    fname.endswith(BINARY_ALLOW_EXT)):
+                    continue
+                self.failure(f"Binary file not allowed: {fname}")
 
 
 def init_logs(cli_arg):
@@ -1092,10 +1089,20 @@ def annotate(res):
     """
     https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#about-workflow-commands
     """
-    notice = f'::{res.severity} file={res.file},line={res.line}' + \
+    notice = f'::{res.severity} file={res.file}' + \
+             (f',line={res.line}' if res.line else '') + \
              (f',col={res.col}' if res.col else '') + \
              f',title={res.title}::{res.message}'
     print(notice)
+
+
+def resolve_path_hint(hint):
+    if hint == "<zephyr-base>":
+        return ZEPHYR_BASE
+    elif hint == "<git-top>":
+        return GIT_TOP
+    else:
+        return hint
 
 
 def parse_args():
@@ -1132,6 +1139,16 @@ def _main(args):
     # The "real" main(), which is wrapped to catch exceptions and report them
     # to GitHub. Returns the number of test failures.
 
+    global ZEPHYR_BASE
+    ZEPHYR_BASE = os.environ.get('ZEPHYR_BASE')
+    if not ZEPHYR_BASE:
+        # Let the user run this script as ./scripts/ci/check_compliance.py without
+        #  making them set ZEPHYR_BASE.
+        ZEPHYR_BASE = str(Path(__file__).resolve().parents[2])
+
+        # Propagate this decision to child processes.
+        os.environ['ZEPHYR_BASE'] = ZEPHYR_BASE
+
     # The absolute path of the top-level git directory. Initialize it here so
     # that issues running Git can be reported to GitHub.
     global GIT_TOP
@@ -1158,11 +1175,11 @@ def _main(args):
             # repo). Since that earlier pass might've posted an error to
             # GitHub, avoid generating a GitHub comment here, by avoiding
             # sys.exit() (which gets caught in main()).
-            print("error: '{}' not found".format(args.previous_run),
+            print(f"error: '{args.previous_run}' not found",
                   file=sys.stderr)
             return 1
 
-        logging.info("Loading previous results from " + args.previous_run)
+        logging.info(f"Loading previous results from {args.previous_run}")
         for loaded_suite in JUnitXml.fromfile(args.previous_run):
             suite = loaded_suite
             break
@@ -1187,7 +1204,7 @@ def _main(args):
         test = testcase()
         try:
             print(f"Running {test.name:16} tests in "
-                  f"{GIT_TOP if test.path_hint == '<git-top>' else test.path_hint} ...")
+                  f"{resolve_path_hint(test.path_hint)} ...")
             test.run()
         except EndTest:
             pass
@@ -1206,22 +1223,22 @@ def _main(args):
 
     failed_cases = []
     name2doc = {testcase.name: testcase.doc
-						for testcase in inheritors(ComplianceTest)}
+                for testcase in inheritors(ComplianceTest)}
 
     for case in suite:
         if case.result:
             if case.is_skipped:
-                logging.warning("Skipped %s", case.name)
+                logging.warning(f"Skipped {case.name}")
             else:
                 failed_cases.append(case)
         else:
             # Some checks like codeowners can produce no .result
-            logging.info("No JUnit result for %s", case.name)
+            logging.info(f"No JUnit result for {case.name}")
 
     n_fails = len(failed_cases)
 
     if n_fails:
-        print("{} checks failed".format(n_fails))
+        print(f"{n_fails} checks failed")
         for case in failed_cases:
             errmsg = ""
             with open(f"{case.name}.txt", "w") as f:
@@ -1229,10 +1246,10 @@ def _main(args):
                 f.write(f"{docs}\n")
                 for res in case.result:
                     errmsg = res.text.strip()
-                    logging.error("Test %s failed: \n%s", case.name, errmsg)
-                    f.write('\n' + errmsg)
+                    logging.error(f"Test {case.name} failed: \n{errmsg}")
+                    f.write(f'\n {errmsg}')
 
-    print("\nComplete results in " + args.output)
+    print(f"\nComplete results in {args.output}")
     return n_fails
 
 
@@ -1252,8 +1269,8 @@ def main():
     except BaseException:
         # Catch BaseException instead of Exception to include stuff like
         # SystemExit (raised by sys.exit())
-        print("Python exception in `{}`:\n\n"
-              "```\n{}\n```".format(__file__, traceback.format_exc()))
+        print(f"Python exception in `{__file__}`:\n\n"
+              f"```\n{traceback.format_exc()}\n```")
 
         raise
 
@@ -1271,7 +1288,7 @@ def err(msg):
     cmd = sys.argv[0]  # Empty if missing
     if cmd:
         cmd += ": "
-    sys.exit(cmd + "error: " + msg)
+    sys.exit(f"{cmd} error: {msg}")
 
 
 if __name__ == "__main__":

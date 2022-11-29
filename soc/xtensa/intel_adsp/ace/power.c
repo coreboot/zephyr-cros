@@ -73,7 +73,7 @@ uint8_t *global_imr_ram_storage;
 /*8
  * @biref a d3 restore boot entry point
  */
-extern void rom_entry_d3_restore(void);
+extern void boot_entry_d3_restore(void);
 
 /* NOTE: This struct will grow with all values that have to be stored for
  * proper cpu restore after PG.
@@ -89,7 +89,7 @@ struct core_state {
 	uint32_t bctl;
 };
 
-static struct core_state core_desc[CONFIG_MP_MAX_NUM_CPUS] = { 0 };
+static struct core_state core_desc[CONFIG_MP_MAX_NUM_CPUS] = {{0}};
 
 struct lpsram_header {
 	uint32_t alt_reset_vector;
@@ -156,7 +156,7 @@ void power_gate_exit(void)
 	_restore_core_context();
 }
 
-void ALWAYS_INLINE power_off_exit(void)
+static void ALWAYS_INLINE power_off_exit(void)
 {
 	__asm__(
 		"  movi  a0, 0\n\t"
@@ -183,7 +183,7 @@ __asm__(".align 4\n\t"
 	"  add sp, sp, a2\n\t"
 	"  call0 power_gate_exit\n\t");
 
-__imr FUNC_NORETURN void pm_state_imr_restore(void)
+__imr void pm_state_imr_restore(void)
 {
 	struct imr_layout *imr_layout = (struct imr_layout *)(IMR_LAYOUT_ADDRESS);
 	/* restore lpsram power and contents */
@@ -219,7 +219,7 @@ __weak void pm_state_set(enum pm_state state, uint8_t substate_id)
 
 			imr_layout->imr_state.header.adsp_imr_magic = ADSP_IMR_MAGIC_VALUE;
 			imr_layout->imr_state.header.imr_restore_vector =
-					(void *)rom_entry_d3_restore;
+					(void *)boot_entry_d3_restore;
 			imr_layout->imr_state.header.imr_ram_storage = global_imr_ram_storage;
 			z_xtensa_cache_flush(imr_layout, sizeof(*imr_layout));
 
@@ -234,7 +234,7 @@ __weak void pm_state_set(enum pm_state state, uint8_t substate_id)
 			_save_core_context(cpu);
 
 			/* save LPSRAM - a simple copy */
-			memcpy(global_imr_ram_storage, LP_SRAM_BASE, LP_SRAM_SIZE);
+			memcpy(global_imr_ram_storage, (void *)LP_SRAM_BASE, LP_SRAM_SIZE);
 
 			/* save HPSRAM - a multi step procedure, executed by a TLB driver
 			 * the TLB driver will change memory mapping
