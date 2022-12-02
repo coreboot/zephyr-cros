@@ -220,7 +220,11 @@ static void lp_comm_tx(struct ll_conn *conn, struct proc_ctx *ctx)
 		 * NOTE: As the supervision timeout is at most 32s the normal procedure response
 		 * timeout of 40s will never come into play for the ACL Termination procedure.
 		 */
-		llcp_lr_prt_restart_with_value(conn, conn->supervision_reload);
+		const uint32_t conn_interval_us = conn->lll.interval * CONN_INT_UNIT_US;
+		const uint16_t sto_reload = RADIO_CONN_EVENTS(
+			(conn->supervision_timeout * 10U * 1000U),
+			conn_interval_us);
+		llcp_lr_prt_restart_with_value(conn, sto_reload);
 	}
 }
 
@@ -357,25 +361,13 @@ static void lp_comm_complete_cte_req(struct ll_conn *conn, struct proc_ctx *ctx)
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
 
 #if defined(CONFIG_BT_CTLR_SCA_UPDATE)
-static void lp_sca_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
+static void lp_comm_ntf_sca(struct node_rx_pdu *ntf, struct proc_ctx *ctx, struct pdu_data *pdu)
 {
-	struct node_rx_pdu *ntf;
-	struct node_rx_sca *pdu;
-
-	/* Allocate ntf node */
-	ntf = llcp_ntf_alloc();
-	LL_ASSERT(ntf);
+	struct node_rx_sca *pdu_sca = (struct node_rx_sca *)pdu;
 
 	ntf->hdr.type = NODE_RX_TYPE_REQ_PEER_SCA_COMPLETE;
-	ntf->hdr.handle = conn->lll.handle;
-	pdu = (struct node_rx_sca *)ntf->pdu;
-
-	pdu->status = ctx->data.sca_update.error_code;
-	pdu->sca = ctx->data.sca_update.sca;
-
-	/* Enqueue notification towards LL */
-	ll_rx_put(ntf->hdr.link, ntf);
-	ll_rx_sched();
+	pdu_sca->status = ctx->data.sca_update.error_code;
+	pdu_sca->sca = ctx->data.sca_update.sca;
 }
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
 
@@ -409,6 +401,11 @@ static void lp_comm_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
 		lp_comm_ntf_cte_req(conn, ctx, pdu);
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
+#if defined(CONFIG_BT_CTLR_SCA_UPDATE)
+	case PROC_SCA_UPDATE:
+		lp_comm_ntf_sca(ntf, ctx, pdu);
+		break;
+#endif /* CONFIG_BT_CTLR_SCA_UPDATE */
 	default:
 		LL_ASSERT(0);
 		break;
@@ -554,9 +551,13 @@ static void lp_comm_complete(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 #endif /* defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 			}
 #endif /* CONFIG_BT_PERIPHERAL */
-			lp_sca_ntf(conn, ctx);
-			llcp_lr_complete(conn);
-			ctx->state = LP_COMMON_STATE_IDLE;
+			if (!llcp_ntf_alloc_is_available()) {
+				ctx->state = LP_COMMON_STATE_WAIT_NTF;
+			} else {
+				lp_comm_ntf(conn, ctx);
+				llcp_lr_complete(conn);
+				ctx->state = LP_COMMON_STATE_IDLE;
+			}
 			break;
 		default:
 			/* Illegal response opcode */
@@ -876,6 +877,9 @@ static void lp_comm_st_wait_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 		case PROC_DATA_LENGTH_UPDATE:
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+#if defined(CONFIG_BT_CTLR_SCA_UPDATE)
+		case PROC_SCA_UPDATE:
+#endif /* CONFIG_BT_CTLR_SCA_UPDATE) */
 			if (llcp_ntf_alloc_is_available()) {
 				lp_comm_ntf(conn, ctx);
 				llcp_lr_complete(conn);
