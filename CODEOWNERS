@@ -363,6 +363,7 @@
 /drivers/pwm/*it8xxx2*                    @RuibinChang
 /drivers/pwm/*esp32*                      @LucasTambor
 /drivers/pwm/*rcar*                       @pmarzin
+/drivers/regulator/*                      @gmarull
 /drivers/regulator/regulator_pca9420.c    @danieldegrasse
 /drivers/regulator/regulator_shell.c      @danieldegrasse
 /drivers/reset/                           @andrei-edward-popa
@@ -721,6 +722,7 @@ scripts/build/gen_image_info.py           @tejlmand
 /scripts/list_boards.py                   @mbolivar-nordic
 /scripts/build/process_gperf.py           @dcpleung @nashif
 /scripts/build/gen_relocate_app.py        @dcpleung
+/scripts/generate_usb_vif/                @madhurimaparuchuri
 /scripts/requirements*.txt                @mbolivar-nordic @galak @nashif
 /scripts/tests/twister/                   @aasthagr
 /scripts/tests/build/test_subfolder_list.py @rmstoi
@@ -754,6 +756,7 @@ scripts/build/gen_image_info.py           @tejlmand
 /subsys/debug/gdbstub.c                   @ceolin
 /subsys/dfu/                              @de-nordic @nordicjm
 /subsys/disk/                             @jfischer-no
+/subsys/dsp/                              @yperess
 /subsys/tracing/                          @nashif
 /subsys/debug/asan_hacks.c                @aescolar @daor-oti
 /subsys/demand_paging/                    @dcpleung @nashif
