@@ -63,6 +63,13 @@
 			status = "disabled";
 		};
 
+		clk_hsi48: clk-hsi48 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <DT_FREQ_M(48)>;
+			status = "disabled";
+		};
+
 		clk_msi: clk-msi {
 			#clock-cells = <0>;
 			compatible = "st,stm32-msi-clock";
@@ -95,6 +102,12 @@
 		pll: pll {
 			#clock-cells = <0>;
 			compatible = "st,stm32wb-pll-clock";
+			status = "disabled";
+		};
+
+		clk48: clk48 {
+			#clock-cells = <0>;
+			compatible = "st,stm32-clock-mux";
 			status = "disabled";
 		};
 	};
@@ -234,6 +247,12 @@
 			clocks = <&rcc STM32_CLOCK_BUS_APB1 0x00000400>;
 			prescaler = <32768>;
 			status = "disabled";
+
+			bbram: backup_regs {
+				compatible = "st,stm32-bbram";
+				st,backup-regs = <20>;
+				status = "disabled";
+			};
 		};
 
 		spi1: spi@40013000 {

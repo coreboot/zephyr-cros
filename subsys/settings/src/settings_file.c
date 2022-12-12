@@ -137,8 +137,12 @@ static int settings_file_load_priv(struct settings_store *cs, line_load_cb cb,
 
 	fs_file_t_init(&file);
 
-	rc = fs_open(&file, cf->cf_name, FS_O_CREATE | FS_O_RDWR);
+	rc = fs_open(&file, cf->cf_name, FS_O_READ);
 	if (rc != 0) {
+		if (rc == -ENOENT) {
+			return -ENOENT;
+		}
+
 		return -EINVAL;
 	}
 
@@ -444,7 +448,7 @@ static int settings_file_save(struct settings_store *cs, const char *name,
 	if (cdca.is_dup == 1) {
 		return 0;
 	}
-	return settings_file_save_priv(cs, name, (char *)value, val_len);
+	return settings_file_save_priv(cs, name, value, val_len);
 }
 
 static int read_handler(void *ctx, off_t off, char *buf, size_t *len)

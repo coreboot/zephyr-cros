@@ -159,8 +159,10 @@ struct ll_conn_iso_stream *ll_iso_stream_connected_get(uint16_t handle)
 	}
 
 	cis = ll_conn_iso_stream_get(handle);
-	if ((cis->group == NULL) || (cis->lll.handle != handle)) {
-		/* CIS does not belong to a group or has inconsistent handle */
+	if ((cis->group == NULL) || (cis->lll.handle != handle) || !cis->established) {
+		/* CIS does not belong to a group, has inconsistent handle or is
+		 * not yet established.
+		 */
 		return NULL;
 	}
 
@@ -442,7 +444,6 @@ void ull_conn_iso_resume_ticker_start(struct lll_event *resume_event,
 				      uint32_t resume_timeout)
 {
 	struct lll_conn_iso_group *cig;
-	uint32_t ready_delay_us;
 	uint32_t resume_delay_us;
 	int32_t resume_offset_us;
 	uint8_t ticker_id;
@@ -458,26 +459,28 @@ void ull_conn_iso_resume_ticker_start(struct lll_event *resume_event,
 	}
 	cig->resume_cis = cis_handle;
 
-	if (0) {
-#if defined(CONFIG_BT_CTLR_PHY)
-	} else {
-		struct ll_conn_iso_stream *cis;
-		struct ll_conn *acl;
-
-		cis = ll_conn_iso_stream_get(cis_handle);
-		acl = ll_conn_get(cis->lll.acl_handle);
-
-		ready_delay_us = lll_radio_rx_ready_delay_get(acl->lll.phy_rx, 1);
-#else
-	} else {
-		ready_delay_us = lll_radio_rx_ready_delay_get(0, 0);
-#endif /* CONFIG_BT_CTLR_PHY */
-	}
-
 	resume_delay_us  = EVENT_OVERHEAD_START_US;
 	resume_delay_us += EVENT_TICKER_RES_MARGIN_US;
-	resume_delay_us += EVENT_JITTER_US;
-	resume_delay_us += ready_delay_us;
+
+	if (cig->role == BT_HCI_ROLE_PERIPHERAL) {
+		/* Add peripheral specific delay */
+		resume_delay_us += EVENT_JITTER_US;
+		if (0) {
+#if defined(CONFIG_BT_CTLR_PHY)
+		} else {
+			struct ll_conn_iso_stream *cis;
+			struct ll_conn *acl;
+
+			cis = ll_conn_iso_stream_get(cis_handle);
+			acl = ll_conn_get(cis->lll.acl_handle);
+
+			resume_delay_us += lll_radio_rx_ready_delay_get(acl->lll.phy_rx, 1);
+#else
+		} else {
+			resume_delay_us += lll_radio_rx_ready_delay_get(0, 0);
+#endif /* CONFIG_BT_CTLR_PHY */
+		}
+	}
 
 	resume_offset_us = (int32_t)(resume_timeout - resume_delay_us);
 	LL_ASSERT(resume_offset_us >= 0);
@@ -542,6 +545,7 @@ static int init_reset(void)
 		cis = ll_conn_iso_stream_get(handle);
 		cis->cis_id = 0;
 		cis->group  = NULL;
+		cis->lll.link_tx_free = NULL;
 	}
 
 	conn_accept_timeout = CONN_ACCEPT_TIMEOUT_DEFAULT;
@@ -631,8 +635,7 @@ void ull_conn_iso_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 #elif !defined(CONFIG_BT_CTLR_CENTRAL_ISO)
 	mfy.fp = lll_peripheral_iso_prepare;
 #else
-	mfy.fp = (cig->lll.role == BT_HCI_ROLE_PERIPHERAL) ? lll_peripheral_iso_prepare :
-							     lll_central_iso_prepare;
+	mfy.fp = IS_PERIPHERAL(cig) ? lll_peripheral_iso_prepare : lll_central_iso_prepare;
 #endif
 
 	if (IS_PERIPHERAL(cig) && cig->sca_update) {
@@ -961,6 +964,11 @@ static void cis_tx_lll_flush(void *param)
 		link = memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head,
 				    (void **)&tx);
 	}
+
+	LL_ASSERT(!lll->link_tx_free);
+	link = memq_deinit(&lll->memq_tx.head, &lll->memq_tx.tail);
+	LL_ASSERT(link);
+	lll->link_tx_free = link;
 
 	/* Resume CIS teardown in ULL_HIGH context */
 	mfys[cig->lll.handle].param = &cig->lll;

@@ -32,7 +32,7 @@ manifest:
       revision: fe0ab36e0fa7453a4c9b97bedac89709f45cf965
       path: modules/lib/chre
     - name: cmsis
-      revision: 093de61c2a7d12dc9253daf8692f61f793a9254a
+      revision: 74981bf893e8b10931464b9945e2143d99a3f0a3
       path: modules/hal/cmsis
       groups:
         - hal
@@ -57,7 +57,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: 8c7ee781ea4c4a010740f5231709ce7b21ad96d6
+      revision: d53c07e949fe5b76535ac552aec98bedd9447de3
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -88,7 +88,7 @@ manifest:
       groups:
         - hal
     - name: hal_nuvoton
-      revision: b4d31f33238713a568e23618845702fadd67386f
+      revision: 0a1f153c433f5f637a4490651bdda6d966de3b99
       path: modules/hal/nuvoton
       groups:
         - hal
@@ -129,7 +129,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 642e199c59828137dc6b1c7044a289d4269886d1
+      revision: 15993325e3aa961fbf5ffc17583ab1d4fed1e0bc
       path: modules/hal/stm32
       groups:
         - hal
@@ -154,7 +154,7 @@ manifest:
       groups:
         - hal
     - name: libmetal
-      revision: 2f586b4f1276fb075ee145421bdf6cbe5403aa41
+      revision: efa2ace6028290ddee494a78ade772a0b112ab83
       path: modules/hal/libmetal
       groups:
         - hal
@@ -200,7 +200,7 @@ manifest:
       revision: 65bc5305d432c08e24a3f343006d1e7deaff4908
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
-      revision: 8d53544871e1f300c478224faca6be8384ab0d04
+      revision: aedcc262f93bbb1b0c2f58026911575729b7465c
       path: modules/lib/open-amp
     - name: openthread
       revision: 3e138d3f5d549894b79cdc8567ed1f9215281344
