@@ -45,6 +45,13 @@ Changes in this release
   Bluetooth subsystem, enable `CONFIG_BT_(module name)_LOG_LEVEL_DBG` instead of
   `CONFIG_BT_DEBUG_(module name)`.
 
+* MCUmgr img_mgmt now requires that a full sha256 hash to be used when
+  uploading an image to keep track of the progress, where the sha256 hash
+  is of the whole file being uploaded (different to the hash used when getting
+  image states). Use of a truncated hash or non-sha256 hash will still work
+  but will cause issues and failures in client software with future updates
+  to Zephyr/MCUmgr such as image verification.
+
 Removed APIs in this release
 ============================
 
@@ -123,6 +130,8 @@ Deprecated in this release
 
 * PCIe APIs :c:func:`pcie_probe` and :c:func:`pcie_bdf_lookup` have been
   deprecated in favor of a centralized scan of available PCIe devices.
+
+* SPI DT :c:func:`spi_is_ready` function has been deprecated in favor of :c:func:`spi_is_ready_dt`.
 
 Stable API changes in this release
 ==================================
@@ -338,6 +347,11 @@ Devicetree
 Libraries / Subsystems
 **********************
 
+* File systems
+
+  * Added new API call `fs_mkfs`.
+  * Added new sample `samples/subsys/fs/format`.
+
 * Management
 
   * MCUmgr functionality deprecated in 3.1 has been removed:
@@ -400,6 +414,12 @@ Libraries / Subsystems
 
     Private headers for above areas can be accessed, when required, using paths:
     ``mgmt/mcumgr/mgmt/<mcumgr_subarea>/``.
+  * MCUmgr os_mgmt info command has been added that allows querying details on
+    the kernel and application, allowing application-level extensibility
+    see :ref:`mcumgr_os_application_info` for details.
+
+ * MCUMgr :kconfig:option:`CONFIG_APP_LINK_WITH_MCUMGR` has been removed as
+   it has not been doing anything.
 
 * LwM2M
 
