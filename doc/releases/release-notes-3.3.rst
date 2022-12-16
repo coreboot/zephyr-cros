@@ -122,7 +122,8 @@ Deprecated in this release
 
   :kconfig:option:`CONFIG_SETTINGS_FS` in favor of :kconfig:option:`CONFIG_SETTINGS_FILE`
 
-  :kconfig:option:`CONFIG_SETTINGS_FS_DIR` in favor of :kconfig:option:`CONFIG_SETTINGS_FILE_DIR`
+  :kconfig:option:`CONFIG_SETTINGS_FS_DIR` in favor of creating all parent
+  directories from :kconfig:option:`CONFIG_SETTINGS_FILE_PATH`
 
   :kconfig:option:`CONFIG_SETTINGS_FS_FILE` in favor of :kconfig:option:`CONFIG_SETTINGS_FILE_PATH`
 
@@ -260,6 +261,12 @@ Drivers and Sensors
 
   * spi_nor: Added property mxicy,mx25r-power-mode to jedec,spi-nor binding for controlling low power/high performance mode on Macronix MX25R* Ultra Low Power flash devices.
 
+  * spi_nor: Added check if the flash is busy during init. This used to cause
+    the flash device to be unavailable until the system was restarted. The fix
+    waits for the flash to become ready before continuing. In cases where a
+    full flash erase was started before a restart, this might result in several
+    minutes of waiting time (depending on flash size and erase speed).
+
 * GPIO
 
 * I2C
@@ -351,6 +358,7 @@ Libraries / Subsystems
 
   * Added new API call `fs_mkfs`.
   * Added new sample `samples/subsys/fs/format`.
+  * FAT FS driver has been updated to version 0.15 w/patch1.
 
 * Management
 
@@ -424,6 +432,11 @@ Libraries / Subsystems
 * LwM2M
 
   * The ``lwm2m_senml_cbor_*`` files have been regenerated using zcbor 0.6.0.
+
+* Settings
+
+  * Replaced all :c:func:`k_panic` invocations within settings backend
+    initialization with returning / propagating error codes.
 
 HALs
 ****
