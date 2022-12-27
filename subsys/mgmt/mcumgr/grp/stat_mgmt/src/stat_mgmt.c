@@ -14,6 +14,7 @@
 #include <zcbor_encode.h>
 
 #include <zephyr/mgmt/mcumgr/mgmt/mgmt.h>
+#include <zephyr/mgmt/mcumgr/mgmt/handlers.h>
 #include <zephyr/mgmt/mcumgr/smp/smp.h>
 #include <zephyr/mgmt/mcumgr/grp/stat_mgmt/stat_mgmt.h>
 
@@ -118,7 +119,7 @@ stat_mgmt_show(struct smp_streamer *ctxt)
 	struct zcbor_string value = { 0 };
 	zcbor_state_t *zse = ctxt->writer->zs;
 	zcbor_state_t *zsd = ctxt->reader->zs;
-	char stat_name[CONFIG_STAT_MGMT_MAX_NAME_LEN];
+	char stat_name[CONFIG_MCUMGR_GRP_STAT_MAX_NAME_LEN];
 	bool ok;
 	size_t counter = 0;
 
@@ -237,8 +238,9 @@ static struct mgmt_group stat_mgmt_group = {
 	.mg_group_id = MGMT_GROUP_ID_STAT,
 };
 
-void
-stat_mgmt_register_group(void)
+static void stat_mgmt_register_group(void)
 {
 	mgmt_register_group(&stat_mgmt_group);
 }
+
+MCUMGR_HANDLER_DEFINE(stat_mgmt, stat_mgmt_register_group);
