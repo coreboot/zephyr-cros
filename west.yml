@@ -57,7 +57,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: a7590d34f28bb1cd3de28847db3f4d31c38ae41d
+      revision: 15c84e32d557545d662392e72ca86e3d88382c03
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -93,7 +93,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 0ee50e0796d66307c8a99e9178140e7432b1eaba
+      revision: 0594f3042da3ddc0f7e590142b0ff3e5935257ca
       path: modules/hal/nxp
       groups:
         - hal
@@ -119,7 +119,7 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: 1ec8dd99aa4ac3e8632d2aa28a7438049bb27102
+      revision: 9dcaa761258cfdfecaacc5a9f0af92f6535d74a3
       path: modules/hal/silabs
       groups:
         - hal
@@ -181,7 +181,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: cfec947e0f8be686d02c73104a3b1ad0b5dcf1e6
+      revision: dd59d907639b81f3c0556ebf6e9249f85482b407
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t

@@ -137,8 +137,8 @@ bool regulator_is_supported_voltage(const struct device *dev, int32_t min_uv,
 	unsigned int volt_cnt;
 
 	/* voltage may not be allowed, even if supported */
-	if ((min_uv < config->min_uv) || (max_uv > config->max_uv)) {
-		return -EINVAL;
+	if ((min_uv > config->max_uv) || (max_uv < config->min_uv)) {
+		return false;
 	}
 
 	volt_cnt = regulator_count_voltages(dev);
@@ -148,7 +148,7 @@ bool regulator_is_supported_voltage(const struct device *dev, int32_t min_uv,
 
 		(void)regulator_list_voltage(dev, idx, &volt_uv);
 
-		if ((volt_uv > min_uv) && (volt_uv < max_uv)) {
+		if ((volt_uv >= min_uv) && (volt_uv <= max_uv)) {
 			return true;
 		}
 	}
@@ -169,7 +169,7 @@ int regulator_set_voltage(const struct device *dev, int32_t min_uv,
 	}
 
 	/* voltage may not be allowed, even if supported */
-	if ((min_uv < config->min_uv) || (max_uv > config->max_uv)) {
+	if ((min_uv > config->max_uv) || (max_uv < config->min_uv)) {
 		return -EINVAL;
 	}
 
@@ -189,7 +189,7 @@ int regulator_set_current_limit(const struct device *dev, int32_t min_ua,
 	}
 
 	/* current limit may not be allowed, even if supported */
-	if ((min_ua < config->min_ua) || (max_ua > config->max_ua)) {
+	if ((min_ua > config->max_ua) || (max_ua < config->min_ua)) {
 		return -EINVAL;
 	}
 

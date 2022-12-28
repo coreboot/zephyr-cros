@@ -187,6 +187,7 @@
 /boards/arm64/mimx8mm_evk/                @MrVan @JiafeiPan
 /boards/arm64/mimx8mp_evk/                @MrVan @JiafeiPan
 /boards/arm64/mimx8mn_evk/                @JiafeiPan
+/boards/arm64/mimx93_evk/                 @JiafeiPan
 /boards/arm64/nxp_ls1046ardb/             @JiafeiPan
 /boards/arm64/xenvm/                      @lorc @firscity
 /boards/arm64/fvp_baser_aemv8r/           @povergoing
@@ -494,6 +495,7 @@
 /dts/arm/silabs/efm32_pg_1b.dtsi          @rdmeneze
 /dts/arm/silabs/efm32gg11b*               @oanerer
 /dts/arm/silabs/efr32bg13p*               @mnkp
+/dts/arm/silabs/efr32bg22*                @kgugala @fkokosinski @pczarnecki
 /dts/arm/silabs/efr32xg13p*               @mnkp
 /dts/arm/silabs/efm32pg1b*                @rdmeneze
 /dts/arm/silabs/efr32mg21*                @l-alfred
@@ -733,6 +735,7 @@ scripts/build/gen_image_info.py           @tejlmand
 /scripts/twister                          @nashif
 /scripts/series-push-hook.sh              @erwango
 /scripts/utils/pinctrl_nrf_migrate.py     @gmarull
+/scripts/utils/migrate_mcumgr_kconfigs.py @de-nordic
 /scripts/west_commands/                   @mbolivar-nordic
 /scripts/west_commands/blobs.py           @carlescufi
 /scripts/west_commands/fetchers/          @carlescufi

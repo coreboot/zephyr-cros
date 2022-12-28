@@ -507,12 +507,13 @@ static int send_iso(struct bt_conn *conn, struct net_buf *buf, uint8_t flags)
 static inline uint16_t conn_mtu(struct bt_conn *conn)
 {
 #if defined(CONFIG_BT_BREDR)
-	if (conn->type == BT_CONN_TYPE_BR || !bt_dev.le.acl_mtu) {
+	if (conn->type == BT_CONN_TYPE_BR ||
+	    (conn->type != BT_CONN_TYPE_ISO && !bt_dev.le.acl_mtu)) {
 		return bt_dev.br.mtu;
 	}
 #endif /* CONFIG_BT_BREDR */
 #if defined(CONFIG_BT_ISO)
-	if (conn->type == BT_CONN_TYPE_ISO && bt_dev.le.iso_mtu) {
+	if (conn->type == BT_CONN_TYPE_ISO) {
 		return bt_dev.le.iso_mtu;
 	}
 #endif /* CONFIG_BT_ISO */
@@ -2163,7 +2164,7 @@ void bt_conn_security_changed(struct bt_conn *conn, uint8_t hci_err,
 		}
 	}
 
-#if IS_ENABLED(CONFIG_BT_KEYS_OVERWRITE_OLDEST)
+#if defined(CONFIG_BT_KEYS_OVERWRITE_OLDEST)
 	if (!err && conn->sec_level >= BT_SECURITY_L2) {
 		if (conn->type == BT_CONN_TYPE_LE) {
 			bt_keys_update_usage(conn->id, bt_conn_get_dst(conn));
