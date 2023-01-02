@@ -4,9 +4,9 @@
 
 menuconfig MCUMGR_SMP_BT
 	bool "Bluetooth mcumgr SMP transport"
-	select BT
-	select BT_PERIPHERAL
-	select BT_GATT_DYNAMIC_DB
+	depends on BT
+	depends on BT_PERIPHERAL
+	depends on BT_GATT_DYNAMIC_DB
 	help
 	  Enables handling of SMP commands received over Bluetooth.
 
@@ -14,7 +14,7 @@ if MCUMGR_SMP_BT
 
 config MCUMGR_SMP_REASSEMBLY_BT
 	bool "Reassemble packets in Bluetooth SMP transport"
-	select MCUMGR_SMP_REASSEMBLY
+	depends on MCUMGR_SMP_REASSEMBLY
 	help
 	  When enabled, the SMP BT transport will buffer and reassemble received
 	  packet fragments before passing it for further processing.
@@ -22,7 +22,7 @@ config MCUMGR_SMP_REASSEMBLY_BT
 
 config MCUMGR_SMP_BT_AUTHEN
 	bool "Authenticated requirement for Bluetooth mcumgr SMP transport"
-	select BT_SMP
+	depends on BT_SMP
 	default y
 	help
 	  Enables encrypted and authenticated connection requirement to

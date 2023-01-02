@@ -4,7 +4,7 @@
 
 menuconfig MCUMGR_SMP_UART
 	bool "UART mcumgr SMP transport"
-	select UART_MCUMGR
+	depends on UART_MCUMGR
 	select BASE64
 	help
 	  Enables handling of SMP commands received over UART.  This is a
