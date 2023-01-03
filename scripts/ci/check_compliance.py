@@ -20,6 +20,9 @@ import shlex
 from junitparser import TestCase, TestSuite, JUnitXml, Skipped, Error, Failure
 import magic
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from get_maintainer import Maintainers, MaintainersError
+
 logger = None
 
 def git(*args, cwd=None):
@@ -225,9 +228,10 @@ class DevicetreeBindingsCheck(ComplianceTest):
     path_hint = "<zephyr-base>"
 
     def run(self, full=True):
-        dts_yaml = self.parse_dt_bindings()
+        dts_bindings = self.parse_dt_bindings()
 
-        self.required_false_check(dts_yaml)
+        for dts_binding in dts_bindings:
+            self.required_false_check(dts_binding)
 
     def parse_dt_bindings(self):
         """
@@ -235,27 +239,22 @@ class DevicetreeBindingsCheck(ComplianceTest):
         """
 
         dt_bindings = []
-        for file_name in get_files():
-            if file_name.startswith('dts/bindings/') and file_name.endswith('.yaml'):
+        for file_name in get_files(filter="d"):
+            if 'dts/bindings/' in file_name and file_name.endswith('.yaml'):
                 dt_bindings.append(file_name)
 
         return dt_bindings
 
-    def required_false_check(self, dt_bindings):
-        for file_name in dt_bindings:
-            try:
-                with open(file_name) as file:
-                    line_number = 0
-                    for line in file:
-                        line_number += 1
-                        if 'required: false' in line:
-                            self.fmtd_failure(
-                                'warning', 'Devicetree Bindings', file_name,
-                                line_number, col=None,
-                                desc="'required: false' is redundant, please remove")
-            except Exception:
-                # error opening file (it was likely deleted by the commit)
-                continue
+    def required_false_check(self, dts_binding):
+        with open(dts_binding) as file:
+            line_number = 0
+            for line in file:
+                line_number += 1
+                if 'required: false' in line:
+                    self.fmtd_failure(
+                        'warning', 'Devicetree Bindings', dts_binding,
+                        line_number, col=None,
+                        desc="'required: false' is redundant, please remove")
 
 
 class KconfigCheck(ComplianceTest):
@@ -969,6 +968,27 @@ class ImageSize(ComplianceTest):
             if size > limit:
                 self.failure(f"Image file too large: {file} reduce size to "
                              f"less than {limit >> 10}kB")
+
+
+class MaintainersFormat(ComplianceTest):
+    """
+    Check that MAINTAINERS file parses correctly.
+    """
+    name = "MaintainersFormat"
+    doc = "Check that MAINTAINERS file parses correctly."
+    path_hint = "<git-top>"
+
+    def run(self):
+        MAINTAINERS_FILES = ["MAINTAINERS.yml", "MAINTAINERS.yaml"]
+
+        for file in get_files(filter="d"):
+            if file not in MAINTAINERS_FILES:
+                continue
+
+            try:
+                Maintainers(file)
+            except MaintainersError as ex:
+                self.failure(f"Error parsing {file}: {ex}")
 
 
 def init_logs(cli_arg):
