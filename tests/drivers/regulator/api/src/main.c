@@ -95,14 +95,12 @@ ZTEST(regulator_api, test_common_config)
 
 ZTEST(regulator_api, test_enable_disable)
 {
-	/* REG1, REG2 initialized at init time (always-on/boot-on) */
-	zassert_equal(regulator_fake_enable_fake.call_count, 2U);
-	zassert_true(regulator_is_enabled(reg1));
-	zassert_true(regulator_is_enabled(reg2));
+	RESET_FAKE(regulator_fake_enable);
+	RESET_FAKE(regulator_fake_disable);
 
 	/* REG1 already enabled, not enabled again */
 	zassert_equal(regulator_enable(reg1), 0);
-	zassert_equal(regulator_fake_enable_fake.call_count, 2U);
+	zassert_equal(regulator_fake_enable_fake.call_count, 0U);
 
 	/* REG1: can't be disabled */
 	zassert_equal(regulator_disable(reg1), 0);
@@ -116,12 +114,12 @@ ZTEST(regulator_api, test_enable_disable)
 	/* REG2: enable again */
 	zassert_equal(regulator_enable(reg2), 0);
 	zassert_equal(regulator_fake_enable_fake.arg0_val, reg2);
-	zassert_equal(regulator_fake_enable_fake.call_count, 3U);
+	zassert_equal(regulator_fake_enable_fake.call_count, 1U);
 
 	/* REG0: enable */
 	zassert_equal(regulator_enable(reg0), 0);
 	zassert_equal(regulator_fake_enable_fake.arg0_val, reg0);
-	zassert_equal(regulator_fake_enable_fake.call_count, 4U);
+	zassert_equal(regulator_fake_enable_fake.call_count, 2U);
 
 	/* REG0: disable */
 	zassert_equal(regulator_disable(reg0), 0);
@@ -555,6 +553,64 @@ ZTEST(regulator_api, test_set_mode_dt_limit)
 	zassert_equal(regulator_fake_set_mode_fake.call_count, 2U);
 }
 
+ZTEST(regulator_api, test_get_mode_not_implemented)
+{
+	int ret;
+	struct regulator_driver_api *api =
+		(struct regulator_driver_api *)reg0->api;
+	regulator_get_mode_t get_mode = api->get_mode;
+
+	api->get_mode = NULL;
+	ret = regulator_get_mode(reg0, NULL);
+	api->get_mode = get_mode;
+
+	zassert_equal(ret, -ENOSYS);
+}
+
+static int get_mode_ok(const struct device *dev, regulator_mode_t *mode)
+{
+	ARG_UNUSED(dev);
+
+	*mode = 10U;
+
+	return 0;
+}
+
+ZTEST(regulator_api, test_get_mode_ok)
+{
+	regulator_mode_t mode;
+
+	RESET_FAKE(regulator_fake_get_mode);
+
+	regulator_fake_get_mode_fake.custom_fake = get_mode_ok;
+
+	zassert_equal(regulator_get_mode(reg0, &mode), 0U);
+	zassert_equal(mode, 10U);
+	zassert_equal(regulator_fake_get_mode_fake.call_count, 1U);
+	zassert_equal(regulator_fake_get_mode_fake.arg0_val, reg0);
+	zassert_equal(regulator_fake_get_mode_fake.arg1_val, &mode);
+}
+
+static int get_mode_fail(const struct device *dev, regulator_mode_t *mode)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(mode);
+
+	return -EIO;
+}
+
+ZTEST(regulator_api, test_get_mode_error)
+{
+	RESET_FAKE(regulator_fake_get_mode);
+
+	regulator_fake_get_mode_fake.custom_fake = get_mode_fail;
+
+	zassert_equal(regulator_get_mode(reg0, NULL), -EIO);
+	zassert_equal(regulator_fake_get_mode_fake.call_count, 1U);
+	zassert_equal(regulator_fake_get_mode_fake.arg0_val, reg0);
+	zassert_equal(regulator_fake_get_mode_fake.arg1_val, NULL);
+}
+
 ZTEST(regulator_api, test_get_error_flags_not_implemented)
 {
 	int ret;
@@ -622,6 +678,14 @@ void *setup(void)
 	zassert_true(device_is_ready(reg1));
 	zassert_true(device_is_ready(reg2));
 	zassert_true(device_is_ready(reg3));
+
+	/* REG1, REG2 initialized at init time (always-on/boot-on) */
+	zassert_equal(regulator_fake_enable_fake.call_count, 2U);
+	zassert_true(regulator_is_enabled(reg1));
+	zassert_true(regulator_is_enabled(reg2));
+
+	/* REG3 mode set at init time (initial-mode) */
+	zassert_equal(regulator_fake_set_mode_fake.call_count, 1U);
 
 	return NULL;
 }

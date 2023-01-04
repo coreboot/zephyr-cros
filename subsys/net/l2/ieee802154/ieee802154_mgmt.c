@@ -353,12 +353,6 @@ static int ieee802154_associate(uint32_t mgmt_request, struct net_if *iface,
 	params.dst.pan_id = req->pan_id;
 	params.pan_id = req->pan_id;
 
-	/* Set channel first */
-	if (ieee802154_set_channel(iface, req->channel)) {
-		ret = -EIO;
-		goto out;
-	}
-
 	pkt = ieee802154_create_mac_cmd_frame(
 		iface, IEEE802154_CFI_ASSOCIATION_REQUEST, &params);
 	if (!pkt) {
@@ -367,9 +361,11 @@ static int ieee802154_associate(uint32_t mgmt_request, struct net_if *iface,
 	}
 
 	cmd = ieee802154_get_mac_command(pkt);
+	cmd->assoc_req.ci.reserved_1 = 0U; /* Reserved */
 	cmd->assoc_req.ci.dev_type = 0U; /* RFD */
 	cmd->assoc_req.ci.power_src = 0U; /* TODO: set right power source */
 	cmd->assoc_req.ci.rx_on = 1U; /* TODO: that will depends on PM */
+	cmd->assoc_req.ci.reserved_2 = 0U; /* Reserved */
 	cmd->assoc_req.ci.sec_capability = 0U; /* TODO: security support */
 	cmd->assoc_req.ci.alloc_addr = 0U; /* TODO: handle short addr */
 
@@ -378,6 +374,8 @@ static int ieee802154_associate(uint32_t mgmt_request, struct net_if *iface,
 	k_sem_give(&ctx->ctx_lock);
 
 	ieee802154_mac_cmd_finalize(pkt, IEEE802154_CFI_ASSOCIATION_REQUEST);
+
+	ieee802154_filter_pan_id(iface, req->pan_id);
 
 	if (net_if_send_data(iface, pkt)) {
 		net_pkt_unref(pkt);
@@ -430,6 +428,10 @@ static int ieee802154_associate(uint32_t mgmt_request, struct net_if *iface,
 	}
 
 out:
+	if (ret < 0) {
+		ieee802154_filter_pan_id(iface, 0);
+	}
+
 	k_sem_give(&ctx->ctx_lock);
 	return ret;
 }
