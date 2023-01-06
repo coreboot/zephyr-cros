@@ -324,6 +324,10 @@ void bt_audio_stream_reset(struct bt_audio_stream *stream)
 		return;
 	}
 
+	if (stream->ep != NULL && stream->ep->iso != NULL) {
+		bt_audio_iso_unbind_ep(stream->ep->iso, stream->ep);
+	}
+
 	bt_audio_stream_detach(stream);
 }
 
@@ -561,11 +565,12 @@ int bt_audio_stream_qos(struct bt_conn *conn,
 			return -EINVAL;
 		}
 
-		if (ep->iso == NULL) {
+		if (stream->audio_iso == NULL) {
 			/* This can only happen if the stream was somehow added
 			 * to a group without the audio_iso being bound to it
 			 */
-			LOG_ERR("Could not find audio_iso for stream %p", stream);
+			LOG_ERR("Could not find audio_iso for stream %p",
+				stream);
 			return -EINVAL;
 		}
 	}
@@ -589,6 +594,11 @@ int bt_audio_stream_qos(struct bt_conn *conn,
 		}
 
 		op->num_ases++;
+
+		if (stream->ep->iso == NULL) {
+			/* Not yet bound with the audio_iso */
+			bt_audio_iso_bind_ep(stream->audio_iso, stream->ep);
+		}
 
 		err = bt_unicast_client_ep_qos(stream->ep, buf, stream->qos);
 		if (err) {
@@ -737,18 +747,24 @@ static struct bt_audio_iso *get_new_iso(struct bt_audio_unicast_group *group,
 
 	/* Check if there's already an ISO that can be used for this direction */
 	SYS_SLIST_FOR_EACH_CONTAINER(&group->streams, stream, _node) {
-		__ASSERT(stream->ep, "stream->ep is NULL");
-		__ASSERT(stream->ep->iso, "ep->iso is NULL");
+		__ASSERT(stream->audio_iso != NULL, "stream->audio_iso is NULL");
 
-		if (stream->conn != acl) {
+		/* Don't attempt to couple streams if the ACL is either NULL,
+		 * or the connection points differ
+		 */
+		if (acl == NULL || stream->conn != acl) {
 			continue;
 		}
 
-		if (bt_audio_iso_get_ep(true, stream->ep->iso, dir) == NULL) {
-			return bt_audio_iso_ref(stream->ep->iso);
+		if (bt_audio_iso_get_stream(stream->audio_iso, dir) == NULL) {
+			LOG_DBG("Returning existing audio_iso for group %p",
+				group);
+
+			return bt_audio_iso_ref(stream->audio_iso);
 		}
 	}
 
+	LOG_DBG("Returning new audio_iso for group %p", group);
 	return bt_unicast_client_new_audio_iso();
 }
 
@@ -835,15 +851,11 @@ static void unicast_client_codec_qos_to_iso_qos(struct bt_audio_iso *iso,
 
 	bt_audio_codec_qos_to_iso_qos(io_qos, qos);
 
-	/* If the opposing ASE of the CIS is not yet configured, we
-	 * assume that it will use the same QoS value.
-	 *
-	 * This allows us to actually create the CIG and only start the
-	 * CIS in one direction, and then later connect the CIS (assuming that
-	 * the QoS values are equal)
-	 */
 	if (other_io_qos != NULL) {
-		bt_audio_codec_qos_to_iso_qos(other_io_qos, qos);
+		/* If the opposing ASE of the CIS is not yet configured, we
+		 * still need to set the PHY value when creating the CIG.
+		 */
+		other_io_qos->phy = io_qos->phy;
 	}
 }
 
@@ -857,8 +869,10 @@ static int unicast_group_add_stream(struct bt_audio_unicast_group *group,
 
 	__ASSERT_NO_MSG(group != NULL);
 	__ASSERT_NO_MSG(stream != NULL);
-	__ASSERT_NO_MSG(stream->ep != NULL);
-	__ASSERT_NO_MSG(stream->ep->iso == NULL);
+	__ASSERT_NO_MSG(stream->ep == NULL ||
+			(stream->ep != NULL && stream->ep->iso == NULL));
+
+	LOG_DBG("group %p stream %p dir %u", group, stream, dir);
 
 	iso = get_new_iso(group, stream->conn, dir);
 	if (iso == NULL) {
@@ -871,16 +885,20 @@ static int unicast_group_add_stream(struct bt_audio_unicast_group *group,
 		return err;
 	}
 
+	stream->qos = qos;
+	stream->dir = dir;
+	stream->unicast_group = group;
+
 	/* iso initialized already */
-	bt_audio_iso_bind_ep(iso, stream->ep);
+	bt_audio_iso_bind_stream(iso, stream);
+	if (stream->ep != NULL) {
+		bt_audio_iso_bind_ep(iso, stream->ep);
+	}
 
 	/* Store the Codec QoS in the audio_iso */
 	unicast_client_codec_qos_to_iso_qos(iso, qos, dir);
 
 	bt_audio_iso_unref(iso);
-
-	stream->qos = qos;
-	stream->unicast_group = group;
 	sys_slist_append(&group->streams, &stream->_node);
 
 	LOG_DBG("Added stream %p to group %p", stream, group);
@@ -896,6 +914,10 @@ static void unicast_group_del_stream(struct bt_audio_unicast_group *group,
 
 	if (sys_slist_find_and_remove(&group->streams, &stream->_node)) {
 		struct bt_audio_ep *ep = stream->ep;
+
+		if (stream->audio_iso != NULL) {
+			bt_audio_iso_unbind_stream(stream->audio_iso, stream);
+		}
 
 		if (ep != NULL && ep->iso != NULL) {
 			unicast_group_del_iso(group, ep->iso);
@@ -937,6 +959,9 @@ static void unicast_group_free(struct bt_audio_unicast_group *group)
 		struct bt_audio_ep *ep = stream->ep;
 
 		stream->unicast_group = NULL;
+		if (stream->audio_iso != NULL) {
+			bt_audio_iso_unbind_stream(stream->audio_iso, stream);
+		}
 
 		if (ep != NULL && ep->iso != NULL) {
 			bt_audio_iso_unbind_ep(ep->iso, ep);
@@ -1139,9 +1164,21 @@ fail:
 
 int bt_audio_unicast_group_delete(struct bt_audio_unicast_group *unicast_group)
 {
+	struct bt_audio_stream *stream;
+
 	CHECKIF(unicast_group == NULL) {
 		LOG_DBG("unicast_group is NULL");
 		return -EINVAL;
+	}
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&unicast_group->streams, stream, _node) {
+		/* If a stream has an endpoint, it is not ready to be removed
+		 * from a group, as it is not in an idle state
+		 */
+		if (stream->ep != NULL) {
+			LOG_DBG("stream %p is not released", stream);
+			return -EINVAL;
+		}
 	}
 
 	if (unicast_group->cig != NULL) {
