@@ -17,6 +17,7 @@
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/audio/bap.h>
 #include <zephyr/bluetooth/audio/lc3.h>
 
 /**
@@ -1289,16 +1290,26 @@ struct bt_audio_lc3_preset {
  *  symmetric in both directions.
  */
 struct bt_audio_stream {
+	/** Stream direction */
+	enum bt_audio_dir dir;
+
 	/** Connection reference */
 	struct bt_conn *conn;
+
 	/** Endpoint reference */
 	struct bt_audio_ep *ep;
+
 	/** Codec Configuration */
 	struct bt_codec *codec;
+
 	/** QoS Configuration */
 	struct bt_codec_qos *qos;
+
 	/** Audio stream operations */
 	struct bt_audio_stream_ops *ops;
+
+	/** Audio ISO reference */
+	struct bt_audio_iso *audio_iso;
 
 	union {
 		void *group;
@@ -2075,6 +2086,12 @@ struct bt_audio_broadcast_source_create_param {
 	 *  controller may ignore.
 	 */
 	uint8_t packing;
+
+	/** Whether or not to encrypt the streams. */
+	bool encryption;
+
+	/** @brief Broadcast code */
+	uint8_t broadcast_code[BT_BAP_BROADCAST_CODE_SIZE];
 };
 
 /** @brief Create audio broadcast source.

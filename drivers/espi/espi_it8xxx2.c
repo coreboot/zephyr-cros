@@ -196,6 +196,7 @@ static const struct ec2i_t pmc2_settings[] = {
  * Linker script of h2ram.ld will make the pool 4K aligned.
  */
 #define IT8XXX2_ESPI_H2RAM_POOL_SIZE_MAX 0x1000
+#define IT8XXX2_ESPI_H2RAM_OFFSET_MASK   GENMASK(3, 0)
 
 #if defined(CONFIG_ESPI_PERIPHERAL_ACPI_SHM_REGION)
 #define H2RAM_ACPI_SHM_MAX ((CONFIG_ESPI_IT8XXX2_ACPI_SHM_H2RAM_SIZE) + \
@@ -249,7 +250,9 @@ static void smfi_it8xxx2_init(const struct device *dev)
 	/* Set the host to RAM cycle address offset */
 	h2ram_offset = ((uint32_t)h2ram_pool & 0xffff) /
 				IT8XXX2_ESPI_H2RAM_POOL_SIZE_MAX;
-	gctrl->GCTRL_H2ROFSR |= h2ram_offset;
+	gctrl->GCTRL_H2ROFSR =
+		(gctrl->GCTRL_H2ROFSR & ~IT8XXX2_ESPI_H2RAM_OFFSET_MASK) |
+		h2ram_offset;
 
 #ifdef CONFIG_ESPI_PERIPHERAL_EC_HOST_CMD
 	memset(&h2ram_pool[CONFIG_ESPI_PERIPHERAL_HOST_CMD_PARAM_PORT_NUM], 0,
@@ -838,6 +841,13 @@ static int espi_it8xxx2_write_lpc_request(const struct device *dev,
 			break;
 		case E8042_CLEAR_OBF:
 			/*
+			 * After enabling IBF/OBF clear mode, we have to make
+			 * sure that IBF interrupt is not triggered before
+			 * disabling the clear mode. Or the interrupt will keep
+			 * triggering until the watchdog is reset.
+			 */
+			unsigned int key = irq_lock();
+			/*
 			 * When IBFOBFCME is enabled, write 1 to COBF bit to
 			 * clear KBC OBF.
 			 */
@@ -846,6 +856,7 @@ static int espi_it8xxx2_write_lpc_request(const struct device *dev,
 			kbc_reg->KBHICR &= ~KBC_KBHICR_COBF;
 			/* Disable clear mode */
 			kbc_reg->KBHICR &= ~KBC_KBHICR_IBFOBFCME;
+			irq_unlock(key);
 			break;
 		case E8042_SET_FLAG:
 			kbc_reg->KBHISR |= (*data & 0xff);
