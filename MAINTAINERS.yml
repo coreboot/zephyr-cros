@@ -243,11 +243,9 @@ Bluetooth Audio:
   maintainers:
     - Thalley
   collaborators:
-    - Vudentz
     - jhedberg
     - Casper-Bonde-Bose
     - MariuszSkamra
-    - rymanluk
     - sjanc
     - szymon-czapracki
     - asbjornsabo
@@ -1324,6 +1322,8 @@ Kernel:
     - tests/kernel/
     - include/zephyr/sys_clock.h
     - samples/kernel/
+  files-exclude:
+    - tests/kernel/mem_protect/
   labels:
     - "area: Kernel"
 
@@ -2689,13 +2689,6 @@ West:
     - samples/modules/tflite-micro/
   labels:
     - manifest-tflite-micro
-
-"West project: tinycbor":
-  status: obsolete
-  files:
-    - modules/Kconfig.tinycbor
-  labels:
-    - manifest-tinycbor
 
 "West project: tinycrypt":
   status: odd fixes

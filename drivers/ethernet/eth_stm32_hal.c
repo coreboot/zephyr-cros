@@ -30,6 +30,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/irq.h>
 #include <zephyr/net/lldp.h>
+#include <zephyr/drivers/hwinfo.h>
 
 #if defined(CONFIG_PTP_CLOCK_STM32_HAL)
 #include <zephyr/drivers/ptp_clock.h>
@@ -37,6 +38,10 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include "eth.h"
 #include "eth_stm32_hal_priv.h"
+
+#if defined(CONFIG_ETH_STM32_HAL_RANDOM_MAC) || DT_INST_PROP(0, zephyr_random_mac_address)
+#define ETH_STM32_RANDOM_MAC
+#endif
 
 #if defined(CONFIG_ETH_STM32_HAL_USE_DTCM_FOR_DMA_BUFFER) && \
 	    !DT_NODE_HAS_STATUS(DT_CHOSEN(zephyr_dtcm), okay)
@@ -1010,12 +1015,30 @@ void HAL_ETH_RxCpltCallback(ETH_HandleTypeDef *heth_handle)
 	k_sem_give(&dev_data->rx_int_sem);
 }
 
-#if defined(CONFIG_ETH_STM32_HAL_RANDOM_MAC)
 static void generate_mac(uint8_t *mac_addr)
 {
+#if defined(ETH_STM32_RANDOM_MAC)
+	/* Either CONFIG_ETH_STM32_HAL_RANDOM_MAC or device tree property */
+	/* "zephyr,random-mac-address" is set, generate a random mac address */
 	gen_random_mac(mac_addr, ST_OUI_B0, ST_OUI_B1, ST_OUI_B2);
-}
+#else /* Use user defined mac address */
+	mac_addr[0] = ST_OUI_B0;
+	mac_addr[1] = ST_OUI_B1;
+	mac_addr[2] = ST_OUI_B2;
+#if NODE_HAS_VALID_MAC_ADDR(DT_DRV_INST(0))
+	mac_addr[3] = NODE_MAC_ADDR_OCTET(DT_DRV_INST(0), 3);
+	mac_addr[4] = NODE_MAC_ADDR_OCTET(DT_DRV_INST(0), 4);
+	mac_addr[5] = NODE_MAC_ADDR_OCTET(DT_DRV_INST(0), 5);
+#elif defined(CONFIG_ETH_STM32_HAL_USER_STATIC_MAC)
+	mac_addr[3] = CONFIG_ETH_STM32_HAL_MAC3;
+	mac_addr[4] = CONFIG_ETH_STM32_HAL_MAC4;
+	mac_addr[5] = CONFIG_ETH_STM32_HAL_MAC5;
+#else
+	/* Nothing defined by the user, use device id */
+	hwinfo_get_device_id(&mac_addr[3], 3);
+#endif /* NODE_HAS_VALID_MAC_ADDR(DT_DRV_INST(0))) */
 #endif
+}
 
 static int eth_initialize(const struct device *dev)
 {
@@ -1066,9 +1089,8 @@ static int eth_initialize(const struct device *dev)
 
 	heth = &dev_data->heth;
 
-#if defined(CONFIG_ETH_STM32_HAL_RANDOM_MAC)
 	generate_mac(dev_data->mac_addr);
-#endif
+
 	heth->Init.MACAddr = dev_data->mac_addr;
 
 #if defined(CONFIG_SOC_SERIES_STM32H7X) || defined(CONFIG_ETH_STM32_HAL_API_V2)
@@ -1368,16 +1390,6 @@ static struct eth_stm32_hal_dev_data eth0_data = {
 			.MediaInterface = ETH_MEDIA_INTERFACE_RMII,
 #endif
 		},
-	},
-	.mac_addr = {
-		ST_OUI_B0,
-		ST_OUI_B1,
-		ST_OUI_B2,
-#if !defined(CONFIG_ETH_STM32_HAL_RANDOM_MAC)
-		CONFIG_ETH_STM32_HAL_MAC3,
-		CONFIG_ETH_STM32_HAL_MAC4,
-		CONFIG_ETH_STM32_HAL_MAC5
-#endif
 	},
 };
 
