@@ -931,28 +931,10 @@ void HAL_ETH_TxCpltCallback(ETH_HandleTypeDef *heth_handle)
 #if defined(CONFIG_ETH_STM32_HAL_API_V2)
 void HAL_ETH_ErrorCallback(ETH_HandleTypeDef *heth)
 {
-	__ASSERT_NO_MSG(heth != NULL);
-
-	const uint32_t error_code = HAL_ETH_GetError(heth);
-
-	switch (error_code) {
-	case HAL_ETH_ERROR_DMA:
-		LOG_ERR("%s errorcode:%x dmaerror:%x",
-			__func__,
-			error_code,
-			HAL_ETH_GetDMAError(heth));
-		break;
-	case HAL_ETH_ERROR_MAC:
-		LOG_ERR("%s errorcode:%x macerror:%x",
-			__func__,
-			error_code,
-			HAL_ETH_GetMACError(heth));
-		break;
-	default:
-		LOG_ERR("%s errorcode:%x",
-			__func__,
-			error_code);
-	}
+	/* Do nothing */
+	/* Do not log errors. If errors are reported du to high traffic,
+	 * logging errors will only increase traffic issues
+	 */
 }
 #elif defined(CONFIG_SOC_SERIES_STM32H7X)
 /* DMA and MAC errors callback only appear in H7 series */
@@ -1264,6 +1246,10 @@ static enum ethernet_hw_caps eth_stm32_hal_get_capabilities(const struct device 
 #if defined(CONFIG_NET_LLDP)
 		| ETHERNET_LLDP
 #endif
+#if defined(CONFIG_ETH_STM32_HW_CHECKSUM)
+		| ETHERNET_HW_RX_CHKSUM_OFFLOAD
+		| ETHERNET_HW_TX_CHKSUM_OFFLOAD
+#endif
 		;
 }
 
@@ -1369,26 +1355,18 @@ static struct eth_stm32_hal_dev_data eth0_data = {
 			.AutoNegotiation = ETH_AUTONEGOTIATION_ENABLE,
 #else
 			.AutoNegotiation = ETH_AUTONEGOTIATION_DISABLE,
-#if defined(CONFIG_ETH_STM32_SPEED_10M)
-			.Speed = ETH_SPEED_10M,
-#else
-			.Speed = ETH_SPEED_100M,
-#endif
-#if defined(CONFIG_ETH_STM32_MODE_HALFDUPLEX)
-			.DuplexMode = ETH_MODE_HALFDUPLEX,
-#else
-			.DuplexMode = ETH_MODE_FULLDUPLEX,
-#endif
+			.Speed = IS_ENABLED(CONFIG_ETH_STM32_SPEED_10M) ?
+				 ETH_SPEED_10M : ETH_SPEED_100M,
+			.DuplexMode = IS_ENABLED(CONFIG_ETH_STM32_MODE_HALFDUPLEX) ?
+				      ETH_MODE_HALFDUPLEX : ETH_MODE_FULLDUPLEX,
 #endif /* !CONFIG_ETH_STM32_AUTO_NEGOTIATION_ENABLE */
 			.PhyAddress = PHY_ADDR,
 			.RxMode = ETH_RXINTERRUPT_MODE,
-			.ChecksumMode = ETH_CHECKSUM_BY_SOFTWARE,
+			.ChecksumMode = IS_ENABLED(CONFIG_ETH_STM32_HW_CHECKSUM) ?
+					ETH_CHECKSUM_BY_HARDWARE : ETH_CHECKSUM_BY_SOFTWARE,
 #endif /* !CONFIG_SOC_SERIES_STM32H7X */
-#if defined(CONFIG_ETH_STM32_HAL_MII)
-			.MediaInterface = ETH_MEDIA_INTERFACE_MII,
-#else
-			.MediaInterface = ETH_MEDIA_INTERFACE_RMII,
-#endif
+			.MediaInterface = IS_ENABLED(CONFIG_ETH_STM32_HAL_MII) ?
+					  ETH_MEDIA_INTERFACE_MII : ETH_MEDIA_INTERFACE_RMII,
 		},
 	},
 };

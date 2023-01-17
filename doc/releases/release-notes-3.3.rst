@@ -291,6 +291,9 @@ Drivers and Sensors
 
 * DFU
 
+  * Remove :c:macro:`BOOT_TRAILER_IMG_STATUS_OFFS` in favor a two new functions;
+    :c:func:`boot_get_area_trailer_status_offset` and :c:func:`boot_get_trailer_status_offset`
+
 * Disk
 
 * Display
@@ -539,6 +542,8 @@ Libraries / Subsystems
        +------------------------------------------------+-------------------------------------------------------+
        | FS_MGMT_HASH_SHA256                            | MCUMGR_GRP_FS_HASH_SHA256                             |
        +------------------------------------------------+-------------------------------------------------------+
+       | FS_MGMT_FILE_ACCESS_HOOK                       | MCUMGR_GRP_FS_FILE_ACCESS_HOOK                        |
+       +------------------------------------------------+-------------------------------------------------------+
        | FS_MGMT_PATH_SIZE                              | MCUMGR_GRP_FS_PATH_LEN                                |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_CMD_IMG_MGMT                            | MCUMGR_GRP_IMG                                        |
@@ -558,6 +563,8 @@ Libraries / Subsystems
        | IMG_MGMT_FRUGAL_LIST                           | MCUMGR_GRP_IMG_FRUGAL_LIST                            |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_CMD_OS_MGMT                             | MCUMGR_GRP_OS                                         |
+       +------------------------------------------------+-------------------------------------------------------+
+       | MCUMGR_GRP_OS_OS_RESET_HOOK                    | MCUMGR_GRP_OS_RESET_HOOK                              |
        +------------------------------------------------+-------------------------------------------------------+
        | OS_MGMT_RESET_MS                               | MCUMGR_GRP_OS_RESET_MS                                |
        +------------------------------------------------+-------------------------------------------------------+
@@ -602,6 +609,8 @@ Libraries / Subsystems
        | MCUMGR_SMP_BT                                  | MCUMGR_TRANSPORT_BT                                   |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_SMP_REASSEMBLY_BT                       | MCUMGR_TRANSPORT_BT_REASSEMBLY                        |
+       +------------------------------------------------+-------------------------------------------------------+
+       | MCUMGR_SMP_REASSEMBLY_UNIT_TESTS               | MCUMGR_TRANSPORT_REASSEMBLY_UNIT_TESTS                |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_SMP_BT_AUTHEN                           | MCUMGR_TRANSPORT_BT_AUTHEN                            |
        +------------------------------------------------+-------------------------------------------------------+
