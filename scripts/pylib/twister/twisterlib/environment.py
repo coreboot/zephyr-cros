@@ -48,10 +48,11 @@ except subprocess.CalledProcessError as e:
 canonical_zephyr_base = os.path.realpath(ZEPHYR_BASE)
 canonical_topdir = os.path.realpath(topdir)
 
-def parse_arguments(args):
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+def add_parse_arguments(parser = None):
+    if parser is None:
+        parser = argparse.ArgumentParser(
+            description=__doc__,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.fromfile_prefix_chars = "+"
 
     case_select = parser.add_argument_group("Test case selection",
@@ -183,6 +184,11 @@ Artificially long but functional example:
         "--prep-artifacts-for-testing", action="store_true",
         help="Generate artifacts for testing, do not attempt to run the"
               "code on targets.")
+
+    parser.add_argument(
+        "--package-artifacts",
+        help="Package artifacts needed for flashing in a file to be used with --test-only"
+        )
 
     test_or_build.add_argument(
         "--test-only", action="store_true",
@@ -355,6 +361,9 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
         "-i", "--inline-logs", action="store_true",
         help="Upon test failure, print relevant log data to stdout "
              "instead of just a path to it.")
+
+    parser.add_argument("--ignore-platform-key", action="store_true",
+                        help="Do not filter based on platform key")
 
     parser.add_argument(
         "-j", "--jobs", type=int,
@@ -627,7 +636,12 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
     parser.add_argument("extra_test_args", nargs=argparse.REMAINDER,
         help="Additional args following a '--' are passed to the test binary")
 
-    options = parser.parse_args(args)
+    return parser
+
+
+def parse_arguments(parser, args, options = None):
+    if options is None:
+        options = parser.parse_args(args)
 
     # Very early error handling
     if options.short_build_path and not options.ninja:

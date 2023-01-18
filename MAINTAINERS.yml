@@ -243,15 +243,14 @@ Bluetooth Audio:
   maintainers:
     - Thalley
   collaborators:
-    - Vudentz
     - jhedberg
     - Casper-Bonde-Bose
     - MariuszSkamra
-    - rymanluk
     - sjanc
     - szymon-czapracki
     - asbjornsabo
     - fredrikdanebjer
+    - kruithofa
   files:
     - subsys/bluetooth/audio/
     - include/zephyr/bluetooth/audio/
@@ -288,9 +287,9 @@ Build system:
     - alexanderwachter
     - cfriedt
   files:
-    - subsys/cpp/
-    - tests/subsys/cpp/
-    - samples/subsys/cpp/
+    - lib/cpp/
+    - tests/lib/cpp/
+    - samples/cpp/
   labels:
     - "area: C++"
 
@@ -1324,6 +1323,8 @@ Kernel:
     - tests/kernel/
     - include/zephyr/sys_clock.h
     - samples/kernel/
+  files-exclude:
+    - tests/kernel/mem_protect/
   labels:
     - "area: Kernel"
 
@@ -1443,9 +1444,12 @@ Modbus:
     - "area: modbus"
 
 OSDP:
-  status: odd fixes
-  collaborators:
+  status: maintained
+  maintainers:
     - sidcha
+  collaborators:
+    - adakus
+    - r2r0
   files:
     - subsys/mgmt/osdp/
     - include/zephyr/mgmt/osdp.h
@@ -2689,13 +2693,6 @@ West:
     - samples/modules/tflite-micro/
   labels:
     - manifest-tflite-micro
-
-"West project: tinycbor":
-  status: obsolete
-  files:
-    - modules/Kconfig.tinycbor
-  labels:
-    - manifest-tinycbor
 
 "West project: tinycrypt":
   status: odd fixes

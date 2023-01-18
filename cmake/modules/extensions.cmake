@@ -436,7 +436,7 @@ endmacro()
 # ZEPHYR_MODULE/drivers/entropy/CMakeLists.txt
 # with content:
 # zephyr_library_amend()
-# zephyr_library_add_sources(...)
+# zephyr_library_sources(...)
 #
 # It is also possible to use generator expression when amending to Zephyr
 # libraries.
@@ -1859,7 +1859,7 @@ endfunction()
 # Support an optional second option for when the first option is not
 # supported.
 function(target_cc_option_fallback target scope option1 option2)
-  if(CONFIG_CPLUSPLUS)
+  if(CONFIG_CPP)
     foreach(lang C CXX)
       # For now, we assume that all flags that apply to C/CXX also
       # apply to ASM.
@@ -2051,7 +2051,7 @@ function(check_set_compiler_property)
       separate_arguments(option UNIX_COMMAND ${option})
     endif()
 
-    if(CONFIG_CPLUSPLUS)
+    if(CONFIG_CPP)
       zephyr_check_compiler_flag(CXX "${option}" check)
 
       if(${check})
@@ -2540,8 +2540,8 @@ endfunction(zephyr_check_cache variable)
 #   zephyr_boilerplate_watch(SOME_BOILERPLATE_VAR)
 #
 # Inform the build system that SOME_BOILERPLATE_VAR, a variable
-# handled in cmake/app/boilerplate.cmake, is now fixed and should no
-# longer be changed.
+# handled in the Zephyr package's boilerplate code, is now fixed and
+# should no longer be changed.
 #
 # This function uses variable_watch() to print a noisy warning
 # if the variable is set after it returns.

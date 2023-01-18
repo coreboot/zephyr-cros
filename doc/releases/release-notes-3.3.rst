@@ -70,6 +70,27 @@ Changes in this release
   :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_AUTOMATIC_INIT` should be
   disabled and the application should call :c:func:`smp_bt_start` at startup.
 
+* MCUmgr transport Kconfigs have changed from ``select`` to ``depends on``
+  which means that for applications using the Bluetooth transport,
+  applications will now need to enable the following:
+
+  * :kconfig:option:`CONFIG_BT`
+  * :kconfig:option:`CONFIG_BT_PERIPHERAL`
+
+  For CDC or serial transports:
+
+  * :kconfig:option:`CONFIG_CONSOLE`
+
+  For shell transport:
+
+  * :kconfig:option:`CONFIG_SHELL`
+  * :kconfig:option:`CONFIG_SHELL_BACKEND_SERIAL`
+
+  For UDP transport:
+
+  * :kconfig:option:`CONFIG_NETWORKING`
+  * :kconfig:option:`CONFIG_NET_UDP`
+
 Removed APIs in this release
 ============================
 
@@ -83,8 +104,29 @@ Removed APIs in this release
 
 * Removed :kconfig:option:`CONFIG_COUNTER_RTC_STM32_BACKUP_DOMAIN_RESET`
 
+* Removed deprecated tinycbor module, code that uses this module should be
+  updated to use zcbor as a replacement.
+
 Deprecated in this release
 ==========================
+
+* C++ library Kconfig options have been renamed to improve consistency. See
+  below for the list of deprecated Kconfig options and their replacements:
+
+  .. table::
+     :align: center
+
+     +----------------------------------------+------------------------------------------------+
+     | Deprecated                             | Replacement                                    |
+     +========================================+================================================+
+     | :kconfig:option:`CONFIG_CPLUSPLUS`     | :kconfig:option:`CONFIG_CPP`                   |
+     +----------------------------------------+------------------------------------------------+
+     | :kconfig:option:`CONFIG_EXCEPTIONS`    | :kconfig:option:`CONFIG_CPP_EXCEPTIONS`        |
+     +----------------------------------------+------------------------------------------------+
+     | :kconfig:option:`CONFIG_RTTI`          | :kconfig:option:`CONFIG_CPP_RTTI`              |
+     +----------------------------------------+------------------------------------------------+
+     | :kconfig:option:`CONFIG_LIB_CPLUSPLUS` | :kconfig:option:`CONFIG_LIBCPP_IMPLEMENTATION` |
+     +----------------------------------------+------------------------------------------------+
 
 * MCUmgr subsystem, specifically the SMP transport API, is dropping `zephyr_`
   prefix, deprecating prefixed functions and callback type definitions with the
@@ -128,6 +170,11 @@ Deprecated in this release
      +---------------------------------------------+---------------------------------------+
 
   NOTE: Only functions are marked as ``__deprecated``, type definitions are not.
+
+* STM32 Ethernet Mac address Kconfig related symbols (:kconfig:option:`CONFIG_ETH_STM32_HAL_RANDOM_MAC`,
+  :kconfig:option:`CONFIG_ETH_STM32_HAL_MAC4`, ...) have been deprecated in favor
+  of the use of zephyr generic device tree ``local-mac-address`` and ``zephyr,random-mac-address``
+  properties.
 
 * STM32 RTC source clock should now be configured using devicetree.
   Related Kconfig :kconfig:option:`CONFIG_COUNTER_RTC_STM32_CLOCK_LSI` and
@@ -283,6 +330,9 @@ Drivers and Sensors
 
 * DFU
 
+  * Remove :c:macro:`BOOT_TRAILER_IMG_STATUS_OFFS` in favor a two new functions;
+    :c:func:`boot_get_area_trailer_status_offset` and :c:func:`boot_get_trailer_status_offset`
+
 * Disk
 
 * Display
@@ -296,6 +346,11 @@ Drivers and Sensors
 * ESPI
 
 * Ethernet
+
+  * STM32: Default Mac address configuration is now uid based. Optionally, user can
+    configure it to be random or provide its own address using device tree.
+
+* Flash
 
   * Flash: Moved CONFIG_FLASH_FLEXSPI_XIP into the SOC level due to the flexspi clock initialization occurring in the SOC level.
 
@@ -363,6 +418,18 @@ Drivers and Sensors
 
 * USB
 
+  * STM32F1: Clock bus configuration is not done automatically by driver anymore.
+    It is user's responsibility to configure the proper bus prescaler using clock_control
+    device tree node to achieve a 48MHz bus clock. Note that, in most cases, core clock
+    is 72MHz and default prescaler configuration is set to achieve 48MHz USB bus clock.
+    Prescaler only needs to be configured manually when core clock is already 48MHz.
+
+  * STM32 (non F1): Clock bus configuration is now expected to be done in device tree
+    using ``clocks`` node property. When a dedicated HSI 48MHz clock is available on target,
+    is it configured by default as the USB bus clock, but user has the ability to select
+    another 48MHz clock source. When no HSI48 is available, a specific 48MHz bus clock
+    source should be configured by user.
+
 * W1
 
 * Watchdog
@@ -392,9 +459,40 @@ Devicetree
     * STM32 SoCs:
 
       * :dtcompatible: `st,stm32-lse-clock`: new ``lse-bypass`` property
+      * :dtcompatible: `st,stm32-ethernet`: now allows ``local-mac-address`` and
+         ``zephyr,random-mac-address`` properties.
 
 Libraries / Subsystems
 **********************
+
+* C++ Library
+
+  * C++ support in Zephyr is no longer considered a "subsystem" because it
+    mainly consists of the C++ ABI runtime library and the C++ standard
+    library, which are "libraries" that are dissimilar to the existing Zephyr
+    subsystems. C++ support components are now located in ``lib/cpp`` as
+    "C++ library."
+  * C++ ABI runtime library components such as global constructor/destructor
+    and initialiser handlers, that were previously located under
+    ``subsys/cpp``, have been moved to ``lib/cpp/abi`` in order to provide a
+    clear separation between the C++ ABI runtime library and the C++ standard
+    library.
+  * C++ minimal library components have been moved to ``lib/cpp/minimal``.
+  * C++ tests have been moved to ``tests/lib/cpp``.
+  * C++ samples have been moved to ``samples/cpp``.
+  * :kconfig:option:`CONFIG_CPLUSPLUS` has been renamed to
+    :kconfig:option:`CONFIG_CPP`.
+  * :kconfig:option:`CONFIG_EXCEPTIONS` has been renamed to
+    :kconfig:option:`CONFIG_CPP_EXCEPTIONS`.
+  * :kconfig:option:`CONFIG_RTTI` has been renamed to
+    :kconfig:option:`CONFIG_CPP_RTTI`.
+  * :kconfig:option:`CONFIG_LIB_CPLUSPLUS` is deprecated. A toolchain-specific
+    C++ standard library Kconfig option from
+    :kconfig:option:`CONFIG_LIBCPP_IMPLEMENTATION` should be selected instead.
+  * Zephyr subsystems and modules that require the features from the full C++
+    standard library (e.g. Standard Template Library) can now select
+    :kconfig:option:`CONFIG_REQUIRES_FULL_LIBC`, which automatically selects
+    a compatible C++ standard library.
 
 * File systems
 
@@ -524,6 +622,8 @@ Libraries / Subsystems
        +------------------------------------------------+-------------------------------------------------------+
        | FS_MGMT_HASH_SHA256                            | MCUMGR_GRP_FS_HASH_SHA256                             |
        +------------------------------------------------+-------------------------------------------------------+
+       | FS_MGMT_FILE_ACCESS_HOOK                       | MCUMGR_GRP_FS_FILE_ACCESS_HOOK                        |
+       +------------------------------------------------+-------------------------------------------------------+
        | FS_MGMT_PATH_SIZE                              | MCUMGR_GRP_FS_PATH_LEN                                |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_CMD_IMG_MGMT                            | MCUMGR_GRP_IMG                                        |
@@ -543,6 +643,8 @@ Libraries / Subsystems
        | IMG_MGMT_FRUGAL_LIST                           | MCUMGR_GRP_IMG_FRUGAL_LIST                            |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_CMD_OS_MGMT                             | MCUMGR_GRP_OS                                         |
+       +------------------------------------------------+-------------------------------------------------------+
+       | MCUMGR_GRP_OS_OS_RESET_HOOK                    | MCUMGR_GRP_OS_RESET_HOOK                              |
        +------------------------------------------------+-------------------------------------------------------+
        | OS_MGMT_RESET_MS                               | MCUMGR_GRP_OS_RESET_MS                                |
        +------------------------------------------------+-------------------------------------------------------+
@@ -587,6 +689,8 @@ Libraries / Subsystems
        | MCUMGR_SMP_BT                                  | MCUMGR_TRANSPORT_BT                                   |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_SMP_REASSEMBLY_BT                       | MCUMGR_TRANSPORT_BT_REASSEMBLY                        |
+       +------------------------------------------------+-------------------------------------------------------+
+       | MCUMGR_SMP_REASSEMBLY_UNIT_TESTS               | MCUMGR_TRANSPORT_REASSEMBLY_UNIT_TESTS                |
        +------------------------------------------------+-------------------------------------------------------+
        | MCUMGR_SMP_BT_AUTHEN                           | MCUMGR_TRANSPORT_BT_AUTHEN                            |
        +------------------------------------------------+-------------------------------------------------------+

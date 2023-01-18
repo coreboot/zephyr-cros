@@ -139,6 +139,13 @@ static int enabled_clock(uint32_t src_clk)
 		}
 		break;
 #endif /* STM32_SRC_LSI */
+#if defined(STM32_SRC_HSI48)
+	case STM32_SRC_HSI48:
+		if (!IS_ENABLED(STM32_HSI48_ENABLED)) {
+			r = -ENOTSUP;
+		}
+		break;
+#endif /* STM32_SRC_HSI48 */
 #if defined(STM32_SRC_MSI)
 	case STM32_SRC_MSI:
 		if (!IS_ENABLED(STM32_MSI_ENABLED)) {
@@ -233,6 +240,11 @@ static inline int stm32_clock_control_configure(const struct device *dev,
 	if (err < 0) {
 		/* Attempt to configure a src clock not available or not valid */
 		return err;
+	}
+
+	if (pclken->enr == NO_SEL) {
+		/* Domain clock is fixed. Nothing to set. Exit */
+		return 0;
 	}
 
 	sys_set_bits(DT_REG_ADDR(DT_NODELABEL(rcc)) + STM32_CLOCK_REG_GET(pclken->enr),
@@ -374,6 +386,11 @@ static int stm32_clock_control_get_subsys_rate(const struct device *clock,
 		*rate = STM32_HSE_FREQ;
 		break;
 #endif
+#if defined(STM32_HSI48_ENABLED)
+	case STM32_SRC_HSI48:
+		*rate = STM32_HSI48_FREQ;
+		break;
+#endif /* STM32_HSI48_ENABLED */
 	default:
 		return -ENOTSUP;
 	}
@@ -622,6 +639,13 @@ static void set_up_fixed_clock_sources(void)
 		LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
 		LL_SYSCFG_VREFINT_EnableHSI48();
 #endif /* CONFIG_SOC_SERIES_STM32L0X */
+
+		/*
+		 * STM32WB: Lock the CLK48 HSEM and do not release to prevent
+		 * M0 core to disable this clock (used for RNG on M0).
+		 * No-op on other series.
+		 */
+		z_stm32_hsem_lock(CFG_HW_CLK48_CONFIG_SEMID, HSEM_LOCK_DEFAULT_RETRY);
 
 		LL_RCC_HSI48_Enable();
 		while (LL_RCC_HSI48_IsReady() != 1) {
