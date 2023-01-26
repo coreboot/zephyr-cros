@@ -529,7 +529,9 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
              "'--ninja' argument (to use Ninja build generator).")
 
     parser.add_argument(
-        "--show-footprint", action="store_true",
+        "--show-footprint",
+        action="store_true",
+        required = "--footprint-from-buildlog" in sys.argv,
         help="Show footprint statistics and deltas since last release."
     )
 
