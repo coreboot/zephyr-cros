@@ -91,6 +91,17 @@ Changes in this release
   * :kconfig:option:`CONFIG_NETWORKING`
   * :kconfig:option:`CONFIG_NET_UDP`
 
+* Python's argparse argument parser usage in Zephyr scripts has been updated
+  to disable abbreviations, any future python scripts or python code updates
+  must also disable allowing abbreviations by using ``allow_abbrev=False``
+  when setting up ``ArgumentParser()``.
+
+  This may cause out-of-tree scripts or commands to fail if they have relied
+  upon their behaviour previously, these will need to be updated in order for
+  building to work. As an example, if a script argument had ``--reset-type``
+  and an out-of-tree script used this by passing ``--reset`` then it will need
+  to be updated to use the full argument name, ``--reset-type``.
+
 Removed APIs in this release
 ============================
 
@@ -180,6 +191,9 @@ Deprecated in this release
   Related Kconfig :kconfig:option:`CONFIG_COUNTER_RTC_STM32_CLOCK_LSI` and
   :kconfig:option:`CONFIG_COUNTER_RTC_STM32_CLOCK_LSE` options are now
   deprecated.
+
+* STM32 Interrupt controller Kconfig symbols such as :kconfig:option:`CONFIG_EXTI_STM32_EXTI0_IRQ_PRI`
+  are removed. Related IRQ prioritues should now be configured in device tree.
 
 * File backend for settings APIs and Kconfig options were deprecated:
 
@@ -383,6 +397,8 @@ Drivers and Sensors
 * IEEE 802.15.4
 
 * Interrupt Controller
+
+  * STM32: Driver configuration and initialization is now based on device tree
 
 * IPM
 
@@ -759,6 +775,15 @@ Libraries / Subsystems
     the resultant response will now be an empty CBOR map. The old behaviour can
     be restored by enabling
     :kconfig:option:`CONFIG_MCUMGR_SMP_LEGACY_RC_BEHAVIOUR`.
+
+  * MCUMGR now has log outputting on most errors from the included fs, img,
+    os, shell, stat and zephyr_basic group commands. The level of logging can be
+    controlled by adjusting: :kconfig:option:`CONFIG_MCUMGR_GRP_FS_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_OS_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_SHELL_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_STAT_LOG_LEVEL` and
+    :kconfig:option:`CONFIG_MCUMGR_GRP_ZBASIC_LOG_LEVEL`.
 
 * LwM2M
 

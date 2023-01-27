@@ -29,6 +29,7 @@ from twisterlib.error import TwisterRuntimeError
 from twisterlib.platform import Platform
 from twisterlib.config_parser import TwisterConfigParser
 from twisterlib.testinstance import TestInstance
+from twisterlib.quarantine import Quarantine
 
 
 from zephyr_module import parse_modules
@@ -79,7 +80,7 @@ class TestPlan:
 
         # Keep track of which test cases we've filtered out and why
         self.testsuites = {}
-        self.quarantine = {}
+        self.quarantine = None
         self.platforms = []
         self.platform_names = []
         self.selected_platforms = []
@@ -128,15 +129,15 @@ class TestPlan:
 
         # handle quarantine
         ql = self.options.quarantine_list
-        if ql:
-            self.load_quarantine(ql)
-
         qv = self.options.quarantine_verify
-        if qv:
-            if not ql:
-                logger.error("No quarantine list given to be verified")
-                raise TwisterRuntimeError("No quarantine list given to be verified")
-
+        if qv and not ql:
+            logger.error("No quarantine list given to be verified")
+            raise TwisterRuntimeError("No quarantine list given to be verified")
+        if ql:
+            for quarantine_file in ql:
+                # validate quarantine yaml file against the provided schema
+                scl.yaml_load_verify(quarantine_file, self.quarantine_schema)
+            self.quarantine = Quarantine(ql)
 
     def load(self):
 
@@ -463,35 +464,6 @@ class TestPlan:
                 break
         return selected_platform
 
-    def load_quarantine(self, file):
-        """
-        Loads quarantine list from the given yaml file. Creates a dictionary
-        of all tests configurations (platform + scenario: comment) that shall be
-        skipped due to quarantine
-        """
-
-        # Load yaml into quarantine_yaml
-        quarantine_yaml = scl.yaml_load_verify(file, self.quarantine_schema)
-
-        # Create quarantine_list with a product of the listed
-        # platforms and scenarios for each entry in quarantine yaml
-        quarantine_list = []
-        for quar_dict in quarantine_yaml:
-            if quar_dict['platforms'][0] == "all":
-                plat = self.platform_names
-            else:
-                plat = quar_dict['platforms']
-                self.verify_platforms_existence(plat, "quarantine-list")
-            comment = quar_dict.get('comment', "NA")
-            quarantine_list.append([{".".join([p, s]): comment}
-                                   for p in plat for s in quar_dict['scenarios']])
-
-        # Flatten the quarantine_list
-        quarantine_list = [it for sublist in quarantine_list for it in sublist]
-        # Change quarantine_list into a dictionary
-        for d in quarantine_list:
-            self.quarantine.update(d)
-
     def load_from_file(self, file, filter_platform=[]):
         with open(file, "r") as json_test_plan:
             jtp = json.load(json_test_plan)
@@ -518,8 +490,10 @@ class TestPlan:
                 )
 
                 instance.metrics['handler_time'] = ts.get('execution_time', 0)
-                instance.metrics['ram_size'] = ts.get("ram_size", 0)
-                instance.metrics['rom_size']  = ts.get("rom_size",0)
+                instance.metrics['used_ram'] = ts.get("used_ram", 0)
+                instance.metrics['used_rom']  = ts.get("used_rom",0)
+                instance.metrics['available_ram'] = ts.get('available_ram', 0)
+                instance.metrics['available_rom'] = ts.get('available_rom', 0)
 
                 status = ts.get('status', None)
                 reason = ts.get("reason", "Unknown")
@@ -559,9 +533,7 @@ class TestPlan:
 
         toolchain = self.env.toolchain
         platform_filter = self.options.platform
-        # temporary workaround for exclusion of boards. setting twister in
-        # board yaml file to False does not really work. Need a better solution for the future.
-        exclude_platform = ['mec15xxevb_assy6853','mec1501modular_assy6885'] + self.options.exclude_platform
+        exclude_platform = self.options.exclude_platform
         testsuite_filter = self.run_individual_testsuite
         arch_filter = self.options.arch
         tag_filter = self.options.tag
@@ -762,27 +734,30 @@ class TestPlan:
                     key = [getattr(plat, key_field) for key_field in key_fields]
                     has_all_fields = True
                     for key_field in key_fields:
-                        if key_field is None:
+                        if key_field is None or key_field == 'na':
                             has_all_fields = False
                     if has_all_fields:
-                        key.append(ts.name)
-                        key = tuple(key)
-                        keyed_test = keyed_tests.get(key)
+                        test_key = copy.deepcopy(key)
+                        test_key.append(ts.name)
+                        test_key = tuple(test_key)
+                        keyed_test = keyed_tests.get(test_key)
                         if keyed_test is not None:
-                            instance.add_filter(f"Excluded test already covered by platform_key {key} given fields {key_fields}", Filters.TESTSUITE)
+                            plat_key = {key_field: getattr(keyed_test['plat'], key_field) for key_field in key_fields}
+                            instance.add_filter(f"Excluded test already covered for key {tuple(key)} by platform {keyed_test['plat'].name} having key {plat_key}", Filters.TESTSUITE)
                         else:
-                            keyed_tests[key] = {'plat': plat, 'ts': ts}
+                            keyed_tests[test_key] = {'plat': plat, 'ts': ts}
                     else:
                         instance.add_filter(f"Excluded platform missing key fields demanded by test {key_fields}", Filters.PLATFORM)
 
-                test_configuration = ".".join([instance.platform.name,
-                                               instance.testsuite.id])
-                # skip quarantined tests
-                if test_configuration in self.quarantine and not self.options.quarantine_verify:
-                    instance.add_filter(f"Quarantine: {self.quarantine[test_configuration]}", Filters.QUARENTINE)
-                # run only quarantined test to verify their statuses (skip everything else)
-                if self.options.quarantine_verify and test_configuration not in self.quarantine:
-                    instance.add_filter("Not under quarantine", Filters.QUARENTINE)
+                # handle quarantined tests
+                if self.quarantine:
+                    matched_quarantine = self.quarantine.get_matched_quarantine(
+                        instance.testsuite.id, plat.name, plat.arch, plat.simulation
+                    )
+                    if matched_quarantine and not self.options.quarantine_verify:
+                        instance.add_filter("Quarantine: " + matched_quarantine, Filters.QUARENTINE)
+                    if not matched_quarantine and self.options.quarantine_verify:
+                        instance.add_filter("Not under quarantine", Filters.QUARENTINE)
 
                 # if nothing stopped us until now, it means this configuration
                 # needs to be added.

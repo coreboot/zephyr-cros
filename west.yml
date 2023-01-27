@@ -129,7 +129,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 6679ef7c30178191638f023f81f054cd053f5eb9
+      revision: b916f9a01c665194fbbdd6a67a0f37b4e0a7e78c
       path: modules/hal/stm32
       groups:
         - hal
@@ -181,7 +181,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: dd59d907639b81f3c0556ebf6e9249f85482b407
+      revision: 750678e33819b95756203e5db1ba827baee35708
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -197,7 +197,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: 85ecf8e3bda805fa1405db5048d77e2980c976f0
+      revision: d8f125e1988221ebfea5944fc3118f1780787ccc
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: aedcc262f93bbb1b0c2f58026911575729b7465c

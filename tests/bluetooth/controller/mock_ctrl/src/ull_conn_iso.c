@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/ztest.h>
+
 #include <zephyr/kernel.h>
 
 #include "hal/ccm.h"
@@ -48,6 +50,11 @@ struct ll_conn_iso_stream *ll_conn_iso_stream_get_by_acl(struct ll_conn *conn, u
 }
 
 struct ll_conn_iso_stream *ll_conn_iso_stream_get(uint16_t handle)
+{
+	return &cis;
+}
+
+struct ll_conn_iso_stream *ll_iso_stream_connected_get(uint16_t handle)
 {
 	return &cis;
 }
