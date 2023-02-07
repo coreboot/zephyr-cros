@@ -381,6 +381,11 @@ static int stm32_clock_control_get_subsys_rate(const struct device *clock,
 		*rate = STM32_HSI_FREQ;
 		break;
 #endif
+#if defined(STM32_SRC_MSI)
+	case STM32_SRC_MSI:
+		*rate = get_msi_frequency();
+		break;
+#endif
 #if defined(STM32_SRC_HSE)
 	case STM32_SRC_HSE:
 		*rate = STM32_HSE_FREQ;
@@ -639,6 +644,13 @@ static void set_up_fixed_clock_sources(void)
 		LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
 		LL_SYSCFG_VREFINT_EnableHSI48();
 #endif /* CONFIG_SOC_SERIES_STM32L0X */
+
+		/*
+		 * STM32WB: Lock the CLK48 HSEM and do not release to prevent
+		 * M0 core to disable this clock (used for RNG on M0).
+		 * No-op on other series.
+		 */
+		z_stm32_hsem_lock(CFG_HW_CLK48_CONFIG_SEMID, HSEM_LOCK_DEFAULT_RETRY);
 
 		LL_RCC_HSI48_Enable();
 		while (LL_RCC_HSI48_IsReady() != 1) {

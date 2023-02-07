@@ -381,7 +381,7 @@ static void print_codec(const struct bt_codec *codec)
 			    codec->meta[i].data.type,
 			    codec->meta[i].data.data_len);
 		shell_hexdump(ctx_shell, codec->meta[i].data.data,
-			      codec->data[i].data.data_len -
+			      codec->meta[i].data.data_len -
 				sizeof(codec->meta[i].data.type));
 	}
 }
@@ -739,6 +739,7 @@ static int handle_metadata_update(const char *meta_str,
 		(void)memcpy(meta[i].value,
 			     default_preset->preset.codec.meta[i].data.data,
 			     default_preset->preset.codec.meta[i].data.data_len);
+		meta[i].data.type = default_preset->preset.codec.meta[i].data.type;
 		meta[i].data.data_len = default_preset->preset.codec.meta[i].data.data_len;
 		meta[i].data.data = meta[i].value;
 	}
@@ -1068,13 +1069,21 @@ static int cmd_qos(const struct shell *sh, size_t argc, char *argv[])
 		struct bt_audio_unicast_group_stream_param stream_param = {
 			.stream = default_stream,
 			.qos = &default_preset->preset.qos,
-			.dir = stream_dir(default_stream)
 		};
+		struct bt_audio_unicast_group_stream_pair_param pair_param;
 		struct bt_audio_unicast_group_param param = {
 			.packing = BT_ISO_PACKING_SEQUENTIAL,
-			.params = &stream_param,
+			.params = &pair_param,
 			.params_count = 1,
 		};
+
+		if (stream_dir(default_stream) == BT_AUDIO_DIR_SOURCE) {
+			pair_param.rx_param = &stream_param;
+			pair_param.tx_param = NULL;
+		} else {
+			pair_param.rx_param = NULL;
+			pair_param.tx_param = &stream_param;
+		}
 
 		err = bt_audio_unicast_group_create(&param, &default_unicast_group);
 		if (err != 0) {
@@ -1933,28 +1942,33 @@ static int cmd_init(const struct shell *sh, size_t argc, char *argv[])
 
 	if (IS_ENABLED(CONFIG_BT_PAC_SNK_LOC)) {
 		err = bt_pacs_set_location(BT_AUDIO_DIR_SINK, LOCATION);
-		__ASSERT(err == 0, "Failed to set sink location");
+		__ASSERT(err == 0, "Failed to set sink location: %d", err);
 
 		err = bt_pacs_set_supported_contexts(BT_AUDIO_DIR_SINK,
 						     CONTEXT);
-		__ASSERT(err == 0, "Failed to set sink supported contexts");
+		__ASSERT(err == 0, "Failed to set sink supported contexts: %d",
+			 err);
 
 		err = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SINK,
 						     CONTEXT);
-		__ASSERT(err == 0, "Failed to set sink available contexts");
+		__ASSERT(err == 0, "Failed to set sink available contexts: %d",
+			 err);
 	}
 
 	if (IS_ENABLED(CONFIG_BT_PAC_SRC_LOC)) {
 		err = bt_pacs_set_location(BT_AUDIO_DIR_SOURCE, LOCATION);
-		__ASSERT(err == 0, "Failed to set source location");
+		__ASSERT(err == 0, "Failed to set source location: %d", err);
 
-		err = bt_pacs_set_supported_contexts(BT_AUDIO_DIR_SINK,
+		err = bt_pacs_set_supported_contexts(BT_AUDIO_DIR_SOURCE,
 						     CONTEXT);
-		__ASSERT(err == 0, "Failed to set sink supported contexts");
+		__ASSERT(err == 0, "Failed to set sink supported contexts: %d",
+			 err);
 
 		err = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SOURCE,
 						     CONTEXT);
-		__ASSERT(err == 0, "Failed to set source available contexts");
+		__ASSERT(err == 0,
+			 "Failed to set source available contexts: %d",
+			 err);
 	}
 
 #if defined(CONFIG_BT_AUDIO_UNICAST)
@@ -2125,8 +2139,8 @@ static int cmd_audio(const struct shell *sh, size_t argc, char **argv)
 SHELL_CMD_ARG_REGISTER(audio, &audio_cmds, "Bluetooth audio shell commands",
 		       cmd_audio, 1, 1);
 
-ssize_t audio_ad_data_add(struct bt_data *data_array, const size_t data_array_size,
-			  const bool discoverable, const bool connectable)
+static ssize_t connectable_ad_data_add(struct bt_data *data_array,
+				       size_t data_array_size)
 {
 	static const uint8_t ad_ext_uuid16[] = {
 		IF_ENABLED(CONFIG_BT_MICP_MIC_DEV, (BT_UUID_16_ENCODE(BT_UUID_MICS_VAL),))
@@ -2136,13 +2150,9 @@ ssize_t audio_ad_data_add(struct bt_data *data_array, const size_t data_array_si
 		IF_ENABLED(CONFIG_BT_GTBS, (BT_UUID_16_ENCODE(BT_UUID_GTBS_VAL),))
 		IF_ENABLED(CONFIG_BT_TBS, (BT_UUID_16_ENCODE(BT_UUID_TBS_VAL),))
 		IF_ENABLED(CONFIG_BT_VCP_VOL_REND, (BT_UUID_16_ENCODE(BT_UUID_VCS_VAL),))
-		IF_ENABLED(CONFIG_BT_HAS, (BT_UUID_16_ENCODE(BT_UUID_HAS_VAL),))
+		IF_ENABLED(CONFIG_BT_HAS, (BT_UUID_16_ENCODE(BT_UUID_HAS_VAL),)) /* Shall be last */
 	};
 	size_t ad_len = 0;
-
-	if (!discoverable) {
-		return 0;
-	}
 
 	if (IS_ENABLED(CONFIG_BT_ASCS)) {
 		static uint8_t ad_bap_announcement[8] = {
@@ -2188,13 +2198,13 @@ ssize_t audio_ad_data_add(struct bt_data *data_array, const size_t data_array_si
 
 		data_array[ad_len].type = BT_DATA_UUID16_SOME;
 
-		if (IS_ENABLED(CONFIG_BT_HAS) && IS_ENABLED(CONFIG_BT_PRIVACY) && connectable) {
+		if (IS_ENABLED(CONFIG_BT_HAS) && IS_ENABLED(CONFIG_BT_PRIVACY)) {
 			/* If the HA is in one of the GAP connectable modes and is using a
 			 * resolvable private address, the HA shall not include the Hearing Access
 			 * Service UUID in the Service UUID AD type field of the advertising data
 			 * or scan response.
 			 */
-			data_array[ad_len].data_len = ARRAY_SIZE(ad_ext_uuid16) - 1;
+			data_array[ad_len].data_len = ARRAY_SIZE(ad_ext_uuid16) - BT_UUID_SIZE_16;
 		} else {
 			data_array[ad_len].data_len = ARRAY_SIZE(ad_ext_uuid16);
 		}
@@ -2202,6 +2212,114 @@ ssize_t audio_ad_data_add(struct bt_data *data_array, const size_t data_array_si
 		data_array[ad_len].data = &ad_ext_uuid16[0];
 		ad_len++;
 	}
+
+	return ad_len;
+}
+
+static ssize_t nonconnectable_ad_data_add(struct bt_data *data_array,
+					  const size_t data_array_size)
+{
+	static const uint8_t ad_ext_uuid16[] = {
+		IF_ENABLED(CONFIG_BT_PACS, (BT_UUID_16_ENCODE(BT_UUID_PACS_VAL),))
+		IF_ENABLED(CONFIG_BT_CAP_ACCEPTOR, (BT_UUID_16_ENCODE(BT_UUID_CAS_VAL),))
+	};
+	size_t ad_len = 0;
+
+	if (IS_ENABLED(CONFIG_BT_CAP_ACCEPTOR)) {
+		static const uint8_t ad_cap_announcement[3] = {
+			BT_UUID_16_ENCODE(BT_UUID_CAS_VAL),
+			BT_AUDIO_UNICAST_ANNOUNCEMENT_TARGETED,
+		};
+
+		__ASSERT(data_array_size > ad_len, "No space for AD_CAP_ANNOUNCEMENT");
+		data_array[ad_len].type = BT_DATA_SVC_DATA16;
+		data_array[ad_len].data_len = ARRAY_SIZE(ad_cap_announcement);
+		data_array[ad_len].data = &ad_cap_announcement[0];
+		ad_len++;
+	}
+
+#if defined(CONFIG_BT_AUDIO_BROADCAST_SOURCE)
+	if (default_source) {
+		static uint8_t ad_bap_broadcast_announcement[5] = {
+			BT_UUID_16_ENCODE(BT_UUID_BROADCAST_AUDIO_VAL),
+		};
+		uint32_t broadcast_id;
+		int err;
+
+		err = bt_audio_broadcast_source_get_id(default_source,
+						       &broadcast_id);
+		if (err != 0) {
+			printk("Unable to get broadcast ID: %d\n", err);
+
+			return -1;
+		}
+
+		ad_bap_broadcast_announcement[2] = (uint8_t)(broadcast_id >> 16);
+		ad_bap_broadcast_announcement[3] = (uint8_t)(broadcast_id >> 8);
+		ad_bap_broadcast_announcement[4] = (uint8_t)(broadcast_id >> 0);
+		data_array[ad_len].type = BT_DATA_SVC_DATA16;
+		data_array[ad_len].data_len = ARRAY_SIZE(ad_bap_broadcast_announcement);
+		data_array[ad_len].data = ad_bap_broadcast_announcement;
+		ad_len++;
+	}
+#endif /* CONFIG_BT_AUDIO_BROADCAST_SOURCE */
+
+	if (ARRAY_SIZE(ad_ext_uuid16) > 0) {
+		if (data_array_size <= ad_len) {
+			shell_warn(ctx_shell, "No space for AD_UUID16");
+			return ad_len;
+		}
+
+		data_array[ad_len].type = BT_DATA_UUID16_SOME;
+		data_array[ad_len].data_len = ARRAY_SIZE(ad_ext_uuid16);
+		data_array[ad_len].data = &ad_ext_uuid16[0];
+		ad_len++;
+	}
+
+	return ad_len;
+}
+
+ssize_t audio_ad_data_add(struct bt_data *data_array, const size_t data_array_size,
+			  const bool discoverable, const bool connectable)
+{
+	if (!discoverable) {
+		return 0;
+	}
+
+	if (connectable) {
+		return connectable_ad_data_add(data_array, data_array_size);
+	} else {
+		return nonconnectable_ad_data_add(data_array, data_array_size);
+	}
+}
+
+ssize_t audio_pa_data_add(struct bt_data *data_array,
+			  const size_t data_array_size)
+{
+	size_t ad_len = 0;
+
+#if defined(CONFIG_BT_AUDIO_BROADCAST_SOURCE)
+	if (default_source) {
+		/* Required size of the buffer depends on what has been
+		 * configured. We just use the maximum size possible.
+		 */
+		NET_BUF_SIMPLE_DEFINE_STATIC(base_buf, UINT8_MAX);
+		int err;
+
+		err = bt_audio_broadcast_source_get_base(default_source,
+							 &base_buf);
+		if (err != 0) {
+			printk("Unable to get BASE: %d\n", err);
+
+			return -1;
+		}
+
+		data_array[ad_len].type = BT_DATA_SVC_DATA16;
+		data_array[ad_len].data_len = base_buf.len;
+		data_array[ad_len].data = base_buf.data;
+		ad_len++;
+	}
+#endif /* CONFIG_BT_AUDIO_BROADCAST_SOURCE */
 
 	return ad_len;
 }

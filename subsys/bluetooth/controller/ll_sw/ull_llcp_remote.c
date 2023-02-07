@@ -18,7 +18,10 @@
 #include "util/memq.h"
 #include "util/dbuf.h"
 
+#include "pdu_df.h"
+#include "lll/pdu_vendor.h"
 #include "pdu.h"
+
 #include "ll.h"
 #include "ll_settings.h"
 #include "ll_feat.h"
@@ -839,11 +842,19 @@ static const struct proc_role new_proc_lut[] = {
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
 	[PDU_DATA_LLCTRL_TYPE_CTE_RSP] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
 #if defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+#if !defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
+	[PDU_DATA_LLCTRL_TYPE_CIS_TERMINATE_IND] = { PROC_CIS_TERMINATE, ACCEPT_ROLE_CENTRAL },
+#else
+#if !defined(CONFIG_BT_CTLR_CENTRAL_ISO)
+	[PDU_DATA_LLCTRL_TYPE_CIS_TERMINATE_IND] = { PROC_CIS_TERMINATE, ACCEPT_ROLE_PERIPHERAL },
+#else
 	[PDU_DATA_LLCTRL_TYPE_CIS_TERMINATE_IND] = { PROC_CIS_TERMINATE, ACCEPT_ROLE_BOTH },
-#endif /* CONFIG_BT_CTLR_CENTRAL_ISO || CONFIG_BT_CTLR_PERIPHERAL_ISO */
+#endif /* !defined(CONFIG_BT_CTLR_CENTRAL_ISO) */
+#endif /* !defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
+#endif /* defined(CONFIG_BT_CTLR_CENTRAL_ISO) || defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 #if defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
 	[PDU_DATA_LLCTRL_TYPE_CIS_REQ] = { PROC_CIS_CREATE, ACCEPT_ROLE_PERIPHERAL },
-#endif /* CONFIG_BT_CTLR_CENTRAL_ISO */
+#endif /* defined(CONFIG_BT_CTLR_PERIPHERAL_ISO) */
 #if defined(CONFIG_BT_CTLR_SCA_UPDATE)
 	[PDU_DATA_LLCTRL_TYPE_CLOCK_ACCURACY_REQ] = { PROC_SCA_UPDATE, ACCEPT_ROLE_BOTH },
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */

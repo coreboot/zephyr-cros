@@ -553,6 +553,8 @@ static void ucpd_start_transmit(const struct device *dev,
 
 		imr = LL_UCPD_ReadReg(config->ucpd_port, IMR);
 		imr |= UCPD_IMR_HRSTDISCIE | UCPD_IMR_HRSTSENTIE;
+		LL_UCPD_WriteReg(config->ucpd_port, IMR, imr);
+
 		/* Initiate Hard Reset */
 		cr |= UCPD_CR_TXHRST;
 		LL_UCPD_WriteReg(config->ucpd_port, CR, cr);
@@ -794,12 +796,11 @@ static void ucpd_manage_tx(struct alert_info *info)
 		break;
 
 	case STATE_HARD_RESET:
-		if (atomic_test_and_clear_bit(&info->evt, UCPD_EVT_HR_DONE)) {
+		if (atomic_test_bit(&info->evt, UCPD_EVT_HR_DONE) ||
+		    atomic_test_bit(&info->evt, UCPD_EVT_HR_FAIL)) {
+			atomic_clear_bit(&info->evt, UCPD_EVT_HR_DONE);
+			atomic_clear_bit(&info->evt, UCPD_EVT_HR_FAIL);
 			/* HR complete, reset tx state values */
-			ucpd_set_tx_state(info->dev, STATE_IDLE);
-			data->ucpd_tx_request = 0;
-			data->tx_retry_count = 0;
-		} else if (atomic_test_and_clear_bit(&info->evt, UCPD_EVT_HR_FAIL)) {
 			ucpd_set_tx_state(info->dev, STATE_IDLE);
 			data->ucpd_tx_request = 0;
 			data->tx_retry_count = 0;
@@ -1136,7 +1137,7 @@ static void ucpd_isr(const struct device *dev_inst[])
 	 */
 	if (sr & tx_done_mask) {
 		/* Check for tx message complete */
-		if (sr & (UCPD_SR_TXMSGSENT | UCPD_SR_HRSTSENT)) {
+		if (sr & UCPD_SR_TXMSGSENT) {
 			atomic_set_bit(&info->evt, UCPD_EVT_TX_MSG_SUCCESS);
 		} else if (sr & (UCPD_SR_TXMSGABT | UCPD_SR_TXUND)) {
 			atomic_set_bit(&info->evt, UCPD_EVT_TX_MSG_FAIL);
@@ -1381,6 +1382,20 @@ static int ucpd_init(const struct device *dev)
 		/* Enable UCPD port */
 		LL_UCPD_Enable(config->ucpd_port);
 
+		/* Enable Dead Battery Support */
+		if (config->ucpd_dead_battery) {
+#ifdef CONFIG_SOC_SERIES_STM32G0X
+			uint32_t cr;
+
+			cr = LL_UCPD_ReadReg(config->ucpd_port, CR);
+			cr |= UCPD_CR_DBATTEN;
+			LL_UCPD_WriteReg(config->ucpd_port, CR, cr);
+			update_stm32g0x_cc_line(config->ucpd_port);
+#else
+			CLEAR_BIT(PWR->CR3, PWR_CR3_UCPD_DBDIS);
+#endif
+		}
+
 		/* Initialize the isr */
 		ucpd_isr_init(dev);
 	} else {
@@ -1444,6 +1459,7 @@ BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT) > 0,
 		.ucpd_params.transwin = DT_INST_PROP(inst, transwin) - 1,		\
 		.ucpd_params.IfrGap = DT_INST_PROP(inst, ifrgap) - 1,			\
 		.ucpd_params.HbitClockDiv = DT_INST_PROP(inst, hbitclkdiv) - 1,		\
+		.ucpd_dead_battery = DT_INST_PROP(inst, dead_battery),			\
 	};										\
 	DEVICE_DT_INST_DEFINE(inst,							\
 			      &ucpd_init,						\

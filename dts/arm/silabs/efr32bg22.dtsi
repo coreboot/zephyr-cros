@@ -55,10 +55,15 @@
 		};
 
 		usart0: usart@5005c000 {
-			compatible = "silabs,gecko-usart";
+			compatible = "silabs,gecko-spi-usart";
 			reg = <0x5005C000 0x400>;
 			interrupts = <13 0>, <14 0>;
 			interrupt-names = "rx", "tx";
+			status = "disabled";
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
 			status = "disabled";
 		};
 
@@ -157,6 +162,15 @@
 			};
 
 		};
+
+		wdog0: wdog@4a018000 {
+			compatible = "silabs,gecko-wdog";
+			reg = <0x4A018000 0x3028>;
+			peripheral-id = <0>;
+			interrupts = <43 0>;
+			status = "disabled";
+		};
+
 	};
 };
 

@@ -12,7 +12,6 @@ import queue
 import re
 import shutil
 import subprocess
-import scl
 import sys
 import time
 import traceback
@@ -20,10 +19,16 @@ from multiprocessing import Lock, Process, Value
 from multiprocessing.managers import BaseManager
 
 from colorama import Fore
+from domains import Domains
 from twisterlib.cmakecache import CMakeCache
 from twisterlib.environment import canonical_zephyr_base
-from twisterlib.jobserver import GNUMakeJobClient, GNUMakeJobServer, JobClient
+
+# Job server only works on Linux for now.
+if sys.platform == 'linux':
+    from twisterlib.jobserver import GNUMakeJobClient, GNUMakeJobServer, JobClient
+
 from twisterlib.log_helper import log_command
+from twisterlib.testinstance import TestInstance
 
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
@@ -229,7 +234,11 @@ class CMake:
         if self.cwd:
             kwargs['cwd'] = self.cwd
 
-        p = self.jobserver.popen(cmd, **kwargs)
+        if sys.platform == 'linux':
+            p = self.jobserver.popen(cmd, **kwargs)
+        else:
+            p = subprocess.Popen(cmd, **kwargs)
+
         out, _ = p.communicate()
 
         results = {}
@@ -330,7 +339,10 @@ class CMake:
         if self.cwd:
             kwargs['cwd'] = self.cwd
 
-        p = self.jobserver.popen(cmd, **kwargs)
+        if sys.platform == 'linux':
+            p = self.jobserver.popen(cmd, **kwargs)
+        else:
+            p = subprocess.Popen(cmd, **kwargs)
         out, _ = p.communicate()
 
         if p.returncode == 0:
@@ -369,15 +381,11 @@ class FilterBuilder(CMake):
             return {}
 
         if self.testsuite.sysbuild:
-            # We must parse the domains.yaml file to determine the
-            # default sysbuild application
+            # Load domain yaml to get default domain build directory
             domain_path = os.path.join(self.build_dir, "domains.yaml")
-            domain_yaml = scl.yaml_load(domain_path)
+            domains = Domains.from_file(domain_path)
             logger.debug("Loaded sysbuild domain data from %s" % (domain_path))
-            default_domain = domain_yaml['default']
-            for domain in domain_yaml['domains']:
-                if domain['name'] == default_domain:
-                    domain_build = domain['build_dir']
+            domain_build = domains.get_default_domain().build_dir
             cmake_cache_path = os.path.join(domain_build, "CMakeCache.txt")
             defconfig_path = os.path.join(domain_build, "zephyr", ".config")
             edt_pickle = os.path.join(domain_build, "zephyr", "edt.pickle")
@@ -855,29 +863,34 @@ class ProjectBuilder(FilterBuilder):
 
         sys.stdout.flush()
 
-    def gather_metrics(self, instance):
+    def gather_metrics(self, instance: TestInstance):
         if self.options.enable_size_report and not self.options.cmake_only:
-            self.calc_one_elf_size(instance)
+            self.calc_size(instance=instance, from_buildlog=self.options.footprint_from_buildlog)
         else:
-            instance.metrics["ram_size"] = 0
-            instance.metrics["rom_size"] = 0
+            instance.metrics["used_ram"] = 0
+            instance.metrics["used_rom"] = 0
+            instance.metrics["available_rom"] = 0
+            instance.metrics["available_ram"] = 0
             instance.metrics["unrecognized"] = []
 
     @staticmethod
-    def calc_one_elf_size(instance):
+    def calc_size(instance: TestInstance, from_buildlog: bool):
         if instance.status not in ["error", "failed", "skipped"]:
-            if instance.platform.type != "native":
-                size_calc = instance.calculate_sizes()
-                instance.metrics["ram_size"] = size_calc.get_ram_size()
-                instance.metrics["rom_size"] = size_calc.get_rom_size()
+            if not instance.platform.type in ["native", "qemu", "unit"]:
+                generate_warning = bool(instance.platform.type == "mcu")
+                size_calc = instance.calculate_sizes(from_buildlog=from_buildlog, generate_warning=generate_warning)
+                instance.metrics["used_ram"] = size_calc.get_used_ram()
+                instance.metrics["used_rom"] = size_calc.get_used_rom()
+                instance.metrics["available_rom"] = size_calc.get_available_rom()
+                instance.metrics["available_ram"] = size_calc.get_available_ram()
                 instance.metrics["unrecognized"] = size_calc.unrecognized_sections()
             else:
-                instance.metrics["ram_size"] = 0
-                instance.metrics["rom_size"] = 0
+                instance.metrics["used_ram"] = 0
+                instance.metrics["used_rom"] = 0
+                instance.metrics["available_rom"] = 0
+                instance.metrics["available_ram"] = 0
                 instance.metrics["unrecognized"] = []
-
             instance.metrics["handler_time"] = instance.execution_time
-
 
 
 class TwisterRunner:
@@ -913,16 +926,19 @@ class TwisterRunner:
             self.jobs = multiprocessing.cpu_count() * 2
         else:
             self.jobs = multiprocessing.cpu_count()
-        if os.name == "posix":
-            self.jobserver = GNUMakeJobClient.from_environ(jobs=self.options.jobs)
-            if not self.jobserver:
-                self.jobserver = GNUMakeJobServer(self.jobs)
-            elif self.jobserver.jobs:
-                self.jobs = self.jobserver.jobs
-        # TODO: Implement this on windows also
-        else:
-            self.jobserver = JobClient()
-        logger.info("JOBS: %d", self.jobs)
+
+        if sys.platform == "linux":
+            if os.name == 'posix':
+                self.jobserver = GNUMakeJobClient.from_environ(jobs=self.options.jobs)
+                if not self.jobserver:
+                    self.jobserver = GNUMakeJobServer(self.jobs)
+                elif self.jobserver.jobs:
+                    self.jobs = self.jobserver.jobs
+            # TODO: Implement this on windows/mac also
+            else:
+                self.jobserver = JobClient()
+
+            logger.info("JOBS: %d", self.jobs)
 
         self.update_counting_before_pipeline()
 
@@ -1016,7 +1032,21 @@ class TwisterRunner:
                     pipeline.put({"op": "cmake", "test": instance})
 
     def pipeline_mgr(self, pipeline, done_queue, lock, results):
-        with self.jobserver.get_job():
+        if sys.platform == 'linux':
+            with self.jobserver.get_job():
+                while True:
+                    try:
+                        task = pipeline.get_nowait()
+                    except queue.Empty:
+                        break
+                    else:
+                        instance = task['test']
+                        pb = ProjectBuilder(instance, self.env, self.jobserver)
+                        pb.duts = self.duts
+                        pb.process(pipeline, done_queue, task, lock, results)
+
+                return True
+        else:
             while True:
                 try:
                     task = pipeline.get_nowait()
@@ -1027,7 +1057,6 @@ class TwisterRunner:
                     pb = ProjectBuilder(instance, self.env, self.jobserver)
                     pb.duts = self.duts
                     pb.process(pipeline, done_queue, task, lock, results)
-
             return True
 
     def execute(self, pipeline, done):

@@ -1329,7 +1329,7 @@ static ssize_t ad_init(struct bt_data *data_array, const size_t data_array_size,
 
 	if (IS_ENABLED(CONFIG_BT_AUDIO) && IS_ENABLED(CONFIG_BT_EXT_ADV) && adv_ext) {
 		const bool connectable = atomic_test_bit(adv_opt, SHELL_ADV_OPT_CONNECTABLE);
-		size_t audio_ad_len;
+		ssize_t audio_ad_len;
 
 		audio_ad_len = audio_ad_data_add(&data_array[ad_len], data_array_size - ad_len,
 						 discoverable, connectable);
@@ -1349,7 +1349,7 @@ static int cmd_advertise(const struct shell *sh, size_t argc, char *argv[])
 	struct bt_data ad[3];
 	bool discoverable = true;
 	bool appearance = false;
-	size_t ad_len;
+	ssize_t ad_len;
 	int err;
 
 	if (!strcmp(argv[1], "off")) {
@@ -1642,7 +1642,7 @@ static int cmd_adv_data(const struct shell *sh, size_t argc, char *argv[])
 	struct bt_data ad[9];
 	struct bt_data sd[9];
 	size_t hex_data_len;
-	size_t ad_len;
+	size_t ad_len = 0;
 	size_t sd_len = 0;
 	bool discoverable = false;
 	size_t *data_len;
@@ -1707,8 +1707,11 @@ static int cmd_adv_data(const struct shell *sh, size_t argc, char *argv[])
 	atomic_set_bit_to(adv_set_opt[selected_adv], SHELL_ADV_OPT_APPEARANCE,
 			  appearance);
 
-	ad_len = ad_init(ad, ARRAY_SIZE(ad), adv_set_opt[selected_adv]);
+	ad_len = ad_init(&ad[*data_len], ARRAY_SIZE(ad) - *data_len,
+			 adv_set_opt[selected_adv]);
 	if (ad_len < 0) {
+		shell_error(sh, "Failed to initialize stack advertising data");
+
 		return -ENOEXEC;
 	}
 
@@ -1977,12 +1980,33 @@ static int cmd_per_adv_param(const struct shell *sh, size_t argc,
 	return 0;
 }
 
+static ssize_t pa_ad_init(struct bt_data *data_array,
+			  const size_t data_array_size)
+{
+	size_t ad_len = 0;
+
+	if (IS_ENABLED(CONFIG_BT_AUDIO)) {
+		ssize_t audio_pa_ad_len;
+
+		audio_pa_ad_len = audio_pa_data_add(&data_array[ad_len],
+						    data_array_size - ad_len);
+		if (audio_pa_ad_len < 0U) {
+			return audio_pa_ad_len;
+		}
+
+		ad_len += audio_pa_ad_len;
+	}
+
+	return ad_len;
+}
+
 static int cmd_per_adv_data(const struct shell *sh, size_t argc,
 			    char *argv[])
 {
 	struct bt_le_ext_adv *adv = adv_sets[selected_adv];
-	static struct bt_data ad;
 	static uint8_t hex_data[256];
+	static struct bt_data ad[2U];
+	ssize_t stack_ad_len;
 	uint8_t ad_len = 0;
 	int err;
 
@@ -1991,19 +2015,34 @@ static int cmd_per_adv_data(const struct shell *sh, size_t argc,
 		return -EINVAL;
 	}
 
-	memset(hex_data, 0, sizeof(hex_data));
-	ad_len = hex2bin(argv[1], strlen(argv[1]), hex_data, sizeof(hex_data));
+	if (argc > 1) {
+		size_t hex_len = 0U;
 
-	if (!ad_len) {
-		shell_error(sh, "Could not parse adv data");
-		return -ENOEXEC;
+		(void)memset(hex_data, 0, sizeof(hex_data));
+		hex_len = hex2bin(argv[1U], strlen(argv[1U]), hex_data,
+				  sizeof(hex_data));
+
+		if (hex_len == 0U) {
+			shell_error(sh, "Could not parse adv data");
+
+			return -ENOEXEC;
+		}
+
+		ad[ad_len].data_len = hex_data[0U];
+		ad[ad_len].type = hex_data[1U];
+		ad[ad_len].data = &hex_data[2U];
+		ad_len++;
 	}
 
-	ad.data_len = hex_data[0];
-	ad.type = hex_data[1];
-	ad.data = &hex_data[2];
+	stack_ad_len = pa_ad_init(&ad[ad_len], ARRAY_SIZE(ad) - ad_len);
+	if (stack_ad_len < 0) {
+		shell_error(sh, "Failed to get stack PA data");
 
-	err = bt_le_per_adv_set_data(adv, &ad, 1);
+		return -ENOEXEC;
+	}
+	ad_len += stack_ad_len;
+
+	err = bt_le_per_adv_set_data(adv, ad, ad_len);
 	if (err) {
 		shell_error(sh,
 			    "Failed to set periodic advertising data (%d)",
@@ -2268,6 +2307,28 @@ static int cmd_per_adv_sync_transfer(const struct shell *sh, size_t argc,
 }
 #endif /* CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER */
 #endif /* CONFIG_BT_PER_ADV_SYNC */
+
+#if defined(CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER) && defined(CONFIG_BT_PER_ADV)
+static int cmd_per_adv_set_info_transfer(const struct shell *sh, size_t argc,
+					 char *argv[])
+{
+	const struct bt_le_ext_adv *adv = adv_sets[selected_adv];
+	int err;
+
+	if (default_conn == NULL) {
+		shell_error(sh, "%s: at least, one connection is required",
+			    sh->ctx->active_cmd.syntax);
+		return -ENOEXEC;
+	}
+
+	err = bt_le_per_adv_set_info_transfer(adv, default_conn, 0U);
+	if (err) {
+		shell_error(sh, "Periodic advertising sync transfer failed (%d)", err);
+	}
+
+	return err;
+}
+#endif /* CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER && CONFIG_BT_PER_ADV */
 
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
@@ -3648,7 +3709,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 	SHELL_CMD_ARG(per-adv-param, NULL,
 		      "[<interval-min> [<interval-max> [tx_power]]]",
 		      cmd_per_adv_param, 1, 3),
-	SHELL_CMD_ARG(per-adv-data, NULL, "<data>", cmd_per_adv_data, 2, 0),
+	SHELL_CMD_ARG(per-adv-data, NULL, "[data]", cmd_per_adv_data, 1, 1),
 #endif /* CONFIG_BT_PER_ADV */
 #endif /* CONFIG_BT_EXT_ADV */
 #endif /* CONFIG_BT_BROADCASTER */
@@ -3669,8 +3730,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(bt_cmds,
 		      cmd_past_unsubscribe, 1, 1),
 #endif /* CONFIG_BT_PER_ADV_SYNC_TRANSFER_RECEIVER */
 #if defined(CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER)
+#if defined(CONFIG_BT_PER_ADV_SYNC)
 	SHELL_CMD_ARG(per-adv-sync-transfer, NULL, "[<index>]",
 		      cmd_per_adv_sync_transfer, 1, 1),
+#endif /* CONFIG_BT_PER_ADV_SYNC */
+#if defined(CONFIG_BT_PER_ADV)
+	SHELL_CMD_ARG(per-adv-set-info-transfer, NULL, "",
+		      cmd_per_adv_set_info_transfer, 1, 0),
+#endif /* CONFIG_BT_PER_ADV */
 #endif /* CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER */
 #if defined(CONFIG_BT_CENTRAL)
 	SHELL_CMD_ARG(connect, NULL, HELP_ADDR_LE EXT_ADV_SCAN_OPT,

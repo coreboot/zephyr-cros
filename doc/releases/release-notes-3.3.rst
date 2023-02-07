@@ -20,6 +20,10 @@ API Changes
 Changes in this release
 =======================
 
+* Bluetooth: Add extra options to bt_le_per_adv_sync_transfer_subscribe to
+  allow disabling sync reports, and enable sync report filtering. these two
+  options are mutually exclusive.
+
 * Bluetooth: :kconfig:option:`CONFIG_BT_PER_ADV_SYNC_TRANSFER_RECEIVER`
   and :kconfig:option:`CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER` have been
   added to enable the PAST implementation rather than
@@ -60,15 +64,42 @@ Changes in this release
 
 * MCUmgr Bluetooth and UDP transports no longer need to be registered by the
   application code, these will now automatically be registered at bootup (this
-  feature can be disabled or tweaked by adjusting:
-  :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_AUTOMATIC_INIT`,
-  :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_AUTOMATIC_INIT_WAIT`, and
-  :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_UDP_AUTOMATIC_INIT`. If applications
-  register transports then those registrations should be removed to prevent
-  registering the same transport multiple times. If the Bluetooth stack needs
-  to be setup/initialised by another module or the application itself, then
-  :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_AUTOMATIC_INIT` should be
-  disabled and the application should call :c:func:`smp_bt_start` at startup.
+  feature can be disabled for the UDP transport by setting
+  :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_UDP_AUTOMATIC_INIT`). If
+  applications register transports then those registrations should be removed
+  to prevent registering the same transport multiple times.
+
+* MCUmgr transport Kconfigs have changed from ``select`` to ``depends on``
+  which means that for applications using the Bluetooth transport,
+  applications will now need to enable the following:
+
+  * :kconfig:option:`CONFIG_BT`
+  * :kconfig:option:`CONFIG_BT_PERIPHERAL`
+
+  For CDC or serial transports:
+
+  * :kconfig:option:`CONFIG_CONSOLE`
+
+  For shell transport:
+
+  * :kconfig:option:`CONFIG_SHELL`
+  * :kconfig:option:`CONFIG_SHELL_BACKEND_SERIAL`
+
+  For UDP transport:
+
+  * :kconfig:option:`CONFIG_NETWORKING`
+  * :kconfig:option:`CONFIG_NET_UDP`
+
+* Python's argparse argument parser usage in Zephyr scripts has been updated
+  to disable abbreviations, any future python scripts or python code updates
+  must also disable allowing abbreviations by using ``allow_abbrev=False``
+  when setting up ``ArgumentParser()``.
+
+  This may cause out-of-tree scripts or commands to fail if they have relied
+  upon their behaviour previously, these will need to be updated in order for
+  building to work. As an example, if a script argument had ``--reset-type``
+  and an out-of-tree script used this by passing ``--reset`` then it will need
+  to be updated to use the full argument name, ``--reset-type``.
 
 Removed APIs in this release
 ============================
@@ -88,6 +119,24 @@ Removed APIs in this release
 
 Deprecated in this release
 ==========================
+
+* C++ library Kconfig options have been renamed to improve consistency. See
+  below for the list of deprecated Kconfig options and their replacements:
+
+  .. table::
+     :align: center
+
+     +----------------------------------------+------------------------------------------------+
+     | Deprecated                             | Replacement                                    |
+     +========================================+================================================+
+     | :kconfig:option:`CONFIG_CPLUSPLUS`     | :kconfig:option:`CONFIG_CPP`                   |
+     +----------------------------------------+------------------------------------------------+
+     | :kconfig:option:`CONFIG_EXCEPTIONS`    | :kconfig:option:`CONFIG_CPP_EXCEPTIONS`        |
+     +----------------------------------------+------------------------------------------------+
+     | :kconfig:option:`CONFIG_RTTI`          | :kconfig:option:`CONFIG_CPP_RTTI`              |
+     +----------------------------------------+------------------------------------------------+
+     | :kconfig:option:`CONFIG_LIB_CPLUSPLUS` | :kconfig:option:`CONFIG_LIBCPP_IMPLEMENTATION` |
+     +----------------------------------------+------------------------------------------------+
 
 * MCUmgr subsystem, specifically the SMP transport API, is dropping `zephyr_`
   prefix, deprecating prefixed functions and callback type definitions with the
@@ -142,6 +191,9 @@ Deprecated in this release
   :kconfig:option:`CONFIG_COUNTER_RTC_STM32_CLOCK_LSE` options are now
   deprecated.
 
+* STM32 Interrupt controller Kconfig symbols such as :kconfig:option:`CONFIG_EXTI_STM32_EXTI0_IRQ_PRI`
+  are removed. Related IRQ prioritues should now be configured in device tree.
+
 * File backend for settings APIs and Kconfig options were deprecated:
 
   :c:func:`settings_mount_fs_backend` in favor of :c:func:`settings_mount_file_backend`
@@ -159,6 +211,9 @@ Deprecated in this release
   deprecated in favor of a centralized scan of available PCIe devices.
 
 * SPI DT :c:func:`spi_is_ready` function has been deprecated in favor of :c:func:`spi_is_ready_dt`.
+
+* LwM2M APIs using string references as LwM2M paths has been deprecated in favor of functions
+  using :c:struct:`lwm2m_path_obj` instead.
 
 Stable API changes in this release
 ==================================
@@ -272,6 +327,11 @@ Boards & SoC Support
 Build system and infrastructure
 *******************************
 
+* Code relocation
+
+  * ``zephyr_code_relocate`` API has changed to accept a list of files to
+    relocate and a location to place the files.
+
 Drivers and Sensors
 *******************
 
@@ -337,6 +397,8 @@ Drivers and Sensors
 
 * Interrupt Controller
 
+  * STM32: Driver configuration and initialization is now based on device tree
+
 * IPM
 
 * KSCAN
@@ -379,6 +441,18 @@ Drivers and Sensors
 
 * USB
 
+  * STM32F1: Clock bus configuration is not done automatically by driver anymore.
+    It is user's responsibility to configure the proper bus prescaler using clock_control
+    device tree node to achieve a 48MHz bus clock. Note that, in most cases, core clock
+    is 72MHz and default prescaler configuration is set to achieve 48MHz USB bus clock.
+    Prescaler only needs to be configured manually when core clock is already 48MHz.
+
+  * STM32 (non F1): Clock bus configuration is now expected to be done in device tree
+    using ``clocks`` node property. When a dedicated HSI 48MHz clock is available on target,
+    is it configured by default as the USB bus clock, but user has the ability to select
+    another 48MHz clock source. When no HSI48 is available, a specific 48MHz bus clock
+    source should be configured by user.
+
 * W1
 
 * Watchdog
@@ -414,11 +488,43 @@ Devicetree
 Libraries / Subsystems
 **********************
 
+* C++ Library
+
+  * C++ support in Zephyr is no longer considered a "subsystem" because it
+    mainly consists of the C++ ABI runtime library and the C++ standard
+    library, which are "libraries" that are dissimilar to the existing Zephyr
+    subsystems. C++ support components are now located in ``lib/cpp`` as
+    "C++ library."
+  * C++ ABI runtime library components such as global constructor/destructor
+    and initialiser handlers, that were previously located under
+    ``subsys/cpp``, have been moved to ``lib/cpp/abi`` in order to provide a
+    clear separation between the C++ ABI runtime library and the C++ standard
+    library.
+  * C++ minimal library components have been moved to ``lib/cpp/minimal``.
+  * C++ tests have been moved to ``tests/lib/cpp``.
+  * C++ samples have been moved to ``samples/cpp``.
+  * :kconfig:option:`CONFIG_CPLUSPLUS` has been renamed to
+    :kconfig:option:`CONFIG_CPP`.
+  * :kconfig:option:`CONFIG_EXCEPTIONS` has been renamed to
+    :kconfig:option:`CONFIG_CPP_EXCEPTIONS`.
+  * :kconfig:option:`CONFIG_RTTI` has been renamed to
+    :kconfig:option:`CONFIG_CPP_RTTI`.
+  * :kconfig:option:`CONFIG_LIB_CPLUSPLUS` is deprecated. A toolchain-specific
+    C++ standard library Kconfig option from
+    :kconfig:option:`CONFIG_LIBCPP_IMPLEMENTATION` should be selected instead.
+  * Zephyr subsystems and modules that require the features from the full C++
+    standard library (e.g. Standard Template Library) can now select
+    :kconfig:option:`CONFIG_REQUIRES_FULL_LIBC`, which automatically selects
+    a compatible C++ standard library.
+
 * File systems
 
   * Added new API call `fs_mkfs`.
   * Added new sample `samples/subsys/fs/format`.
   * FAT FS driver has been updated to version 0.15 w/patch1.
+  * Added the option to disable CRC checking in :ref:`fcb_api` by enabling the
+    Kconfig option :kconfig:option:`CONFIG_FCB_ALLOW_FIXED_ENDMARKER`
+    and setting the `FCB_FLAGS_CRC_DISABLED` flag in the :c:struct:`fcb` struct.
 
 * Management
 
@@ -668,6 +774,15 @@ Libraries / Subsystems
     the resultant response will now be an empty CBOR map. The old behaviour can
     be restored by enabling
     :kconfig:option:`CONFIG_MCUMGR_SMP_LEGACY_RC_BEHAVIOUR`.
+
+  * MCUMGR now has log outputting on most errors from the included fs, img,
+    os, shell, stat and zephyr_basic group commands. The level of logging can be
+    controlled by adjusting: :kconfig:option:`CONFIG_MCUMGR_GRP_FS_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_OS_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_SHELL_LOG_LEVEL`,
+    :kconfig:option:`CONFIG_MCUMGR_GRP_STAT_LOG_LEVEL` and
+    :kconfig:option:`CONFIG_MCUMGR_GRP_ZBASIC_LOG_LEVEL`.
 
 * LwM2M
 

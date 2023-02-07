@@ -16,7 +16,6 @@ from twisterlib.error import BuildError
 from twisterlib.size_calc import SizeCalculator
 from twisterlib.handlers import Handler, SimulationHandler, BinaryHandler, QEMUHandler, DeviceHandler, SUPPORTED_SIMS
 
-
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
 
@@ -140,7 +139,11 @@ class TestInstance:
 
         options = env.options
         handler = Handler(self, "")
-        if self.platform.simulation != "na":
+        if options.device_testing:
+            handler = DeviceHandler(self, "device")
+            handler.call_make_run = False
+            handler.ready = True
+        elif self.platform.simulation != "na":
             if self.platform.simulation == "qemu":
                 handler = QEMUHandler(self, "qemu")
                 handler.args.append(f"QEMU_PIPE={handler.get_fifo()}")
@@ -155,10 +158,6 @@ class TestInstance:
             handler.binary = os.path.join(self.build_dir, "testbinary")
             if options.enable_coverage:
                 handler.args.append("COVERAGE=1")
-            handler.call_make_run = False
-            handler.ready = True
-        elif options.device_testing:
-            handler = DeviceHandler(self, "device")
             handler.call_make_run = False
             handler.ready = True
 
@@ -251,7 +250,7 @@ class TestInstance:
 
         return content
 
-    def calculate_sizes(self):
+    def calculate_sizes(self, from_buildlog: bool = False, generate_warning: bool = True) -> SizeCalculator:
         """Get the RAM/ROM sizes of a test case.
 
         This can only be run after the instance has been executed by
@@ -259,13 +258,33 @@ class TestInstance:
 
         @return A SizeCalculator object
         """
+        elf_filepath = self.get_elf_file()
+        buildlog_filepath = self.get_buildlog_file() if from_buildlog else ''
+        return SizeCalculator(elf_filename=elf_filepath,
+                            extra_sections=self.testsuite.extra_sections,
+                            buildlog_filepath=buildlog_filepath,
+                            generate_warning=generate_warning)
+
+    def get_elf_file(self) -> str:
         fns = glob.glob(os.path.join(self.build_dir, "zephyr", "*.elf"))
         fns.extend(glob.glob(os.path.join(self.build_dir, "zephyr", "*.exe")))
-        fns = [x for x in fns if '_pre' not in x]
+        fns = [x for x in fns if '_pre' not in os.path.split(x)[-1]]
+        # EFI elf files
+        fns = [x for x in fns if 'zefi' not in os.path.split(x)[-1]]
         if len(fns) != 1:
             raise BuildError("Missing/multiple output ELF binary")
+        return fns[0]
 
-        return SizeCalculator(fns[0], self.testsuite.extra_sections)
+    def get_buildlog_file(self) -> str:
+        """Get path to build.log file.
+
+        @raises BuildError: Incorrect amount (!=1) of build logs.
+        @return: Path to build.log (str).
+        """
+        buildlog_paths = glob.glob(os.path.join(self.build_dir, "build.log"))
+        if len(buildlog_paths) != 1:
+            raise BuildError("Missing/multiple build.log file.")
+        return buildlog_paths[0]
 
     def __repr__(self):
         return "<TestSuite %s on %s>" % (self.testsuite.name, self.platform.name)

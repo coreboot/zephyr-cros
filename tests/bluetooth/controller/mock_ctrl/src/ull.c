@@ -5,6 +5,7 @@
  */
 
 #include <zephyr/types.h>
+#include <zephyr/ztest.h>
 
 #include <zephyr/bluetooth/hci.h>
 
@@ -17,12 +18,14 @@
 #include "util/dbuf.h"
 #include "util.h"
 
+#include "pdu_df.h"
+#include "lll/pdu_vendor.h"
 #include "pdu.h"
 #include "ll.h"
 #include "ll_feat.h"
 #include "ll_settings.h"
 #include "lll.h"
-#include "lll_vendor.h"
+#include "lll/lll_vendor.h"
 #include "lll/lll_adv_types.h"
 #include "lll_adv.h"
 #include "lll/lll_adv_pdu.h"
