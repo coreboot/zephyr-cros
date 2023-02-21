@@ -525,13 +525,13 @@ static int pd_decode_command(struct osdp_pd *pd, uint8_t *buf, int len)
 		cmd.comset.baud_rate |= buf[pos++] << 16;
 		cmd.comset.baud_rate |= buf[pos++] << 24;
 		if (!(osdp_is_valid_pd_address(cmd.comset.address) &&
-		      osdp_is_valid_baudrate(cmd.comset.baud_rate))) {
+		      osdp_is_valid_baudrate(cmd.comset.baud_rate))) {				
 			LOG_ERR("COMSET Failed! command discarded");
 			cmd.comset.address = pd->address;
 			cmd.comset.baud_rate = pd->baud_rate;
 		}
 		ret = pd->command_callback(pd->command_callback_arg, &cmd);
-		if (ret != 0) {
+		if (ret < 0) {
 			pd->reply_id = REPLY_NAK;
 			pd->ephemeral_data[0] = OSDP_PD_NAK_RECORD;
 			ret = OSDP_PD_ERR_REPLY;
