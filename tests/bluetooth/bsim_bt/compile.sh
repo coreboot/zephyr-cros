@@ -27,6 +27,8 @@ app=tests/bluetooth/bsim_bt/bsim_test_bond_overwrite_denied compile &
 app=tests/bluetooth/bsim_bt/bsim_test_notify compile &
 app=tests/bluetooth/bsim_bt/bsim_test_notify_multiple compile &
 app=tests/bluetooth/bsim_bt/bsim_test_eatt_notif conf_file=prj.conf compile &
+app=tests/bluetooth/bsim_bt/bsim_test_gatt_settings compile &
+app=tests/bluetooth/bsim_bt/bsim_test_gatt_settings conf_file=prj_2.conf compile &
 app=tests/bluetooth/bsim_bt/bsim_test_gatt_caching compile &
 app=tests/bluetooth/bsim_bt/bsim_test_eatt conf_file=prj_collision.conf compile &
 app=tests/bluetooth/bsim_bt/bsim_test_eatt conf_file=prj_multiple_conn.conf compile &
@@ -47,6 +49,8 @@ app=tests/bluetooth/bsim_bt/bsim_test_l2cap compile &
 app=tests/bluetooth/bsim_bt/bsim_test_l2cap_userdata compile &
 app=tests/bluetooth/bsim_bt/bsim_test_l2cap_stress compile &
 app=tests/bluetooth/bsim_bt/bsim_test_iso compile &
+app=tests/bluetooth/bsim_bt/bsim_test_rpa_central compile &
+app=tests/bluetooth/bsim_bt/bsim_test_rpa_peripheral compile &
 app=tests/bluetooth/bsim_bt/bsim_test_iso conf_file=prj_vs_dp.conf \
   compile &
 app=tests/bluetooth/bsim_bt/bsim_test_audio compile &

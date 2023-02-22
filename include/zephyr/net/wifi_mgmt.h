@@ -42,6 +42,7 @@ enum net_request_wifi_cmd {
 	NET_REQUEST_WIFI_CMD_PS_CONFIG,
 	NET_REQUEST_WIFI_CMD_REG_DOMAIN,
 	NET_REQUEST_WIFI_CMD_PS_TIMEOUT,
+	NET_REQUEST_WIFI_CMD_MAX
 };
 
 #define NET_REQUEST_WIFI_SCAN					\
@@ -180,6 +181,8 @@ struct wifi_iface_status {
 	enum wifi_security_type security;
 	enum wifi_mfp_options mfp;
 	int rssi;
+	unsigned short dtim_period;
+	unsigned char beacon_interval;
 };
 
 struct wifi_ps_params {
