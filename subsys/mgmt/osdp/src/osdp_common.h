@@ -80,11 +80,11 @@
 #define CMD_CHLNG               0x76
 #define CMD_SCRYPT              0x77
 #define CMD_CONT                0x79
-#define CMD_ABORT               0x7A
 #define CMD_ACURXSIZE           0x7B
 #define CMD_MFG                 0x80
 #define CMD_SCDONE              0xA0
 #define CMD_XWR                 0xA1
+#define CMD_ABORT               0xA2
 
 /**
  * @brief OSDP reserved responses
