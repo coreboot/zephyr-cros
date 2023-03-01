@@ -84,8 +84,14 @@ static sys_slist_t callback_list;
 static sys_slist_t db;
 #endif /* CONFIG_BT_GATT_DYNAMIC_DB */
 
-static atomic_t init;
-static atomic_t service_init;
+enum gatt_global_flags {
+	GATT_INITIALIZED,
+	GATT_SERVICE_INITIALIZED,
+
+	GATT_NUM_FLAGS,
+};
+
+static ATOMIC_DEFINE(gatt_flags, GATT_NUM_FLAGS);
 
 static ssize_t read_name(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 			 void *buf, uint16_t len, uint16_t offset)
@@ -277,12 +283,12 @@ BUILD_ASSERT(sizeof(struct sc_data) == sizeof(sc_cfg[0].data));
 enum {
 	SC_RANGE_CHANGED,    /* SC range changed */
 	SC_INDICATE_PENDING, /* SC indicate pending */
+	SC_LOAD,	     /* SC has been loaded from settings */
 
-#if defined(CONFIG_BT_GATT_CACHING)
 	DB_HASH_VALID,       /* Database hash needs to be calculated */
 	DB_HASH_LOAD,        /* Database hash loaded from settings. */
 	DB_HASH_LOAD_PROC,   /* DB hash loaded from settings has been processed. */
-#endif
+
 	/* Total number of flags - must be at the end of the enum */
 	SC_NUM_FLAGS,
 };
@@ -874,9 +880,11 @@ static void db_hash_gen(void)
 static void sc_indicate(uint16_t start, uint16_t end);
 #endif
 
-static void db_hash_process(struct k_work *work)
+static void do_db_hash(void)
 {
-	if (!atomic_test_bit(gatt_sc.flags, DB_HASH_VALID)) {
+	bool new_hash = !atomic_test_bit(gatt_sc.flags, DB_HASH_VALID);
+
+	if (new_hash) {
 		db_hash_gen();
 	}
 
@@ -893,13 +901,15 @@ static void db_hash_process(struct k_work *work)
 		return;
 	}
 
-	if (!already_processed) {
+	if (already_processed) {
 		/* hash has been loaded from settings and we have already
 		 * executed the special case below once. we can now safely save
-		 * the calculated hash to settings.
+		 * the calculated hash to settings (if it has changed).
 		 */
-		set_all_change_unaware();
-		db_hash_store();
+		if (new_hash) {
+			set_all_change_unaware();
+			db_hash_store();
+		}
 	} else {
 		/* this is only supposed to run once, on bootup, after the hash
 		 * has been loaded from settings.
@@ -934,6 +944,11 @@ static void db_hash_process(struct k_work *work)
 		db_hash_store();
 	}
 #endif /* defined(CONFIG_BT_SETTINGS) */
+}
+
+static void db_hash_process(struct k_work *work)
+{
+	do_db_hash();
 }
 
 static ssize_t db_hash_read(struct bt_conn *conn,
@@ -1071,7 +1086,7 @@ static int bt_gatt_store_cf(uint8_t id, const bt_addr_le_t *peer)
 
 }
 
-#if defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_SMP) && defined(CONFIG_BT_GATT_CLIENT)
+#if defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_SMP)
 /** Struct used to store both the id and the random address of a device when replacing
  * random addresses in the ccc attribute's cfg array with the device's id address after
  * pairing complete.
@@ -1114,14 +1129,35 @@ static void bt_gatt_identity_resolved(struct bt_conn *conn, const bt_addr_le_t *
 		.private_addr = private_addr,
 		.id_addr      = id_addr
 	};
+	bool is_bonded = bt_addr_le_is_bonded(conn->id, &conn->le.dst);
 
 	bt_gatt_foreach_attr(0x0001, 0xffff, convert_to_id_on_match, &user_data);
 
-	/* Store the ccc and cf data */
-	bt_gatt_store_ccc(conn->id, &(conn->le.dst));
-	bt_gatt_store_cf(conn->id, &conn->le.dst);
+	/* Store the ccc */
+	if (is_bonded) {
+		bt_gatt_store_ccc(conn->id, &conn->le.dst);
+	}
+
+	/* Update the cf addresses and store it if we get a match */
+	struct gatt_cf_cfg *cfg = find_cf_cfg_by_addr(conn->id, private_addr);
+
+	if (cfg) {
+		bt_addr_le_copy(&cfg->peer, id_addr);
+		if (is_bonded) {
+			bt_gatt_store_cf(conn->id, &conn->le.dst);
+		}
+	}
 }
-#endif /* CONFIG_BT_SETTINGS && CONFIG_BT_SMP && CONFIG_BT_GATT_CLIENT */
+
+static void bt_gatt_pairing_complete(struct bt_conn *conn, bool bonded)
+{
+	if (bonded) {
+		/* Store the ccc and cf data */
+		bt_gatt_store_ccc(conn->id, &(conn->le.dst));
+		bt_gatt_store_cf(conn->id, &conn->le.dst);
+	}
+}
+#endif /* CONFIG_BT_SETTINGS && CONFIG_BT_SMP */
 
 BT_GATT_SERVICE_DEFINE(_1_gatt_svc,
 	BT_GATT_PRIMARY_SERVICE(BT_UUID_GATT),
@@ -1447,7 +1483,7 @@ static void delayed_store(struct k_work *work)
 
 static void bt_gatt_service_init(void)
 {
-	if (!atomic_cas(&service_init, 0, 1)) {
+	if (atomic_test_and_set_bit(gatt_flags, GATT_SERVICE_INITIALIZED)) {
 		return;
 	}
 
@@ -1458,7 +1494,7 @@ static void bt_gatt_service_init(void)
 
 void bt_gatt_init(void)
 {
-	if (!atomic_cas(&init, 0, 1)) {
+	if (atomic_test_and_set_bit(gatt_flags, GATT_INITIALIZED)) {
 		return;
 	}
 
@@ -1493,17 +1529,28 @@ void bt_gatt_init(void)
 	k_work_init_delayable(&gatt_delayed_store.work, delayed_store);
 #endif
 
-#if defined(CONFIG_BT_GATT_CLIENT) && defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_SMP)
+#if defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_SMP)
+	static struct bt_conn_auth_info_cb gatt_conn_auth_info_cb = {
+		.pairing_complete = bt_gatt_pairing_complete,
+	};
+
+	/* Register the gatt module for authentication info callbacks so it can
+	 * be notified when pairing has completed. This is used to enable CCC
+	 * and CF storage on pairing complete.
+	 */
+	bt_conn_auth_info_cb_register(&gatt_conn_auth_info_cb);
+
 	static struct bt_conn_cb gatt_conn_cb = {
 		.identity_resolved = bt_gatt_identity_resolved,
 	};
 
-	/* Register the gatt module for connection callbacks so it can be
-	 * notified when pairing has completed. This is used to enable CCC and
-	 * CF storage on pairing complete.
+	/* Also update the address of CCC or CF writes that happened before the
+	 * identity resolution. Note that to increase security in the future, we
+	 * might want to explicitly not do this and treat a bonded device as a
+	 * brand-new peer.
 	 */
 	bt_conn_cb_register(&gatt_conn_cb);
-#endif /* CONFIG_BT_GATT_CLIENT && CONFIG_BT_SETTINGS && CONFIG_BT_SMP */
+#endif /* CONFIG_BT_SETTINGS && CONFIG_BT_SMP */
 }
 
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB) || \
@@ -1639,6 +1686,13 @@ int bt_gatt_service_register(struct bt_gatt_service *svc)
 	__ASSERT(svc->attrs, "invalid parameters\n");
 	__ASSERT(svc->attr_count, "invalid parameters\n");
 
+	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
+	    atomic_test_bit(gatt_flags, GATT_INITIALIZED) &&
+	    !atomic_test_bit(gatt_sc.flags, SC_LOAD)) {
+		LOG_ERR("Can't register service after init and before settings are loaded.");
+		return -EINVAL;
+	}
+
 	/* Init GATT core services */
 	bt_gatt_service_init();
 
@@ -1657,7 +1711,7 @@ int bt_gatt_service_register(struct bt_gatt_service *svc)
 	}
 
 	/* Don't submit any work until the stack is initialized */
-	if (!atomic_get(&init)) {
+	if (!atomic_test_bit(gatt_flags, GATT_INITIALIZED)) {
 		k_sched_unlock();
 		return 0;
 	}
@@ -1687,7 +1741,7 @@ int bt_gatt_service_unregister(struct bt_gatt_service *svc)
 	}
 
 	/* Don't submit any work until the stack is initialized */
-	if (!atomic_get(&init)) {
+	if (!atomic_test_bit(gatt_flags, GATT_INITIALIZED)) {
 		k_sched_unlock();
 		return 0;
 	}
@@ -5712,14 +5766,14 @@ void bt_gatt_encrypt_change(struct bt_conn *conn)
 
 	bt_gatt_foreach_attr(0x0001, 0xffff, update_ccc, &data);
 
-#if defined(CONFIG_BT_SETTINGS)
+#if defined(CONFIG_BT_SETTINGS) && defined(CONFIG_BT_GATT_SERVICE_CHANGED)
 	if (!bt_gatt_change_aware(conn, false)) {
 		/* Send a Service Changed indication if the current peer is
 		 * marked as change-unaware.
 		 */
 		sc_indicate(0x0001, 0xffff);
 	}
-#endif	/* CONFIG_BT_SETTINGS */
+#endif	/* CONFIG_BT_SETTINGS && CONFIG_BT_GATT_SERVICE_CHANGED */
 }
 
 bool bt_gatt_change_aware(struct bt_conn *conn, bool req)
@@ -5954,6 +6008,7 @@ static int sc_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 
 static int sc_commit(void)
 {
+	atomic_set_bit(gatt_sc.flags, SC_LOAD);
 	atomic_clear_bit(gatt_sc.flags, SC_INDICATE_PENDING);
 
 	if (atomic_test_bit(gatt_sc.flags, SC_RANGE_CHANGED)) {
@@ -6074,28 +6129,15 @@ static int db_hash_set(const char *name, size_t len_rd,
 
 static int db_hash_commit(void)
 {
-	int err;
-
 	atomic_set_bit(gatt_sc.flags, DB_HASH_LOAD);
-	/* Reschedule work to calculate and compare against the Hash value
-	 * loaded from flash.
+
+	/* Calculate the hash and compare it against the value loaded from
+	 * flash. Do it from the current context to avoid any potential race
+	 * conditions.
 	 */
-	if (IS_ENABLED(CONFIG_BT_LONG_WQ)) {
-		err = bt_long_wq_reschedule(&db_hash.work, K_NO_WAIT);
-	} else {
-		err = k_work_reschedule(&db_hash.work, K_NO_WAIT);
-	}
+	do_db_hash();
 
-	/* Settings commit uses non-zero value to indicate failure. */
-	if (err > 0) {
-		err = 0;
-	}
-
-	if (err) {
-		LOG_ERR("Unable to reschedule database hash process (err %d)", err);
-	}
-
-	return err;
+	return 0;
 }
 
 SETTINGS_STATIC_HANDLER_DEFINE(bt_hash, "bt/hash", NULL, db_hash_set,

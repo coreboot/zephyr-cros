@@ -153,7 +153,9 @@ static void nrf5_rx_thread(void *arg1, void *arg2, void *arg3)
 			pkt_len = rx_frame->psdu[0] -  NRF5_FCS_LENGTH;
 		}
 
+#if defined(CONFIG_NET_BUF_DATA_SIZE)
 		__ASSERT_NO_MSG(pkt_len <= CONFIG_NET_BUF_DATA_SIZE);
+#endif
 
 		LOG_DBG("Frame received");
 
@@ -722,6 +724,23 @@ static int nrf5_stop(const struct device *dev)
 	return 0;
 }
 
+#if defined(CONFIG_NRF_802154_CARRIER_FUNCTIONS)
+static int nrf5_continuous_carrier(const struct device *dev)
+{
+	ARG_UNUSED(dev);
+
+	if (!nrf_802154_continuous_carrier()) {
+		LOG_ERR("Failed to enter continuous carrier state");
+		return -EIO;
+	}
+
+	LOG_DBG("Continuous carrier wave transmission started (channel: %d)",
+		nrf_802154_channel_get());
+
+	return 0;
+}
+#endif
+
 #if !IS_ENABLED(CONFIG_IEEE802154_NRF5_EXT_IRQ_MGMT)
 static void nrf5_radio_irq(const void *arg)
 {
@@ -1167,6 +1186,9 @@ static struct ieee802154_radio_api nrf5_radio_api = {
 	.set_txpower = nrf5_set_txpower,
 	.start = nrf5_start,
 	.stop = nrf5_stop,
+#if defined(CONFIG_NRF_802154_CARRIER_FUNCTIONS)
+	.continuous_carrier = nrf5_continuous_carrier,
+#endif
 	.tx = nrf5_tx,
 	.ed_scan = nrf5_energy_scan_start,
 	.get_time = nrf5_get_time,

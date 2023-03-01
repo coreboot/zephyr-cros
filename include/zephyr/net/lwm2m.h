@@ -1983,6 +1983,7 @@ enum lwm2m_rd_client_event {
 	LWM2M_RD_CLIENT_EVENT_QUEUE_MODE_RX_OFF,
 	LWM2M_RD_CLIENT_EVENT_ENGINE_SUSPENDED,
 	LWM2M_RD_CLIENT_EVENT_NETWORK_ERROR,
+	LWM2M_RD_CLIENT_EVENT_REG_UPDATE,
 };
 
 /**
@@ -2156,7 +2157,7 @@ int lwm2m_engine_enable_cache(char const *resource_path, struct lwm2m_time_serie
  * @return 0 for success or negative in case of error.
  *
  */
-int lwm2m_enable_cache(struct lwm2m_obj_path *path, struct lwm2m_time_series_elem *data_cache,
+int lwm2m_enable_cache(const struct lwm2m_obj_path *path, struct lwm2m_time_series_elem *data_cache,
 		       size_t cache_len);
 
 #endif	/* ZEPHYR_INCLUDE_NET_LWM2M_H_ */
