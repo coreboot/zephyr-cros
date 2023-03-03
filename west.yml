@@ -37,7 +37,7 @@ manifest:
       groups:
         - hal
     - name: edtt
-      revision: 8ef968c1471769af61ba3e5befb6b119b22a7afe
+      revision: fc998bcaed44796c3800a3e62cf026bd9403d299
       path: tools/edtt
       groups:
         - tools
@@ -57,7 +57,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: 73e7af1e2ed64571ce49ff9f07dc02690b9f2df5
+      revision: d2564ca5c14439888f7c4351884a2cf4db517a33
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -73,7 +73,7 @@ manifest:
       groups:
         - hal
     - name: hal_infineon
-      revision: 5b0c7700a7be049e02835dfa0950d378aac39e67
+      revision: 8485083ad91d3e2cc5d706da3464716718a6a42e
       path: modules/hal/infineon
       groups:
         - hal
@@ -83,7 +83,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 3f7ae2320b6d348898c7b11e956a6e792d0b3724
+      revision: 6c9f23498ee6a225fee049c8c5b2e1ac760bd4a8
       path: modules/hal/nordic
       groups:
         - hal
@@ -197,7 +197,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: d8f125e1988221ebfea5944fc3118f1780787ccc
+      revision: ad21dabc84c6574944d978cce2079dbe1ede38c6
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: aedcc262f93bbb1b0c2f58026911575729b7465c
@@ -207,7 +207,7 @@ manifest:
       path: modules/lib/openthread
     - name: picolibc
       path: modules/lib/picolibc
-      revision: 98e59b70d6ef8eb18f7dccc3d39cecaa0658fa4f
+      revision: 2097f26ce7dee36922b22ce048c09cd073ebae3d
     - name: segger
       revision: e2ff2200556e8a8f962921444275c04971a2bb3d
       path: modules/debug/segger

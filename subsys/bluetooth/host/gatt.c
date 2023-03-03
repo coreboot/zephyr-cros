@@ -84,8 +84,14 @@ static sys_slist_t callback_list;
 static sys_slist_t db;
 #endif /* CONFIG_BT_GATT_DYNAMIC_DB */
 
-static atomic_t init;
-static atomic_t service_init;
+enum gatt_global_flags {
+	GATT_INITIALIZED,
+	GATT_SERVICE_INITIALIZED,
+
+	GATT_NUM_FLAGS,
+};
+
+static ATOMIC_DEFINE(gatt_flags, GATT_NUM_FLAGS);
 
 static ssize_t read_name(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 			 void *buf, uint16_t len, uint16_t offset)
@@ -277,12 +283,12 @@ BUILD_ASSERT(sizeof(struct sc_data) == sizeof(sc_cfg[0].data));
 enum {
 	SC_RANGE_CHANGED,    /* SC range changed */
 	SC_INDICATE_PENDING, /* SC indicate pending */
+	SC_LOAD,	     /* SC has been loaded from settings */
 
-#if defined(CONFIG_BT_GATT_CACHING)
 	DB_HASH_VALID,       /* Database hash needs to be calculated */
 	DB_HASH_LOAD,        /* Database hash loaded from settings. */
 	DB_HASH_LOAD_PROC,   /* DB hash loaded from settings has been processed. */
-#endif
+
 	/* Total number of flags - must be at the end of the enum */
 	SC_NUM_FLAGS,
 };
@@ -874,7 +880,7 @@ static void db_hash_gen(void)
 static void sc_indicate(uint16_t start, uint16_t end);
 #endif
 
-static void db_hash_process(struct k_work *work)
+static void do_db_hash(void)
 {
 	bool new_hash = !atomic_test_bit(gatt_sc.flags, DB_HASH_VALID);
 
@@ -938,6 +944,11 @@ static void db_hash_process(struct k_work *work)
 		db_hash_store();
 	}
 #endif /* defined(CONFIG_BT_SETTINGS) */
+}
+
+static void db_hash_process(struct k_work *work)
+{
+	do_db_hash();
 }
 
 static ssize_t db_hash_read(struct bt_conn *conn,
@@ -1426,21 +1437,6 @@ static void gatt_delayed_store_enqueue(uint8_t id, const bt_addr_le_t *peer_addr
 	}
 }
 
-static bool gatt_delayed_work_queue_is_empty(void)
-{
-	for (size_t i = 0; i < ARRAY_SIZE(gatt_delayed_store.peer_list); i++) {
-		/* Checking for the flags is cheaper than a memcmp for the
-		 * address, so we use that to signal that a given slot is
-		 * free.
-		 */
-		if (atomic_get(gatt_delayed_store.peer_list[i].flags) != 0) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
 static void delayed_store(struct k_work *work)
 {
 	struct ds_peer *el;
@@ -1472,7 +1468,7 @@ static void delayed_store(struct k_work *work)
 
 static void bt_gatt_service_init(void)
 {
-	if (!atomic_cas(&service_init, 0, 1)) {
+	if (atomic_test_and_set_bit(gatt_flags, GATT_SERVICE_INITIALIZED)) {
 		return;
 	}
 
@@ -1483,7 +1479,7 @@ static void bt_gatt_service_init(void)
 
 void bt_gatt_init(void)
 {
-	if (!atomic_cas(&init, 0, 1)) {
+	if (atomic_test_and_set_bit(gatt_flags, GATT_INITIALIZED)) {
 		return;
 	}
 
@@ -1675,6 +1671,13 @@ int bt_gatt_service_register(struct bt_gatt_service *svc)
 	__ASSERT(svc->attrs, "invalid parameters\n");
 	__ASSERT(svc->attr_count, "invalid parameters\n");
 
+	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
+	    atomic_test_bit(gatt_flags, GATT_INITIALIZED) &&
+	    !atomic_test_bit(gatt_sc.flags, SC_LOAD)) {
+		LOG_ERR("Can't register service after init and before settings are loaded.");
+		return -EINVAL;
+	}
+
 	/* Init GATT core services */
 	bt_gatt_service_init();
 
@@ -1693,7 +1696,7 @@ int bt_gatt_service_register(struct bt_gatt_service *svc)
 	}
 
 	/* Don't submit any work until the stack is initialized */
-	if (!atomic_get(&init)) {
+	if (!atomic_test_bit(gatt_flags, GATT_INITIALIZED)) {
 		k_sched_unlock();
 		return 0;
 	}
@@ -1723,7 +1726,7 @@ int bt_gatt_service_unregister(struct bt_gatt_service *svc)
 	}
 
 	/* Don't submit any work until the stack is initialized */
-	if (!atomic_get(&init)) {
+	if (!atomic_test_bit(gatt_flags, GATT_INITIALIZED)) {
 		k_sched_unlock();
 		return 0;
 	}
@@ -5755,7 +5758,7 @@ void bt_gatt_encrypt_change(struct bt_conn *conn)
 		 */
 		sc_indicate(0x0001, 0xffff);
 	}
-#endif	/* CONFIG_BT_SETTINGS */
+#endif	/* CONFIG_BT_SETTINGS && CONFIG_BT_GATT_SERVICE_CHANGED */
 }
 
 bool bt_gatt_change_aware(struct bt_conn *conn, bool req)
@@ -5990,6 +5993,7 @@ static int sc_set(const char *name, size_t len_rd, settings_read_cb read_cb,
 
 static int sc_commit(void)
 {
+	atomic_set_bit(gatt_sc.flags, SC_LOAD);
 	atomic_clear_bit(gatt_sc.flags, SC_INDICATE_PENDING);
 
 	if (atomic_test_bit(gatt_sc.flags, SC_RANGE_CHANGED)) {
@@ -6110,28 +6114,15 @@ static int db_hash_set(const char *name, size_t len_rd,
 
 static int db_hash_commit(void)
 {
-	int err;
-
 	atomic_set_bit(gatt_sc.flags, DB_HASH_LOAD);
-	/* Reschedule work to calculate and compare against the Hash value
-	 * loaded from flash.
+
+	/* Calculate the hash and compare it against the value loaded from
+	 * flash. Do it from the current context to avoid any potential race
+	 * conditions.
 	 */
-	if (IS_ENABLED(CONFIG_BT_LONG_WQ)) {
-		err = bt_long_wq_reschedule(&db_hash.work, K_NO_WAIT);
-	} else {
-		err = k_work_reschedule(&db_hash.work, K_NO_WAIT);
-	}
+	do_db_hash();
 
-	/* Settings commit uses non-zero value to indicate failure. */
-	if (err > 0) {
-		err = 0;
-	}
-
-	if (err) {
-		LOG_ERR("Unable to reschedule database hash process (err %d)", err);
-	}
-
-	return err;
+	return 0;
 }
 
 SETTINGS_STATIC_HANDLER_DEFINE(bt_hash, "bt/hash", NULL, db_hash_set,
@@ -6296,20 +6287,21 @@ void bt_gatt_disconnected(struct bt_conn *conn)
 #endif /* CONFIG_BT_GATT_NOTIFY_MULTIPLE */
 
 #if defined(CONFIG_BT_SETTINGS_DELAYED_STORE)
-	struct ds_peer *el = gatt_delayed_store_find(conn->id, &conn->le.dst);
+	if (gatt_delayed_store_find(conn->id, &conn->le.dst)) {
+		int err = k_work_reschedule(&gatt_delayed_store.work, K_NO_WAIT);
 
-	gatt_delayed_store_free(el);
-
-	if (gatt_delayed_work_queue_is_empty()) {
-		k_work_cancel_delayable(&gatt_delayed_store.work);
+		if (err < 0) {
+			LOG_ERR("Unable to reschedule settings storage (err %d)",
+				err);
+		}
 	}
-#endif
-
+#else
 	if (IS_ENABLED(CONFIG_BT_SETTINGS) &&
 	    bt_addr_le_is_bonded(conn->id, &conn->le.dst)) {
 		bt_gatt_store_ccc(conn->id, &conn->le.dst);
 		bt_gatt_store_cf(conn->id, &conn->le.dst);
 	}
+#endif	/* CONFIG_BT_SETTINGS_DELAYED_STORE */
 
 	/* Make sure to clear the CCC entry when using lazy loading */
 	if (IS_ENABLED(CONFIG_BT_SETTINGS_CCC_LAZY_LOADING) &&

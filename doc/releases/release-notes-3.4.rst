@@ -122,6 +122,8 @@ Drivers and Sensors
 
 * Battery-backed RAM
 
+  * Added MCP7940N battery-backed RTC SRAM driver.
+
 * CAN
 
 * Clock control
@@ -141,6 +143,8 @@ Drivers and Sensors
 * DMA
 
 * EEPROM
+
+  * Switched from :dtcompatible:`atmel,at24` to dedicated :dtcompatible:`zephyr,i2c-target-eeprom` for I2C EEPROM target driver.
 
 * Entropy
 
