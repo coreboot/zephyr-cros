@@ -1350,26 +1350,7 @@ void bt_gatt_init(void)
     (defined(CONFIG_BT_GATT_CACHING) && defined(CONFIG_BT_SETTINGS))
 static void sc_indicate(uint16_t start, uint16_t end)
 {
-	BT_DBG("start 0x%04x end 0x%04x", start, end);
 
-	if (!atomic_test_and_set_bit(gatt_sc.flags, SC_RANGE_CHANGED)) {
-		gatt_sc.start = start;
-		gatt_sc.end = end;
-		goto submit;
-	}
-
-	if (!update_range(&gatt_sc.start, &gatt_sc.end, start, end)) {
-		return;
-	}
-
-submit:
-	if (atomic_test_bit(gatt_sc.flags, SC_INDICATE_PENDING)) {
-		BT_DBG("indicate pending, waiting until complete...");
-		return;
-	}
-
-	/* Reschedule since the range has changed */
-	sc_work_submit(SC_TIMEOUT);
 }
 #endif /* BT_GATT_DYNAMIC_DB || (BT_GATT_CACHING && BT_SETTINGS) */
 
