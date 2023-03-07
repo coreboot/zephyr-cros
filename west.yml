@@ -57,7 +57,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: a06af2476671160f19e813c86570a17541f3b07e
+      revision: d2564ca5c14439888f7c4351884a2cf4db517a33
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -73,7 +73,7 @@ manifest:
       groups:
         - hal
     - name: hal_infineon
-      revision: 5b0c7700a7be049e02835dfa0950d378aac39e67
+      revision: 8485083ad91d3e2cc5d706da3464716718a6a42e
       path: modules/hal/infineon
       groups:
         - hal
@@ -93,7 +93,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: d957472002a3758154f402e982d95ce90cf58e12
+      revision: afd053086e9e36a413f7cbec40694733588e1b9f
       path: modules/hal/nxp
       groups:
         - hal
@@ -181,7 +181,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 750678e33819b95756203e5db1ba827baee35708
+      revision: 59624334748129cb93f096408911a227b0dd64c0
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -231,7 +231,7 @@ manifest:
       groups:
         - debug
     - name: trusted-firmware-m
-      revision: f2a639c8d1842acb2964a27461f5c9cfdfaa4d16
+      revision: a8313be08816a2ed9d883c6b79fb4e5d2bef81c2
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee
@@ -246,7 +246,7 @@ manifest:
       groups:
         - tee
     - name: psa-arch-tests
-      revision: 24ed42e34e03ebbc945a7204819c1471cce2bda8
+      revision: 6a17330e0dfb5f319730f974d5b05f7b7f04757b
       path: modules/tee/tf-m/psa-arch-tests
       groups:
         - tee

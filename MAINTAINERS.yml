@@ -1155,6 +1155,19 @@ Release Notes:
   labels:
     - "area: PWM"
 
+"Drivers: SDHC":
+  status: maintained
+  maintainers:
+    - danieldegrasse
+  files:
+    - drivers/sdhc/
+    - tests/drivers/sdhc/
+    - include/zephyr/drivers/sdhc.h
+    - dts/bindings/sdhc/
+    - doc/hardware/peripherals/sdhc.rst
+  labels:
+    - "area: Disk Access"
+
 "Drivers: Serial/UART":
   status: maintained
   maintainers:
@@ -1381,6 +1394,20 @@ Google Platforms:
     - keith-zephyr
   files:
     - boards/*/google_*/
+
+Hash Utilities:
+  status: maintained
+  maintainers:
+    - cfriedt
+  files:
+    - include/zephyr/sys/hash_*
+    - lib/hash/
+    - samples/basic/hash_map/
+    - tests/lib/hash_*/
+  description: >-
+    Hash Functions and Hash Maps (Hash Tables)
+  labels:
+    - "area: hash utils"
 
 IPC:
   status: maintained
@@ -2128,6 +2155,23 @@ nRF Platforms:
   labels:
     - "platform: nRF"
 
+Renesas SmartBond Platforms:
+  status: maintained
+  maintainers:
+    - andrzej-kaczmarek
+    - blauret
+  files:
+    - boards/arm/da14*/
+    - drivers/*/*smartbond*
+    - dts/arm/renesas/smartbond/
+    - dts/bindings/*/renesas,smartbond*
+    - soc/arm/renesas_smartbond/
+  labels:
+    - "platform: Renesas SmartBond"
+  description: >-
+    Renesas SmartBond SOCs, dts files, and related drivers. Renesas boards based
+    on SmartBond SoCs.
+
 Renesas R-Car Platforms:
   status: maintained
   maintainers:
@@ -2138,7 +2182,7 @@ Renesas R-Car Platforms:
     - boards/arm/rcar_*/
     - drivers/*/*rcar*
     - drivers/clock_control/*cpg_mssr*
-    - dts/arm/renesas/
+    - dts/arm/renesas/gen3/
     - dts/bindings/*/*rcar*
     - soc/arm/renesas_rcar/
   labels:
@@ -2513,8 +2557,8 @@ West:
   maintainers:
     - ifyall
   collaborators:
-    - nandojve
     - nashif
+    - npal-cy
   files:
     - modules/Kconfig.cypress
   labels:
@@ -2551,6 +2595,7 @@ West:
   collaborators:
     - parthitce
     - talih0
+    - npal-cy
   files:
     - modules/Kconfig.infineon
     - modules/hal_infineon/
