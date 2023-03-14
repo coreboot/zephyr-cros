@@ -599,6 +599,10 @@ struct bt_uuid_128 {
 #define BT_UUID_MESH_PROXY \
 	BT_UUID_DECLARE_16(BT_UUID_MESH_PROXY_VAL)
 /**
+ *  @brief Proxy Solicitation UUID value
+ */
+#define BT_UUID_MESH_PROXY_SOLICITATION_VAL 0x7fcb
+/**
  *  @brief Reconnection Configuration Service UUID value
  */
 #define BT_UUID_RCSRV_VAL 0x1829
@@ -4687,11 +4691,11 @@ struct bt_uuid_128 {
 #define BT_UUID_TBS_FRIENDLY_NAME \
 	BT_UUID_DECLARE_16(BT_UUID_TBS_FRIENDLY_NAME_VAL)
 /**
- *  @brief Microphone Input Control Service Mute value
+ *  @brief Microphone Control Service Mute value
  */
 #define BT_UUID_MICS_MUTE_VAL 0x2bc3
 /**
- *  @brief Microphone Input Control Service Mute
+ *  @brief Microphone Control Service Mute
  */
 #define BT_UUID_MICS_MUTE \
 	BT_UUID_DECLARE_16(BT_UUID_MICS_MUTE_VAL)
