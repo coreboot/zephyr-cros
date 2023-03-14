@@ -1395,6 +1395,38 @@ Google Platforms:
   files:
     - boards/*/google_*/
 
+Hash Utilities:
+  status: maintained
+  maintainers:
+    - cfriedt
+  files:
+    - include/zephyr/sys/hash_*
+    - lib/hash/
+    - samples/basic/hash_map/
+    - tests/lib/hash_*/
+  description: >-
+    Hash Functions and Hash Maps (Hash Tables)
+  labels:
+    - "area: hash utils"
+
+Input:
+  status: maintained
+  maintainers:
+    - fabiobaltieri
+  collaborators:
+    - gmarull
+  files:
+    - doc/services/input/
+    - include/zephyr/dt-bindings/input/
+    - include/zephyr/input/
+    - samples/subsys/input/
+    - subsys/input/
+    - tests/subsys/input/
+  description: >-
+    Input subsystem and drivers
+  labels:
+    - "area: Input"
+
 IPC:
   status: maintained
   maintainers:
@@ -2008,7 +2040,11 @@ Raspberry Pi Pico Platforms:
     - "platform: Raspberry Pi Pico"
 
 SiLabs Platforms:
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - fkokosinski
+  collaborators:
+    - tgorochowik
   files:
     - soc/arm/silabs_*/
     - boards/arm/ef*/
@@ -2141,6 +2177,23 @@ nRF Platforms:
   labels:
     - "platform: nRF"
 
+Renesas SmartBond Platforms:
+  status: maintained
+  maintainers:
+    - andrzej-kaczmarek
+    - blauret
+  files:
+    - boards/arm/da14*/
+    - drivers/*/*smartbond*
+    - dts/arm/renesas/smartbond/
+    - dts/bindings/*/renesas,smartbond*
+    - soc/arm/renesas_smartbond/
+  labels:
+    - "platform: Renesas SmartBond"
+  description: >-
+    Renesas SmartBond SOCs, dts files, and related drivers. Renesas boards based
+    on SmartBond SoCs.
+
 Renesas R-Car Platforms:
   status: maintained
   maintainers:
@@ -2151,7 +2204,7 @@ Renesas R-Car Platforms:
     - boards/arm/rcar_*/
     - drivers/*/*rcar*
     - drivers/clock_control/*cpg_mssr*
-    - dts/arm/renesas/
+    - dts/arm/renesas/gen3/
     - dts/bindings/*/*rcar*
     - soc/arm/renesas_rcar/
   labels:
@@ -2308,6 +2361,19 @@ Storage:
     - doc/services/storage/
   labels:
     - "area: Storage"
+
+Sysbuild:
+  status: maintained
+  maintainers:
+    - tejlmand
+  collaborators:
+    - nordicjm
+  files:
+    - share/sysbuild/
+    - samples/application_development/sysbuild/
+    - doc/build/sysbuild/
+  labels:
+    - "area: Sysbuild"
 
 Task Watchdog:
   status: maintained
