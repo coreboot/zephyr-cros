@@ -173,5 +173,66 @@
 			status = "disabled";
 		};
 
+		spi2: spi@60024000 {
+			compatible = "espressif,esp32-spi";
+			reg = <0x60024000 DT_SIZE_K(4)>;
+			interrupts = <SPI2_INTR_SOURCE>;
+			interrupt-parent = <&intc>;
+			clocks = <&rtc ESP32_SPI2_MODULE>;
+			dma-clk = <ESP32_GDMA_MODULE>;
+			dma-host = <0>;
+			status = "disabled";
+		};
+
+		spi3: spi@60025000 {
+			compatible = "espressif,esp32-spi";
+			reg = <0x60025000 DT_SIZE_K(4)>;
+			interrupts = <SPI3_INTR_SOURCE>;
+			interrupt-parent = <&intc>;
+			clocks = <&rtc ESP32_SPI3_MODULE>;
+			dma-clk = <ESP32_GDMA_MODULE>;
+			dma-host = <1>;
+			status = "disabled";
+		};
+
+		timer0: counter@6001f000 {
+			compatible = "espressif,esp32-timer";
+			reg = <0x6001f000 DT_SIZE_K(4)>;
+			group = <0>;
+			index = <0>;
+			interrupts = <TG0_T0_LEVEL_INTR_SOURCE>;
+			interrupt-parent = <&intc>;
+			status = "disabled";
+		};
+
+		timer1: counter@6001f024 {
+			compatible = "espressif,esp32-timer";
+			reg = <0x6001f024 DT_SIZE_K(4)>;
+			group = <0>;
+			index = <1>;
+			interrupts = <TG0_T1_LEVEL_INTR_SOURCE>;
+			interrupt-parent = <&intc>;
+			status = "disabled";
+		};
+
+		timer2: counter@60020000 {
+			compatible = "espressif,esp32-timer";
+			reg = <0x60020000 DT_SIZE_K(4)>;
+			group = <1>;
+			index = <0>;
+			interrupts = <TG1_T0_LEVEL_INTR_SOURCE>;
+			interrupt-parent = <&intc>;
+			status = "disabled";
+		};
+
+		timer3: counter@60020024 {
+			compatible = "espressif,esp32-timer";
+			reg = <0x60020024 DT_SIZE_K(4)>;
+			group = <1>;
+			index = <1>;
+			interrupts = <TG1_T1_LEVEL_INTR_SOURCE>;
+			interrupt-parent = <&intc>;
+		};
+
 	};
 };
