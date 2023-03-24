@@ -31,7 +31,7 @@ zephyr_linker_section_configure(SECTION initlevel_error INPUT ".z_init_[_A-Z0-9]
 # ASSERT(SIZEOF(initlevel_error) == 0, "Undefined initialization levels used.")
 
 
-if(CONFIG_CPLUSPLUS)
+if(CONFIG_CPP)
   zephyr_linker_section(NAME ctors KVMA RAM_REGION GROUP RODATA_REGION NOINPUT)
   #
   # The compiler fills the constructor pointers table below,
@@ -146,6 +146,10 @@ if(CONFIG_SENSOR_INFO)
   zephyr_iterable_section(NAME sensor_info KVMA RAM_REGION GROUP RODATA_REGION SUBALIGN 4)
 endif()
 
+if(CONFIG_MCUMGR)
+  zephyr_iterable_section(NAME mcumgr_handler KVMA RAM_REGION GROUP RODATA_REGION SUBALIGN 4)
+endif()
+
 zephyr_iterable_section(NAME k_p4wq_initparam KVMA RAM_REGION GROUP RODATA_REGION SUBALIGN 4)
 
 if(CONFIG_EMUL)
@@ -187,3 +191,5 @@ zephyr_linker_section_configure(SECTION zephyr_dbg_info INPUT ".zephyr_dbg_info"
 zephyr_linker_section(NAME device_handles KVMA RAM_REGION GROUP RODATA_REGION NOINPUT ${XIP_ALIGN_WITH_INPUT} ENDALIGN 16)
 zephyr_linker_section_configure(SECTION device_handles INPUT .__device_handles_pass1* KEEP SORT NAME PASS LINKER_DEVICE_HANDLES_PASS1)
 zephyr_linker_section_configure(SECTION device_handles INPUT .__device_handles_pass2* KEEP SORT NAME PASS NOT LINKER_DEVICE_HANDLES_PASS1)
+
+zephyr_iterable_section(NAME _static_thread_data KVMA RAM_REGION GROUP RODATA_REGION SUBALIGN 4)

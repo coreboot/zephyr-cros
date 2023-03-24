@@ -5,7 +5,9 @@ arch: x86
 toolchain:
   - zephyr
 ram: 2048
+supported:
+  - watchdog
 testing:
   ignore_tags:
-     - net
-     - bluetooth
+    - net
+    - bluetooth

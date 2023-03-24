@@ -45,6 +45,7 @@
 		device_type = "memory";
 		reg = <0xc0000000 DT_SIZE_M(16)>;
 		zephyr,memory-region = "SDRAM1";
+		zephyr,memory-region-mpu = "RAM";
 	};
 
 	aliases {
@@ -143,6 +144,10 @@ zephyr_udc0: &usbotg_fs {
 	clocks = <&rcc STM32_CLOCK_BUS_APB1 0x10000000>,
 		 <&rcc STM32_SRC_LSI RTC_SEL(2)>;
 	status = "okay";
+
+	backup_regs {
+		status = "okay";
+	};
 };
 
 &sdmmc1 {

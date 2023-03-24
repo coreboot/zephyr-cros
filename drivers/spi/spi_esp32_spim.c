@@ -19,9 +19,11 @@ LOG_MODULE_REGISTER(esp32_spi, CONFIG_SPI_LOG_LEVEL);
 #ifndef CONFIG_SOC_ESP32C3
 #include <zephyr/drivers/interrupt_controller/intc_esp32.h>
 #else
+#include <zephyr/drivers/interrupt_controller/intc_esp32c3.h>
+#endif
+#ifdef SOC_GDMA_SUPPORTED
 #include <hal/gdma_hal.h>
 #include <hal/gdma_ll.h>
-#include <zephyr/drivers/interrupt_controller/intc_esp32c3.h>
 #endif
 #include <zephyr/drivers/clock_control.h>
 #include "spi_context.h"
@@ -32,6 +34,8 @@ LOG_MODULE_REGISTER(esp32_spi, CONFIG_SPI_LOG_LEVEL);
 #else
 #define ISR_HANDLER intr_handler_t
 #endif
+
+#define SPI_DMA_MAX_BUFFER_SIZE 4092
 
 static bool spi_esp32_transfer_ongoing(struct spi_esp32_data *data)
 {
@@ -64,7 +68,9 @@ static int IRAM_ATTR spi_esp32_transfer(const struct device *dev)
 	spi_hal_dev_config_t *hal_dev = &data->dev_config;
 	spi_hal_trans_config_t *hal_trans = &data->trans_config;
 	size_t chunk_len = spi_context_max_continuous_chunk(&data->ctx);
-	chunk_len = MIN(chunk_len, SOC_SPI_MAXIMUM_BUFFER_SIZE);
+	size_t max_buf_sz =
+		cfg->dma_enabled ? SPI_DMA_MAX_BUFFER_SIZE : SOC_SPI_MAXIMUM_BUFFER_SIZE;
+	chunk_len = MIN(chunk_len, max_buf_sz);
 	size_t bit_len = chunk_len << 3;
 	uint8_t *rx_temp = NULL;
 	uint8_t *tx_temp = NULL;
@@ -89,6 +95,7 @@ static int IRAM_ATTR spi_esp32_transfer(const struct device *dev)
 			rx_temp = k_calloc(((ctx->rx_len << 3) + 31) / 8, sizeof(uint8_t));
 			if (!rx_temp) {
 				LOG_ERR("Error allocating temp buffer Rx");
+				k_free(tx_temp);
 				return -ENOMEM;
 			}
 		}
@@ -100,6 +107,10 @@ static int IRAM_ATTR spi_esp32_transfer(const struct device *dev)
 	hal_trans->rcv_buffer = rx_temp ? rx_temp : ctx->rx_buf;
 	hal_trans->tx_bitlen = bit_len;
 	hal_trans->rx_bitlen = bit_len;
+
+	/* keep cs line active ultil last transmission */
+	hal_trans->cs_keep_active =
+		(!ctx->num_cs_gpios && (ctx->rx_count > 1 || ctx->tx_count > 1));
 
 	/* configure SPI */
 	spi_hal_setup_trans(hal, hal_dev, hal_trans);
@@ -122,13 +133,8 @@ static int IRAM_ATTR spi_esp32_transfer(const struct device *dev)
 
 	spi_context_update_rx(&data->ctx, data->dfs, chunk_len);
 
-	if (tx_temp) {
-		k_free(tx_temp);
-	}
-
-	if (rx_temp) {
-		k_free(rx_temp);
-	}
+	k_free(tx_temp);
+	k_free(rx_temp);
 
 	return 0;
 }
@@ -159,17 +165,17 @@ static int spi_esp32_init_dma(const struct device *dev)
 		return -EIO;
 	}
 
-#ifdef CONFIG_SOC_ESP32C3
-	gdma_hal_init(&data->hal_gdma, 0);
+#ifdef SOC_GDMA_SUPPORTED
+	gdma_hal_init(&data->hal_gdma, cfg->dma_host);
 	gdma_ll_enable_clock(data->hal_gdma.dev, true);
 	gdma_ll_tx_reset_channel(data->hal_gdma.dev, cfg->dma_host);
 	gdma_ll_rx_reset_channel(data->hal_gdma.dev, cfg->dma_host);
-	gdma_ll_tx_connect_to_periph(data->hal_gdma.dev, cfg->dma_host, 0);
-	gdma_ll_rx_connect_to_periph(data->hal_gdma.dev, cfg->dma_host, 0);
+	gdma_ll_tx_connect_to_periph(data->hal_gdma.dev, cfg->dma_host, cfg->dma_host);
+	gdma_ll_rx_connect_to_periph(data->hal_gdma.dev, cfg->dma_host, cfg->dma_host);
 	channel_offset = 0;
 #else
 	channel_offset = 1;
-#endif /* CONFIG_SOC_ESP32C3 */
+#endif /* SOC_GDMA_SUPPORTED */
 #ifdef CONFIG_SOC_ESP32
 	/*Connect SPI and DMA*/
 	DPORT_SET_PERI_REG_BITS(DPORT_SPI_DMA_CHAN_SEL_REG, 3, cfg->dma_host + 1,
@@ -318,8 +324,7 @@ static int IRAM_ATTR spi_esp32_configure(const struct device *dev,
 	data->trans_config.line_mode.addr_lines = 1;
 	data->trans_config.line_mode.cmd_lines = 1;
 
-	/* keep cs line after transmission not supported */
-	data->trans_config.cs_keep_active = 0;
+	hal_dev->cs_setup = 1;
 
 	/* SPI mode */
 	hal_dev->mode = 0;
@@ -332,6 +337,16 @@ static int IRAM_ATTR spi_esp32_configure(const struct device *dev,
 	}
 
 	spi_hal_setup_device(hal, hal_dev);
+
+	/*
+	 * Workaround for ESP32S3 and ESP32C3 SoC. This dummy transaction is needed to sync CLK and
+	 * software controlled CS when SPI is in mode 3
+	 */
+#if defined(CONFIG_SOC_ESP32S3) || defined(CONFIG_SOC_ESP32C3)
+	if (ctx->num_cs_gpios && (hal_dev->mode & (SPI_MODE_CPOL | SPI_MODE_CPHA))) {
+		spi_esp32_transfer(dev);
+	}
+#endif
 
 	return 0;
 }

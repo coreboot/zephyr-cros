@@ -152,6 +152,10 @@ extern "C" {
 /* min number of elems for config with irq disabled */
 #define DW_DMA_CFG_NO_IRQ_MIN_ELEMS	3
 
+#define DW_DMA_CHANNEL_REGISTER_OFFSET_END	0x50
+#define DW_DMA_IP_REGISTER_OFFSET_END		0x418
+#define DW_DMA_IP_REGISTER_OFFSET_START	0x2C0
+
 /* linked list item address */
 #define DW_DMA_LLI_ADDRESS(lli, dir) \
 	(((dir) == MEMORY_TO_PERIPHERAL) ? ((lli)->sar) : ((lli)->dar))
@@ -220,12 +224,6 @@ struct dw_dma_chan_data {
  * 2 ^ msize = burst_elems
  */
 static const uint32_t burst_elems[] = {1, 2, 4, 8};
-
-#if CONFIG_DMA_HW_LLI
-#define DW_DMA_BUFFER_PERIOD_COUNT	4
-#else
-#define DW_DMA_BUFFER_PERIOD_COUNT	2
-#endif
 
 /* Device run time data */
 struct dw_dma_dev_data {

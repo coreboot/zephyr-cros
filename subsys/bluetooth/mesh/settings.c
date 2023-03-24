@@ -9,11 +9,9 @@
 #include <sys/types.h>
 #include <zephyr/sys/util.h>
 
-#include <zephyr/settings/settings.h>
+#include <zephyr/bluetooth/hci.h>
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG_SETTINGS)
-#define LOG_MODULE_NAME bt_mesh_settings
-#include "common/log.h"
+#include <zephyr/settings/settings.h>
 
 #include "host/hci_core.h"
 #include "mesh.h"
@@ -30,6 +28,11 @@
 #include "pb_gatt_srv.h"
 #include "settings.h"
 #include "cfg.h"
+#include "solicitation.h"
+
+#define LOG_LEVEL CONFIG_BT_MESH_SETTINGS_LOG_LEVEL
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(bt_mesh_settings);
 
 #ifdef CONFIG_BT_MESH_RPL_STORE_TIMEOUT
 #define RPL_STORE_TIMEOUT CONFIG_BT_MESH_RPL_STORE_TIMEOUT
@@ -47,14 +50,14 @@ int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 
 	len = read_cb(cb_arg, out, read_len);
 	if (len < 0) {
-		BT_ERR("Failed to read value (err %zd)", len);
+		LOG_ERR("Failed to read value (err %zd)", len);
 		return len;
 	}
 
 	LOG_HEXDUMP_DBG(out, len, "val");
 
 	if (len != read_len) {
-		BT_ERR("Unexpected value length (%zd != %zu)", len, read_len);
+		LOG_ERR("Unexpected value length (%zd != %zu)", len, read_len);
 		return -EINVAL;
 	}
 
@@ -63,6 +66,10 @@ int bt_mesh_settings_set(settings_read_cb read_cb, void *cb_arg,
 
 static int mesh_commit(void)
 {
+	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {
+		return 0;
+	}
+
 	if (!atomic_test_bit(bt_dev.flags, BT_DEV_ENABLE)) {
 		/* The Bluetooth mesh settings loader calls bt_mesh_start() immediately
 		 * after loading the settings. This is not intended to work before
@@ -107,7 +114,8 @@ SETTINGS_STATIC_HANDLER_DEFINE(bt_mesh, "bt/mesh", NULL, NULL, mesh_commit,
 			      BIT(BT_MESH_SETTINGS_HB_PUB_PENDING)   |      \
 			      BIT(BT_MESH_SETTINGS_CFG_PENDING)      |      \
 			      BIT(BT_MESH_SETTINGS_MOD_PENDING)      |      \
-			      BIT(BT_MESH_SETTINGS_VA_PENDING))
+			      BIT(BT_MESH_SETTINGS_VA_PENDING)       |      \
+			      BIT(BT_MESH_SETTINGS_SSEQ_PENDING))
 
 void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 {
@@ -118,7 +126,8 @@ void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 	if (atomic_get(pending_flags) & NO_WAIT_PENDING_BITS) {
 		timeout_ms = 0;
 	} else if (IS_ENABLED(CONFIG_BT_MESH_RPL_STORAGE_MODE_SETTINGS) && RPL_STORE_TIMEOUT >= 0 &&
-		   atomic_test_bit(pending_flags, BT_MESH_SETTINGS_RPL_PENDING) &&
+		   (atomic_test_bit(pending_flags, BT_MESH_SETTINGS_RPL_PENDING) ||
+		     atomic_test_bit(pending_flags, BT_MESH_SETTINGS_SRPL_PENDING)) &&
 		   !(atomic_get(pending_flags) & GENERIC_PENDING_BITS)) {
 		timeout_ms = RPL_STORE_TIMEOUT * MSEC_PER_SEC;
 	} else {
@@ -126,7 +135,7 @@ void bt_mesh_settings_store_schedule(enum bt_mesh_settings_flag flag)
 	}
 
 	remaining_ms = k_ticks_to_ms_floor32(k_work_delayable_remaining_get(&pending_store));
-	BT_DBG("Waiting %u ms vs rem %u ms", timeout_ms, remaining_ms);
+	LOG_DBG("Waiting %u ms vs rem %u ms", timeout_ms, remaining_ms);
 
 	/* If the new deadline is sooner, override any existing
 	 * deadline; otherwise schedule without changing any existing
@@ -146,7 +155,7 @@ void bt_mesh_settings_store_cancel(enum bt_mesh_settings_flag flag)
 
 static void store_pending(struct k_work *work)
 {
-	BT_DBG("");
+	LOG_DBG("");
 
 	if (IS_ENABLED(CONFIG_BT_MESH_RPL_STORAGE_MODE_SETTINGS) &&
 	    atomic_test_and_clear_bit(pending_flags, BT_MESH_SETTINGS_RPL_PENDING)) {
@@ -202,6 +211,18 @@ static void store_pending(struct k_work *work)
 	    atomic_test_and_clear_bit(pending_flags,
 				      BT_MESH_SETTINGS_CDB_PENDING)) {
 		bt_mesh_cdb_pending_store();
+	}
+
+	if (IS_ENABLED(CONFIG_BT_MESH_OD_PRIV_PROXY_SRV) &&
+		atomic_test_and_clear_bit(pending_flags,
+					  BT_MESH_SETTINGS_SRPL_PENDING)) {
+		bt_mesh_srpl_pending_store();
+	}
+
+	if (IS_ENABLED(CONFIG_BT_MESH_PROXY_SOLICITATION) &&
+		atomic_test_and_clear_bit(pending_flags,
+					  BT_MESH_SETTINGS_SSEQ_PENDING)) {
+		bt_mesh_sseq_pending_store();
 	}
 }
 

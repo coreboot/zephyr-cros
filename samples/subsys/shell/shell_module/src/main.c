@@ -13,6 +13,12 @@
 #include <zephyr/usb/usb_device.h>
 #include <ctype.h>
 
+#ifdef CONFIG_ARCH_POSIX
+#include <unistd.h>
+#else
+#include <zephyr/posix/unistd.h>
+#endif
+
 LOG_MODULE_REGISTER(app);
 
 extern void foo(void);
@@ -134,7 +140,7 @@ static int cmd_demo_getopt_ts(const struct shell *sh, size_t argc,
 				shell_print(sh,
 					"Option -%c requires an argument.",
 					state->optopt);
-			} else if (isprint(state->optopt)) {
+			} else if (isprint(state->optopt) != 0) {
 				shell_print(sh,
 					"Unknown option `-%c'.",
 					state->optopt);
@@ -184,7 +190,7 @@ static int cmd_demo_getopt(const struct shell *sh, size_t argc,
 				shell_print(sh,
 					"Option -%c requires an argument.",
 					optopt);
-			} else if (isprint(optopt)) {
+			} else if (isprint(optopt) != 0) {
 				shell_print(sh, "Unknown option `-%c'.",
 					optopt);
 			} else {
@@ -363,7 +369,8 @@ static int cmd_dict(const struct shell *shell, size_t argc, char **argv,
 }
 
 SHELL_SUBCMD_DICT_SET_CREATE(sub_dict_cmds, cmd_dict,
-	(value_0, 0), (value_1, 1), (value_2, 2), (value_3, 3)
+	(value_0, 0, "value 0"), (value_1, 1, "value 1"),
+	(value_2, 2, "value 2"), (value_3, 3, "value 3")
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_demo,

@@ -28,9 +28,9 @@
 #include <zephyr/logging/log_ctrl.h>
 #endif /* CONFIG_BT_HCI_VS_FATAL_ERROR */
 
-#define BT_DBG_ENABLED 0
-#define LOG_MODULE_NAME hci_rpmsg
-#include "common/log.h"
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(hci_rpmsg, CONFIG_BT_LOG_LEVEL);
 
 static struct ipc_ept hci_ept;
 
@@ -211,8 +211,7 @@ static void hci_rpmsg_send(struct net_buf *buf, bool is_fatal_err)
 	uint8_t retries = 0;
 	int ret;
 
-	LOG_DBG("buf %p type %u len %u", buf, bt_buf_get_type(buf),
-		buf->len);
+	LOG_DBG("buf %p type %u len %u", buf, bt_buf_get_type(buf), buf->len);
 
 	LOG_HEXDUMP_DBG(buf->data, buf->len, "Controller buffer:");
 
@@ -270,10 +269,10 @@ static void hci_rpmsg_send(struct net_buf *buf, bool is_fatal_err)
 #if defined(CONFIG_BT_CTLR_ASSERT_HANDLER)
 void bt_ctlr_assert_handle(char *file, uint32_t line)
 {
-#if defined(CONFIG_BT_HCI_VS_FATAL_ERROR)
 	/* Disable interrupts, this is unrecoverable */
 	(void)irq_lock();
 
+#if defined(CONFIG_BT_HCI_VS_FATAL_ERROR)
 	/* Generate an error event only when IPC service endpoint is already bound. */
 	if (ipc_ept_ready) {
 		/* Prepare vendor specific HCI debug event */
@@ -287,16 +286,18 @@ void bt_ctlr_assert_handle(char *file, uint32_t line)
 			LOG_ERR("Can't create Fatal Error HCI event: %s at %d", __FILE__, __LINE__);
 		}
 	} else {
-		LOG_ERR("IPC endpoint is not redy yet: %s at %d", __FILE__, __LINE__);
+		LOG_ERR("IPC endpoint is not ready yet: %s at %d", __FILE__, __LINE__);
 	}
 
 	LOG_ERR("Halting system");
 
+#else /* !CONFIG_BT_HCI_VS_FATAL_ERROR */
+	LOG_ERR("Controller assert in: %s at %d", file, line);
+
+#endif /* !CONFIG_BT_HCI_VS_FATAL_ERROR */
+
 	while (true) {
 	};
-#else
-	LOG_ERR("Controller assert in: %s at %d", file, line);
-#endif /* CONFIG_BT_HCI_VS_FATAL_ERROR */
 }
 #endif /* CONFIG_BT_CTLR_ASSERT_HANDLER */
 
@@ -378,7 +379,7 @@ void main(void)
 
 	/* Initialize IPC service instance and register endpoint. */
 	err = ipc_service_open_instance(hci_ipc_instance);
-	if (err) {
+	if (err < 0 && err != -EALREADY) {
 		LOG_ERR("IPC service instance initialization failed: %d\n", err);
 	}
 

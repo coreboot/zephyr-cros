@@ -38,6 +38,7 @@ except ImportError as capture_error:
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
 
+SUPPORTED_SIMS = ["mdb-nsim", "nsim", "renode", "qemu", "tsim", "armfvp", "xt-sim", "native"]
 
 class HarnessImporter:
 
@@ -76,6 +77,7 @@ class Handler:
         self.generator = None
         self.generator_cmd = None
         self.suite_name_check = True
+        self.ready = False
 
         self.args = []
         self.terminated = False
@@ -164,6 +166,7 @@ class BinaryHandler(Handler):
 
         self.call_west_flash = False
         self.seed = None
+        self.extra_test_args = None
         self.line = b""
 
     def try_kill_process_by_pid(self):
@@ -244,7 +247,9 @@ class BinaryHandler(Handler):
 
         # Only valid for native_posix
         if self.seed is not None:
-            command = command + ["--seed="+str(self.seed)]
+            command.append(f"--seed={self.seed}")
+        if self.extra_test_args is not None:
+            command.extend(self.extra_test_args)
 
         logger.debug("Spawning process: " +
                      " ".join(shlex.quote(word) for word in command) + os.linesep +
@@ -311,6 +316,21 @@ class BinaryHandler(Handler):
         self._final_handle_actions(harness, handler_time)
 
 
+class SimulationHandler(BinaryHandler):
+    def __init__(self, instance, type_str):
+        """Constructor
+
+        @param instance Test Instance
+        """
+        super().__init__(instance, type_str)
+
+        if type_str == 'renode':
+            self.pid_fn = os.path.join(instance.build_dir, "renode.pid")
+        elif type_str == 'native':
+            self.call_make_run = False
+            self.binary = os.path.join(instance.build_dir, "zephyr", "zephyr.exe")
+            self.ready = True
+
 class DeviceHandler(Handler):
 
     def __init__(self, instance, type_str):
@@ -333,7 +353,8 @@ class DeviceHandler(Handler):
             # from the test.
             harness.capture_coverage = True
 
-        ser.flush()
+        # Clear serial leftover.
+        ser.reset_input_buffer()
 
         while ser.isOpen():
             if halt_event.is_set():
@@ -341,9 +362,16 @@ class DeviceHandler(Handler):
                 ser.close()
                 break
 
-            if not ser.in_waiting:
-                # no incoming bytes are waiting to be read from the serial
-                # input buffer, let other threads run
+            try:
+                if not ser.in_waiting:
+                    # no incoming bytes are waiting to be read from
+                    # the serial input buffer, let other threads run
+                    time.sleep(0.001)
+                    continue
+            # maybe the serial port is still in reset
+            # check status may cause error
+            # wait for more time
+            except OSError:
                 time.sleep(0.001)
                 continue
 
@@ -418,7 +446,6 @@ class DeviceHandler(Handler):
 
         hardware = self.device_is_available(self.instance)
         while not hardware:
-            logger.debug("Waiting for device {} to become available".format(self.instance.platform.name))
             time.sleep(1)
             hardware = self.device_is_available(self.instance)
 
@@ -461,10 +488,7 @@ class DeviceHandler(Handler):
                 board_id = hardware.probe_id or hardware.id
                 product = hardware.product
                 if board_id is not None:
-                    if runner == "pyocd":
-                        command_extra_args.append("--board-id")
-                        command_extra_args.append(board_id)
-                    elif runner == "nrfjprog":
+                    if runner in ("pyocd", "nrfjprog"):
                         command_extra_args.append("--dev-id")
                         command_extra_args.append(board_id)
                     elif runner == "openocd" and product == "STM32 STLink":
@@ -524,21 +548,6 @@ class DeviceHandler(Handler):
             else:
                 self.make_device_available(serial_device)
             return
-
-        ser.flush()
-
-        # turns out the ser.flush() is not enough to clear serial leftover from last case
-        # explicitly readline() can do it reliably
-        old_timeout = ser.timeout
-        # wait for 1s if no serial output
-        ser.timeout = 1
-        # or read 1000 lines at most
-        # if the leftovers are more than 1000 lines, user should realize that once
-        # saw the caught ones and fix it.
-        leftover_lines = ser.readlines(1000)
-        for line in leftover_lines:
-            logger.debug(f"leftover log of previous test: {line}")
-        ser.timeout = old_timeout
 
         harness_name = self.instance.testsuite.harness.capitalize()
         harness_import = HarnessImporter(harness_name)
@@ -621,8 +630,8 @@ class DeviceHandler(Handler):
             if harness.state == "failed":
                 self.instance.reason = "Failed"
         elif not flash_error:
-            self.instance.status = "error"
-            self.instance.reason = "No Console Output(Timeout)"
+            self.instance.status = "failed"
+            self.instance.reason = "Timeout"
 
         if self.instance.status == "error":
             self.instance.add_missing_case_status("blocked", self.instance.reason)
@@ -658,7 +667,7 @@ class QEMUHandler(Handler):
 
         self.pid_fn = os.path.join(instance.build_dir, "qemu.pid")
 
-        if "ignore_qemu_crash" in instance.testsuite.tags:
+        if instance.testsuite.ignore_qemu_crash:
             self.ignore_qemu_crash = True
             self.ignore_unexpected_eof = True
         else:

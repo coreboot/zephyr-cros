@@ -52,16 +52,32 @@ typedef void (*k_thread_entry_t)(void *p1, void *p2, void *p3);
  */
 
 /**
- * Obtain the current cycle count, in units that are hardware-specific
+ * Obtain the current cycle count, in units specified by
+ * CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC.  While this is historically
+ * specified as part of the architecture API, in practice virtually
+ * all platforms forward it to the sys_clock_cycle_get_32() API
+ * provided by the timer driver.
  *
  * @see k_cycle_get_32()
+ *
+ * @return The current cycle time.  This should count up monotonically
+ * through the full 32 bit space, wrapping at 0xffffffff.  Hardware
+ * with fewer bits of precision in the timer is expected to synthesize
+ * a 32 bit count.
  */
 static inline uint32_t arch_k_cycle_get_32(void);
 
 /**
- * Obtain the current cycle count, in units that are hardware-specific
+ * As for arch_k_cycle_get_32(), but with a 64 bit return value.  Not
+ * all timer hardware has a 64 bit timer, this needs to be implemented
+ * only if CONFIG_TIMER_HAS_64BIT_CYCLE_COUNTER is set.
  *
- * @see k_cycle_get_64()
+ * @see arch_k_cycle_get_32()
+ *
+ * @return The current cycle time.  This should count up monotonically
+ * through the full 64 bit space, wrapping at 2^64-1.  Hardware with
+ * fewer bits of precision in the timer is generally not expected to
+ * implement this API.
  */
 static inline uint64_t arch_k_cycle_get_64(void);
 
@@ -1020,48 +1036,112 @@ int arch_gdb_remove_breakpoint(struct gdb_ctx *ctx, uint8_t type,
  * @{
  */
 
-#if defined(CONFIG_CACHE_MANAGEMENT) && defined(CONFIG_HAS_ARCH_CACHE)
-
+#if defined(CONFIG_CACHE_MANAGEMENT) && defined(CONFIG_ARCH_CACHE)
 #if defined(CONFIG_DCACHE)
 
 /**
+ * @brief Enable the d-cache
  *
- * @brief Enable d-cache
- *
- * @see arch_dcache_enable
+ * Enable the data cache.
  */
+
 void arch_dcache_enable(void);
 
 /**
+ * @brief Disable the d-cache
  *
- * @brief Disable d-cache
- *
- * @see arch_dcache_disable
+ * Disable the data cache.
  */
 void arch_dcache_disable(void);
 
 /**
+ * @brief Flush the d-cache
  *
- * @brief Write-back / Invalidate / Write-back + Invalidate all d-cache
+ * Flush the whole data cache.
  *
- * @see arch_dcache_all
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
  */
-int arch_dcache_all(int op);
+int arch_dcache_flush_all(void);
 
 /**
+ * @brief Invalidate the d-cache
  *
- * @brief Write-back / Invalidate / Write-back + Invalidate d-cache lines
+ * Invalidate the whole data cache.
  *
- * @see arch_dcache_range
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
  */
-int arch_dcache_range(void *addr, size_t size, int op);
+int arch_dcache_invd_all(void);
+
+/**
+ * @brief Flush and Invalidate the d-cache
+ *
+ * Flush and Invalidate the whole data cache.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_dcache_flush_and_invd_all(void);
+
+/**
+ * @brief Flush an address range in the d-cache
+ *
+ * Flush the specified address range of the data cache.
+ *
+ * @param addr Starting address to flush.
+ * @param size Range size.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_dcache_flush_range(void *addr, size_t size);
+
+/**
+ * @brief Invalidate an address range in the d-cache
+ *
+ * Invalidate the specified address range of the data cache.
+ *
+ * @param addr Starting address to invalidate.
+ * @param size Range size.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_dcache_invd_range(void *addr, size_t size);
+
+/**
+ * @brief Flush and Invalidate an address range in the d-cache
+ *
+ * Flush and Invalidate the specified address range of the data cache.
+ *
+ * @param addr Starting address to flush and invalidate.
+ * @param size Range size.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_dcache_flush_and_invd_range(void *addr, size_t size);
 
 #if defined(CONFIG_DCACHE_LINE_SIZE_DETECT)
 /**
  *
- * @brief Get d-cache line size
+ * @brief Get the the d-cache line size.
  *
- * @see sys_cache_data_line_size_get
+ * The API is provided to dynamically detect the data cache line size at run
+ * time.
+ *
+ * The function must be implemented only when CONFIG_DCACHE_LINE_SIZE_DETECT is
+ * defined.
+ *
+ * @retval size Size of the d-cache line.
+ * @retval 0 If the d-cache is not enabled.
  */
 size_t arch_dcache_line_size_get(void);
 #endif /* CONFIG_DCACHE_LINE_SIZE_DETECT */
@@ -1069,54 +1149,114 @@ size_t arch_dcache_line_size_get(void);
 #endif /* CONFIG_DCACHE */
 
 #if defined(CONFIG_ICACHE)
-
 /**
+ * @brief Enable the i-cache
  *
- * @brief Enable i-cache
- *
- * @see arch_icache_enable
+ * Enable the instruction cache.
  */
 void arch_icache_enable(void);
 
 /**
+ * @brief Disable the i-cache
  *
- * @brief Enable i-cache
- *
- * @see arch_icache_disable
+ * Disable the instruction cache.
  */
 void arch_icache_disable(void);
 
+/**
+ * @brief Flush the i-cache
+ *
+ * Flush the whole instruction cache.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_icache_flush_all(void);
 
 /**
+ * @brief Invalidate the i-cache
  *
- * @brief Write-back / Invalidate / Write-back + Invalidate all i-cache
+ * Invalidate the whole instruction cache.
  *
- * @see arch_icache_all
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
  */
-int arch_icache_all(int op);
+int arch_icache_invd_all(void);
 
 /**
+ * @brief Flush and Invalidate the i-cache
  *
- * @brief Write-back / Invalidate / Write-back + Invalidate i-cache lines
+ * Flush and Invalidate the whole instruction cache.
  *
- * @see arch_icache_range
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
  */
-int arch_icache_range(void *addr, size_t size, int op);
+int arch_icache_flush_and_invd_all(void);
 
+/**
+ * @brief Flush an address range in the i-cache
+ *
+ * Flush the specified address range of the instruction cache.
+ *
+ * @param addr Starting address to flush.
+ * @param size Range size.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_icache_flush_range(void *addr, size_t size);
+
+/**
+ * @brief Invalidate an address range in the i-cache
+ *
+ * Invalidate the specified address range of the instruction cache.
+ *
+ * @param addr Starting address to invalidate.
+ * @param size Range size.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_icache_invd_range(void *addr, size_t size);
+
+/**
+ * @brief Flush and Invalidate an address range in the i-cache
+ *
+ * Flush and Invalidate the specified address range of the instruction cache.
+ *
+ * @param addr Starting address to flush and invalidate.
+ * @param size Range size.
+ *
+ * @retval 0 If succeeded.
+ * @retval -ENOTSUP If not supported.
+ * @retval -errno Negative errno for other failures.
+ */
+int arch_icache_flush_and_invd_range(void *addr, size_t size);
 
 #if defined(CONFIG_ICACHE_LINE_SIZE_DETECT)
 /**
  *
- * @brief Get i-cache line size
+ * @brief Get the the i-cache line size.
  *
- * @see sys_cache_instr_line_size_get
+ * The API is provided to dynamically detect the instruction cache line size at
+ * run time.
+ *
+ * The function must be implemented only when CONFIG_ICACHE_LINE_SIZE_DETECT is
+ * defined.
+ *
+ * @retval size Size of the d-cache line.
+ * @retval 0 If the d-cache is not enabled.
  */
 size_t arch_icache_line_size_get(void);
 #endif /* CONFIG_ICACHE_LINE_SIZE_DETECT */
 
 #endif /* CONFIG_ICACHE */
-
-#endif /* CONFIG_CACHE_MANAGEMENT && CONFIG_HAS_ARCH_CACHE */
+#endif /* CONFIG_CACHE_MANAGEMENT && CONFIG_ARCH_CACHE */
 
 /** @} */
 

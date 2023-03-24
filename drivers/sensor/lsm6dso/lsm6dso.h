@@ -58,6 +58,7 @@ struct lsm6dso_config {
 	uint8_t gyro_pm;
 	uint8_t gyro_odr;
 	uint8_t gyro_range;
+	uint8_t drdy_pulsed;
 #ifdef CONFIG_LSM6DSO_TRIGGER
 	const struct gpio_dt_spec gpio_drdy;
 	uint8_t int_pin;
@@ -106,8 +107,11 @@ struct lsm6dso_data {
 #ifdef CONFIG_LSM6DSO_TRIGGER
 	struct gpio_callback gpio_cb;
 	sensor_trigger_handler_t handler_drdy_acc;
+	const struct sensor_trigger *trig_drdy_acc;
 	sensor_trigger_handler_t handler_drdy_gyr;
+	const struct sensor_trigger *trig_drdy_gyr;
 	sensor_trigger_handler_t handler_drdy_temp;
+	const struct sensor_trigger *trig_drdy_temp;
 
 #if defined(CONFIG_LSM6DSO_TRIGGER_OWN_THREAD)
 	K_KERNEL_STACK_MEMBER(thread_stack, CONFIG_LSM6DSO_THREAD_STACK_SIZE);

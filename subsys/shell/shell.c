@@ -1049,7 +1049,7 @@ static void state_collect(const struct shell *shell)
 				break;
 
 			default:
-				if (isprint((int) data)) {
+				if (isprint((int) data) != 0) {
 					z_flag_history_exit_set(shell, true);
 					z_shell_op_char_insert(shell, data);
 				} else if (z_flag_echo_get(shell)) {
@@ -1321,10 +1321,12 @@ void shell_thread(void *shell_handle, void *arg_log_backend,
 					   log_level);
 	}
 
-	/* Enable shell and print prompt. */
-	err = shell_start(shell);
-	if (err != 0) {
-		return;
+	if (IS_ENABLED(CONFIG_SHELL_AUTOSTART)) {
+		/* Enable shell and print prompt. */
+		err = shell_start(shell);
+		if (err != 0) {
+			return;
+		}
 	}
 
 	while (true) {
@@ -1555,7 +1557,7 @@ void shell_hexdump_line(const struct shell *shell, unsigned int offset,
 			char c = data[i];
 
 			shell_fprintf(shell, SHELL_NORMAL, "%c",
-				      isprint((int)c) ? c : '.');
+				      isprint((int)c) != 0 ? c : '.');
 		} else {
 			shell_fprintf(shell, SHELL_NORMAL, " ");
 		}
@@ -1656,6 +1658,15 @@ int shell_use_colors_set(const struct shell *shell, bool val)
 	return (int)z_flag_use_colors_set(shell, val);
 }
 
+int shell_use_vt100_set(const struct shell *sh, bool val)
+{
+	if (sh == NULL) {
+		return -EINVAL;
+	}
+
+	return (int)z_flag_use_vt100_set(sh, val);
+}
+
 int shell_echo_set(const struct shell *shell, bool val)
 {
 	if (shell == NULL) {
@@ -1688,6 +1699,10 @@ void shell_set_bypass(const struct shell *sh, shell_bypass_cb_t bypass)
 	__ASSERT_NO_MSG(sh);
 
 	sh->ctx->bypass = bypass;
+
+	if (bypass == NULL) {
+		cmd_buffer_clear(sh);
+	}
 }
 
 bool shell_ready(const struct shell *sh)

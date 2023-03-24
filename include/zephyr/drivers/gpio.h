@@ -388,8 +388,10 @@ struct gpio_dt_spec {
  * @return static initializer for a struct gpio_dt_spec for the property
  * @see GPIO_DT_SPEC_GET_BY_IDX()
  */
-#define GPIO_DT_SPEC_INST_GET_BY_IDX_OR(inst, prop, idx, default_value)	\
-	GPIO_DT_SPEC_GET_BY_IDX_OR(DT_DRV_INST(inst), prop, idx, default_value)
+#define GPIO_DT_SPEC_INST_GET_BY_IDX_OR(inst, prop, idx, default_value)		\
+	COND_CODE_1(DT_PROP_HAS_IDX(DT_DRV_INST(inst), prop, idx),		\
+		    (GPIO_DT_SPEC_GET_BY_IDX(DT_DRV_INST(inst), prop, idx)),	\
+		    (default_value))
 
 /**
  * @brief Equivalent to GPIO_DT_SPEC_INST_GET_BY_IDX(inst, prop, 0).
@@ -511,7 +513,8 @@ enum gpio_int_mode {
 
 enum gpio_int_trig {
 	/* Trigger detection when input state is (or transitions to)
-	 * physical low. (Edge Failing or Active Low) */
+	 * physical low. (Edge Falling or Active Low)
+	 */
 	GPIO_INT_TRIG_LOW = GPIO_INT_LOW_0,
 	/* Trigger detection when input state is (or transitions to)
 	 * physical high. (Edge Rising or Active High) */
@@ -554,6 +557,20 @@ __subsystem struct gpio_driver_api {
 /**
  * @endcond
  */
+
+/**
+ * @brief Validate that GPIO port is ready.
+ *
+ * @param spec GPIO specification from devicetree
+ *
+ * @retval true if the GPIO spec is ready for use.
+ * @retval false if the GPIO spec is not ready for use.
+ */
+static inline bool gpio_is_ready_dt(const struct gpio_dt_spec *spec)
+{
+	/* Validate port is ready */
+	return device_is_ready(spec->port);
+}
 
 /**
  * @brief Configure pin interrupt.
@@ -682,9 +699,8 @@ static inline int z_impl_gpio_pin_configure(const struct device *port,
 		 (GPIO_PULL_UP | GPIO_PULL_DOWN),
 		 "Pull Up and Pull Down should not be enabled simultaneously");
 
-	__ASSERT((flags & GPIO_OUTPUT) != 0 || (flags & GPIO_SINGLE_ENDED) == 0,
-		 "Output needs to be enabled for 'Open Drain', 'Open Source' "
-		 "mode to be supported");
+	__ASSERT(!((flags & GPIO_INPUT) && !(flags & GPIO_OUTPUT) && (flags & GPIO_SINGLE_ENDED)),
+		 "Input cannot be enabled for 'Open Drain', 'Open Source' modes without Output");
 
 	__ASSERT_NO_MSG((flags & GPIO_SINGLE_ENDED) != 0 ||
 			(flags & GPIO_LINE_OPEN_DRAIN) == 0);
@@ -802,6 +818,22 @@ static inline int gpio_pin_is_input(const struct device *port, gpio_pin_t pin)
 }
 
 /**
+ * @brief Check if a single pin from @p gpio_dt_spec is configured for input
+ *
+ * This is equivalent to:
+ *
+ *     gpio_pin_is_input(spec->port, spec->pin);
+ *
+ * @param spec GPIO specification from devicetree.
+ *
+ * @return A value from gpio_pin_is_input().
+ */
+static inline int gpio_pin_is_input_dt(const struct gpio_dt_spec *spec)
+{
+	return gpio_pin_is_input(spec->port, spec->pin);
+}
+
+/**
  * @brief Check if @p pin is configured for output
  *
  * @param port Pointer to device structure for the driver instance.
@@ -828,6 +860,22 @@ static inline int gpio_pin_is_output(const struct device *port, gpio_pin_t pin)
 	}
 
 	return (int)!!((gpio_port_pins_t)BIT(pin) & pins);
+}
+
+/**
+ * @brief Check if a single pin from @p gpio_dt_spec is configured for output
+ *
+ * This is equivalent to:
+ *
+ *     gpio_pin_is_output(spec->port, spec->pin);
+ *
+ * @param spec GPIO specification from devicetree.
+ *
+ * @return A value from gpio_pin_is_output().
+ */
+static inline int gpio_pin_is_output_dt(const struct gpio_dt_spec *spec)
+{
+	return gpio_pin_is_output(spec->port, spec->pin);
 }
 
 /**

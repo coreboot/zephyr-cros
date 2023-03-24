@@ -55,7 +55,13 @@ endif()
 # breaks easily.  Set noload flags explicitly here.
 add_custom_target(
   gen_modules ALL
-  DEPENDS ${ZEPHYR_FINAL_EXECUTABLE}
+  DEPENDS ${CMAKE_BINARY_DIR}/zephyr/boot.mod ${CMAKE_BINARY_DIR}/zephyr/main.mod
+)
+
+add_custom_command(
+  OUTPUT  ${CMAKE_BINARY_DIR}/zephyr/boot.mod ${CMAKE_BINARY_DIR}/zephyr/main.mod
+  COMMENT "Extracting .mod(ule) files for rimage"
+  DEPENDS ${ZEPHYR_FINAL_EXECUTABLE} ${ZEPHYR_BINARY_DIR}/${KERNEL_ELF_NAME}
 
   # The .fw_metadata section may not be present (xcc's older linker
   # will remove it if empty).  Extract it here (which will create an
@@ -99,3 +105,16 @@ add_custom_target(
       ${CMAKE_BINARY_DIR}/zephyr/main.mod
       ${CMAKE_BINARY_DIR}/zephyr/main.mod 2>${NULL_FILE}
 )
+
+if(CONFIG_BUILD_OUTPUT_STRIPPED)
+add_custom_command(
+  COMMENT "strip main.mod"
+  APPEND OUTPUT ${CMAKE_BINARY_DIR}/zephyr/main.mod
+    COMMAND $<TARGET_PROPERTY:bintools,strip_command>
+            $<TARGET_PROPERTY:bintools,strip_flag>
+            $<TARGET_PROPERTY:bintools,strip_flag_all>
+            $<TARGET_PROPERTY:bintools,strip_flag_infile>${CMAKE_BINARY_DIR}/zephyr/main.mod
+            $<TARGET_PROPERTY:bintools,strip_flag_outfile>${CMAKE_BINARY_DIR}/zephyr/main-stripped.mod
+            $<TARGET_PROPERTY:bintools,strip_flag_final>
+)
+endif()

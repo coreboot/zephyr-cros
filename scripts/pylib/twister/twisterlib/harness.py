@@ -3,6 +3,7 @@ from asyncio.log import logger
 import re
 import os
 import subprocess
+import shlex
 from collections import OrderedDict
 import xml.etree.ElementTree as ET
 import logging
@@ -59,7 +60,7 @@ class Harness:
         config = instance.testsuite.harness_config
         self.id = instance.testsuite.id
         self.run_id = instance.run_id
-        if "ignore_faults" in instance.testsuite.tags:
+        if instance.testsuite.ignore_faults:
             self.fail_on_fault = False
 
         if config:
@@ -207,6 +208,9 @@ class Pytest(Harness):
         outs = []
         errs = []
 
+        logger.debug(
+                "Running pytest command: %s",
+                " ".join(shlex.quote(a) for a in cmd))
         with subprocess.Popen(cmd,
                               stdout = subprocess.PIPE,
                               stderr = subprocess.PIPE) as proc:

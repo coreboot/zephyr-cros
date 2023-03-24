@@ -22,6 +22,8 @@
 
 #include "ticker/ticker.h"
 
+#include "pdu_df.h"
+#include "lll/pdu_vendor.h"
 #include "pdu.h"
 
 #include "lll.h"
@@ -34,10 +36,7 @@
 #include "lll_conn.h"
 #include "lll_filter.h"
 
-#if !defined(CONFIG_BT_LL_SW_LLCP_LEGACY)
-#include "ull_tx_queue.h"
-#endif /* CONFIG_BT_LL_SW_LLCP_LEGACY */
-
+#include "ll_sw/ull_tx_queue.h"
 
 #include "ull_adv_types.h"
 #include "ull_filter.h"
@@ -51,9 +50,6 @@
 
 #include "ll.h"
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
-#define LOG_MODULE_NAME bt_ctlr_ull_scan
-#include "common/log.h"
 #include "hal/debug.h"
 
 static int init_reset(void);
@@ -133,7 +129,8 @@ uint8_t ll_scan_params_set(uint8_t type, uint16_t interval, uint16_t window,
 
 	scan->own_addr_type = own_addr_type;
 
-	ull_scan_params_set(lll, type, interval, window, filter_policy);
+	scan->ticks_window = ull_scan_params_set(lll, type, interval, window,
+						 filter_policy);
 
 	return 0;
 }
@@ -350,8 +347,9 @@ int ull_scan_reset(void)
 	return 0;
 }
 
-void ull_scan_params_set(struct lll_scan *lll, uint8_t type, uint16_t interval,
-			 uint16_t window, uint8_t filter_policy)
+uint32_t ull_scan_params_set(struct lll_scan *lll, uint8_t type,
+			     uint16_t interval, uint16_t window,
+			     uint8_t filter_policy)
 {
 	/* type value:
 	 * 0000b - legacy 1M passive
@@ -370,6 +368,8 @@ void ull_scan_params_set(struct lll_scan *lll, uint8_t type, uint16_t interval,
 	lll->interval = interval;
 	lll->ticks_window = HAL_TICKER_US_TO_TICKS((uint64_t)window *
 						   SCAN_INT_UNIT_US);
+
+	return lll->ticks_window;
 }
 
 uint8_t ull_scan_enable(struct ll_scan_set *scan)
@@ -415,6 +415,7 @@ uint8_t ull_scan_enable(struct ll_scan_set *scan)
 		ticks_slot_overhead = 0U;
 	}
 
+	lll->ticks_window = scan->ticks_window;
 	if ((lll->ticks_window +
 	     HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US)) <
 	    (ticks_interval - ticks_slot_overhead)) {
@@ -554,13 +555,7 @@ uint8_t ull_scan_enable(struct ll_scan_set *scan)
 	}
 
 	ticks_anchor = ticker_ticks_now_get();
-
-#if !defined(CONFIG_BT_TICKER_LOW_LAT)
-	/* NOTE: mesh bsim loopback_group_low_lat test needs both adv and scan
-	 * to not have that start overhead added to pass the test.
-	 */
 	ticks_anchor += HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US);
-#endif /* !CONFIG_BT_TICKER_LOW_LAT */
 
 #if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
 	if (!lll->conn) {
@@ -1123,8 +1118,7 @@ static void ext_disabled_cb(void *param)
 	/* NOTE: parameters are already populated on disable,
 	 * just enqueue here
 	 */
-	ll_rx_put(rx_hdr->link, rx_hdr);
-	ll_rx_sched();
+	ll_rx_put_sched(rx_hdr->link, rx_hdr);
 }
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 
