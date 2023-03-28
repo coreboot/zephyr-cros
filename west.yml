@@ -52,12 +52,12 @@ manifest:
       groups:
         - hal
     - name: hal_atmel
-      revision: d45adfb6897aba323cac29cdda8070ce4f23f014
+      revision: f47a9a8b55677b5d03bf7f066f907e6b74c9e57d
       path: modules/hal/atmel
       groups:
         - hal
     - name: hal_espressif
-      revision: d2564ca5c14439888f7c4351884a2cf4db517a33
+      revision: 8ee96508f329c7e59fcbf739f060cf12082dd805
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -73,7 +73,7 @@ manifest:
       groups:
         - hal
     - name: hal_infineon
-      revision: 8485083ad91d3e2cc5d706da3464716718a6a42e
+      revision: 15d8a4278611fb2dc6ca52108c36ec1f4caab14e
       path: modules/hal/infineon
       groups:
         - hal
@@ -83,7 +83,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 609d4b41fe9773cd294eb8656d99eb9385389e52
+      revision: 6c6b666ab3bc02b6fa0696ab7bd15658a694a03a
       path: modules/hal/nordic
       groups:
         - hal
@@ -110,7 +110,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: 468d3f2146d18c7f86a4640fc641cc1d20a4a100
+      revision: f2d791d28cd8fdbc5861652b863822632c91f690
       groups:
         - hal
     - name: hal_rpi_pico
@@ -129,7 +129,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: c36136b253a46ed8dd63525eeee659393047ce83
+      revision: 7c511b744fadde3fd197779a93043d27e30b0025
       path: modules/hal/stm32
       groups:
         - hal
@@ -139,7 +139,7 @@ manifest:
       groups:
         - hal
     - name: hal_ti
-      revision: 5e7d5cd584047699c9fd279923120cb25ba3dda7
+      revision: 4e0e053f5ea413ef0cb20000729038d921ac2746
       path: modules/hal/ti
       groups:
         - hal
@@ -189,7 +189,7 @@ manifest:
         - debug
       revision: 0d521d8055f3b2b4842f728b0365d3f0ece9c37f
     - name: nanopb
-      revision: dc4deed54fd4c7e1935e3b6387eedf21bb45dc38
+      revision: 42fa8b211e946b90b9d968523fce7b1cfe27617e
       path: modules/lib/nanopb
     - name: net-tools
       revision: e0828aa9629b533644dc96ff6d1295c939bd713c
@@ -197,7 +197,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: ad21dabc84c6574944d978cce2079dbe1ede38c6
+      revision: feb3e555f7745dc4fd0a16403f5d81a7ea7359b0
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: aedcc262f93bbb1b0c2f58026911575729b7465c
@@ -207,7 +207,7 @@ manifest:
       path: modules/lib/openthread
     - name: picolibc
       path: modules/lib/picolibc
-      revision: 2097f26ce7dee36922b22ce048c09cd073ebae3d
+      revision: 0694a78fc08b3300c7db79602c46ba0a64428c8e
     - name: segger
       revision: e2ff2200556e8a8f962921444275c04971a2bb3d
       path: modules/debug/segger
@@ -231,7 +231,7 @@ manifest:
       groups:
         - debug
     - name: trusted-firmware-m
-      revision: a8313be08816a2ed9d883c6b79fb4e5d2bef81c2
+      revision: 2d4edabafd9d59f37b16d7fe38f5f7ebab8495a4
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee

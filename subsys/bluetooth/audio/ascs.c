@@ -130,11 +130,9 @@ static void ascs_disconnect_stream_work_handler(struct k_work *work)
 	struct bt_bap_stream *stream = ep->stream;
 	struct bt_bap_stream *pair_stream;
 
-	__ASSERT(stream != NULL &&
-		 ep->iso != NULL &&
-		 ep->iso->chan.state != BT_ISO_STATE_CONNECTED,
+	__ASSERT(ep != NULL && ep->iso && stream != NULL,
 		 "Invalid endpoint %p, iso %p or stream %p",
-		 ep, ep->iso, stream);
+		 ep, ep == NULL ? NULL : ep->iso, stream);
 
 	if (ep->dir == BT_AUDIO_DIR_SINK) {
 		pair_stream = ep->iso->tx.stream;
@@ -231,6 +229,8 @@ void ascs_ep_set_state(struct bt_bap_ep *ep, uint8_t state)
 
 		switch (state) {
 		case BT_BAP_EP_STATE_IDLE:
+			bt_bap_stream_detach(stream);
+
 			if (ops->released != NULL) {
 				ops->released(stream);
 			}
@@ -396,7 +396,6 @@ void ascs_ep_set_state(struct bt_bap_ep *ep, uint8_t state)
 					bt_bap_iso_unbind_ep(ep->iso, ep);
 				}
 
-				bt_bap_stream_detach(stream);
 				ascs_ep_set_state(ep, BT_BAP_EP_STATE_IDLE);
 			} else {
 				/* Either the client or the server may disconnect the
@@ -888,8 +887,8 @@ static void ascs_cp_rsp_add(uint8_t id, uint8_t op, uint8_t code,
 	/* If the Response_Code value is 0x01 or 0x02, Number_of_ASEs shall be
 	 * set to 0xFF.
 	 */
-	case BT_ASCS_RSP_NOT_SUPPORTED:
-	case BT_ASCS_RSP_TRUNCATED:
+	case BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED:
+	case BT_BAP_ASCS_RSP_CODE_INVALID_LENGTH:
 		rsp->num_ase = 0xff;
 		break;
 	default:
@@ -903,79 +902,16 @@ static void ascs_cp_rsp_add(uint8_t id, uint8_t op, uint8_t code,
 	ase_rsp->reason = reason;
 }
 
-static void ascs_cp_rsp_add_errno(uint8_t id, uint8_t op, int err,
-				  uint8_t reason)
-{
-	LOG_DBG("id %u op %u err %d reason %u", id, op, err, reason);
-
-	switch (err) {
-	case -ENOBUFS:
-	case -ENOMEM:
-		return ascs_cp_rsp_add(id, op, BT_ASCS_RSP_NO_MEM,
-				       BT_ASCS_REASON_NONE);
-	case -EINVAL:
-		switch (op) {
-		case BT_ASCS_CONFIG_OP:
-		/* Fallthrough */
-		case BT_ASCS_QOS_OP:
-			return ascs_cp_rsp_add(id, op,
-					       BT_ASCS_RSP_CONF_INVALID,
-					       reason);
-		case BT_ASCS_ENABLE_OP:
-		/* Fallthrough */
-		case BT_ASCS_METADATA_OP:
-			return ascs_cp_rsp_add(id, op,
-					       BT_ASCS_RSP_METADATA_INVALID,
-					       reason);
-		default:
-			return ascs_cp_rsp_add(id, op, BT_ASCS_RSP_UNSPECIFIED,
-					       BT_ASCS_REASON_NONE);
-		}
-	case -ENOTSUP:
-		switch (op) {
-		case BT_ASCS_CONFIG_OP:
-		/* Fallthrough */
-		case BT_ASCS_QOS_OP:
-			return ascs_cp_rsp_add(id, op,
-					       BT_ASCS_RSP_CONF_UNSUPPORTED,
-					       reason);
-		case BT_ASCS_ENABLE_OP:
-		/* Fallthrough */
-		case BT_ASCS_METADATA_OP:
-			return ascs_cp_rsp_add(id, op,
-					       BT_ASCS_RSP_METADATA_UNSUPPORTED,
-					       reason);
-		default:
-			return ascs_cp_rsp_add(id, op,
-					       BT_ASCS_RSP_NOT_SUPPORTED,
-					       BT_ASCS_REASON_NONE);
-		}
-	case -EBADMSG:
-		return ascs_cp_rsp_add(id, op, BT_ASCS_RSP_INVALID_ASE_STATE,
-					       BT_ASCS_REASON_NONE);
-	case -EACCES:
-		switch (op) {
-		case BT_ASCS_METADATA_OP:
-			return ascs_cp_rsp_add(id, op,
-					       BT_ASCS_RSP_METADATA_REJECTED,
-					       reason);
-		default:
-			return ascs_cp_rsp_add(id, op, BT_ASCS_RSP_UNSPECIFIED,
-					       BT_ASCS_REASON_NONE);
-		}
-	default:
-		return ascs_cp_rsp_add(id, op, BT_ASCS_RSP_UNSPECIFIED,
-				       BT_ASCS_REASON_NONE);
-	}
-}
-
 static void ascs_cp_rsp_success(uint8_t id, uint8_t op)
 {
-	ascs_cp_rsp_add(id, op, BT_ASCS_RSP_SUCCESS, BT_ASCS_REASON_NONE);
+	ascs_cp_rsp_add(id, op, BT_BAP_ASCS_RSP_CODE_SUCCESS, BT_BAP_ASCS_REASON_NONE);
 }
 
 static void ase_release(struct bt_ascs_ase *ase)
 {
+	uint8_t ase_id = ASE_ID(ase);
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	int err;
 
 	LOG_DBG("ase %p state %s", ase, bt_bap_ep_state_str(ase->ep.status.state));
@@ -986,26 +922,36 @@ static void ase_release(struct bt_ascs_ase *ase)
 	}
 
 	if (unicast_server_cb != NULL && unicast_server_cb->release != NULL) {
-		err = unicast_server_cb->release(ase->ep.stream);
+		err = unicast_server_cb->release(ase->ep.stream, &rsp);
 	} else {
 		err = -ENOTSUP;
+		rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+				      BT_BAP_ASCS_REASON_NONE);
 	}
 
 	if (err) {
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_RELEASE_OP, err,
-				      BT_ASCS_REASON_NONE);
+		if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+					      BT_BAP_ASCS_REASON_NONE);
+		}
+
+		LOG_ERR("Release failed: err %d, code %u, reason %u", err, rsp.code, rsp.reason);
+		ascs_cp_rsp_add(ase_id, BT_ASCS_RELEASE_OP, rsp.code, rsp.reason);
 		return;
 	}
 
 	ascs_ep_set_state(&ase->ep, BT_BAP_EP_STATE_RELEASING);
+	/* At this point, `ase` object might have been free'd if automously went to Idle */
 
-	ascs_cp_rsp_success(ASE_ID(ase), BT_ASCS_RELEASE_OP);
+	ascs_cp_rsp_success(ase_id, BT_ASCS_RELEASE_OP);
 }
 
 static void ase_disable(struct bt_ascs_ase *ase)
 {
 	struct bt_bap_stream *stream;
 	struct bt_bap_ep *ep;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	int err;
 
 	LOG_DBG("ase %p", ase);
@@ -1020,23 +966,29 @@ static void ase_disable(struct bt_ascs_ase *ase)
 		break;
 	default:
 		LOG_WRN("Invalid operation in state: %s", bt_bap_ep_state_str(ep->status.state));
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_DISABLE_OP,
-				      -EBADMSG, BT_ASCS_REASON_NONE);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_DISABLE_OP,
+				BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, BT_BAP_ASCS_REASON_NONE);
 		return;
 	}
 
 	stream = ep->stream;
 
 	if (unicast_server_cb != NULL && unicast_server_cb->disable != NULL) {
-		err = unicast_server_cb->disable(stream);
+		err = unicast_server_cb->disable(stream, &rsp);
 	} else {
 		err = -ENOTSUP;
+		rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+				      BT_BAP_ASCS_REASON_NONE);
 	}
 
 	if (err) {
-		LOG_ERR("Disable failed: %d", err);
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_DISABLE_OP,
-				      err, BT_ASCS_REASON_NONE);
+		if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+					      BT_BAP_ASCS_REASON_NONE);
+		}
+
+		LOG_ERR("Disable failed: err %d, code %u, reason %u", err, rsp.code, rsp.reason);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_DISABLE_OP, rsp.code, rsp.reason);
 		return;
 	}
 
@@ -1070,9 +1022,6 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 		stream = ase->ep.stream;
 
 		if (ase->ep.status.state != BT_BAP_EP_STATE_IDLE) {
-			/* ase_process will handle the final state transition into idle
-			 * state, where the ase finally will be deallocated
-			 */
 			ase_release(ase);
 
 			if (stream != NULL) {
@@ -1148,17 +1097,6 @@ static struct bt_bap_iso *bap_iso_get_or_new(struct bt_ascs *ascs, uint8_t cig_i
 	bt_bap_iso_init(iso, &ascs_iso_ops);
 
 	return iso;
-}
-
-static void ase_stream_add(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
-			   struct bt_bap_stream *stream)
-{
-	LOG_DBG("ase %p stream %p", ase, stream);
-	ase->ep.stream = stream;
-	if (stream->conn == NULL) {
-		stream->conn = bt_conn_ref(ascs->conn);
-	}
-	stream->ep = &ase->ep;
 }
 
 static void ascs_init(struct bt_ascs *ascs, struct bt_conn *conn)
@@ -1269,11 +1207,17 @@ static ssize_t ascs_ase_read(struct bt_conn *conn,
 			     const struct bt_gatt_attr *attr, void *buf,
 			     uint16_t len, uint16_t offset)
 {
-	struct bt_ascs *ascs = ascs_get(conn);
+	struct bt_ascs *ascs;
 	struct bt_ascs_ase *ase;
 	uint8_t ase_id;
 
 	LOG_DBG("conn %p attr %p buf %p len %u offset %u", (void *)conn, attr, buf, len, offset);
+
+	if (!conn) {
+		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+	}
+
+	ascs = ascs_get(conn);
 
 	ase_id = POINTER_TO_UINT(BT_AUDIO_CHRC_USER_DATA(attr));
 
@@ -1336,6 +1280,8 @@ static bool ascs_codec_config_store(struct bt_data *data, void *user_data)
 
 struct codec_lookup_id_data {
 	uint8_t id;
+	uint16_t cid;
+	uint16_t vid;
 	struct bt_codec *codec;
 };
 
@@ -1343,7 +1289,8 @@ static bool codec_lookup_id(const struct bt_pacs_cap *cap, void *user_data)
 {
 	struct codec_lookup_id_data *data = user_data;
 
-	if (cap->codec->id == data->id) {
+	if (cap->codec->id == data->id && cap->codec->cid == data->cid &&
+	    cap->codec->vid == data->vid) {
 		data->codec = cap->codec;
 
 		return false;
@@ -1353,14 +1300,19 @@ static bool codec_lookup_id(const struct bt_pacs_cap *cap, void *user_data)
 }
 
 static int ascs_ep_set_codec(struct bt_bap_ep *ep, uint8_t id, uint16_t cid, uint16_t vid,
-			     struct net_buf_simple *buf, uint8_t len, struct bt_codec *codec)
+			     struct net_buf_simple *buf, uint8_t len, struct bt_codec *codec,
+			     struct bt_bap_ascs_rsp *rsp)
 {
 	struct net_buf_simple ad;
 	struct codec_lookup_id_data lookup_data = {
 		.id = id,
+		.cid = cid,
+		.vid = vid,
 	};
 
 	if (ep == NULL && codec == NULL) {
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_CONF_INVALID,
+				       BT_BAP_ASCS_REASON_CODEC_DATA);
 		return -EINVAL;
 	}
 
@@ -1373,6 +1325,8 @@ static int ascs_ep_set_codec(struct bt_bap_ep *ep, uint8_t id, uint16_t cid, uin
 		LOG_DBG("Codec with id %u for dir %s is not supported by our capabilities",
 			id, bt_audio_dir_str(ep->dir));
 
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_CONF_INVALID,
+				       BT_BAP_ASCS_REASON_CODEC);
 		return -ENOENT;
 	}
 
@@ -1387,6 +1341,7 @@ static int ascs_ep_set_codec(struct bt_bap_ep *ep, uint8_t id, uint16_t cid, uin
 	codec->path_id = lookup_data.codec->path_id;
 
 	if (len == 0 || buf == NULL) {
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS, BT_BAP_ASCS_REASON_NONE);
 		return 0;
 	}
 
@@ -1400,19 +1355,23 @@ static int ascs_ep_set_codec(struct bt_bap_ep *ep, uint8_t id, uint16_t cid, uin
 	if (ad.len) {
 		LOG_ERR("Unable to parse Codec Config: len %u", ad.len);
 		(void)memset(codec, 0, sizeof(*codec));
-
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_CONF_INVALID,
+				       BT_BAP_ASCS_REASON_CODEC_DATA);
 		return -EINVAL;
 	}
 
+	*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS, BT_BAP_ASCS_REASON_NONE);
 	return 0;
 }
 
-static int ase_config(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
-		      const struct bt_ascs_config *cfg,
-		      struct net_buf_simple *buf)
+static void ase_config(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
+		       const struct bt_ascs_config *cfg,
+		       struct net_buf_simple *buf)
 {
 	struct bt_bap_stream *stream;
 	struct bt_codec codec;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	int err;
 
 	LOG_DBG("ase %p latency 0x%02x phy 0x%02x codec 0x%02x "
@@ -1424,17 +1383,17 @@ static int ase_config(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
 	    cfg->latency > BT_ASCS_CONFIG_LATENCY_HIGH) {
 		LOG_WRN("Invalid latency: 0x%02x", cfg->latency);
 		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP,
-				BT_ASCS_RSP_CONF_INVALID,
-				BT_ASCS_REASON_LATENCY);
-		return 0;
+				BT_BAP_ASCS_RSP_CODE_CONF_INVALID,
+				BT_BAP_ASCS_REASON_LATENCY);
+		return;
 	}
 
 	if (cfg->phy < BT_ASCS_CONFIG_PHY_LE_1M ||
 	    cfg->phy > BT_ASCS_CONFIG_PHY_LE_CODED) {
 		LOG_WRN("Invalid PHY: 0x%02x", cfg->phy);
 		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP,
-				BT_ASCS_RSP_CONF_INVALID, BT_ASCS_REASON_PHY);
-		return 0;
+				BT_BAP_ASCS_RSP_CODE_CONF_INVALID, BT_BAP_ASCS_REASON_PHY);
+		return;
 	}
 
 	switch (ase->ep.status.state) {
@@ -1449,8 +1408,8 @@ static int ase_config(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
 		LOG_WRN("Invalid operation in state: %s",
 			bt_bap_ep_state_str(ase->ep.status.state));
 		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP,
-				BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
-		return 0;
+				BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, 0x00);
+		return;
 	}
 
 	/* Store current codec configuration to be able to restore it
@@ -1458,15 +1417,14 @@ static int ase_config(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
 	 */
 	(void)memcpy(&codec, &ase->ep.codec, sizeof(codec));
 
-	if (ascs_ep_set_codec(&ase->ep, cfg->codec.id,
-			      sys_le16_to_cpu(cfg->codec.cid),
-			      sys_le16_to_cpu(cfg->codec.vid),
-			      buf, cfg->cc_len, &ase->ep.codec)) {
+	err = ascs_ep_set_codec(&ase->ep, cfg->codec.id,
+				sys_le16_to_cpu(cfg->codec.cid),
+				sys_le16_to_cpu(cfg->codec.vid),
+				buf, cfg->cc_len, &ase->ep.codec, &rsp);
+	if (err) {
 		(void)memcpy(&ase->ep.codec, &codec, sizeof(codec));
-		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP,
-				BT_ASCS_RSP_CONF_INVALID,
-				BT_ASCS_REASON_CODEC_DATA);
-		return 0;
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP, rsp.code, rsp.reason);
+		return;
 	}
 
 	if (ase->ep.stream != NULL) {
@@ -1475,21 +1433,27 @@ static int ase_config(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
 			err = unicast_server_cb->reconfig(ase->ep.stream,
 							  ase->ep.dir,
 							  &ase->ep.codec,
-							  &ase->ep.qos_pref);
+							  &ase->ep.qos_pref,
+							  &rsp);
 		} else {
 			err = -ENOTSUP;
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+					      BT_BAP_ASCS_REASON_NONE);
 		}
 
-		if (err != 0) {
-			uint8_t reason = BT_ASCS_REASON_CODEC_DATA;
+		if (err) {
+			if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+				rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+						      BT_BAP_ASCS_REASON_NONE);
+			}
 
-			LOG_ERR("Reconfig failed: %d", err);
+			LOG_ERR("Reconfig failed: err %d, code %u, reason %u",
+				err, rsp.code, rsp.reason);
 
 			(void)memcpy(&ase->ep.codec, &codec, sizeof(codec));
-			ascs_cp_rsp_add_errno(ASE_ID(ase),
-					      BT_ASCS_CONFIG_OP,
-					      err, reason);
-			return 0;
+			ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP, rsp.code, rsp.reason);
+
+			return;
 		}
 
 		stream = ase->ep.stream;
@@ -1497,38 +1461,38 @@ static int ase_config(struct bt_ascs *ascs, struct bt_ascs_ase *ase,
 		stream = NULL;
 		if (unicast_server_cb != NULL &&
 		    unicast_server_cb->config != NULL) {
-			err = unicast_server_cb->config(ascs->conn, &ase->ep,
-							ase->ep.dir,
+			err = unicast_server_cb->config(ascs->conn, &ase->ep, ase->ep.dir,
 							&ase->ep.codec, &stream,
-							&ase->ep.qos_pref);
+							&ase->ep.qos_pref, &rsp);
 		} else {
 			err = -ENOTSUP;
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+					      BT_BAP_ASCS_REASON_NONE);
 		}
 
-		if (err != 0 || stream == NULL) {
-			LOG_ERR("Config failed, err: %d, stream %p", err, stream);
+		if (err || stream == NULL) {
+			if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+				rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+						      BT_BAP_ASCS_REASON_NONE);
+			}
+
+			LOG_ERR("Config failed: err %d, stream %p, code %u, reason %u",
+				err, stream, rsp.code, rsp.reason);
 
 			(void)memcpy(&ase->ep.codec, &codec, sizeof(codec));
-			ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP,
-					BT_ASCS_RSP_CONF_REJECTED,
-					BT_ASCS_REASON_CODEC_DATA);
+			ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_CONFIG_OP, rsp.code, rsp.reason);
 
-			return err;
+			return;
 		}
 
-		ase_stream_add(ascs, ase, stream);
+		bt_bap_stream_init(stream);
 	}
 
 	ascs_cp_rsp_success(ASE_ID(ase), BT_ASCS_CONFIG_OP);
 
-	/* TODO: bt_bap_stream_attach duplicates some of the
-	 * ase_stream_add. Should be cleaned up.
-	 */
 	bt_bap_stream_attach(ascs->conn, stream, &ase->ep, &ase->ep.codec);
 
 	ascs_ep_set_state(&ase->ep, BT_BAP_EP_STATE_CODEC_CONFIGURED);
-
-	return 0;
 }
 
 int bt_ascs_config_ase(struct bt_conn *conn, struct bt_bap_stream *stream, struct bt_codec *codec,
@@ -1538,6 +1502,8 @@ int bt_ascs_config_ase(struct bt_conn *conn, struct bt_bap_stream *stream, struc
 	struct bt_ascs *ascs;
 	struct bt_ascs_ase *ase;
 	struct bt_bap_ep *ep;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 
 	CHECKIF(conn == NULL || stream == NULL || codec == NULL || qos_pref == NULL) {
 		LOG_DBG("NULL value(s) supplied)");
@@ -1575,7 +1541,7 @@ int bt_ascs_config_ase(struct bt_conn *conn, struct bt_bap_stream *stream, struc
 	}
 
 	err = ascs_ep_set_codec(ep, codec->id, sys_le16_to_cpu(codec->cid),
-				sys_le16_to_cpu(codec->vid), NULL, 0, &ep->codec);
+				sys_le16_to_cpu(codec->vid), NULL, 0, &ep->codec, &rsp);
 	if (err) {
 		return err;
 	}
@@ -1589,14 +1555,57 @@ int bt_ascs_config_ase(struct bt_conn *conn, struct bt_bap_stream *stream, struc
 	return 0;
 }
 
+static bool codec_config_len_is_valid(struct net_buf_simple *buf)
+{
+	const struct bt_ascs_config_op *req;
+	struct net_buf_simple_state state;
+
+	net_buf_simple_save(buf, &state);
+
+	if (buf->len < sizeof(*req)) {
+		LOG_WRN("Malformed ASE Config");
+		return false;
+	}
+
+	req = net_buf_simple_pull_mem(buf, sizeof(*req));
+	if (req->num_ases < 1) {
+		LOG_WRN("Number_of_ASEs parameter value is less than 1");
+		return false;
+	}
+
+	for (uint8_t i = 0U; i < req->num_ases; i++) {
+		const struct bt_ascs_config *cfg;
+
+		if (buf->len < sizeof(*cfg)) {
+			LOG_WRN("Malformed ASE Config: len %u < %zu", buf->len, sizeof(*cfg));
+			return false;
+		}
+
+		cfg = net_buf_simple_pull_mem(buf, sizeof(*cfg));
+		if (buf->len < cfg->cc_len) {
+			LOG_WRN("Malformed ASE Codec Config len %u != %u", buf->len, cfg->cc_len);
+			return false;
+		}
+
+		(void)net_buf_simple_pull_mem(buf, cfg->cc_len);
+	}
+
+	if (buf->len > 0) {
+		LOG_WRN("Unexpected data");
+		return false;
+	}
+
+	net_buf_simple_restore(buf, &state);
+
+	return true;
+}
+
 static ssize_t ascs_config(struct bt_ascs *ascs, struct net_buf_simple *buf)
 {
 	const struct bt_ascs_config_op *req;
 	const struct bt_ascs_config *cfg;
-	int i;
 
-	if (buf->len < sizeof(*req)) {
-		LOG_WRN("Malformed ASE Config");
+	if (!codec_config_len_is_valid(buf)) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
 	}
 
@@ -1604,37 +1613,17 @@ static ssize_t ascs_config(struct bt_ascs *ascs, struct net_buf_simple *buf)
 
 	LOG_DBG("num_ases %u", req->num_ases);
 
-	if (req->num_ases < 1) {
-		LOG_WRN("Number_of_ASEs parameter value is less than 1");
-		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-	} else if (buf->len < req->num_ases * sizeof(*cfg)) {
-		LOG_WRN("Malformed ASE Config: len %u < %zu", buf->len,
-			req->num_ases * sizeof(*cfg));
-		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-	}
-
-	for (i = 0; i < req->num_ases; i++) {
+	for (uint8_t i = 0; i < req->num_ases; i++) {
 		struct bt_ascs_ase *ase;
-		int err;
-
-		if (buf->len < sizeof(*cfg)) {
-			LOG_WRN("Malformed ASE Config: len %u < %zu", buf->len, sizeof(*cfg));
-			return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-		}
 
 		cfg = net_buf_simple_pull_mem(buf, sizeof(*cfg));
-
-		if (buf->len < cfg->cc_len) {
-			LOG_WRN("Malformed ASE Codec Config len %u != %u", buf->len, cfg->cc_len);
-			return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-		}
 
 		LOG_DBG("ase 0x%02x cc_len %u", cfg->ase, cfg->cc_len);
 
 		if (!cfg->ase || cfg->ase > ASE_COUNT) {
 			LOG_WRN("Invalid ASE ID: %u", cfg->ase);
 			ascs_cp_rsp_add(cfg->ase, BT_ASCS_CONFIG_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE, 0x00);
 			continue;
 		} else {
 			ase = ase_get(ascs, cfg->ase);
@@ -1642,16 +1631,12 @@ static ssize_t ascs_config(struct bt_ascs *ascs, struct net_buf_simple *buf)
 
 		if (!ase) {
 			ascs_cp_rsp_add(cfg->ase, BT_ASCS_CONFIG_OP,
-					BT_ASCS_RSP_NO_MEM, 0x00);
+					BT_BAP_ASCS_RSP_CODE_NO_MEM, 0x00);
 			LOG_WRN("No free ASE found for config ASE ID 0x%02x", cfg->ase);
 			continue;
 		}
 
-		err = ase_config(ascs, ase, cfg, buf);
-		if (err != 0) {
-			LOG_WRN("Malformed ASE Config");
-			return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-		}
+		ase_config(ascs, ase, cfg, buf);
 	}
 
 	return buf->size;
@@ -1670,12 +1655,16 @@ void bt_ascs_foreach_ep(struct bt_conn *conn, bt_bap_ep_func_t func, void *user_
 }
 
 static int ase_stream_qos(struct bt_bap_stream *stream, struct bt_codec_qos *qos,
-			  struct bt_ascs *ascs, uint8_t cig_id, uint8_t cis_id)
+			  struct bt_ascs *ascs, uint8_t cig_id, uint8_t cis_id,
+			  struct bt_bap_ascs_rsp *rsp)
 {
 	struct bt_bap_ep *ep;
+	*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS, BT_BAP_ASCS_REASON_NONE);
 
-	if (stream == NULL || stream->ep == NULL || qos == NULL) {
+	CHECKIF(stream == NULL || stream->ep == NULL || qos == NULL) {
 		LOG_DBG("Invalid input stream, ep or qos pointers");
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE,
+				       BT_BAP_ASCS_REASON_NONE);
 		return -EINVAL;
 	}
 
@@ -1691,23 +1680,34 @@ static int ase_stream_qos(struct bt_bap_stream *stream, struct bt_codec_qos *qos
 		break;
 	default:
 		LOG_WRN("Invalid operation in state: %s", bt_bap_ep_state_str(ep->status.state));
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE,
+				       BT_BAP_ASCS_REASON_NONE);
 		return -EBADMSG;
 	}
 
-	if (!bt_audio_valid_qos(qos)) {
+	rsp->reason = bt_audio_verify_qos(qos);
+	if (rsp->reason != BT_BAP_ASCS_REASON_NONE) {
+		rsp->code = BT_BAP_ASCS_RSP_CODE_CONF_INVALID;
 		return -EINVAL;
 	}
 
-	if (!bt_bap_stream_valid_qos(stream, qos)) {
+	rsp->reason = bt_bap_stream_verify_qos(stream, qos);
+	if (rsp->reason != BT_BAP_ASCS_REASON_NONE) {
+		rsp->code = BT_BAP_ASCS_RSP_CODE_CONF_INVALID;
 		return -EINVAL;
 	}
 
 	if (unicast_server_cb != NULL && unicast_server_cb->qos != NULL) {
-		int err;
+		int err = unicast_server_cb->qos(stream, qos, rsp);
 
-		err = unicast_server_cb->qos(stream, qos);
-		if (err != 0) {
-			LOG_DBG("Application returned error: %d", err);
+		if (err) {
+			if (rsp->code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+				*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+						       BT_BAP_ASCS_REASON_NONE);
+			}
+
+			LOG_DBG("Application returned error: err %d status %u reason %u",
+				err, rsp->code, rsp->reason);
 			return err;
 		}
 	}
@@ -1723,6 +1723,8 @@ static int ase_stream_qos(struct bt_bap_stream *stream, struct bt_codec_qos *qos
 		iso = bap_iso_get_or_new(ascs, cig_id, cis_id);
 		if (iso == NULL) {
 			LOG_ERR("Could not allocate bap_iso");
+			*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NO_MEM,
+					       BT_BAP_ASCS_REASON_NONE);
 			return -ENOMEM;
 		}
 
@@ -1730,6 +1732,8 @@ static int ase_stream_qos(struct bt_bap_stream *stream, struct bt_codec_qos *qos
 			LOG_ERR("iso %p already in use in dir %s",
 			       &iso->chan, bt_audio_dir_str(ep->dir));
 			bt_bap_iso_unref(iso);
+			*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_CONF_INVALID,
+					       BT_BAP_ASCS_REASON_CIS);
 			return -EALREADY;
 		}
 
@@ -1756,6 +1760,7 @@ static int ase_stream_qos(struct bt_bap_stream *stream, struct bt_codec_qos *qos
 
 	ascs_iso_listen(stream);
 
+	*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS, BT_BAP_ASCS_REASON_NONE);
 	return 0;
 }
 
@@ -1766,6 +1771,8 @@ static void ase_qos(struct bt_ascs_ase *ase, const struct bt_ascs_qos *qos)
 	struct bt_codec_qos *cqos = &ep->qos;
 	const uint8_t cig_id = qos->cig;
 	const uint8_t cis_id = qos->cis;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	int err;
 
 	cqos->interval = sys_get_le24(qos->interval);
@@ -1781,38 +1788,16 @@ static void ase_qos(struct bt_ascs_ase *ase, const struct bt_ascs_qos *qos)
 	       qos->cis, cqos->interval, cqos->framing, cqos->phy, cqos->sdu,
 	       cqos->rtn, cqos->latency, cqos->pd);
 
-	err = ase_stream_qos(stream, cqos, ase->ascs, cig_id, cis_id);
+	err = ase_stream_qos(stream, cqos, ase->ascs, cig_id, cis_id, &rsp);
 	if (err) {
-		uint8_t reason = BT_ASCS_REASON_NONE;
-
-		LOG_ERR("QoS failed: err %d", err);
-
-		if (err == -ENOTSUP) {
-			if (cqos->interval == 0) {
-				reason = BT_ASCS_REASON_INTERVAL;
-			} else if (cqos->framing == 0xff) {
-				reason = BT_ASCS_REASON_FRAMING;
-			} else if (cqos->phy == 0) {
-				reason = BT_ASCS_REASON_PHY;
-			} else if (cqos->sdu == 0xffff) {
-				reason = BT_ASCS_REASON_SDU;
-			} else if (cqos->latency == 0) {
-				reason = BT_ASCS_REASON_LATENCY;
-			} else if (cqos->pd == 0) {
-				reason = BT_ASCS_REASON_PD;
-			}
-		} else if (err == -EALREADY) {
-			reason = BT_ASCS_REASON_CIS;
-			/* FIXME: Ugly workaround to send Response_Code
-			 *        0x09 = Invalid Configuration Parameter Value
-			 */
-			err = -EINVAL;
+		if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+					      BT_BAP_ASCS_REASON_NONE);
 		}
-
+		LOG_ERR("QoS failed: err %d, code %u, reason %u", err, rsp.code, rsp.reason);
 		memset(cqos, 0, sizeof(*cqos));
 
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_QOS_OP,
-				      err, reason);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_QOS_OP, rsp.code, rsp.reason);
 		return;
 	}
 
@@ -1849,8 +1834,8 @@ static ssize_t ascs_qos(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		LOG_DBG("ase 0x%02x", qos->ase);
 
 		if (!is_valid_ase_id(qos->ase)) {
-			ascs_cp_rsp_add(qos->ase, BT_ASCS_QOS_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+			ascs_cp_rsp_add(qos->ase, BT_ASCS_QOS_OP, BT_BAP_ASCS_RSP_CODE_INVALID_ASE,
+					0x00);
 			LOG_WRN("Unknown ase 0x%02x", qos->ase);
 			continue;
 		}
@@ -1859,7 +1844,7 @@ static ssize_t ascs_qos(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		if (!ase) {
 			LOG_DBG("Invalid operation for idle ASE");
 			ascs_cp_rsp_add(qos->ase, BT_ASCS_QOS_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, 0x00);
 			continue;
 		}
 
@@ -1891,6 +1876,7 @@ static bool ascs_codec_store_metadata(struct bt_data *data, void *user_data)
 
 struct ascs_parse_result {
 	int err;
+	struct bt_bap_ascs_rsp *rsp;
 	size_t count;
 	const struct bt_bap_ep *ep;
 };
@@ -1910,6 +1896,8 @@ static bool ascs_parse_metadata(struct bt_data *data, void *user_data)
 	if (result->count > CONFIG_BT_CODEC_MAX_METADATA_COUNT) {
 		LOG_ERR("Not enough buffers for Codec Config Metadata: %zu > %zu", result->count,
 			CONFIG_BT_CODEC_MAX_METADATA_LEN);
+		*result->rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NO_MEM,
+					       BT_BAP_ASCS_REASON_NONE);
 		result->err = -ENOMEM;
 
 		return false;
@@ -1918,6 +1906,8 @@ static bool ascs_parse_metadata(struct bt_data *data, void *user_data)
 	if (data_len > CONFIG_BT_CODEC_MAX_METADATA_LEN) {
 		LOG_ERR("Not enough space for Codec Config Metadata: %u > %zu", data->data_len,
 			CONFIG_BT_CODEC_MAX_METADATA_LEN);
+		*result->rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NO_MEM,
+					       BT_BAP_ASCS_REASON_NONE);
 		result->err = -ENOMEM;
 
 		return false;
@@ -1932,7 +1922,8 @@ static bool ascs_parse_metadata(struct bt_data *data, void *user_data)
 
 			if (!bt_pacs_context_available(ep->dir, context)) {
 				LOG_WRN("Context 0x%04x is unavailable", context);
-
+				*result->rsp = BT_BAP_ASCS_RSP(
+					BT_BAP_ASCS_RSP_CODE_METADATA_REJECTED, data_type);
 				result->err = -EACCES;
 
 				return false;
@@ -1965,9 +1956,11 @@ static bool ascs_parse_metadata(struct bt_data *data, void *user_data)
 	return true;
 }
 
-static int ascs_verify_metadata(const struct net_buf_simple *buf, struct bt_bap_ep *ep)
+static int ascs_verify_metadata(const struct net_buf_simple *buf, struct bt_bap_ep *ep,
+				struct bt_bap_ascs_rsp *rsp)
 {
 	struct ascs_parse_result result = {
+		.rsp = rsp,
 		.count = 0U,
 		.err = 0,
 		.ep = ep
@@ -1986,9 +1979,13 @@ static int ascs_verify_metadata(const struct net_buf_simple *buf, struct bt_bap_
 
 		if (meta_ltv.len > 2) {
 			/* Value of the Metadata Type field in error */
+			*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_METADATA_INVALID,
+					       meta_ltv.data[2]);
 			return meta_ltv.data[2];
 		}
 
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_METADATA_INVALID,
+				       BT_BAP_ASCS_REASON_NONE);
 		return -EINVAL;
 	}
 
@@ -1996,12 +1993,15 @@ static int ascs_verify_metadata(const struct net_buf_simple *buf, struct bt_bap_
 }
 
 static int ascs_ep_set_metadata(struct bt_bap_ep *ep, struct net_buf_simple *buf, uint8_t len,
-				struct bt_codec *codec)
+				struct bt_codec *codec, struct bt_bap_ascs_rsp *rsp)
 {
 	struct net_buf_simple meta_ltv;
 	int err;
+	*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS, BT_BAP_ASCS_REASON_NONE);
 
 	if (ep == NULL && codec == NULL) {
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE,
+				       BT_BAP_ASCS_REASON_NONE);
 		return -EINVAL;
 	}
 
@@ -2009,6 +2009,7 @@ static int ascs_ep_set_metadata(struct bt_bap_ep *ep, struct net_buf_simple *buf
 
 	if (len == 0) {
 		(void)memset(codec->meta, 0, sizeof(codec->meta));
+		*rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS, BT_BAP_ASCS_REASON_NONE);
 		return 0;
 	}
 
@@ -2021,7 +2022,7 @@ static int ascs_ep_set_metadata(struct bt_bap_ep *ep, struct net_buf_simple *buf
 				      net_buf_simple_pull_mem(buf, len),
 				      len);
 
-	err = ascs_verify_metadata(&meta_ltv, ep);
+	err = ascs_verify_metadata(&meta_ltv, ep, rsp);
 	if (err != 0) {
 		return err;
 	}
@@ -2035,13 +2036,15 @@ static int ascs_ep_set_metadata(struct bt_bap_ep *ep, struct net_buf_simple *buf
 	return 0;
 }
 
-static int ase_metadata(struct bt_ascs_ase *ase, uint8_t op,
-			struct bt_ascs_metadata *meta,
-			struct net_buf_simple *buf)
+static void ase_metadata(struct bt_ascs_ase *ase, uint8_t op,
+			 struct bt_ascs_metadata *meta,
+			 struct net_buf_simple *buf)
 {
 	struct bt_codec_data metadata_backup[CONFIG_BT_CODEC_MAX_DATA_COUNT];
 	struct bt_bap_stream *stream;
 	struct bt_bap_ep *ep;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	uint8_t state;
 	int err;
 
@@ -2058,10 +2061,9 @@ static int ase_metadata(struct bt_ascs_ase *ase, uint8_t op,
 		break;
 	default:
 		LOG_WRN("Invalid operation in state: %s", bt_bap_ep_state_str(state));
-		err = -EBADMSG;
-		ascs_cp_rsp_add_errno(ASE_ID(ase), op, err,
-				      buf->len ? *buf->data : 0x00);
-		return err;
+		ascs_cp_rsp_add(ASE_ID(ase), op, BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE,
+				BT_BAP_ASCS_REASON_NONE);
+		return;
 	}
 
 	if (!meta->len) {
@@ -2070,42 +2072,40 @@ static int ase_metadata(struct bt_ascs_ase *ase, uint8_t op,
 
 	/* Backup existing metadata */
 	(void)memcpy(metadata_backup, ep->codec.meta, sizeof(metadata_backup));
-	err = ascs_ep_set_metadata(ep, buf, meta->len, &ep->codec);
+	err = ascs_ep_set_metadata(ep, buf, meta->len, &ep->codec, &rsp);
 	if (err) {
-		if (err < 0) {
-			ascs_cp_rsp_add_errno(ASE_ID(ase), op, err, 0x00);
-		} else {
-			ascs_cp_rsp_add(ASE_ID(ase), op,
-					BT_ASCS_RSP_METADATA_INVALID, err);
-		}
-		return 0;
+		ascs_cp_rsp_add(ASE_ID(ase), op, rsp.code, rsp.reason);
+		return;
 	}
 
 	stream = ep->stream;
 	if (unicast_server_cb != NULL && unicast_server_cb->metadata != NULL) {
 		err = unicast_server_cb->metadata(stream, ep->codec.meta,
-						  ep->codec.meta_count);
+						  ep->codec.meta_count, &rsp);
 	} else {
 		err = -ENOTSUP;
+		rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+				      BT_BAP_ASCS_REASON_NONE);
 	}
 
 	if (err) {
-		/* Restore backup */
-		(void)memcpy(ep->codec.meta, metadata_backup,
-			     sizeof(metadata_backup));
+		if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+					      BT_BAP_ASCS_REASON_NONE);
+		}
 
-		LOG_ERR("Metadata failed: %d", err);
-		ascs_cp_rsp_add_errno(ASE_ID(ase), op, err,
-				      buf->len ? *buf->data : 0x00);
-		return err;
+		/* Restore backup */
+		(void)memcpy(ep->codec.meta, metadata_backup, sizeof(metadata_backup));
+
+		LOG_ERR("Metadata failed: err %d, code %u, reason %u", err, rsp.code, rsp.reason);
+		ascs_cp_rsp_add(ASE_ID(ase), op, rsp.code, rsp.reason);
+		return;
 	}
 
 	/* Set the state to the same state to trigger the notifications */
 	ascs_ep_set_state(ep, ep->status.state);
 done:
 	ascs_cp_rsp_success(ASE_ID(ase), op);
-
-	return 0;
 }
 
 static int ase_enable(struct bt_ascs_ase *ase, struct bt_ascs_metadata *meta,
@@ -2113,6 +2113,8 @@ static int ase_enable(struct bt_ascs_ase *ase, struct bt_ascs_metadata *meta,
 {
 	struct bt_bap_stream *stream;
 	struct bt_bap_ep *ep;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	int err;
 
 	LOG_DBG("ase %p buf->len %u", ase, buf->len);
@@ -2123,35 +2125,36 @@ static int ase_enable(struct bt_ascs_ase *ase, struct bt_ascs_metadata *meta,
 	if (ep->status.state != BT_BAP_EP_STATE_QOS_CONFIGURED) {
 		err = -EBADMSG;
 		LOG_WRN("Invalid operation in state: %s", bt_bap_ep_state_str(ep->status.state));
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_ENABLE_OP, err,
-				      BT_ASCS_REASON_NONE);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_ENABLE_OP,
+				BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, BT_BAP_ASCS_REASON_NONE);
 		return err;
 	}
 
-	err = ascs_ep_set_metadata(ep, buf, meta->len, &ep->codec);
+	err = ascs_ep_set_metadata(ep, buf, meta->len, &ep->codec, &rsp);
 	if (err) {
-		if (err < 0) {
-			ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_ENABLE_OP,
-					      err, 0x00);
-		} else {
-			ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_ENABLE_OP,
-					BT_ASCS_RSP_METADATA_INVALID, err);
-		}
-		return 0;
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_ENABLE_OP, rsp.code, rsp.reason);
+		return err;
 	}
 
 	stream = ep->stream;
 	if (unicast_server_cb != NULL && unicast_server_cb->enable != NULL) {
 		err = unicast_server_cb->enable(stream, ep->codec.meta,
-						ep->codec.meta_count);
+						ep->codec.meta_count, &rsp);
 	} else {
 		err = -ENOTSUP;
+		rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+				      BT_BAP_ASCS_REASON_NONE);
 	}
 
 	if (err) {
-		LOG_ERR("Enable rejected: %d", err);
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_ENABLE_OP, err,
-				      BT_ASCS_REASON_NONE);
+		if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+					      BT_BAP_ASCS_REASON_NONE);
+		}
+
+		LOG_ERR("Enable rejected: err %d, code %u, reason %u", err, rsp.code, rsp.reason);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_ENABLE_OP, rsp.code, rsp.reason);
+
 		return -EFAULT;
 	}
 
@@ -2199,7 +2202,7 @@ static ssize_t ascs_enable(struct bt_ascs *ascs, struct net_buf_simple *buf)
 
 		if (!is_valid_ase_id(meta->ase)) {
 			ascs_cp_rsp_add(meta->ase, BT_ASCS_ENABLE_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE, 0x00);
 			LOG_WRN("Unknown ase 0x%02x", meta->ase);
 			continue;
 		}
@@ -2208,7 +2211,7 @@ static ssize_t ascs_enable(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		if (!ase) {
 			LOG_DBG("Invalid operation for idle ASE");
 			ascs_cp_rsp_add(meta->ase, BT_ASCS_ENABLE_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, 0x00);
 			continue;
 		}
 
@@ -2221,6 +2224,8 @@ static ssize_t ascs_enable(struct bt_ascs *ascs, struct net_buf_simple *buf)
 static void ase_start(struct bt_ascs_ase *ase)
 {
 	struct bt_bap_ep *ep;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	int err;
 
 	LOG_DBG("ase %p", ase);
@@ -2230,8 +2235,8 @@ static void ase_start(struct bt_ascs_ase *ase)
 	/* Valid for an ASE only if ASE_State field = 0x02 (QoS Configured) */
 	if (ep->status.state != BT_BAP_EP_STATE_ENABLING) {
 		LOG_WRN("Invalid operation in state: %s", bt_bap_ep_state_str(ep->status.state));
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_START_OP, -EBADMSG,
-				      BT_ASCS_REASON_NONE);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_START_OP,
+				BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, BT_BAP_ASCS_REASON_NONE);
 		return;
 	}
 
@@ -2244,7 +2249,7 @@ static void ase_start(struct bt_ascs_ase *ase)
 	if (ep->dir == BT_AUDIO_DIR_SINK) {
 		LOG_WRN("Start failed: invalid operation for Sink");
 		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_START_OP,
-				BT_ASCS_RSP_INVALID_DIR, BT_ASCS_REASON_NONE);
+				BT_BAP_ASCS_RSP_CODE_INVALID_DIR, BT_BAP_ASCS_REASON_NONE);
 		return;
 	} else if (ep->iso->chan.state != BT_ISO_STATE_CONNECTED) {
 		/* An ASE may not go into the streaming state unless the CIS
@@ -2253,21 +2258,27 @@ static void ase_start(struct bt_ascs_ase *ase)
 		LOG_WRN("Start failed: CIS not connected: %u",
 			ep->iso->chan.state);
 		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_START_OP,
-				BT_ASCS_RSP_INVALID_ASE_STATE,
-				BT_ASCS_REASON_NONE);
+				BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE,
+				BT_BAP_ASCS_REASON_NONE);
 		return;
 	}
 
 	if (unicast_server_cb != NULL && unicast_server_cb->start != NULL) {
-		err = unicast_server_cb->start(ep->stream);
+		err = unicast_server_cb->start(ep->stream, &rsp);
 	} else {
 		err = -ENOTSUP;
+		rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+				      BT_BAP_ASCS_REASON_NONE);
 	}
 
 	if (err) {
-		LOG_ERR("Start failed: %d", err);
-		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_START_OP, err,
-				BT_ASCS_REASON_NONE);
+		if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+					      BT_BAP_ASCS_REASON_NONE);
+		}
+
+		LOG_ERR("Start failed: err %d, code %u, reason %u", err, rsp.code, rsp.reason);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_START_OP, rsp.code, rsp.reason);
 
 		return;
 	}
@@ -2309,8 +2320,8 @@ static ssize_t ascs_start(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		LOG_DBG("ase 0x%02x", id);
 
 		if (!is_valid_ase_id(id)) {
-			ascs_cp_rsp_add(id, BT_ASCS_START_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+			ascs_cp_rsp_add(id, BT_ASCS_START_OP, BT_BAP_ASCS_RSP_CODE_INVALID_ASE,
+					0x00);
 			LOG_WRN("Unknown ase 0x%02x", id);
 			continue;
 		}
@@ -2319,7 +2330,7 @@ static ssize_t ascs_start(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		if (!ase) {
 			LOG_DBG("Invalid operation for idle ASE");
 			ascs_cp_rsp_add(id, BT_ASCS_START_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, 0x00);
 			continue;
 		}
 
@@ -2359,8 +2370,8 @@ static ssize_t ascs_disable(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		LOG_DBG("ase 0x%02x", id);
 
 		if (!is_valid_ase_id(id)) {
-			ascs_cp_rsp_add(id, BT_ASCS_DISABLE_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+			ascs_cp_rsp_add(id, BT_ASCS_DISABLE_OP, BT_BAP_ASCS_RSP_CODE_INVALID_ASE,
+					0x00);
 			LOG_WRN("Unknown ase 0x%02x", id);
 			continue;
 		}
@@ -2369,7 +2380,7 @@ static ssize_t ascs_disable(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		if (!ase) {
 			LOG_DBG("Invalid operation for idle ASE");
 			ascs_cp_rsp_add(id, BT_ASCS_DISABLE_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, 0x00);
 			continue;
 		}
 
@@ -2383,6 +2394,8 @@ static void ase_stop(struct bt_ascs_ase *ase)
 {
 	struct bt_bap_stream *stream;
 	struct bt_bap_ep *ep;
+	struct bt_bap_ascs_rsp rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_SUCCESS,
+						     BT_BAP_ASCS_REASON_NONE);
 	int err;
 
 	LOG_DBG("ase %p", ase);
@@ -2397,29 +2410,35 @@ static void ase_stop(struct bt_ascs_ase *ase)
 	 */
 	if (ase->ep.dir == BT_AUDIO_DIR_SINK) {
 		LOG_WRN("Stop failed: invalid operation for Sink");
-		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_STOP_OP,
-				BT_ASCS_RSP_INVALID_DIR, BT_ASCS_REASON_NONE);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_STOP_OP, BT_BAP_ASCS_RSP_CODE_INVALID_DIR,
+				BT_BAP_ASCS_REASON_NONE);
 		return;
 	}
 
 	if (ep->status.state != BT_BAP_EP_STATE_DISABLING) {
 		LOG_WRN("Invalid operation in state: %s", bt_bap_ep_state_str(ep->status.state));
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_STOP_OP, -EBADMSG,
-				      BT_ASCS_REASON_NONE);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_STOP_OP,
+				BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, BT_BAP_ASCS_REASON_NONE);
 		return;
 	}
 
 	stream = ep->stream;
 	if (unicast_server_cb != NULL && unicast_server_cb->stop != NULL) {
-		err = unicast_server_cb->stop(stream);
+		err = unicast_server_cb->stop(stream, &rsp);
 	} else {
 		err = -ENOTSUP;
+		rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED,
+				      BT_BAP_ASCS_REASON_NONE);
 	}
 
 	if (err) {
-		LOG_ERR("Stop failed: %d", err);
-		ascs_cp_rsp_add_errno(ASE_ID(ase), BT_ASCS_STOP_OP, err,
-				      BT_ASCS_REASON_NONE);
+		if (rsp.code == BT_BAP_ASCS_RSP_CODE_SUCCESS) {
+			rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_UNSPECIFIED,
+					      BT_BAP_ASCS_REASON_NONE);
+		}
+
+		LOG_ERR("Stop failed: err %d, code %u, reason %u", err, rsp.code, rsp.reason);
+		ascs_cp_rsp_add(ASE_ID(ase), BT_ASCS_STOP_OP, rsp.code, rsp.reason);
 		return;
 	}
 
@@ -2469,8 +2488,8 @@ static ssize_t ascs_stop(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		LOG_DBG("ase 0x%02x", id);
 
 		if (!is_valid_ase_id(id)) {
-			ascs_cp_rsp_add(id, BT_ASCS_STOP_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+			ascs_cp_rsp_add(id, BT_ASCS_STOP_OP, BT_BAP_ASCS_RSP_CODE_INVALID_ASE,
+					0x00);
 			LOG_WRN("Unknown ase 0x%02x", id);
 			continue;
 		}
@@ -2478,8 +2497,8 @@ static ssize_t ascs_stop(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		ase = ase_find(ascs, id);
 		if (!ase) {
 			LOG_DBG("Invalid operation for idle ASE");
-			ascs_cp_rsp_add(id, BT_ASCS_STOP_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
+			ascs_cp_rsp_add(id, BT_ASCS_STOP_OP, BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE,
+					0x00);
 			continue;
 		}
 
@@ -2526,7 +2545,7 @@ static ssize_t ascs_metadata(struct bt_ascs *ascs, struct net_buf_simple *buf)
 
 		if (!is_valid_ase_id(meta->ase)) {
 			ascs_cp_rsp_add(meta->ase, BT_ASCS_METADATA_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE, 0x00);
 			LOG_WRN("Unknown ase 0x%02x", meta->ase);
 			continue;
 		}
@@ -2535,7 +2554,7 @@ static ssize_t ascs_metadata(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		if (!ase) {
 			LOG_DBG("Invalid operation for idle ASE");
 			ascs_cp_rsp_add(meta->ase, BT_ASCS_METADATA_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, 0x00);
 			continue;
 		}
 
@@ -2575,8 +2594,8 @@ static ssize_t ascs_release(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		LOG_DBG("ase 0x%02x", id);
 
 		if (!is_valid_ase_id(id)) {
-			ascs_cp_rsp_add(id, BT_ASCS_RELEASE_OP,
-					BT_ASCS_RSP_INVALID_ASE, 0x00);
+			ascs_cp_rsp_add(id, BT_ASCS_RELEASE_OP, BT_BAP_ASCS_RSP_CODE_INVALID_ASE,
+					0x00);
 			LOG_WRN("Unknown ase 0x%02x", id);
 			continue;
 		}
@@ -2585,7 +2604,7 @@ static ssize_t ascs_release(struct bt_ascs *ascs, struct net_buf_simple *buf)
 		if (!ase) {
 			LOG_DBG("Invalid operation for idle ASE");
 			ascs_cp_rsp_add(id, BT_ASCS_RELEASE_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, 0x00);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE, 0x00);
 			continue;
 		}
 
@@ -2594,7 +2613,8 @@ static ssize_t ascs_release(struct bt_ascs *ascs, struct net_buf_simple *buf)
 			LOG_WRN("Invalid operation in state: %s",
 				bt_bap_ep_state_str(ase->ep.status.state));
 			ascs_cp_rsp_add(id, BT_ASCS_RELEASE_OP,
-					BT_ASCS_RSP_INVALID_ASE_STATE, BT_ASCS_REASON_NONE);
+					BT_BAP_ASCS_RSP_CODE_INVALID_ASE_STATE,
+					BT_BAP_ASCS_REASON_NONE);
 			continue;
 		}
 
@@ -2657,14 +2677,14 @@ static ssize_t ascs_cp_write(struct bt_conn *conn,
 		ret = ascs_release(ascs, &buf);
 		break;
 	default:
-		ascs_cp_rsp_add(0x00, req->op, BT_ASCS_RSP_NOT_SUPPORTED, 0);
+		ascs_cp_rsp_add(0x00, req->op, BT_BAP_ASCS_RSP_CODE_NOT_SUPPORTED, 0);
 		LOG_DBG("Unknown opcode");
 		goto respond;
 	}
 
 	if (ret == BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN)) {
-		ascs_cp_rsp_add(0, req->op, BT_ASCS_RSP_TRUNCATED,
-				BT_ASCS_REASON_NONE);
+		ascs_cp_rsp_add(0, req->op, BT_BAP_ASCS_RSP_CODE_INVALID_LENGTH,
+				BT_BAP_ASCS_REASON_NONE);
 	}
 
 respond:
@@ -2703,4 +2723,41 @@ static int control_point_notify(struct bt_conn *conn, const void *data, uint16_t
 	return bt_gatt_notify_uuid(conn, BT_UUID_ASCS_ASE_CP, ascs_svc.attrs, data, len);
 }
 
+#if defined(ZTEST_UNITTEST)
+static void ase_cleanup(struct bt_ascs_ase *ase)
+{
+	if (ase->ep.iso != NULL) {
+		bt_bap_iso_unbind_ep(ase->ep.iso, &ase->ep);
+	}
+
+	if (ase->ep.stream != NULL) {
+		bt_bap_stream_detach(ase->ep.stream);
+	}
+
+	bt_ascs_ase_return_to_slab(ase);
+}
+
+void ascs_cleanup(void)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(sessions); i++) {
+		struct bt_ascs *session = &sessions[i];
+		sys_snode_t *node, *tmp;
+
+		if (session->conn == NULL) {
+			continue;
+		}
+
+		SYS_SLIST_FOR_EACH_NODE_SAFE(&session->ases, node, tmp) {
+			struct bt_ascs_ase *ase;
+
+			ase = CONTAINER_OF(node, struct bt_ascs_ase, node);
+
+			ase_cleanup(ase);
+		}
+
+		bt_conn_unref(session->conn);
+		session->conn = NULL;
+	}
+}
+#endif /* ZTEST_UNITTEST */
 #endif /* BT_BAP_UNICAST_SERVER */

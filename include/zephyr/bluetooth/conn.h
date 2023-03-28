@@ -216,7 +216,17 @@ struct bt_conn *bt_conn_ref(struct bt_conn *conn);
  */
 void bt_conn_unref(struct bt_conn *conn);
 
-/** @brief Iterate through all existing connections.
+/** @brief Iterate through all bt_conn objects.
+ *
+ * Iterates trough all bt_conn objects that are alive in the Host allocator.
+ *
+ * To find established connections, combine this with @ref bt_conn_get_info.
+ * Check that @ref bt_conn_info.state is @ref BT_CONN_STATE_CONNECTED.
+ *
+ * Thread safety: This API is thread safe, but it does not guarantee a
+ * sequentially-consistent view for objects allocated during the current
+ * invocation of this API. E.g. If preempted while allocations A then B then C
+ * happen then results may include A and C but miss B.
  *
  * @param type  Connection Type
  * @param func  Function to call for each connection.
@@ -748,9 +758,11 @@ int bt_le_set_auto_conn(const bt_addr_le_t *addr,
  *  strong key this function does nothing.
  *
  *  If the device has no bond information for the peer and is not already paired
- *  then the pairing procedure will be initiated. If the device has bond
- *  information or is already paired and the keys are too weak then the pairing
- *  procedure will be initiated.
+ *  then the pairing procedure will be initiated. Note that @p sec has no effect
+ *  on the security level selected for the pairing process. The selection is
+ *  instead controlled by the values of the registered @ref bt_conn_auth_cb. If
+ *  the device has bond information or is already paired and the keys are too
+ *  weak then the pairing procedure will be initiated.
  *
  *  This function may return error if required level of security is not possible
  *  to achieve due to local or remote device limitation (e.g., input output
@@ -1034,15 +1046,21 @@ void bt_conn_cb_register(struct bt_conn_cb *cb);
  */
 void bt_set_bondable(bool enable);
 
-/** @brief Allow/disallow remote OOB data to be used for pairing.
+/** @brief Allow/disallow remote LE SC OOB data to be used for pairing.
  *
- *  Set/clear the OOB data flag for SMP Pairing Request/Response data.
- *  The initial value of this flag depends on BT_OOB_DATA_PRESENT Kconfig
- *  setting.
+ *  Set/clear the OOB data flag for LE SC SMP Pairing Request/Response data.
  *
- *  @param enable Value allowing/disallowing remote OOB data.
+ *  @param enable Value allowing/disallowing remote LE SC OOB data.
  */
-void bt_set_oob_data_flag(bool enable);
+void bt_le_oob_set_sc_flag(bool enable);
+
+/** @brief Allow/disallow remote legacy OOB data to be used for pairing.
+ *
+ *  Set/clear the OOB data flag for legacy SMP Pairing Request/Response data.
+ *
+ *  @param enable Value allowing/disallowing remote legacy OOB data.
+ */
+void bt_le_oob_set_legacy_flag(bool enable);
 
 /** @brief Set OOB Temporary Key to be used for pairing
  *

@@ -273,6 +273,8 @@ static int cmd_can_stop(const struct shell *sh, size_t argc, char **argv)
 static int cmd_can_show(const struct shell *sh, size_t argc, char **argv)
 {
 	const struct device *dev = device_get_binding(argv[1]);
+	const struct can_timing *timing_min;
+	const struct can_timing *timing_max;
 	struct can_bus_err_cnt err_cnt;
 	enum can_state state;
 	uint32_t max_bitrate = 0;
@@ -336,6 +338,30 @@ static int cmd_can_show(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "rx errors:       %d", err_cnt.rx_err_cnt);
 	shell_print(sh, "tx errors:       %d", err_cnt.tx_err_cnt);
 
+	timing_min = can_get_timing_min(dev);
+	timing_max = can_get_timing_max(dev);
+
+	shell_print(sh, "timing:          sjw %u..%u, prop_seg %u..%u, "
+		    "phase_seg1 %u..%u, phase_seg2 %u..%u, prescaler %u..%u",
+		    timing_min->sjw, timing_max->sjw,
+		    timing_min->prop_seg, timing_max->prop_seg,
+		    timing_min->phase_seg1, timing_max->phase_seg1,
+		    timing_min->phase_seg2, timing_max->phase_seg2,
+		    timing_min->prescaler, timing_max->prescaler);
+
+	if (IS_ENABLED(CONFIG_CAN_FD_MODE) && (cap & CAN_MODE_FD) != 0) {
+		timing_min = can_get_timing_data_min(dev);
+		timing_max = can_get_timing_data_max(dev);
+
+		shell_print(sh, "timing data:     sjw %u..%u, prop_seg %u..%u, "
+			    "phase_seg1 %u..%u, phase_seg2 %u..%u, prescaler %u..%u",
+			    timing_min->sjw, timing_max->sjw,
+			    timing_min->prop_seg, timing_max->prop_seg,
+			    timing_min->phase_seg1, timing_max->phase_seg1,
+			    timing_min->phase_seg2, timing_max->phase_seg2,
+			    timing_min->prescaler, timing_max->prescaler);
+	}
+
 	return 0;
 }
 
@@ -366,7 +392,15 @@ static int cmd_can_bitrate_set(const struct shell *sh, size_t argc, char **argv)
 			return -EINVAL;
 		}
 
-		timing.sjw = CAN_SJW_NO_CHANGE;
+		if (argc >= 5) {
+			timing.sjw = (uint16_t)strtoul(argv[4], &endptr, 10);
+			if (*endptr != '\0') {
+				shell_error(sh, "failed to parse SJW");
+				return -EINVAL;
+			}
+		} else {
+			timing.sjw = CAN_SJW_NO_CHANGE;
+		}
 
 		err = can_calc_timing(dev, &timing, bitrate, sample_pnt);
 		if (err < 0) {
@@ -376,9 +410,20 @@ static int cmd_can_bitrate_set(const struct shell *sh, size_t argc, char **argv)
 			return err;
 		}
 
-		shell_print(sh, "setting bitrate to %d bps, sample point %d.%d%% "
-			    "(+/- %d.%d%%)",
-			    bitrate, sample_pnt / 10, sample_pnt % 10, err / 10, err % 10);
+		if (timing.sjw == CAN_SJW_NO_CHANGE) {
+			shell_print(sh, "setting bitrate to %d bps, sample point %d.%d%% "
+				    "(+/- %d.%d%%)",
+				    bitrate, sample_pnt / 10, sample_pnt % 10, err / 10, err % 10);
+		} else {
+			shell_print(sh, "setting bitrate to %d bps, sample point %d.%d%% "
+				    "(+/- %d.%d%%), sjw %d",
+				    bitrate, sample_pnt / 10, sample_pnt % 10, err / 10, err % 10,
+				    timing.sjw);
+		}
+
+		LOG_DBG("sjw %u, prop_seg %u, phase_seg1 %u, phase_seg2 %u, prescaler %u",
+			timing.sjw, timing.prop_seg, timing.phase_seg1, timing.phase_seg2,
+			timing.prescaler);
 
 		err = can_set_timing(dev, &timing);
 		if (err != 0) {
@@ -425,7 +470,15 @@ static int cmd_can_dbitrate_set(const struct shell *sh, size_t argc, char **argv
 			return -EINVAL;
 		}
 
-		timing.sjw = CAN_SJW_NO_CHANGE;
+		if (argc >= 5) {
+			timing.sjw = (uint16_t)strtoul(argv[4], &endptr, 10);
+			if (*endptr != '\0') {
+				shell_error(sh, "failed to parse SJW");
+				return -EINVAL;
+			}
+		} else {
+			timing.sjw = CAN_SJW_NO_CHANGE;
+		}
 
 		err = can_calc_timing_data(dev, &timing, bitrate, sample_pnt);
 		if (err < 0) {
@@ -435,9 +488,20 @@ static int cmd_can_dbitrate_set(const struct shell *sh, size_t argc, char **argv
 			return err;
 		}
 
-		shell_print(sh, "setting data bitrate to %d bps, sample point %d.%d%% "
-			    "(+/- %d.%d%%)",
-			    bitrate, sample_pnt / 10, sample_pnt % 10, err / 10, err % 10);
+		if (timing.sjw == CAN_SJW_NO_CHANGE) {
+			shell_print(sh, "setting data bitrate to %d bps, sample point %d.%d%% "
+				    "(+/- %d.%d%%)",
+				    bitrate, sample_pnt / 10, sample_pnt % 10, err / 10, err % 10);
+		} else {
+			shell_print(sh, "setting data bitrate to %d bps, sample point %d.%d%% "
+				    "(+/- %d.%d%%), sjw %d",
+				    bitrate, sample_pnt / 10, sample_pnt % 10, err / 10, err % 10,
+				    timing.sjw);
+		}
+
+		LOG_DBG("sjw %u, prop_seg %u, phase_seg1 %u, phase_seg2 %u, prescaler %u",
+			timing.sjw, timing.prop_seg, timing.phase_seg1, timing.phase_seg2,
+			timing.prescaler);
 
 		err = can_set_timing_data(dev, &timing);
 		if (err != 0) {
@@ -872,14 +936,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_can_cmds,
 		"Usage: can show <device>",
 		cmd_can_show, 2, 0),
 	SHELL_CMD_ARG(bitrate, &dsub_can_device_name,
-		"Set CAN controller bitrate and optional sample point\n"
-		"Usage: can bitrate <device> <bitrate> [sample point]",
-		cmd_can_bitrate_set, 3, 1),
+		"Set CAN controller bitrate (sample point and SJW optional)\n"
+		"Usage: can bitrate <device> <bitrate> [sample point] [sjw]",
+		cmd_can_bitrate_set, 3, 2),
 	SHELL_COND_CMD_ARG(CONFIG_CAN_FD_MODE,
 		dbitrate, &dsub_can_device_name,
-		"Set CAN controller data phase bitrate and optional sample point\n"
-		"Usage: can dbitrate <device> <data phase bitrate> [sample point]",
-		cmd_can_dbitrate_set, 3, 1),
+		"Set CAN controller data phase bitrate (sample point and SJW optional)\n"
+		"Usage: can dbitrate <device> <data phase bitrate> [sample point] [sjw]",
+		cmd_can_dbitrate_set, 3, 2),
 	SHELL_CMD_ARG(mode, &dsub_can_device_name_mode,
 		"Set CAN controller mode\n"
 		"Usage: can mode <device> <mode> [mode] [mode] [...]",

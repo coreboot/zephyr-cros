@@ -277,7 +277,8 @@ static struct bt_smp_br bt_smp_br_pool[CONFIG_BT_MAX_CONN];
 
 static struct bt_smp bt_smp_pool[CONFIG_BT_MAX_CONN];
 static bool bondable = IS_ENABLED(CONFIG_BT_BONDABLE);
-static bool oobd_present;
+static bool sc_oobd_present;
+static bool legacy_oobd_present;
 static bool sc_supported;
 static const uint8_t *sc_public_key;
 static K_SEM_DEFINE(sc_local_pkey_ready, 0, 1);
@@ -798,7 +799,13 @@ static void smp_br_timeout(struct k_work *work)
 static void smp_br_send(struct bt_smp_br *smp, struct net_buf *buf,
 			bt_conn_tx_cb_t cb)
 {
-	if (bt_l2cap_send_cb(smp->chan.chan.conn, BT_L2CAP_CID_BR_SMP, buf, cb, NULL)) {
+	int err = bt_l2cap_send_cb(smp->chan.chan.conn, BT_L2CAP_CID_BR_SMP, buf, cb, NULL);
+
+	if (err) {
+		if (err == -ENOBUFS) {
+			LOG_ERR("Ran out of TX buffers or contexts.");
+		}
+
 		net_buf_unref(buf);
 		return;
 	}
@@ -1716,7 +1723,13 @@ static void smp_timeout(struct k_work *work)
 static void smp_send(struct bt_smp *smp, struct net_buf *buf,
 		     bt_conn_tx_cb_t cb, void *user_data)
 {
-	if (bt_l2cap_send_cb(smp->chan.chan.conn, BT_L2CAP_CID_SMP, buf, cb, NULL)) {
+	int err = bt_l2cap_send_cb(smp->chan.chan.conn, BT_L2CAP_CID_SMP, buf, cb, NULL);
+
+	if (err) {
+		if (err == -ENOBUFS) {
+			LOG_ERR("Ran out of TX buffers or contexts.");
+		}
+
 		net_buf_unref(buf);
 		return;
 	}
@@ -2543,9 +2556,14 @@ void bt_set_bondable(bool enable)
 	bondable = enable;
 }
 
-void bt_set_oob_data_flag(bool enable)
+void bt_le_oob_set_sc_flag(bool enable)
 {
-	oobd_present = enable;
+	sc_oobd_present = enable;
+}
+
+void bt_le_oob_set_legacy_flag(bool enable)
+{
+	legacy_oobd_present = enable;
 }
 
 static uint8_t get_auth(struct bt_smp *smp, uint8_t auth)
@@ -2848,8 +2866,6 @@ static uint8_t smp_pairing_req(struct bt_smp *smp, struct net_buf *buf)
 
 	rsp->auth_req = get_auth(smp, req->auth_req);
 	rsp->io_capability = get_io_capa(smp);
-	rsp->oob_flag = oobd_present ? BT_SMP_OOB_PRESENT :
-				       BT_SMP_OOB_NOT_PRESENT;
 	rsp->max_key_size = BT_SMP_MAX_ENC_KEY_SIZE;
 	rsp->init_key_dist = (req->init_key_dist & RECV_KEYS);
 	rsp->resp_key_dist = (req->resp_key_dist & SEND_KEYS);
@@ -2860,6 +2876,14 @@ static uint8_t smp_pairing_req(struct bt_smp *smp, struct net_buf *buf)
 
 		rsp->init_key_dist &= RECV_KEYS_SC;
 		rsp->resp_key_dist &= SEND_KEYS_SC;
+	}
+
+	if (atomic_test_bit(smp->flags, SMP_FLAG_SC)) {
+		rsp->oob_flag = sc_oobd_present ? BT_SMP_OOB_PRESENT :
+				BT_SMP_OOB_NOT_PRESENT;
+	} else {
+		rsp->oob_flag = legacy_oobd_present ? BT_SMP_OOB_PRESENT :
+				BT_SMP_OOB_NOT_PRESENT;
 	}
 
 	if ((rsp->auth_req & BT_SMP_AUTH_CT2) &&
@@ -3027,8 +3051,15 @@ static int smp_send_pairing_req(struct bt_conn *conn)
 
 	req->auth_req = get_auth(smp, BT_SMP_AUTH_DEFAULT);
 	req->io_capability = get_io_capa(smp);
-	req->oob_flag = oobd_present ? BT_SMP_OOB_PRESENT :
-				       BT_SMP_OOB_NOT_PRESENT;
+
+	if (req->auth_req & BT_SMP_AUTH_SC) {
+		req->oob_flag = sc_oobd_present ? BT_SMP_OOB_PRESENT :
+				BT_SMP_OOB_NOT_PRESENT;
+	} else {
+		req->oob_flag = legacy_oobd_present ? BT_SMP_OOB_PRESENT :
+				BT_SMP_OOB_NOT_PRESENT;
+	}
+
 	req->max_key_size = BT_SMP_MAX_ENC_KEY_SIZE;
 
 	if (req->auth_req & BT_SMP_AUTH_BONDING) {

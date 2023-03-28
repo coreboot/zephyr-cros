@@ -26,6 +26,7 @@ Peripherals
    i2c_eeprom_target.rst
    i2c.rst
    i3c.rst
+   smbus.rst
    ipm.rst
    kscan.rst
    led.rst
@@ -34,6 +35,7 @@ Peripherals
    ps2.rst
    peci.rst
    regulators.rst
+   retained_mem.rst
    reset.rst
    rtc.rst
    sdhc.rst
