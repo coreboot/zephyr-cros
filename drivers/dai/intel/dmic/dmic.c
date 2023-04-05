@@ -475,11 +475,9 @@ static void dai_dmic_gain_ramp(struct dai_intel_dmic *dmic)
 		if (!dmic->enable[i])
 			continue;
 
-#ifndef CONFIG_SOC_SERIES_INTEL_ACE
 		if (dmic->startcount == DMIC_UNMUTE_CIC)
 			dai_dmic_update_bits(dmic, base[i] + CIC_CONTROL,
 					     CIC_CONTROL_MIC_MUTE_BIT, 0);
-#endif
 
 		if (dmic->startcount == DMIC_UNMUTE_FIR) {
 			switch (dmic->dai_config_params.dai_index) {
@@ -555,6 +553,14 @@ static void dai_dmic_start(struct dai_intel_dmic *dmic)
 	}
 
 	for (i = 0; i < CONFIG_DAI_DMIC_HW_CONTROLLERS; i++) {
+#ifdef CONFIG_SOC_SERIES_INTEL_ACE
+		dai_dmic_update_bits(dmic, base[i] + CIC_CONTROL,
+				     CIC_CONTROL_SOFT_RESET_BIT, 0);
+
+		LOG_INF("dmic_start(), cic 0x%08x",
+			dai_dmic_read(dmic, base[i] + CIC_CONTROL));
+#endif
+
 		mic_a = dmic->enable[i] & 1;
 		mic_b = (dmic->enable[i] & 2) >> 1;
 		fir_a = (dmic->enable[i] > 0) ? 1 : 0;
@@ -882,8 +888,12 @@ static int dai_dmic_initialize_device(const struct device *dev)
 		dai_dmic_irq_handler,
 		DEVICE_DT_INST_GET(0),
 		0);
+	if (pm_device_on_power_domain(dev)) {
+		pm_device_init_off(dev);
+	} else {
+		pm_device_init_suspended(dev);
+	}
 
-	pm_device_init_suspended(dev);
 	return pm_device_runtime_enable(dev);
 };
 

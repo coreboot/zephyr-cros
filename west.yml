@@ -52,12 +52,12 @@ manifest:
       groups:
         - hal
     - name: hal_atmel
-      revision: f47a9a8b55677b5d03bf7f066f907e6b74c9e57d
+      revision: 5ab43007eda3f380c125f957f03638d2e8d1144d
       path: modules/hal/atmel
       groups:
         - hal
     - name: hal_espressif
-      revision: 8ee96508f329c7e59fcbf739f060cf12082dd805
+      revision: d7576d0da639acbd9a191a3eb7e4f3f3476c9641
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -119,17 +119,17 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: 9dcaa761258cfdfecaacc5a9f0af92f6535d74a3
+      revision: ed4185ce6f6598892fba6ce1b6dede77b217fb37
       path: modules/hal/silabs
       groups:
         - hal
     - name: hal_st
-      revision: cccbc24c14decfd3f93959f7b14514536af973c7
+      revision: 60b149c2df9b7766737af243d2ee5f8c6bd83804
       path: modules/hal/st
       groups:
         - hal
     - name: hal_stm32
-      revision: 7c511b744fadde3fd197779a93043d27e30b0025
+      revision: 5c79d0c7c4f7094e19959f0bc542ebc35db44002
       path: modules/hal/stm32
       groups:
         - hal
@@ -176,12 +176,12 @@ manifest:
       revision: 8e303c264fc21c2116dc612658003a22e933124d
       path: modules/lib/lz4
     - name: mbedtls
-      revision: 6e166050075688fd3cf3d0cb3fc34a1c52df2496
+      revision: 4e1f66df894dc622da7bcd3884016a6ace08e9ea
       path: modules/crypto/mbedtls
       groups:
         - crypto
     - name: mcuboot
-      revision: 59624334748129cb93f096408911a227b0dd64c0
+      revision: 143485e35b8da7d234677d8920a28f5ea03f6d09
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -197,13 +197,13 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: feb3e555f7745dc4fd0a16403f5d81a7ea7359b0
+      revision: 7078310d522664b1612ebac93240b367c4c96299
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: aedcc262f93bbb1b0c2f58026911575729b7465c
       path: modules/lib/open-amp
     - name: openthread
-      revision: 1f1a826d1891fc99d14822abc0a1de257e9c6e9b
+      revision: 7bdcf8a5d49838ce6e3e227e2780e4f12c461330
       path: modules/lib/openthread
     - name: picolibc
       path: modules/lib/picolibc
@@ -231,7 +231,7 @@ manifest:
       groups:
         - debug
     - name: trusted-firmware-m
-      revision: 60fbdb43fb371d811a7d5d88709cb06fa92b7b68
+      revision: 0e25742e8023a0c823c825fbaf19ea265162cc56
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee
