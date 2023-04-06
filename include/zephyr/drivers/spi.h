@@ -26,8 +26,9 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/__assert.h>
+#if defined(CONFIG_SPI_RTIO)
 #include <zephyr/rtio/rtio.h>
-
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
