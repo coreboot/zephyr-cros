@@ -23,6 +23,20 @@ extern "C" {
 
 #if defined(CONFIG_PM_DEVICE_RUNTIME) || defined(__DOXYGEN__)
 /**
+ * @brief Automatically enable device runtime based on devicetree properties
+ *
+ * @note Must not be called from application code. See the
+ * zephyr,pm-device-runtime-auto property in pm.yaml and z_sys_init_run_level.
+ *
+ * @param dev Device instance.
+ *
+ * @retval 0 If the device runtime PM is enabled successfully or it has not
+ * been requested for this device in devicetree.
+ * @retval -errno Other negative errno, result of enabled device runtime PM.
+ */
+int pm_device_runtime_auto_enable(const struct device *dev);
+
+/**
  * @brief Enable device runtime PM
  *
  * This function will enable runtime PM on the given device. If the device is
@@ -35,7 +49,6 @@ extern "C" {
  * @retval 0 If the device runtime PM is enabled successfully.
  * @retval -EPERM If device has power state locked.
  * @retval -ENOTSUP If the device does not support PM.
- * @retval -ENOSYS If the functionality is not available.
  * @retval -errno Other negative errno, result of suspending the device.
  *
  * @see pm_device_init_suspended()
@@ -53,7 +66,6 @@ int pm_device_runtime_enable(const struct device *dev);
  *
  * @retval 0 If the device runtime PM is disabled successfully.
  * @retval -ENOTSUP If the device does not support PM.
- * @retval -ENOSYS If the functionality is not available.
  * @retval -errno Other negative errno, result of resuming the device.
  */
 int pm_device_runtime_disable(const struct device *dev);
@@ -141,6 +153,12 @@ int pm_device_runtime_put_async(const struct device *dev);
 bool pm_device_runtime_is_enabled(const struct device *dev);
 
 #else
+
+static inline int pm_device_runtime_auto_enable(const struct device *dev)
+{
+	ARG_UNUSED(dev);
+	return 0;
+}
 
 static inline int pm_device_runtime_enable(const struct device *dev)
 {

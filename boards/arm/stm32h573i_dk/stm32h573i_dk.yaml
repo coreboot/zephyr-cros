@@ -12,3 +12,10 @@ supported:
   - uart
   - watchdog
   - entropy
+  - dma
+  - adc
+  - dac
+  - pwm
+  - counter
+  - spi
+  - octospi

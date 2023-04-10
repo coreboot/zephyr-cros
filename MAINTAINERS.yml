@@ -781,7 +781,7 @@ Release Notes:
     - include/zephyr/drivers/edac.h
     - samples/subsys/edac/
     - tests/subsys/edac/
-    - doc/hardware/peripherals/edac/index.rst
+    - doc/hardware/peripherals/edac/
   labels:
     - "area: EDAC"
 
@@ -949,6 +949,8 @@ Release Notes:
   status: maintained
   maintainers:
     - dcpleung
+  collaborators:
+    - XenuIsWatching
   files:
     - drivers/i3c/
     - dts/bindings/i3c/
@@ -1109,6 +1111,18 @@ Release Notes:
     - tests/drivers/retained_mem/
   labels:
     - "area: Retained Memory"
+
+"Drivers: RTC":
+  status: maintained
+  maintainers:
+    - bjarki-trackunit
+  files:
+    - drivers/rtc/
+    - tests/drivers/rtc/
+    - doc/hardware/peripherals/rtc.rst
+    - include/zephyr/drivers/rtc.h
+  labels:
+    - "area: RTC"
 
 "Drivers: PCI":
   status: maintained
@@ -1479,6 +1493,7 @@ Input:
   files:
     - doc/services/input/
     - drivers/input/
+    - dts/bindings/input/
     - include/zephyr/dt-bindings/input/
     - include/zephyr/input/
     - samples/subsys/input/
@@ -1837,6 +1852,8 @@ Networking:
     - rlubos
   collaborators:
     - pdgendt
+    - canisLupus1313
+    - mariuszpos
   files:
     - subsys/net/l2/openthread/
     - samples/net/openthread/
@@ -1934,6 +1951,7 @@ Twister:
     - PerMac
     - hakehuang
     - gopiotr
+    - golowanow
   files:
     - scripts/twister
     - scripts/pylib/twister/
@@ -3025,6 +3043,8 @@ West:
     - rlubos
   collaborators:
     - pdgendt
+    - canisLupus1313
+    - mariuszpos
   files:
     - modules/openthread/
   labels:

@@ -254,53 +254,29 @@ static void dai_dmic_irq_handler(const void *data)
 
 static inline void dai_dmic_dis_clk_gating(const struct dai_intel_dmic *dmic)
 {
-#ifdef CONFIG_SOC_SERIES_INTEL_CAVS_V15
-	uint32_t shim_reg;
-
-	shim_reg = sys_read32(SHIM_CLKCTL) | SHIM_CLKCTL_DMICFDCGB;
-
-	sys_write32(shim_reg, SHIM_CLKCTL);
-
-	LOG_INF("dis-dmic-clk-gating CLKCTL %08x", shim_reg);
-#else
 	/* Disable DMIC clock gating */
 	sys_write32((sys_read32(dmic->shim_base + DMICLCTL_OFFSET) | DMIC_DCGD),
 			dmic->shim_base + DMICLCTL_OFFSET);
-#endif
 }
 
 static inline void dai_dmic_en_clk_gating(const struct dai_intel_dmic *dmic)
 {
-#ifdef CONFIG_SOC_SERIES_INTEL_CAVS_V15
-	uint32_t shim_reg;
-
-	shim_reg = sys_read32(SHIM_CLKCTL) & ~SHIM_CLKCTL_DMICFDCGB;
-
-	sys_write32(shim_reg, SHIM_CLKCTL);
-
-	LOG_INF("en-dmic-clk-gating CLKCTL %08x", shim_reg);
-#else
 	/* Enable DMIC clock gating */
 	sys_write32((sys_read32(dmic->shim_base + DMICLCTL_OFFSET) & ~DMIC_DCGD),
 			dmic->shim_base + DMICLCTL_OFFSET);
-#endif
 }
 
 static inline void dai_dmic_en_power(const struct dai_intel_dmic *dmic)
 {
-#ifndef CONFIG_SOC_SERIES_INTEL_CAVS_V15
 	/* Enable DMIC power */
 	sys_write32((sys_read32(dmic->shim_base + DMICLCTL_OFFSET) | DMICLCTL_SPA),
 			dmic->shim_base + DMICLCTL_OFFSET);
-#endif
 }
 static inline void dai_dmic_dis_power(const struct dai_intel_dmic *dmic)
 {
-#ifndef CONFIG_SOC_SERIES_INTEL_CAVS_V15
 	/* Disable DMIC power */
 	sys_write32((sys_read32(dmic->shim_base + DMICLCTL_OFFSET) & (~DMICLCTL_SPA)),
 			dmic->shim_base + DMICLCTL_OFFSET);
-#endif
 }
 
 static int dai_dmic_probe(struct dai_intel_dmic *dmic)
@@ -888,8 +864,12 @@ static int dai_dmic_initialize_device(const struct device *dev)
 		dai_dmic_irq_handler,
 		DEVICE_DT_INST_GET(0),
 		0);
+	if (pm_device_on_power_domain(dev)) {
+		pm_device_init_off(dev);
+	} else {
+		pm_device_init_suspended(dev);
+	}
 
-	pm_device_init_suspended(dev);
 	return pm_device_runtime_enable(dev);
 };
 
