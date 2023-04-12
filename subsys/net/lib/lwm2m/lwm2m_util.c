@@ -361,7 +361,7 @@ int lwm2m_atof(const char *input, double *out)
 		return 0;
 	}
 
-	while (*(++pos) && base > 1 && isdigit((unsigned char)*pos)) {
+	while (*(++pos) && base > 1 && isdigit((unsigned char)*pos) != 0) {
 		val2 = val2 * 10 + (*pos - '0');
 		base /= 10;
 	}
@@ -424,7 +424,8 @@ int lwm2m_ftoa(double *input, char *out, size_t outlen, int8_t dec_limit)
 			(val1 == 0 && val2 < 0) ? "-" : "", (long long)val1, buf);
 }
 
-int lwm2m_path_to_string(char *buf, size_t buf_size, struct lwm2m_obj_path *input, int level_max)
+int lwm2m_path_to_string(char *buf, size_t buf_size, const struct lwm2m_obj_path *input,
+			 int level_max)
 {
 	size_t fpl = 0; /* Length of the formed path */
 	int level;
@@ -480,7 +481,7 @@ uint16_t lwm2m_atou16(const uint8_t *buf, uint16_t buflen, uint16_t *len)
 	uint16_t pos = 0U;
 
 	/* we should get a value first - consume all numbers */
-	while (pos < buflen && isdigit(buf[pos])) {
+	while (pos < buflen && isdigit(buf[pos]) != 0) {
 		val = val * 10U + (buf[pos] - '0');
 		pos++;
 	}
@@ -500,7 +501,7 @@ int lwm2m_string_to_path(const char *pathstr, struct lwm2m_obj_path *path,
 	for (i = 0; i <= end_index; i++) {
 		/* search for first numeric */
 		if (tokstart == -1) {
-			if (!isdigit((unsigned char)pathstr[i])) {
+			if (isdigit((unsigned char)pathstr[i]) == 0) {
 				continue;
 			}
 
@@ -550,4 +551,31 @@ int lwm2m_string_to_path(const char *pathstr, struct lwm2m_obj_path *path,
 	}
 
 	return 0;
+}
+
+bool lwm2m_obj_path_equal(const struct lwm2m_obj_path *a, const struct lwm2m_obj_path *b)
+{
+	uint8_t level = a->level;
+
+	if (a->level != b->level) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_OBJECT && (a->obj_id != b->obj_id)) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_OBJECT_INST && (a->obj_inst_id != b->obj_inst_id)) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_RESOURCE && (a->res_id != b->res_id)) {
+		return false;
+	}
+
+	if (level >= LWM2M_PATH_LEVEL_RESOURCE_INST && (a->res_inst_id != b->res_inst_id)) {
+		return false;
+	}
+
+	return true;
 }

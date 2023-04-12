@@ -34,6 +34,7 @@
 #include <kswap.h>
 #include <zephyr/timing/timing.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/pm/device_runtime.h>
 LOG_MODULE_REGISTER(os, CONFIG_KERNEL_LOG_LEVEL);
 
 /* the only struct z_kernel instance */
@@ -261,6 +262,10 @@ static void z_sys_init_run_level(enum init_level level)
 				dev->state->init_res = rc;
 			}
 			dev->state->initialized = true;
+			if (rc == 0) {
+				/* Run automatic device runtime enablement */
+				(void)pm_device_runtime_auto_enable(dev);
+			}
 		}
 	}
 }
@@ -296,7 +301,7 @@ static void bg_thread_main(void *unused1, void *unused2, void *unused3)
 #endif
 	boot_banner();
 
-#if defined(CONFIG_CPLUSPLUS)
+#if defined(CONFIG_CPP)
 	void z_cpp_init_static(void);
 	z_cpp_init_static();
 #endif
@@ -498,6 +503,7 @@ sys_rand_fallback:
  * @return Does not return
  */
 __boot_func
+FUNC_NO_STACK_PROTECTOR
 FUNC_NORETURN void z_cstart(void)
 {
 	/* gcov hook needed to get the coverage report.*/

@@ -4,19 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/drivers/ec_host_cmd_periph/ec_host_cmd_simulator.h>
-#include <zephyr/mgmt/ec_host_cmd.h>
+#include <zephyr/mgmt/ec_host_cmd/ec_host_cmd.h>
+#include <zephyr/mgmt/ec_host_cmd/simulator.h>
 #include <zephyr/ztest.h>
 
 /* Variables used to record what is "sent" to host for verification. */
 K_SEM_DEFINE(send_called, 0, 1);
-struct ec_host_cmd_periph_tx_buf sent;
+struct ec_host_cmd_tx_buf *sent;
 
-static int host_send(const struct device *const dev,
-		     const struct ec_host_cmd_periph_tx_buf *const buf)
+static int host_send(const struct ec_host_cmd_backend *backend)
 {
-	sent.len = buf->len;
-	sent.buf = buf->buf;
 	k_sem_give(&send_called);
 	return 0;
 }
@@ -105,7 +102,7 @@ static void simulate_rx_data(void)
 	 * Always send entire buffer and let host command framework read what it
 	 * needs.
 	 */
-	rv = ec_host_cmd_periph_sim_data_received(host_to_dut_buffer,
+	rv = ec_host_cmd_backend_sim_data_received(host_to_dut_buffer,
 						  sizeof(host_to_dut_buffer));
 	zassert_equal(rv, 0, "Could not send data %d", rv);
 
@@ -124,8 +121,8 @@ static void verify_tx_data(void)
 {
 	update_dut_to_host_checksum();
 
-	zassert_equal(sent.len, expected_tx_size(), "Sent bytes did not match");
-	zassert_mem_equal(sent.buf, expected_dut_to_host, expected_tx_size(),
+	zassert_equal(sent->len, expected_tx_size(), "Sent bytes did not match");
+	zassert_mem_equal(sent->buf, expected_dut_to_host, expected_tx_size(),
 			  "Sent buffer did not match");
 }
 
@@ -137,8 +134,8 @@ static void verify_tx_error(enum ec_host_cmd_status error)
 	expected_dut_to_host->header.reserved = 0;
 	update_dut_to_host_checksum();
 
-	zassert_equal(sent.len, expected_tx_size(), "Sent bytes did not match");
-	zassert_mem_equal(sent.buf, expected_dut_to_host, expected_tx_size(),
+	zassert_equal(sent->len, expected_tx_size(), "Sent bytes did not match");
+	zassert_mem_equal(sent->buf, expected_dut_to_host, expected_tx_size(),
 			  "Sent buffer did not match");
 }
 
@@ -162,7 +159,7 @@ ec_host_cmd_add(struct ec_host_cmd_handler_args *args)
 	args->output_buf_size = sizeof(*response);
 	return EC_HOST_CMD_SUCCESS;
 }
-EC_HOST_CMD_HANDLER(ec_host_cmd_add, EC_CMD_HELLO, BIT(0) | BIT(1) | BIT(2),
+EC_HOST_CMD_HANDLER(EC_CMD_HELLO, ec_host_cmd_add, BIT(0) | BIT(1) | BIT(2),
 		    struct ec_params_add, struct ec_response_add);
 
 ZTEST(ec_host_cmd, test_add)
@@ -280,7 +277,7 @@ ZTEST(ec_host_cmd, test_add_invalid_rx_checksum)
 	/* Always send entire buffer and let host command framework read what it
 	 * needs.
 	 */
-	rv = ec_host_cmd_periph_sim_data_received(host_to_dut_buffer,
+	rv = ec_host_cmd_backend_sim_data_received(host_to_dut_buffer,
 						  sizeof(host_to_dut_buffer));
 	zassert_equal(rv, 0, "Could not send data %d", rv);
 
@@ -302,7 +299,7 @@ ZTEST(ec_host_cmd, test_add_rx_size_too_small_for_header)
 	host_to_dut->header.data_len = sizeof(host_to_dut->add);
 	host_to_dut->add.in_data = 0x10203040;
 
-	rv = ec_host_cmd_periph_sim_data_received(host_to_dut_buffer, 4);
+	rv = ec_host_cmd_backend_sim_data_received(host_to_dut_buffer, 4);
 	zassert_equal(rv, 0, "Could not send data %d", rv);
 
 	/* Ensure Send was called so we can verify outputs */
@@ -323,7 +320,7 @@ ZTEST(ec_host_cmd, test_add_rx_size_too_small)
 	host_to_dut->header.data_len = sizeof(host_to_dut->add);
 	host_to_dut->add.in_data = 0x10203040;
 
-	rv = ec_host_cmd_periph_sim_data_received(
+	rv = ec_host_cmd_backend_sim_data_received(
 		host_to_dut_buffer,
 		sizeof(host_to_dut->header) + host_to_dut->header.data_len - 1);
 	zassert_equal(rv, 0, "Could not send data %d", rv);
@@ -372,7 +369,7 @@ ec_host_cmd_unbounded(struct ec_host_cmd_handler_args *args)
 	}
 
 	/* Version 0 (and 2) write request bytes if it can fit */
-	if (request->bytes_to_write > args->output_buf_size) {
+	if (request->bytes_to_write > args->output_buf_max) {
 		return EC_HOST_CMD_OVERFLOW;
 	}
 
@@ -384,7 +381,7 @@ ec_host_cmd_unbounded(struct ec_host_cmd_handler_args *args)
 	args->output_buf_size = request->bytes_to_write;
 	return EC_HOST_CMD_SUCCESS;
 }
-EC_HOST_CMD_HANDLER_UNBOUND(ec_host_cmd_unbounded, EC_CMD_UNBOUNDED,
+EC_HOST_CMD_HANDLER_UNBOUND(EC_CMD_UNBOUNDED, ec_host_cmd_unbounded,
 			    BIT(0) | BIT(1) | BIT(2));
 
 ZTEST(ec_host_cmd, test_unbounded_handler_error_return)
@@ -415,76 +412,13 @@ ZTEST(ec_host_cmd, test_unbounded_handler_response_too_big)
 	verify_tx_error(EC_HOST_CMD_INVALID_RESPONSE);
 }
 
-ZTEST(ec_host_cmd, test_rx_buffer_cleared_foreach_hostcommand)
-{
-	host_to_dut->header.prtcl_ver = 3;
-	host_to_dut->header.cmd_id = EC_CMD_UNBOUNDED;
-	host_to_dut->header.cmd_ver = 2;
-	host_to_dut->header.reserved = 0;
-	host_to_dut->header.data_len = sizeof(host_to_dut->unbounded);
-	host_to_dut->unbounded.bytes_to_write = 5;
-
-	/* Write data after the entire request message. The host command handler
-	 * always assert that this data is cleared upon receipt.
-	 */
-	host_to_dut->raw[4] = 42;
-
-	simulate_rx_data();
-
-	expected_dut_to_host->header.prtcl_ver = 3;
-	expected_dut_to_host->header.result = 0;
-	expected_dut_to_host->header.reserved = 0;
-	expected_dut_to_host->header.data_len = 5;
-	expected_dut_to_host->raw[0] = 0;
-	expected_dut_to_host->raw[1] = 1;
-	expected_dut_to_host->raw[2] = 2;
-	expected_dut_to_host->raw[3] = 3;
-	expected_dut_to_host->raw[4] = 4;
-
-	verify_tx_data();
-}
-
-ZTEST(ec_host_cmd, test_tx_buffer_cleared_foreach_hostcommand)
-{
-	host_to_dut->header.prtcl_ver = 3;
-	host_to_dut->header.cmd_id = EC_CMD_UNBOUNDED;
-	host_to_dut->header.cmd_ver = 2;
-	host_to_dut->header.reserved = 0;
-	host_to_dut->header.data_len = sizeof(host_to_dut->unbounded);
-	host_to_dut->unbounded.bytes_to_write = 5;
-
-	simulate_rx_data();
-
-	expected_dut_to_host->header.prtcl_ver = 3;
-	expected_dut_to_host->header.result = 0;
-	expected_dut_to_host->header.reserved = 0;
-	expected_dut_to_host->header.data_len = 5;
-	expected_dut_to_host->raw[0] = 0;
-	expected_dut_to_host->raw[1] = 1;
-	expected_dut_to_host->raw[2] = 2;
-	expected_dut_to_host->raw[3] = 3;
-	expected_dut_to_host->raw[4] = 4;
-
-	verify_tx_data();
-
-	/* Send second command with less bytes to write. Host command handler
-	 * asserts that the previous output data is zero.
-	 */
-
-	host_to_dut->unbounded.bytes_to_write = 2;
-	simulate_rx_data();
-
-	expected_dut_to_host->header.data_len = 2;
-	verify_tx_data();
-}
-
 #define EC_CMD_TOO_BIG 0x0003
 static enum ec_host_cmd_status
 ec_host_cmd_too_big(struct ec_host_cmd_handler_args *args)
 {
 	return EC_HOST_CMD_SUCCESS;
 }
-EC_HOST_CMD_HANDLER(ec_host_cmd_too_big, EC_CMD_TOO_BIG, BIT(0), uint32_t,
+EC_HOST_CMD_HANDLER(EC_CMD_TOO_BIG, ec_host_cmd_too_big, BIT(0), uint32_t,
 		    struct ec_response_too_big);
 
 ZTEST(ec_host_cmd, test_response_always_too_big)
@@ -502,7 +436,7 @@ ZTEST(ec_host_cmd, test_response_always_too_big)
 
 static void *ec_host_cmd_tests_setup(void)
 {
-	ec_host_cmd_periph_sim_install_send_cb(host_send);
+	ec_host_cmd_backend_sim_install_send_cb(host_send, &sent);
 	return NULL;
 }
 

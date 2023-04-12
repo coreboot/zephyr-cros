@@ -178,7 +178,7 @@ static int port1_policy_cb_get_snk_cap(const struct device *dev,
 	struct port1_data_t *dpm_data = usbc_get_dpm_data(dev);
 
 	*pdos = dpm_data->snk_caps;
-	num_pdos = &dpm_data->snk_cap_cnt;
+	*num_pdos = dpm_data->snk_cap_cnt;
 
 	return 0;
 }
@@ -259,6 +259,10 @@ static void port1_notify(const struct device *dev,
 	case SNK_TRANSITION_TO_DEFAULT:
 		break;
 	case HARD_RESET_RECEIVED:
+		break;
+	case SENDER_RESPONSE_TIMEOUT:
+		break;
+	case SOURCE_CAPABILITIES_RECEIVED:
 		break;
 	}
 }

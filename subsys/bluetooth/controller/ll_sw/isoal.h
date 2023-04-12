@@ -262,6 +262,7 @@ struct isoal_sink_session {
 	uint16_t                 handle;
 	uint8_t                  pdus_per_sdu;
 	uint8_t                  framed;
+	uint8_t                  burst_number;
 	uint32_t                 sdu_interval;
 	uint32_t                 latency_unframed;
 	uint32_t                 latency_framed;
@@ -417,6 +418,8 @@ struct isoal_source {
 	uint64_t timeout_trigger:1;
 	uint64_t context_active:1;
 };
+
+uint32_t isoal_get_wrapped_time_us(uint32_t time_now_us, int32_t time_diff_us);
 
 isoal_status_t isoal_init(void);
 

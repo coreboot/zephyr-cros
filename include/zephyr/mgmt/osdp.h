@@ -600,6 +600,7 @@ struct osdp_event_reader_tamper_status {
 	uint8_t readers_num;
 	uint8_t rtamper_statuses[OSDP_RTMAPER_STATUS_MAX_LEN];
 };
+
 /**
  * @brief Various card formats that a PD can support. This is sent to CP
  * when a PD must report a card read.

@@ -7,7 +7,7 @@
 # I2C options
 #
 menuconfig I2C
-	bool "I2C Drivers"
+	bool "Inter-Integrated Circuit (I2C) bus drivers"
 	help
 	  Enable I2C Driver Configuration
 
@@ -28,6 +28,12 @@ config I2C_STATS
 	depends on STATS
 	help
 	  Enable I2C Stats.
+
+config I2C_DUMP_MESSAGES
+	bool "Log all I2C transactions"
+	depends on LOG
+	help
+	  Dump every I2C transaction to the system log as debug level log messages.
 
 config I2C_CALLBACK
 	bool "I2C asynchronous callback API"
@@ -58,6 +64,7 @@ source "drivers/i2c/Kconfig.rcar"
 source "drivers/i2c/Kconfig.tca954x"
 source "drivers/i2c/Kconfig.gd32"
 source "drivers/i2c/Kconfig.andes_atciic100"
+source "drivers/i2c/Kconfig.sc18im704"
 
 config I2C_INIT_PRIORITY
 	int "Init priority"

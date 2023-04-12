@@ -14,9 +14,8 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/mesh.h>
 
-#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_MESH_DEBUG)
-#define LOG_MODULE_NAME bt_mesh_main
-#include "common/log.h"
+#include <zephyr/logging/log.h>
+#include <common/bt_str.h>
 
 #include "test.h"
 #include "adv.h"
@@ -39,18 +38,25 @@
 #include "pb_gatt_srv.h"
 #include "settings.h"
 #include "mesh.h"
+#include "solicitation.h"
 #include "gatt_cli.h"
+
+LOG_MODULE_REGISTER(bt_mesh_main, CONFIG_BT_MESH_LOG_LEVEL);
 
 int bt_mesh_provision(const uint8_t net_key[16], uint16_t net_idx,
 		      uint8_t flags, uint32_t iv_index, uint16_t addr,
 		      const uint8_t dev_key[16])
 {
 	int err;
+
+	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {
+		return -ENODEV;
+	}
+
 	struct bt_mesh_cdb_subnet *subnet = NULL;
 
-	BT_INFO("Primary Element: 0x%04x", addr);
-	BT_DBG("net_idx 0x%04x flags 0x%02x iv_index 0x%04x",
-	       net_idx, flags, iv_index);
+	LOG_INF("Primary Element: 0x%04x", addr);
+	LOG_DBG("net_idx 0x%04x flags 0x%02x iv_index 0x%04x", net_idx, flags, iv_index);
 
 	if (atomic_test_and_set_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		return -EALREADY;
@@ -64,14 +70,14 @@ int bt_mesh_provision(const uint8_t net_key[16], uint16_t net_idx,
 
 		comp = bt_mesh_comp_get();
 		if (comp == NULL) {
-			BT_ERR("Failed to get node composition");
+			LOG_ERR("Failed to get node composition");
 			atomic_clear_bit(bt_mesh.flags, BT_MESH_VALID);
 			return -EINVAL;
 		}
 
 		subnet = bt_mesh_cdb_subnet_get(net_idx);
 		if (!subnet) {
-			BT_ERR("No subnet with idx %d", net_idx);
+			LOG_ERR("No subnet with idx %d", net_idx);
 			atomic_clear_bit(bt_mesh.flags, BT_MESH_VALID);
 			return -ENOENT;
 		}
@@ -80,7 +86,7 @@ int bt_mesh_provision(const uint8_t net_key[16], uint16_t net_idx,
 		node = bt_mesh_cdb_node_alloc(prov->uuid, addr,
 					      comp->elem_count, net_idx);
 		if (node == NULL) {
-			BT_ERR("Failed to allocate database node");
+			LOG_ERR("Failed to allocate database node");
 			atomic_clear_bit(bt_mesh.flags, BT_MESH_VALID);
 			return -ENOMEM;
 		}
@@ -132,8 +138,78 @@ int bt_mesh_provision(const uint8_t net_key[16], uint16_t net_idx,
 	return 0;
 }
 
-int bt_mesh_provision_adv(const uint8_t uuid[16], uint16_t net_idx, uint16_t addr,
-			  uint8_t attention_duration)
+#if defined(CONFIG_BT_MESH_RPR_SRV)
+void bt_mesh_reprovision(uint16_t addr)
+{
+	LOG_DBG("0x%04x devkey: %s", addr, bt_hex(bt_mesh.dev_key_cand, 16));
+	if (addr != bt_mesh_primary_addr()) {
+		bt_mesh.seq = 0U;
+
+		bt_mesh_comp_provision(addr);
+		bt_mesh_trans_reset();
+
+		if (IS_ENABLED(CONFIG_BT_MESH_FRIEND)) {
+			bt_mesh_friends_clear();
+		}
+
+		if (IS_ENABLED(CONFIG_BT_MESH_LOW_POWER)) {
+			bt_mesh_lpn_friendship_end();
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		LOG_DBG("Storing network information persistently");
+		bt_mesh_net_pending_net_store();
+		bt_mesh_net_pending_seq_store();
+		bt_mesh_comp_clear();
+		bt_mesh_models_metadata_clear();
+	}
+}
+
+void bt_mesh_dev_key_cand(const uint8_t *key)
+{
+	memcpy(bt_mesh.dev_key_cand, key, 16);
+	atomic_set_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND);
+
+	LOG_DBG("%s", bt_hex(key, 16));
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		bt_mesh_net_dev_key_cand_store();
+	}
+}
+
+void bt_mesh_dev_key_cand_remove(void)
+{
+	if (!atomic_test_and_clear_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
+		return;
+	}
+
+	LOG_DBG("");
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		bt_mesh_net_dev_key_cand_store();
+	}
+}
+
+void bt_mesh_dev_key_cand_activate(void)
+{
+	if (!atomic_test_and_clear_bit(bt_mesh.flags, BT_MESH_DEVKEY_CAND)) {
+		return;
+	}
+
+	memcpy(bt_mesh.dev_key, bt_mesh.dev_key_cand, 16);
+
+	LOG_DBG("");
+
+	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+		bt_mesh_net_pending_net_store();
+		bt_mesh_net_dev_key_cand_store();
+	}
+}
+#endif
+
+int bt_mesh_provision_adv(const uint8_t uuid[16], uint16_t net_idx,
+			  uint16_t addr, uint8_t attention_duration)
 {
 	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
 		return -EINVAL;
@@ -171,9 +247,47 @@ int bt_mesh_provision_gatt(const uint8_t uuid[16], uint16_t net_idx, uint16_t ad
 	return -ENOTSUP;
 }
 
-void bt_mesh_reset(void)
+int bt_mesh_provision_remote(struct bt_mesh_rpr_cli *cli,
+			     const struct bt_mesh_rpr_node *srv,
+			     const uint8_t uuid[16], uint16_t net_idx,
+			     uint16_t addr)
 {
 	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+		return -EINVAL;
+	}
+
+	if (bt_mesh_subnet_get(net_idx) == NULL) {
+		return -EINVAL;
+	}
+
+	if (IS_ENABLED(CONFIG_BT_MESH_PROVISIONER) &&
+	    IS_ENABLED(CONFIG_BT_MESH_RPR_CLI)) {
+		return bt_mesh_pb_remote_open(cli, srv, uuid, net_idx, addr);
+	}
+
+	return -ENOTSUP;
+}
+
+int bt_mesh_reprovision_remote(struct bt_mesh_rpr_cli *cli,
+			       struct bt_mesh_rpr_node *srv,
+			       uint16_t addr, bool comp_change)
+{
+	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_VALID)) {
+		return -EINVAL;
+	}
+
+	if (IS_ENABLED(CONFIG_BT_MESH_PROVISIONER) &&
+	    IS_ENABLED(CONFIG_BT_MESH_RPR_CLI)) {
+		return bt_mesh_pb_remote_open_node(cli, srv, addr, comp_change);
+	}
+
+	return -ENOTSUP;
+}
+
+void bt_mesh_reset(void)
+{
+	if (!atomic_test_bit(bt_mesh.flags, BT_MESH_VALID) ||
+	    !atomic_test_bit(bt_mesh.flags, BT_MESH_INIT)) {
 		return;
 	}
 
@@ -182,6 +296,9 @@ void bt_mesh_reset(void)
 	bt_mesh.seq = 0U;
 
 	memset(bt_mesh.flags, 0, sizeof(bt_mesh.flags));
+	atomic_set_bit(bt_mesh.flags, BT_MESH_INIT);
+
+	bt_mesh_scan_disable();
 
 	/* If this fails, the work handler will return early on the next
 	 * execution, as the device is not provisioned. If the device is
@@ -225,7 +342,6 @@ void bt_mesh_reset(void)
 
 	(void)memset(bt_mesh.dev_key, 0, sizeof(bt_mesh.dev_key));
 
-	bt_mesh_scan_disable();
 	bt_mesh_beacon_disable();
 
 	bt_mesh_comp_unprovision();
@@ -236,6 +352,10 @@ void bt_mesh_reset(void)
 
 	if (IS_ENABLED(CONFIG_BT_MESH_PROV)) {
 		bt_mesh_prov_reset();
+	}
+
+	if (IS_ENABLED(CONFIG_BT_MESH_PROXY_SOLICITATION)) {
+		bt_mesh_sol_reset();
 	}
 }
 
@@ -271,7 +391,7 @@ int bt_mesh_suspend(void)
 	err = bt_mesh_scan_disable();
 	if (err) {
 		atomic_clear_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
-		BT_WARN("Disabling scanning failed (err %d)", err);
+		LOG_WRN("Disabling scanning failed (err %d)", err);
 		return err;
 	}
 
@@ -317,7 +437,7 @@ int bt_mesh_resume(void)
 
 	err = bt_mesh_scan_enable();
 	if (err) {
-		BT_WARN("Re-enabling scanning failed (err %d)", err);
+		LOG_WRN("Re-enabling scanning failed (err %d)", err);
 		atomic_set_bit(bt_mesh.flags, BT_MESH_SUSPENDED);
 		return err;
 	}
@@ -337,6 +457,10 @@ int bt_mesh_init(const struct bt_mesh_prov *prov,
 		 const struct bt_mesh_comp *comp)
 {
 	int err;
+
+	if (atomic_test_and_set_bit(bt_mesh.flags, BT_MESH_INIT)) {
+		return -EALREADY;
+	}
 
 	err = bt_mesh_test();
 	if (err) {
@@ -383,7 +507,7 @@ int bt_mesh_start(void)
 
 	err = bt_mesh_adv_enable();
 	if (err) {
-		BT_ERR("Failed enabling advertiser");
+		LOG_ERR("Failed enabling advertiser");
 		return err;
 	}
 
@@ -401,7 +525,6 @@ int bt_mesh_start(void)
 
 		if (IS_ENABLED(CONFIG_BT_MESH_GATT_PROXY)) {
 			(void)bt_mesh_proxy_gatt_enable();
-			bt_mesh_adv_gatt_update();
 		}
 	}
 

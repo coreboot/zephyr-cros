@@ -13,14 +13,16 @@
 
 #if DT_HAS_COMPAT_STATUS_OKAY(atmel_sam_afec)
 #define DT_DRV_COMPAT atmel_sam_afec
+#elif DT_HAS_COMPAT_STATUS_OKAY(espressif_esp32_adc)
+#define DT_DRV_COMPAT espressif_esp32_adc
+#elif DT_HAS_COMPAT_STATUS_OKAY(atmel_sam_adc)
+#define DT_DRV_COMPAT atmel_sam_adc
 #elif DT_HAS_COMPAT_STATUS_OKAY(atmel_sam0_adc)
 #define DT_DRV_COMPAT atmel_sam0_adc
 #elif DT_HAS_COMPAT_STATUS_OKAY(ite_it8xxx2_adc)
 #define DT_DRV_COMPAT ite_it8xxx2_adc
 #elif DT_HAS_COMPAT_STATUS_OKAY(microchip_xec_adc)
 #define DT_DRV_COMPAT microchip_xec_adc
-#elif DT_HAS_COMPAT_STATUS_OKAY(microchip_xec_adc_v2)
-#define DT_DRV_COMPAT microchip_xec_adc_v2
 #elif DT_HAS_COMPAT_STATUS_OKAY(nordic_nrf_adc)
 #define DT_DRV_COMPAT nordic_nrf_adc
 #elif DT_HAS_COMPAT_STATUS_OKAY(nordic_nrf_saadc)
@@ -133,7 +135,7 @@ static int cmd_adc_ch_id(const struct shell *shell, size_t argc, char **argv)
 		return -ENODEV;
 	}
 
-	if (!isdigit((unsigned char)argv[1][0])) {
+	if (isdigit((unsigned char)argv[1][0]) == 0) {
 		shell_error(shell, "<channel> must be digits");
 		return -EINVAL;
 	}
@@ -157,7 +159,7 @@ static int cmd_adc_ch_neg(const struct shell *shell, size_t argc, char **argv)
 		return -ENODEV;
 	}
 
-	if (!isdigit((unsigned char)argv[1][0])) {
+	if (isdigit((unsigned char)argv[1][0]) == 0) {
 		shell_error(shell, "<negative input> must be digits");
 		return -EINVAL;
 	}
@@ -184,7 +186,7 @@ static int cmd_adc_ch_pos(const struct shell *shell, size_t argc, char **argv)
 		return -ENODEV;
 	}
 
-	if (!isdigit((unsigned char)argv[1][0])) {
+	if (isdigit((unsigned char)argv[1][0]) == 0) {
 		shell_error(shell, "<positive input> must be digits");
 		return -EINVAL;
 	}
@@ -235,7 +237,7 @@ static int cmd_adc_acq(const struct shell *shell, size_t argc, char **argv)
 		return -ENODEV;
 	}
 
-	if (!isdigit((unsigned char)argv[1][0])) {
+	if (isdigit((unsigned char)argv[1][0]) == 0) {
 		shell_error(shell, "<time> must be digits");
 		return -EINVAL;
 	}
@@ -270,7 +272,7 @@ static int cmd_adc_reso(const struct shell *shell, size_t argc, char **argv)
 		return -ENODEV;
 	}
 
-	if (!isdigit((unsigned char)argv[1][0])) {
+	if (isdigit((unsigned char)argv[1][0]) == 0) {
 		shell_error(shell, "<resolution> must be digits");
 		return -EINVAL;
 	}
@@ -357,30 +359,30 @@ static int cmd_adc_print(const struct shell *shell, size_t argc, char **argv)
 }
 
 SHELL_SUBCMD_DICT_SET_CREATE(sub_ref_cmds, cmd_adc_ref,
-	(VDD_1, ADC_REF_VDD_1),
-	(VDD_1_2, ADC_REF_VDD_1_2),
-	(VDD_1_3, ADC_REF_VDD_1_3),
-	(VDD_1_4, ADC_REF_VDD_1_4),
-	(INTERNAL, ADC_REF_INTERNAL),
-	(EXTERNAL_0, ADC_REF_EXTERNAL0),
-	(EXTERNAL_1, ADC_REF_EXTERNAL1)
+	(VDD_1, ADC_REF_VDD_1, "VDD"),
+	(VDD_1_2, ADC_REF_VDD_1_2, "VDD/2"),
+	(VDD_1_3, ADC_REF_VDD_1_3, "VDD/3"),
+	(VDD_1_4, ADC_REF_VDD_1_4, "VDD/4"),
+	(INTERNAL, ADC_REF_INTERNAL, "Internal"),
+	(EXTERNAL_0, ADC_REF_EXTERNAL0, "External, input 0"),
+	(EXTERNAL_1, ADC_REF_EXTERNAL1, "External, input 1")
 );
 
 SHELL_SUBCMD_DICT_SET_CREATE(sub_gain_cmds, cmd_adc_gain,
-	(GAIN_1_6, ADC_GAIN_1_6),
-	(GAIN_1_5, ADC_GAIN_1_5),
-	(GAIN_1_4, ADC_GAIN_1_4),
-	(GAIN_1_3, ADC_GAIN_1_3),
-	(GAIN_1_2, ADC_GAIN_1_2),
-	(GAIN_2_3, ADC_GAIN_2_3),
-	(GAIN_1, ADC_GAIN_1),
-	(GAIN_2, ADC_GAIN_2),
-	(GAIN_3, ADC_GAIN_3),
-	(GAIN_4, ADC_GAIN_4),
-	(GAIN_8, ADC_GAIN_8),
-	(GAIN_16, ADC_GAIN_16),
-	(GAIN_32, ADC_GAIN_32),
-	(GAIN_64, ADC_GAIN_64)
+	(GAIN_1_6, ADC_GAIN_1_6, "x 1/6"),
+	(GAIN_1_5, ADC_GAIN_1_5, "x 1/5"),
+	(GAIN_1_4, ADC_GAIN_1_4, "x 1/4"),
+	(GAIN_1_3, ADC_GAIN_1_3, "x 1/3"),
+	(GAIN_1_2, ADC_GAIN_1_2, "x 1/2"),
+	(GAIN_2_3, ADC_GAIN_2_3, "x 2/3"),
+	(GAIN_1, ADC_GAIN_1, "x 1"),
+	(GAIN_2, ADC_GAIN_2, "x 2"),
+	(GAIN_3, ADC_GAIN_3, "x 3"),
+	(GAIN_4, ADC_GAIN_4, "x 4"),
+	(GAIN_8, ADC_GAIN_8, "x 8"),
+	(GAIN_16, ADC_GAIN_16, "x 16"),
+	(GAIN_32, ADC_GAIN_32, "x 32"),
+	(GAIN_64, ADC_GAIN_64, "x 64")
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_channel_cmds,

@@ -58,6 +58,12 @@ const pll_setup_t pll0Setup = {
 
 static ALWAYS_INLINE void clock_init(void)
 {
+
+#if defined(CONFIG_SOC_LPC55S36)
+	/* Power Management Controller initialization */
+	POWER_PowerInit();
+#endif
+
 #if defined(CONFIG_SOC_LPC55S06) || defined(CONFIG_SOC_LPC55S16) || \
 	defined(CONFIG_SOC_LPC55S28) || defined(CONFIG_SOC_LPC55S36) || \
 	defined(CONFIG_SOC_LPC55S69_CPU0)
@@ -257,6 +263,24 @@ static int nxp_lpc55xxx_init(const struct device *arg)
 
 	return 0;
 }
+
+#ifdef CONFIG_PLATFORM_SPECIFIC_INIT
+
+void z_arm_platform_init(void)
+{
+	SystemInit();
+
+
+#ifndef CONFIG_LOG_BACKEND_SWO
+	/*
+	 * SystemInit unconditionally enables the trace clock.
+	 * Disable the trace clock unless SWO is used
+	 */
+	 SYSCON->TRACECLKDIV = 0x4000000;
+#endif
+}
+
+#endif /* CONFIG_PLATFORM_SPECIFIC_INIT */
 
 SYS_INIT(nxp_lpc55xxx_init, PRE_KERNEL_1, 0);
 

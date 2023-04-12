@@ -23,6 +23,7 @@
 		zephyr,sram = &sram1;
 		zephyr,flash = &flash1;
 		zephyr,code-partition = &slot0_partition;
+		zephyr,ieee802154 = &ieee802154;
 	};
 
 	buttons {
@@ -93,18 +94,6 @@
 	pinctrl-names = "default", "sleep";
 };
 
-&timer0 {
-	status = "okay";
-};
-
-&timer1 {
-	status = "okay";
-};
-
-&timer2 {
-	status = "okay";
-};
-
 &flash1 {
 
 	partitions {
@@ -133,6 +122,10 @@
 			reg = <0x0003a000 0x6000>;
 		};
 	};
+};
+
+&ieee802154 {
+	status = "okay";
 };
 
 /* Include shared RAM configuration file */

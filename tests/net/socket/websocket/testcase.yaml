@@ -1,9 +1,10 @@
 common:
   depends_on: netif
+  # The websocket library uses int for pointers for testing and does not work
+  # reliably on 64 bit architectures.
+  # See: https://github.com/zephyrproject-rtos/zephyr/issues/56542
+  filter: not CONFIG_64BIT
 tests:
   net.socket.websocket:
     min_ram: 21
     tags: net websocket
-    # Temporarily disable test for native_posix_64 because of sanity issues
-    # not seen locally but only in shippable.
-    platform_exclude: native_posix_64

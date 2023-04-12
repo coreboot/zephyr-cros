@@ -63,6 +63,10 @@ if(QEMU_PTY)
 elseif(QEMU_PIPE)
   # Redirect console to a pipe, used for running automated tests.
   list(APPEND QEMU_FLAGS -chardev pipe,id=con,mux=on,path=${QEMU_PIPE})
+  # Create the pipe file before passing the path to QEMU.
+  foreach(target ${qemu_targets})
+    list(APPEND PRE_QEMU_COMMANDS_FOR_${target} COMMAND ${CMAKE_COMMAND} -E touch ${QEMU_PIPE})
+  endforeach()
 else()
   # Redirect console to stdio, used for manual debugging.
   list(APPEND QEMU_FLAGS -chardev stdio,id=con,mux=on)
@@ -364,7 +368,11 @@ set(env_qemu $ENV{QEMU_EXTRA_FLAGS})
 separate_arguments(env_qemu)
 list(APPEND QEMU_EXTRA_FLAGS ${env_qemu})
 
-list(APPEND MORE_FLAGS_FOR_debugserver_qemu -s -S)
+list(APPEND MORE_FLAGS_FOR_debugserver_qemu -S)
+
+if(NOT CONFIG_QEMU_GDBSERVER_LISTEN_DEV STREQUAL "")
+  list(APPEND MORE_FLAGS_FOR_debugserver_qemu -gdb "${CONFIG_QEMU_GDBSERVER_LISTEN_DEV}")
+endif()
 
 # Architectures can define QEMU_KERNEL_FILE to use a specific output
 # file to pass to qemu (and a "qemu_kernel_target" target to generate
