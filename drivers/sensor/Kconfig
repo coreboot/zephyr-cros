@@ -191,6 +191,8 @@ source "drivers/sensor/max6675/Kconfig"
 
 source "drivers/sensor/mchp_tach_xec/Kconfig"
 
+source "drivers/sensor/mcp970x/Kconfig"
+
 source "drivers/sensor/mcp9808/Kconfig"
 
 source "drivers/sensor/mhz19b/Kconfig"
@@ -290,5 +292,7 @@ source "drivers/sensor/rpi_pico_temp/Kconfig"
 source "drivers/sensor/xmc4xxx_temp/Kconfig"
 
 source "drivers/sensor/tmd2620/Kconfig"
+
+source "drivers/sensor/zephyr_thermistor/Kconfig"
 
 endif # SENSOR
