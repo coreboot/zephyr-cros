@@ -8,8 +8,10 @@
 #include <zephyr/bluetooth/buf.h>
 #include <zephyr/sys/byteorder.h>
 
+#include "util/util.h"
 #include "util/memq.h"
 #include "util/mayfly.h"
+#include "util/dbuf.h"
 
 #include "hal/ccm.h"
 #include "hal/ticker.h"
@@ -21,8 +23,9 @@
 #include "pdu.h"
 
 #include "lll.h"
-#include "lll/lll_vendor.h"
 #include "lll_clock.h"
+#include "lll/lll_vendor.h"
+#include "lll/lll_df_types.h"
 #include "lll_conn.h"
 #include "lll_conn_iso.h"
 #include "lll_peripheral_iso.h"
@@ -188,7 +191,7 @@ uint8_t ull_peripheral_iso_acquire(struct ll_conn *acl,
 		cig->lll.window_widening_max_us = (iso_interval_us >> 1) -
 						  EVENT_IFS_US;
 		cig->lll.window_widening_periodic_us_frac =
-			ceiling_fraction(((lll_clock_ppm_local_get() +
+			DIV_ROUND_UP(((lll_clock_ppm_local_get() +
 					 lll_clock_ppm_get(acl->periph.sca)) *
 					 EVENT_US_TO_US_FRAC(iso_interval_us)), USEC_PER_SEC);
 

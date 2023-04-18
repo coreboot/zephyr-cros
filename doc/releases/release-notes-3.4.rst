@@ -112,6 +112,34 @@ Changes in this release
   on the stack. Applications that allocate a sensor trigger on the stack need
   to be updated.
 
+* Converted few drivers to the :ref:`input` subsystem.
+
+  * ``gpio_keys``: moved out of ``gpio``, replaced the custom API to use input
+    events instead, the :dtcompatible:`zephyr,gpio-keys` binding is unchanged
+    but now requires ``zephyr,code`` to be set.
+  * ``ft5336``: moved from :ref:`kscan_api` to :ref:`input`, renamed the Kconfig
+    options from ``CONFIG_KSCAN_FT5336``, ``CONFIG_KSCAN_FT5336_PERIOD`` and
+    ``KSCAN_FT5336_INTERRUPT`` to :kconfig:option:`CONFIG_INPUT_FT5336`,
+    :kconfig:option:`CONFIG_INPUT_FT5336_PERIOD` and
+    :kconfig:option:`CONFIG_INPUT_FT5336_INTERRUPT`.
+  * ``kscan_sdl``: moved from :ref:`kscan_api` to :ref:`input`, renamed the Kconfig
+    option from ``KSCAN_SDL`` to :kconfig:option:`CONFIG_INPUT_SDL_TOUCH` and the
+    compatible from ``zephyr,sdl-kscan`` to
+    :dtcompatible:`zephyr,input-sdl-touch`.
+  * Touchscreen drivers converted to use the input APIs can use the
+    :dtcompatible:`zephyr,kscan-input` driver to maintain Kscan compatilibity.
+
+* The declaration of :c:func:`main` has been changed from ``void
+  main(void)`` to ``int main(void)``. The main function is required to
+  return the value zero. All other return values are reserved. This aligns
+  Zephyr with the C and C++ language specification requirements for
+  "hosted" environments, avoiding compiler warnings and errors. These
+  compiler messages are generated when applications are built in "hosted"
+  mode (which means without the ``-ffreestanding`` compiler flag). As the
+  ``-ffreestanding`` flag is currently enabled unless the application is
+  using picolibc, only applications using picolibc will be affected by this
+  change at this time.
+
 Removed APIs in this release
 ============================
 
@@ -129,6 +157,11 @@ Stable API changes in this release
 * Removed `bt_set_oob_data_flag` and replaced it with two new API calls:
   * :c:func:`bt_le_oob_set_sc_flag` for setting/clearing OOB flag in SC pairing
   * :c:func:`bt_le_oob_set_legacy_flag` for setting/clearing OOB flag in legacy paring
+
+* :c:macro:`SYS_INIT` callback no longer requires a :c:struct:`device` argument.
+  The new callback signature is ``int f(void)``. A utility script to
+  automatically migrate existing projects can be found in
+  :zephyr_file:`scripts/utils/migrate_sys_init.py`.
 
 New APIs in this release
 ========================
@@ -295,12 +328,18 @@ Drivers and Sensors
     selected by the driver to indicate that extra operations are supported.
     To enable extra operations user should select
     :kconfig:option:`CONFIG_FLASH_EX_OP_ENABLED`.
+  * nrf_qspi_nor: Replaced custom API function ``nrf_qspi_nor_base_clock_div_force``
+    with ``nrf_qspi_nor_xip_enable`` which apart from forcing the clock divider
+    prevents the driver from deactivating the QSPI peripheral so that the XIP
+    operation is actually possible.
 
 * FPGA
 
 * Fuel Gauge
 
 * GPIO
+
+  * Converted the ``gpio_keys`` driver to the input subsystem.
 
 * hwinfo
 
@@ -312,11 +351,18 @@ Drivers and Sensors
 
 * IEEE 802.15.4
 
+* Input
+
+  * Introduced the :ref:`input` subsystem.
+
 * Interrupt Controller
 
 * IPM
 
 * KSCAN
+
+  * Added a :dtcompatible:`zephyr,kscan-input` input to kscan compatibility driver.
+  * Converted the ``ft5336`` and ``kscan_sdl`` drivers to the input subsystem.
 
 * LED
 
@@ -354,6 +400,9 @@ Trusted Firmware-M
 * SPI
 
 * Timer
+
+  * Support added for stopping Nordic nRF RTC system timer, which fixes an
+    issue when booting applications built in prior version of Zephyr.
 
 * USB
 
@@ -404,6 +453,11 @@ Libraries / Subsystems
     after a file upload is complete to ensure that the file handle is closed
     correctly, allowing other transports or other parts of the application
     code to use it.
+
+* RTIO
+
+  * Added policy that every ``sqe`` will generate a ``cqe`` (previously an RTIO_SQE_TRANSACTION
+    entry would only trigger a ``cqe`` on the last ``sqe`` in the transaction.
 
 HALs
 ****

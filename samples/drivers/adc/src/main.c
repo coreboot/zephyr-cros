@@ -29,9 +29,10 @@ static const struct adc_dt_spec adc_channels[] = {
 			     DT_SPEC_AND_COMMA)
 };
 
-void main(void)
+int main(void)
 {
 	int err;
+	uint32_t count = 0;
 	uint16_t buf;
 	struct adc_sequence sequence = {
 		.buffer = &buf,
@@ -42,19 +43,19 @@ void main(void)
 	/* Configure channels individually prior to sampling. */
 	for (size_t i = 0U; i < ARRAY_SIZE(adc_channels); i++) {
 		if (!device_is_ready(adc_channels[i].dev)) {
-			printk("ADC controller device not ready\n");
-			return;
+			printk("ADC controller device %s not ready\n", adc_channels[i].dev->name);
+			return 0;
 		}
 
 		err = adc_channel_setup_dt(&adc_channels[i]);
 		if (err < 0) {
 			printk("Could not setup channel #%d (%d)\n", i, err);
-			return;
+			return 0;
 		}
 	}
 
 	while (1) {
-		printk("ADC reading:\n");
+		printk("ADC reading[%u]:\n", count++);
 		for (size_t i = 0U; i < ARRAY_SIZE(adc_channels); i++) {
 			int32_t val_mv;
 
@@ -93,4 +94,5 @@ void main(void)
 
 		k_sleep(K_MSEC(1000));
 	}
+	return 0;
 }

@@ -17,3 +17,6 @@ supported:
   - dac
   - pwm
   - counter
+  - spi
+  - octospi
+  - can

@@ -41,6 +41,8 @@ config SENSOR_INFO
 
 comment "Device Drivers"
 
+source "drivers/sensor/adt7310/Kconfig"
+
 source "drivers/sensor/adt7420/Kconfig"
 
 source "drivers/sensor/adxl345/Kconfig"
@@ -191,6 +193,8 @@ source "drivers/sensor/max6675/Kconfig"
 
 source "drivers/sensor/mchp_tach_xec/Kconfig"
 
+source "drivers/sensor/mcp970x/Kconfig"
+
 source "drivers/sensor/mcp9808/Kconfig"
 
 source "drivers/sensor/mhz19b/Kconfig"
@@ -269,6 +273,8 @@ source "drivers/sensor/wsen_hids/Kconfig"
 
 source "drivers/sensor/wsen_itds/Kconfig"
 
+source "drivers/sensor/wsen_pads/Kconfig"
+
 source "drivers/sensor/wsen_tids/Kconfig"
 
 source "drivers/sensor/mcux_acmp/Kconfig"
@@ -290,5 +296,7 @@ source "drivers/sensor/rpi_pico_temp/Kconfig"
 source "drivers/sensor/xmc4xxx_temp/Kconfig"
 
 source "drivers/sensor/tmd2620/Kconfig"
+
+source "drivers/sensor/zephyr_thermistor/Kconfig"
 
 endif # SENSOR

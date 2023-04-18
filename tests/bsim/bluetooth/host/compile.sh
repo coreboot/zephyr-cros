@@ -25,6 +25,7 @@ app=tests/bsim/bluetooth/host/adv/chain compile
 app=tests/bsim/bluetooth/host/adv/periodic compile
 app=tests/bsim/bluetooth/host/adv/periodic conf_file=prj_long_data.conf compile
 app=tests/bsim/bluetooth/host/adv/encrypted/css_sample_data compile
+app=tests/bsim/bluetooth/host/adv/encrypted/ead_sample compile
 
 app=tests/bsim/bluetooth/host/att/eatt conf_file=prj_collision.conf compile
 app=tests/bsim/bluetooth/host/att/eatt conf_file=prj_multiple_conn.conf compile
@@ -38,14 +39,12 @@ app=tests/bsim/bluetooth/host/gatt/notify compile
 app=tests/bsim/bluetooth/host/gatt/notify_multiple compile
 app=tests/bsim/bluetooth/host/gatt/settings compile
 app=tests/bsim/bluetooth/host/gatt/settings conf_file=prj_2.conf compile
-app=tests/bsim/bluetooth/host/gatt/write compile
 
 app=tests/bsim/bluetooth/host/l2cap/general compile
 app=tests/bsim/bluetooth/host/l2cap/userdata compile
 app=tests/bsim/bluetooth/host/l2cap/stress compile
 
 app=tests/bsim/bluetooth/host/misc/disable compile
-app=tests/bsim/bluetooth/host/misc/multiple_id compile
 
 app=tests/bsim/bluetooth/host/privacy/central compile
 app=tests/bsim/bluetooth/host/privacy/peripheral compile

@@ -53,7 +53,7 @@ LOG_MODULE_REGISTER(itim, LOG_LEVEL_ERR);
 					/ CONFIG_SYS_CLOCK_TICKS_PER_SEC)
 #define SYS_CYCLES_PER_USEC (sys_clock_hw_cycles_per_sec() / 1000000)
 #define EVT_CYCLES_FROM_TICKS(ticks) \
-	ceiling_fraction(ticks * EVT_CYCLES_PER_SEC, \
+	DIV_ROUND_UP(ticks * EVT_CYCLES_PER_SEC, \
 			 CONFIG_SYS_CLOCK_TICKS_PER_SEC)
 #define NPCX_ITIM_CLK_SEL_DELAY 92 /* Delay for clock selection (Unit:us) */
 /* Timeout for enabling ITIM module: 100us (Unit:cycles) */
@@ -303,9 +303,8 @@ uint64_t npcx_clock_get_sleep_ticks(void)
 }
 #endif /* CONFIG_PM */
 
-static int sys_clock_driver_init(const struct device *dev)
+static int sys_clock_driver_init(void)
 {
-	ARG_UNUSED(dev);
 	int ret;
 	uint32_t sys_tmr_rate;
 	const struct device *const clk_dev = DEVICE_DT_GET(NPCX_CLK_CTRL_NODE);

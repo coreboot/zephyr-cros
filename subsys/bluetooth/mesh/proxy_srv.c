@@ -24,7 +24,6 @@
 #include "net.h"
 #include "rpl.h"
 #include "transport.h"
-#include "host/ecc.h"
 #include "prov.h"
 #include "beacon.h"
 #include "foundation.h"
@@ -382,7 +381,7 @@ static void identity_enabled(struct bt_mesh_subnet *sub)
 static void node_id_start(struct bt_mesh_subnet *sub)
 {
 #if defined(CONFIG_BT_MESH_PRIV_BEACONS)
-	sub->priv_beacon.node_id = false;
+	sub->priv_beacon_ctx.node_id = false;
 #endif
 
 	identity_enabled(sub);
@@ -391,7 +390,7 @@ static void node_id_start(struct bt_mesh_subnet *sub)
 static void private_node_id_start(struct bt_mesh_subnet *sub)
 {
 #if defined(CONFIG_BT_MESH_PRIV_BEACONS)
-	sub->priv_beacon.node_id = true;
+	sub->priv_beacon_ctx.node_id = true;
 #endif
 
 	identity_enabled(sub);
@@ -497,7 +496,7 @@ static int enc_id_adv(struct bt_mesh_subnet *sub, uint8_t type,
 	};
 	int err;
 
-	err = bt_encrypt_be(sub->keys[SUBNET_KEY_TX_IDX(sub)].identity, hash, hash);
+	err = bt_mesh_encrypt(sub->keys[SUBNET_KEY_TX_IDX(sub)].identity, hash, hash);
 	if (err) {
 		return err;
 	}
@@ -752,7 +751,7 @@ static int gatt_proxy_advertise(struct bt_mesh_subnet *sub)
 				LOG_DBG("Node ID active for %u ms, %d ms remaining",
 					active, remaining);
 #if defined(CONFIG_BT_MESH_PRIV_BEACONS)
-				priv_node_id = sub->priv_beacon.node_id;
+				priv_node_id = sub->priv_beacon_ctx.node_id;
 #endif
 				if (priv_node_id) {
 					err = priv_node_id_adv(sub, remaining);
