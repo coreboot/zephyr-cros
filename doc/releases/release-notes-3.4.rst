@@ -129,6 +129,17 @@ Changes in this release
   * Touchscreen drivers converted to use the input APIs can use the
     :dtcompatible:`zephyr,kscan-input` driver to maintain Kscan compatilibity.
 
+* The declaration of :c:func:`main` has been changed from ``void
+  main(void)`` to ``int main(void)``. The main function is required to
+  return the value zero. All other return values are reserved. This aligns
+  Zephyr with the C and C++ language specification requirements for
+  "hosted" environments, avoiding compiler warnings and errors. These
+  compiler messages are generated when applications are built in "hosted"
+  mode (which means without the ``-ffreestanding`` compiler flag). As the
+  ``-ffreestanding`` flag is currently enabled unless the application is
+  using picolibc, only applications using picolibc will be affected by this
+  change at this time.
+
 Removed APIs in this release
 ============================
 
@@ -146,6 +157,11 @@ Stable API changes in this release
 * Removed `bt_set_oob_data_flag` and replaced it with two new API calls:
   * :c:func:`bt_le_oob_set_sc_flag` for setting/clearing OOB flag in SC pairing
   * :c:func:`bt_le_oob_set_legacy_flag` for setting/clearing OOB flag in legacy paring
+
+* :c:macro:`SYS_INIT` callback no longer requires a :c:struct:`device` argument.
+  The new callback signature is ``int f(void)``. A utility script to
+  automatically migrate existing projects can be found in
+  :zephyr_file:`scripts/utils/migrate_sys_init.py`.
 
 New APIs in this release
 ========================
@@ -312,6 +328,10 @@ Drivers and Sensors
     selected by the driver to indicate that extra operations are supported.
     To enable extra operations user should select
     :kconfig:option:`CONFIG_FLASH_EX_OP_ENABLED`.
+  * nrf_qspi_nor: Replaced custom API function ``nrf_qspi_nor_base_clock_div_force``
+    with ``nrf_qspi_nor_xip_enable`` which apart from forcing the clock divider
+    prevents the driver from deactivating the QSPI peripheral so that the XIP
+    operation is actually possible.
 
 * FPGA
 
@@ -381,6 +401,9 @@ Trusted Firmware-M
 
 * Timer
 
+  * Support added for stopping Nordic nRF RTC system timer, which fixes an
+    issue when booting applications built in prior version of Zephyr.
+
 * USB
 
 * W1
@@ -430,6 +453,11 @@ Libraries / Subsystems
     after a file upload is complete to ensure that the file handle is closed
     correctly, allowing other transports or other parts of the application
     code to use it.
+
+* RTIO
+
+  * Added policy that every ``sqe`` will generate a ``cqe`` (previously an RTIO_SQE_TRANSACTION
+    entry would only trigger a ``cqe`` on the last ``sqe`` in the transaction.
 
 HALs
 ****

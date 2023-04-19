@@ -70,8 +70,9 @@
 /soc/arm64/arm/                           @povergoing
 /soc/arm64/arm/fvp_aemv8a/                @carlocaione
 /soc/arm64/intel_socfpga/*                @siclim
+/soc/Kconfig                              @tejlmand @galak @nashif @nordicjm
 /submanifests/*                           @mbolivar-nordic
-/arch/x86/                                @jhedberg @nashif @jenmwms @aasthagr
+/arch/x86/                                @jhedberg @nashif @aasthagr
 /arch/nios2/                              @nashif
 /arch/posix/                              @aescolar @daor-oti
 /arch/riscv/                              @kgugala @pgielda
@@ -83,7 +84,7 @@
 /soc/riscv/riscv-privilege/neorv32/       @henrikbrixandersen
 /soc/riscv/riscv-privilege/gd32vf103/     @soburi
 /soc/riscv/riscv-privilege/niosv/         @sweeaun
-/soc/x86/                                 @dcpleung @nashif @jenmwms @aasthagr
+/soc/x86/                                 @dcpleung @nashif @aasthagr
 /arch/xtensa/                             @dcpleung @andyross @nashif
 /soc/xtensa/                              @dcpleung @andyross @nashif
 /arch/sparc/                              @julius-barendt
@@ -99,6 +100,7 @@
 /boards/arm/96b_stm32_sensor_mez/         @Mani-Sadhasivam
 /boards/arm/96b_wistrio/                  @Mani-Sadhasivam
 /boards/arm/arduino_due/                  @ioannisg
+/boards/arm/acn52832/                     @sven-hm
 /boards/arm/bbc_microbit_v2/              @LingaoM
 /boards/arm/bl5340_dvk/                   @lairdjm
 /boards/arm/bl65*/                        @lairdjm
@@ -182,7 +184,7 @@
 /boards/shields/atmel_rf2xx/              @nandojve
 /boards/shields/esp_8266/                 @nandojve
 /boards/shields/inventek_eswifi/          @nandojve
-/boards/x86/                              @dcpleung @nashif @jenmwms @aasthagr
+/boards/x86/                              @dcpleung @nashif @aasthagr
 /boards/x86/acrn/                         @enjiamai
 /boards/xtensa/                           @nashif @dcpleung
 /boards/xtensa/odroid_go/                 @ydamigos
@@ -199,6 +201,7 @@
 /boards/arm64/fvp_baser_aemv8r/           @povergoing
 /boards/arm64/fvp_base_revc_2xaemv8a/     @carlocaione
 /boards/arm64/intel_socfpga_agilex_socdk/ @siclim @ngboonkhai
+/boards/Kconfig                           @tejlmand @galak @nashif @nordicjm
 # All cmake related files
 /cmake/                                   @tejlmand @nashif
 /cmake/*/arcmwdt/                         @abrodkin @evgeniy-paltsev @tejlmand
@@ -280,6 +283,7 @@
 /drivers/ethernet/*stm32*                 @Nukersson @lochej
 /drivers/ethernet/*w5500*                 @parthitce
 /drivers/ethernet/*xlnx_gem*              @ibirnbaum
+/drivers/ethernet/*smsc91x*               @sgrrzhf
 /drivers/ethernet/phy/                    @rlubos @tbursztyka @arvinf
 /drivers/mdio/                            @rlubos @tbursztyka @arvinf
 /drivers/flash/                           @nashif @de-nordic
@@ -393,7 +397,7 @@
 /drivers/serial/*b91*                     @andy-liu-telink
 /drivers/serial/uart_altera_jtag.c        @nashif @gohshunjing
 /drivers/serial/uart_altera.c             @gohshunjing
-/drivers/serial/*ns16550*                 @dcpleung @nashif @jenmwms @aasthagr
+/drivers/serial/*ns16550*                 @dcpleung @nashif @aasthagr
 /drivers/serial/*nrfx*                    @Mierunski @anangl
 /drivers/serial/uart_liteuart.c           @mateusz-holenko @kgugala @pgielda
 /drivers/serial/Kconfig.mcux_iuart        @Mani-Sadhasivam
@@ -555,6 +559,7 @@
 /dts/bindings/*/vexriscv*                 @mateusz-holenko @kgugala @pgielda
 /dts/bindings/*/andes*                    @cwshu @kevinwang821020 @jimmyzhe
 /dts/bindings/*/neorv32*                  @henrikbrixandersen
+/dts/bindings/*/*lan91c111*               @sgrrzhf
 /dts/bindings/i3c/                        @dcpleung
 /dts/bindings/pm_cpu_ops/*                @carlocaione
 /dts/bindings/ethernet/*gem.yaml          @ibirnbaum

@@ -41,6 +41,8 @@ config SENSOR_INFO
 
 comment "Device Drivers"
 
+source "drivers/sensor/adt7310/Kconfig"
+
 source "drivers/sensor/adt7420/Kconfig"
 
 source "drivers/sensor/adxl345/Kconfig"
@@ -270,6 +272,8 @@ source "drivers/sensor/nxp_kinetis_temp/Kconfig"
 source "drivers/sensor/wsen_hids/Kconfig"
 
 source "drivers/sensor/wsen_itds/Kconfig"
+
+source "drivers/sensor/wsen_pads/Kconfig"
 
 source "drivers/sensor/wsen_tids/Kconfig"
 
