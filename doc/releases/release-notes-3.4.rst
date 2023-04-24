@@ -172,19 +172,50 @@ New APIs in this release
   :kconfig:option:`CONFIG_FLASH_EX_OP_ENABLED` which depends on
   :kconfig:option:`CONFIG_FLASH_HAS_EX_OP` selected by driver.
 
+* Introduced :ref:`rtc_api` API which adds experimental support for real-time clock
+  devices. These devices previously used the :ref:`counter_api` API combined with
+  conversion between unix-time and broken-down time. The new API adds the mandatory
+  functions :c:func:`rtc_set_time` and :c:func:`rtc_get_time`, the optional functions
+  :c:func:`rtc_alarm_get_supported_fields`, :c:func:`rtc_alarm_set_time`,
+  :c:func:`rtc_alarm_get_time`, :c:func:`rtc_alarm_is_pending` and
+  :c:func:`rtc_alarm_set_callback` are enabled with
+  :kconfig:option:`CONFIG_RTC_ALARM`, the optional function
+  :c:func:`rtc_update_set_callback` is enabled with
+  :kconfig:option:`CONFIG_RTC_UPDATE`, and lastly, the optional functions
+  :c:func:`rtc_set_calibration` and :c:func:`rtc_get_calibration` are enabled with
+  :kconfig:option:`CONFIG_RTC_CALIBRATION`.
+
 Kernel
 ******
+
+* Removed absolute symbols :c:macro:`___cpu_t_SIZEOF`,
+  :c:macro:`_STRUCT_KERNEL_SIZE`, :c:macro:`K_THREAD_SIZEOF` and
+  :c:macro:`_DEVICE_STRUCT_SIZEOF`
 
 Architectures
 *************
 
-* ARM
+* ARC
+  * Removed absolute symbols :c:macro:`___callee_saved_t_SIZEOF` and
+  :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
 
 * ARM
+  * Removed absolute symbols :c:macro:`___basic_sf_t_SIZEOF`,
+  :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`, :c:macro:`___cpu_context_t_SIZEOF`
+  and :c:macro:`___thread_stack_info_t_SIZEOF`
 
 * ARM64
+  * Removed absolute symbol :c:macro:`___callee_saved_t_SIZEOF`
+
+* NIOS2
+  * Removed absolute symbol :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
 
 * RISC-V
+
+* SPARC
+  * Removed absolute symbol :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
+
+* X86
 
 * Xtensa
 
@@ -476,6 +507,14 @@ Trusted Firmware-M
 
 zcbor
 *****
+
+Updated from 0.6.0 to 0.7.0.
+Among other things, this update brings:
+
+* C++ improvements
+* float16 support
+* Improved docs
+* -Wall and -Wconversion compliance
 
 Documentation
 *************

@@ -134,7 +134,7 @@ int bt_bap_ep_get_info(const struct bt_bap_ep *ep, struct bt_bap_ep_info *info)
 	return 0;
 }
 
-#if defined(CONFIG_BT_BAP_UNICAST) || defined(CONFIG_BT_BAP_BROADCAST_SOURCE)
+#if defined(CONFIG_BT_AUDIO_TX)
 enum bt_bap_ascs_reason bt_audio_verify_qos(const struct bt_codec_qos *qos)
 {
 	if (qos->interval < BT_ISO_SDU_INTERVAL_MIN ||
@@ -167,7 +167,63 @@ enum bt_bap_ascs_reason bt_audio_verify_qos(const struct bt_codec_qos *qos)
 		return BT_BAP_ASCS_REASON_LATENCY;
 	}
 
+	if (qos->pd > BT_AUDIO_PD_MAX) {
+		LOG_DBG("Invalid presentation delay %u", qos->pd);
+		return BT_BAP_ASCS_REASON_PD;
+	}
+
 	return BT_BAP_ASCS_REASON_NONE;
+}
+
+#if CONFIG_BT_CODEC_MAX_DATA_LEN > 0
+bool bt_audio_valid_codec_data(const struct bt_codec_data *data)
+{
+	if (data->data.data_len > ARRAY_SIZE(data->value)) {
+		LOG_DBG("data invalid length: %zu/%zu", data->data.data_len,
+			ARRAY_SIZE(data->value));
+		return false;
+	}
+
+	return true;
+}
+#endif /* CONFIG_BT_CODEC_MAX_DATA_LEN > 0 */
+
+bool bt_audio_valid_codec(const struct bt_codec *codec)
+{
+	if (codec == NULL) {
+		LOG_DBG("codec is NULL");
+		return false;
+	}
+
+#if CONFIG_BT_CODEC_MAX_DATA_COUNT > 0
+	if (codec->data_count > CONFIG_BT_CODEC_MAX_DATA_COUNT) {
+		LOG_DBG("codec->data_count (%zu) is invalid", codec->data_count);
+		return false;
+	}
+
+	for (size_t i = 0U; i < codec->data_count; i++) {
+		if (!bt_audio_valid_codec_data(&codec->data[i])) {
+			LOG_DBG("codec->data[%zu] invalid", i);
+			return false;
+		}
+	}
+#endif /* CONFIG_BT_CODEC_MAX_DATA_COUNT > 0 */
+
+#if CONFIG_BT_CODEC_MAX_METADATA_COUNT > 0
+	if (codec->meta_count > CONFIG_BT_CODEC_MAX_METADATA_COUNT) {
+		LOG_DBG("codec->meta_count (%zu) is invalid", codec->meta_count);
+		return false;
+	}
+
+	for (size_t i = 0U; i < codec->meta_count; i++) {
+		if (!bt_audio_valid_codec_data(&codec->meta[i])) {
+			LOG_DBG("codec->meta[%zu] invalid", i);
+			return false;
+		}
+	}
+#endif /* CONFIG_BT_CODEC_MAX_METADATA_COUNT > 0 */
+
+	return true;
 }
 
 int bt_bap_stream_send(struct bt_bap_stream *stream, struct net_buf *buf,
@@ -192,7 +248,7 @@ int bt_bap_stream_send(struct bt_bap_stream *stream, struct net_buf *buf,
 	return bt_iso_chan_send(bt_bap_stream_iso_chan_get(stream),
 				buf, seq_num, ts);
 }
-#endif /* CONFIG_BT_BAP_UNICAST || CONFIG_BT_BAP_BROADCAST_SOURCE */
+#endif /* CONFIG_BT_AUDIO_TX */
 
 #if defined(CONFIG_BT_BAP_UNICAST)
 static bool bt_bap_stream_is_broadcast(const struct bt_bap_stream *stream)
