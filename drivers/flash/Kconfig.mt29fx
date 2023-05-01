@@ -1,0 +1,46 @@
+# Copyright (c) 2023 Schlumberger
+# SPDX-License-Identifier: Apache-2.0
+
+config MICRON_MT29FX_MEMC_NAND
+	bool "Micron mt29fx Nand flash driver"
+	default y
+	depends on DT_HAS_MICRON_MT29FX_MEMC_NAND_ENABLED
+	select FLASH_HAS_PAGE_LAYOUT
+	select FLASH_HAS_DRIVER_ENABLED
+	select GPIO
+	select MEMC
+	select FLASH_HAS_EX_OP
+	select FLASH_EX_OP_ENABLED
+	help
+          Enables Micron mt29fx Nand flash driver.
+
+config MICRON_MT29FX_MEMC_NAND_USE_EXTERNAL_ECC
+	bool "Use external ECC"
+	select FLASH_ECC_BCH
+	help
+	  Use external ECC if internal ECC is not supported.
+
+config MICRON_MT29FX_MEMC_NAND_USE_DMA
+	bool "Use DMA for data transfers"
+	default y
+	depends on MICRON_MT29FX_MEMC_NAND
+	help
+	  Use DMA for reading/writing data to the chip.
+
+
+if MICRON_MT29FX_MEMC_NAND_USE_DMA
+
+config MICRON_MT29FX_MEMC_NAND_ASYNC_DMA
+	bool "Use Asynchronouse DMA for transaction"
+	default y
+	depends on MICRON_MT29FX_MEMC_NAND
+	help
+	  Wait for a callback from DMA handler to complete transaction.
+
+config MICRON_MT29FX_MEMC_NAND_ASYNC_DMA_TIMEOUT_MS
+	int "Timeout for DMA transaction to complete"
+	default 200
+	help
+	  Timeout for DMA transaction to complete.
+
+endif

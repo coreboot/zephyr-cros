@@ -179,4 +179,6 @@ source "drivers/flash/Kconfig.andes"
 
 source "drivers/flash/Kconfig.ambiq"
 
+source "drivers/flash/Kconfig.mt29fx"
+
 endif # FLASH

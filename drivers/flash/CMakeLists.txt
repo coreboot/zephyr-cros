@@ -54,7 +54,7 @@ zephyr_library_sources_ifdef(CONFIG_FLASH_ANDES_QSPI flash_andes_qspi.c)
 zephyr_library_sources_ifdef(CONFIG_FLASH_AMBIQ flash_ambiq.c)
 zephyr_library_sources_ifdef(CONFIG_FLASH_CDNS_NAND flash_cadence_nand.c flash_cadence_nand_ll.c)
 zephyr_library_sources_ifdef(CONFIG_FLASH_ECC_BCH flash_ecc/bch.c flash_ecc/gf13.c)
->>>>>>> 7375cbf831c (Add ECC BCH implementation helpers)
+zephyr_library_sources_ifdef(CONFIG_MICRON_MT29FX_MEMC_NAND flash_mt29fx_memc_nand.c)
 
 if(CONFIG_FLASH_MCUX_FLEXSPI_XIP)
   dt_chosen(chosen_flash PROPERTY "zephyr,flash")

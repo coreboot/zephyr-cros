@@ -38,6 +38,12 @@ struct flash_pages_layout {
 };
 #endif /* CONFIG_FLASH_PAGE_LAYOUT */
 
+#define FLASH_EX_OP_IS_BAD_BLOCK               BIT(0)
+#define FLASH_EX_OP_IS_PARTIAL_PAGE_ERASED     BIT(1)
+#define FLASH_EX_OP_GET_PARTIAL_PAGE_SIZE      BIT(2)
+#define FLASH_EX_OP_MARK_BAD_BLOCK             BIT(3)
+#define FLASH_EX_OP_IS_PAGE_ERASED             BIT(4)
+
 /**
  * @}
  */

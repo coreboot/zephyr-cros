@@ -1,0 +1,66 @@
+# Copyright (c) 2023, Schlumberger
+# SPDX-License-Identifier: Apache-2.0
+
+description: Micron memory mapped NAND flash device
+
+compatible: "micron,mt29fx-memc-nand"
+
+include: soc-nv-flash.yaml
+
+properties:
+  reg:
+    required: true
+
+  write-page-size:
+    type: int
+    required: true
+
+  partial-write-page-size:
+    type: int
+    required: true
+
+  pages-per-block:
+    type: int
+    required: true
+    description: Number of pages per block. All pages in a block are erased together.
+
+  ecc-chunk-size-bytes:
+    type: int
+
+  oob-size-bytes:
+    type: int
+
+  num-blocks:
+    type: int
+    required: true
+    description: Number of blocks in the device. Each block is an erasable sector.
+
+  ready-busy-gpios:
+    type: phandle-array
+    description: External read-busy line
+
+  write-protect-gpios:
+    type: phandle-array
+    description: External write protect line
+
+  ale-address-mask:
+    type: int
+    required: true
+    description: Address mask to use during an Address stage
+
+  cle-address-mask:
+    type: int
+    required: true
+    description: Address mask to use during a Command stage
+
+  memc-handle:
+    type: phandle
+    required: true
+    description: |
+      Specifies a reference to a memc handle
+
+  memc-index:
+    type: int
+    required: true
+    description: |
+      Memc index
