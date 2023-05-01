@@ -35,6 +35,12 @@
 #include <zephyr/timing/timing.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device_runtime.h>
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 43
+
 LOG_MODULE_REGISTER(os, CONFIG_KERNEL_LOG_LEVEL);
 
 
