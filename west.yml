@@ -23,6 +23,8 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
+    - name: origin_dnm5
+      url-base: https://slb1-swt@dev.azure.com/slb1-swt/dnm-gen5/_git
 
   group-filter: [-babblesim, -optional]
 
@@ -282,7 +284,8 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: a4eda30f5b0cfd0cf15512be9dcd559239dbfc91
+      remote: origin_dnm5
+      revision: 478586235479e5728a4966f0ecdb992551294098
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
