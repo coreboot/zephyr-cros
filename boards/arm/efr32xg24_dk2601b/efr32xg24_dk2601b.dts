@@ -105,6 +105,10 @@
 	status = "okay";
 };
 
+&se {
+	status = "okay";
+};
+
 &flash0 {
 	partitions {
 		compatible = "fixed-partitions";
@@ -142,4 +146,8 @@
 			reg = <0x000fc000 0x00084000>;
 		};
 	};
+};
+
+&adc0 {
+	status = "okay";
 };
