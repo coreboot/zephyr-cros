@@ -79,6 +79,8 @@ source "drivers/sensor/bmi160/Kconfig"
 
 source "drivers/sensor/bmi270/Kconfig"
 
+source "drivers/sensor/bmi323/Kconfig"
+
 source "drivers/sensor/bmm150/Kconfig"
 
 source "drivers/sensor/bmp388/Kconfig"
@@ -172,6 +174,8 @@ source "drivers/sensor/lsm6ds0/Kconfig"
 source "drivers/sensor/lsm6dsl/Kconfig"
 
 source "drivers/sensor/lsm6dso/Kconfig"
+
+source "drivers/sensor/lsm6dso16is/Kconfig"
 
 source "drivers/sensor/lsm9ds0_gyro/Kconfig"
 
@@ -305,7 +309,7 @@ source "drivers/sensor/xmc4xxx_temp/Kconfig"
 
 source "drivers/sensor/tmd2620/Kconfig"
 
-source "drivers/sensor/zephyr_thermistor/Kconfig"
+source "drivers/sensor/ntc_thermistor/Kconfig"
 
 source "drivers/sensor/s11059/Kconfig"
 

@@ -167,6 +167,10 @@ struct proc_ctx {
 
 	/* Procedure data */
 	union {
+		/* Feature Exchange Procedure */
+		struct {
+			uint8_t host_initiated:1;
+		} fex;
 		/* Used by Minimum Used Channels Procedure */
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN)
 		struct {
@@ -711,6 +715,7 @@ void llcp_pdu_encode_cte_rsp(const struct proc_ctx *ctx, struct pdu_data *pdu);
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
 
 void llcp_lp_cc_init_proc(struct proc_ctx *ctx);
+void llcp_lp_cc_offset_calc_reply(struct ll_conn *conn, struct proc_ctx *ctx);
 void llcp_lp_cc_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
 void llcp_lp_cc_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
 bool llcp_lp_cc_is_active(struct proc_ctx *ctx);

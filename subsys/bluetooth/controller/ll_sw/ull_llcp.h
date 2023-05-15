@@ -85,7 +85,7 @@ uint8_t ull_cp_version_exchange(struct ll_conn *conn);
 /**
  * @brief Initiate a Feature Exchange Procedure.
  */
-uint8_t ull_cp_feature_exchange(struct ll_conn *conn);
+uint8_t ull_cp_feature_exchange(struct ll_conn *conn, uint8_t host_initiated);
 
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN)
 /**
@@ -185,6 +185,12 @@ uint8_t ull_cp_cis_terminate(struct ll_conn *conn, struct ll_conn_iso_stream *ci
  * @brief Initiate a CIS Create Procedure.
  */
 uint8_t ull_cp_cis_create(struct ll_conn *conn, struct ll_conn_iso_stream *cis);
+
+/**
+ * @brief Resume CIS create after CIS offset calculation.
+ */
+void ull_cp_cc_offset_calc_reply(struct ll_conn *conn, uint32_t cis_offset_min,
+				 uint32_t cis_offset_max);
 
 /**
  * @brief Is ongoing create cis procedure expecting a reply?

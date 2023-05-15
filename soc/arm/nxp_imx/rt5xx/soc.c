@@ -312,9 +312,13 @@ static void clock_init(void)
 	 * (height + VSW + VFP + VBP) * (width + HSW + HFP + HBP) * frame rate.
 	 * this means the clock divider will vary depending on
 	 * the attached display.
+	 *
+	 * The root clock used here is the AUX0 PLL (PLL0 PFD2).
 	 */
 	CLOCK_SetClkDiv(kCLOCK_DivDcPixelClk,
-		DT_PROP(DT_NODELABEL(lcdif), clk_div));
+		((CLOCK_GetSysPfdFreq(kCLOCK_Pfd2) /
+		DT_PROP(DT_CHILD(DT_NODELABEL(lcdif), display_timings),
+			clock_frequency)) + 1));
 
 	CLOCK_EnableClock(kCLOCK_DisplayCtrl);
 	RESET_ClearPeripheralReset(kDISP_CTRL_RST_SHIFT_RSTn);
@@ -422,12 +426,13 @@ void imxrt_pre_init_display_interface(void)
 	 *     (Pixel clock * bit per output pixel) / number of MIPI data lane
 	 *
 	 * DPHY supports up to 895.1MHz bit clock.
-	 * Note: AUX1 PLL clock is system pll clock * 18 / pfd.
-	 * system pll clock is configured at 528MHz by default.
+	 * We set the divider of the PFD3 output of the SYSPLL, which has a
+	 * fixed multiplied of 18, and use this output frequency for the DPHY.
 	 */
 	CLOCK_AttachClk(kAUX1_PLL_to_MIPI_DPHY_CLK);
 	CLOCK_InitSysPfd(kCLOCK_Pfd3,
-		DT_PROP(DT_NODELABEL(mipi_dsi), dphy_clk_div));
+		((CLOCK_GetSysPllFreq() * 18ull) /
+		((unsigned long long)(DT_PROP(DT_NODELABEL(mipi_dsi), phy_clock)))));
 	CLOCK_SetClkDiv(kCLOCK_DivDphyClk, 1);
 
 	/* Clear DSI control reset (Note that DPHY reset is cleared later)*/

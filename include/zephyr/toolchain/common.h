@@ -221,7 +221,7 @@
  */
 #define TYPE_SECTION_ITERABLE(type, varname, secname, section_postfix) \
 	Z_DECL_ALIGN(type) varname \
-	__in_section(_##secname, static, section_postfix) __used __noasan
+	__in_section(_##secname, static, _CONCAT(section_postfix, _)) __used __noasan
 
 /**
  * @brief iterable section start symbol for a generic type
@@ -322,6 +322,14 @@
 } while (0)
 
 /**
+ * @brief iterable section start symbol for a struct type
+ *
+ * @param[in]  struct_type data type of section
+ */
+#define STRUCT_SECTION_START(struct_type) \
+	TYPE_SECTION_START(struct_type)
+
+/**
  * @brief iterable section extern for start symbol for a struct
  *
  * Helper macro to give extern for start of iterable section.
@@ -330,6 +338,14 @@
  */
 #define STRUCT_SECTION_START_EXTERN(struct_type) \
 	TYPE_SECTION_START_EXTERN(struct struct_type, struct_type)
+
+/**
+ * @brief iterable section end symbol for a struct type
+ *
+ * @param[in]  struct_type data type of section
+ */
+#define STRUCT_SECTION_END(struct_type) \
+	TYPE_SECTION_END(struct_type)
 
 /**
  * @brief iterable section extern for end symbol for a struct
@@ -368,6 +384,15 @@
  */
 #define STRUCT_SECTION_ITERABLE(struct_type, varname) \
 	STRUCT_SECTION_ITERABLE_ALTERNATE(struct_type, struct_type, varname)
+
+/**
+ * @brief Defines a new element for an iterable section with a custom name.
+ *
+ * The name can be used to customize how iterable section entries are sorted.
+ * @see STRUCT_SECTION_ITERABLE()
+ */
+#define STRUCT_SECTION_ITERABLE_NAMED(struct_type, name, varname) \
+	TYPE_SECTION_ITERABLE(struct struct_type, varname, struct_type, name)
 
 /**
  * @brief Iterate over a specified iterable section (alternate).

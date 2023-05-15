@@ -16,6 +16,7 @@ menuconfig MCUMGR_GRP_IMG
 	bool "Mcumgr handlers for image management"
 	depends on FLASH
 	depends on IMG_MANAGER
+	depends on !MCUBOOT_BOOTLOADER_MODE_SINGLE_APP
 	select MPU_ALLOW_FLASH_WRITE if ARM_MPU
 	select MCUMGR_SMP_CBOR_MIN_DECODING_LEVEL_2
 	help
@@ -87,6 +88,13 @@ config MCUMGR_GRP_IMG_FRUGAL_LIST
 	  non-empty or true.  This option slightly reduces number of bytes transferred back from
 	  a device but requires support in client software, which has to default omitted values.
 	  Works correctly with mcumgr-cli.
+
+config MCUMGR_GRP_IMG_VERSION_CMP_USE_BUILD_NUMBER
+	bool "Use build number while comparing image version"
+	help
+	  By default, the image version comparison relies only on version major,
+	  minor and revision. Enable this option to take into account the build
+	  number as well.
 
 config MCUMGR_GRP_IMG_UPLOAD_CHECK_HOOK
 	bool "Upload check hook"

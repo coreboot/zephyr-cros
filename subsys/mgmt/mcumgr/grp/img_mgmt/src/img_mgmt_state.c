@@ -1,18 +1,20 @@
 /*
  * Copyright (c) 2018-2021 mcumgr authors
- * Copyright (c) 2022 Nordic Semiconductor ASA
+ * Copyright (c) 2022-2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>
-#include <assert.h>
 #include <string.h>
+#include <zephyr/logging/log.h>
 
 #include <zcbor_common.h>
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
+
+#include <bootutil/bootutil_public.h>
 
 #include <zephyr/mgmt/mcumgr/mgmt/mgmt.h>
 #include <zephyr/mgmt/mcumgr/smp/smp.h>
@@ -20,13 +22,14 @@
 #include <zephyr/mgmt/mcumgr/grp/img_mgmt/image.h>
 
 #include <mgmt/mcumgr/util/zcbor_bulk.h>
-#include <mgmt/mcumgr/grp/img_mgmt/img_mgmt_config.h>
 #include <mgmt/mcumgr/grp/img_mgmt/img_mgmt_priv.h>
 #include <mgmt/mcumgr/grp/img_mgmt/img_mgmt_impl.h>
 
 #ifdef CONFIG_MCUMGR_MGMT_NOTIFICATION_HOOKS
 #include <zephyr/mgmt/mcumgr/mgmt/callbacks.h>
 #endif
+
+LOG_MODULE_DECLARE(mcumgr_img_grp, CONFIG_MCUMGR_GRP_IMG_LOG_LEVEL);
 
 /* The value here sets how many "characteristics" that describe image is
  * encoded into a map per each image (like bootable flags, and so on).
@@ -56,6 +59,8 @@ img_mgmt_state_flags(int query_slot)
 {
 	uint8_t flags;
 	int swap_type;
+	int image = query_slot / 2;	/* We support max 2 images for now */
+	int active_slot = img_mgmt_active_slot(image);
 
 	flags = 0;
 
@@ -65,14 +70,13 @@ img_mgmt_state_flags(int query_slot)
 	swap_type = img_mgmt_swap_type(query_slot);
 	switch (swap_type) {
 	case IMG_MGMT_SWAP_TYPE_NONE:
-		if (query_slot == IMG_MGMT_BOOT_CURR_SLOT) {
+		if (query_slot == active_slot) {
 			flags |= IMG_MGMT_STATE_F_CONFIRMED;
-			flags |= IMG_MGMT_STATE_F_ACTIVE;
 		}
 		break;
 
 	case IMG_MGMT_SWAP_TYPE_TEST:
-		if (query_slot == IMG_MGMT_BOOT_CURR_SLOT) {
+		if (query_slot == active_slot) {
 			flags |= IMG_MGMT_STATE_F_CONFIRMED;
 		} else {
 			flags |= IMG_MGMT_STATE_F_PENDING;
@@ -80,7 +84,7 @@ img_mgmt_state_flags(int query_slot)
 		break;
 
 	case IMG_MGMT_SWAP_TYPE_PERM:
-		if (query_slot == IMG_MGMT_BOOT_CURR_SLOT) {
+		if (query_slot == active_slot) {
 			flags |= IMG_MGMT_STATE_F_CONFIRMED;
 		} else {
 			flags |= IMG_MGMT_STATE_F_PENDING | IMG_MGMT_STATE_F_PERMANENT;
@@ -88,17 +92,14 @@ img_mgmt_state_flags(int query_slot)
 		break;
 
 	case IMG_MGMT_SWAP_TYPE_REVERT:
-		if (query_slot == IMG_MGMT_BOOT_CURR_SLOT) {
-			flags |= IMG_MGMT_STATE_F_ACTIVE;
-		} else {
+		if (query_slot != active_slot) {
 			flags |= IMG_MGMT_STATE_F_CONFIRMED;
 		}
 		break;
 	}
 
-	/* Slot 0 is always active. */
-	/* XXX: The slot 0 assumption only holds when running from flash. */
-	if (query_slot == IMG_MGMT_BOOT_CURR_SLOT) {
+	/* Only running application is active */
+	if (image == img_mgmt_active_image() && query_slot == active_slot) {
 		flags |= IMG_MGMT_STATE_F_ACTIVE;
 	}
 
@@ -123,12 +124,18 @@ img_mgmt_state_any_pending(void)
 int
 img_mgmt_slot_in_use(int slot)
 {
-	uint8_t state_flags;
+	int active_slot = img_mgmt_active_slot(img_mgmt_active_image());
 
-	state_flags = img_mgmt_state_flags(slot);
-	return state_flags & IMG_MGMT_STATE_F_ACTIVE	   ||
-		   state_flags & IMG_MGMT_STATE_F_CONFIRMED	||
-		   state_flags & IMG_MGMT_STATE_F_PENDING;
+#ifndef CONFIG_MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP
+	uint8_t state_flags = img_mgmt_state_flags(slot);
+
+	if (state_flags & IMG_MGMT_STATE_F_CONFIRMED ||
+	    state_flags & IMG_MGMT_STATE_F_PENDING) {
+		return 1;
+	}
+#endif
+
+	return (active_slot == slot);
 }
 
 /**
@@ -262,6 +269,53 @@ img_mgmt_state_read(struct smp_streamer *ctxt)
 	return ok ? MGMT_ERR_EOK : MGMT_ERR_EMSGSIZE;
 }
 
+int img_mgmt_set_next_boot_slot(int slot, bool confirm)
+{
+	const struct flash_area *fa;
+	int area_id = img_mgmt_flash_area_id(slot);
+	int rc = 0;
+	bool active = (slot == img_mgmt_active_slot(img_mgmt_active_image()));
+
+	if (active) {
+		confirm = true;
+	} else {
+		if (slot != 1 &&
+		    !(CONFIG_MCUMGR_GRP_IMG_UPDATABLE_IMAGE_NUMBER == 2 && slot == 3)) {
+			return MGMT_ERR_EINVAL;
+		}
+	}
+
+	/* Confirm disallowed if a test is pending. */
+	if (active && img_mgmt_state_any_pending()) {
+		return MGMT_ERR_EBADSTATE;
+	}
+
+	if (flash_area_open(area_id, &fa) != 0) {
+		return MGMT_ERR_EUNKNOWN;
+	}
+
+	rc = boot_set_next(fa, active, confirm);
+	if (rc != 0) {
+		/* Failed to set next slot for boot as desired */
+		if (active) {
+			LOG_ERR("Failed to write confirmed flag: %d", rc);
+		} else {
+			LOG_ERR("Failed to write pending flag for slot %d: %d", slot, rc);
+		}
+		rc = MGMT_ERR_EUNKNOWN;
+	}
+	flash_area_close(fa);
+
+#if CONFIG_MCUMGR_GRP_IMG_STATUS_HOOKS
+	if (active) {
+		/* Confirm event is only sent for active slot */
+		(void)mgmt_callback_notify(MGMT_EVT_OP_IMG_MGMT_DFU_CONFIRMED, NULL, 0);
+	}
+#endif
+
+	return rc;
+}
+
 /**
  * Command handler: image state write
  */
@@ -292,7 +346,7 @@ img_mgmt_state_write(struct smp_streamer *ctxt)
 	/* Determine which slot is being operated on. */
 	if (zhash.len == 0) {
 		if (confirm) {
-			slot = IMG_MGMT_BOOT_CURR_SLOT;
+			slot = img_mgmt_active_slot(img_mgmt_active_image());
 		} else {
 			/* A 'test' without a hash is invalid. */
 			return MGMT_ERR_EINVAL;
@@ -313,12 +367,7 @@ img_mgmt_state_write(struct smp_streamer *ctxt)
 		}
 	}
 
-	if (slot == IMG_MGMT_BOOT_CURR_SLOT && confirm) {
-		/* Confirm current setup. */
-		rc = img_mgmt_state_confirm();
-	} else {
-		rc = img_mgmt_state_set_pending(slot, confirm);
-	}
+	rc = img_mgmt_set_next_boot_slot(slot, confirm);
 	if (rc != 0) {
 		return rc;
 	}

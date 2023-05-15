@@ -701,7 +701,7 @@ uint8_t ull_cp_le_ping(struct ll_conn *conn)
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
 #if defined(CONFIG_BT_CENTRAL) || defined(CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG)
-uint8_t ull_cp_feature_exchange(struct ll_conn *conn)
+uint8_t ull_cp_feature_exchange(struct ll_conn *conn, uint8_t host_initiated)
 {
 	struct proc_ctx *ctx;
 
@@ -709,6 +709,8 @@ uint8_t ull_cp_feature_exchange(struct ll_conn *conn)
 	if (!ctx) {
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
+
+	ctx->data.fex.host_initiated = host_initiated;
 
 	llcp_lr_enqueue(conn, ctx);
 
@@ -874,8 +876,11 @@ uint8_t ull_cp_cis_create(struct ll_conn *conn, struct ll_conn_iso_stream *cis)
 	struct ll_conn_iso_group *cig;
 	struct proc_ctx *ctx;
 
-	if (conn->lll.handle != cis->lll.acl_handle) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
+	if (!conn->llcp.fex.valid) {
+		/* No feature exchange was performed so initiate before CIS Create */
+		if (ull_cp_feature_exchange(conn, 0U) != BT_HCI_ERR_SUCCESS) {
+			return BT_HCI_ERR_CMD_DISALLOWED;
+		}
 	}
 
 	ctx = llcp_create_local_procedure(PROC_CIS_CREATE);
@@ -905,10 +910,9 @@ uint8_t ull_cp_cis_create(struct ll_conn *conn, struct ll_conn_iso_stream *cis)
 	ctx->data.cis_create.c_ft = cis->lll.tx.ft;
 	ctx->data.cis_create.p_ft = cis->lll.rx.ft;
 
-	ctx->data.cis_create.conn_event_count =
-		ull_central_iso_cis_offset_get(cis->lll.handle,
-					       &ctx->data.cis_create.cis_offset_min,
-					       &ctx->data.cis_create.cis_offset_max);
+	/* ctx->data.cis_create.conn_event_count will be filled when Tx PDU is
+	 * enqueued.
+	 */
 
 	llcp_lr_enqueue(conn, ctx);
 
@@ -1234,6 +1238,20 @@ void ull_cp_cte_req_set_disable(struct ll_conn *conn)
 }
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_REQ */
 
+void ull_cp_cc_offset_calc_reply(struct ll_conn *conn, uint32_t cis_offset_min,
+				 uint32_t cis_offset_max)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_lr_peek(conn);
+	if (ctx && ctx->proc == PROC_CIS_CREATE) {
+		ctx->data.cis_create.cis_offset_min = cis_offset_min;
+		ctx->data.cis_create.cis_offset_max = cis_offset_max;
+
+		llcp_lp_cc_offset_calc_reply(conn, ctx);
+	}
+}
+
 #if defined(CONFIG_BT_PERIPHERAL) && defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
 bool ull_cp_cc_awaiting_reply(struct ll_conn *conn)
 {
@@ -1245,7 +1263,6 @@ bool ull_cp_cc_awaiting_reply(struct ll_conn *conn)
 	}
 
 	return false;
-
 }
 
 uint16_t ull_cp_cc_ongoing_handle(struct ll_conn *conn)

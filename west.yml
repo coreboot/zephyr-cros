@@ -90,7 +90,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 140140ea047f441fe076d26f79eb54dc9a38bcb6
+      revision: a1c3e0fbaafda091139b8744becd4853ada2f747
       path: modules/hal/nordic
       groups:
         - hal
@@ -100,7 +100,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 69d57af9ae499c07dd2348e9d4cf4c9f781486c9
+      revision: a45b6bcee7824e42d9950c8324b3d783a2521a84
       path: modules/hal/nxp
       groups:
         - hal
@@ -136,7 +136,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: b8f135bac6347924c6719d645fd8082277616114
+      revision: c865374fc83d93416c0f380e6310368ff55d6ce2
       path: modules/hal/stm32
       groups:
         - hal
@@ -156,7 +156,7 @@ manifest:
       groups:
         - hal
     - name: hal_xtensa
-      revision: 63f655362423aa49507da7977a2d37142e8debeb
+      revision: bce25bd242fb07c4cfd13ccb1ed29bc8bc12b0b8
       path: modules/hal/xtensa
       groups:
         - hal
@@ -188,7 +188,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 1558e7ab0aadb4eac11f03befb5ccd3fa3f0aafe
+      revision: 2878eb4e32fabc14bc391c3221cbf285064d9db4
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -204,13 +204,13 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: bad9877e997b2c2a78dd74eec8978181f4655d14
+      revision: c8d2ecd25d6976d2d77eccf66878420fdb8ef5a1
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: 233fb29c52ffa7733ba132a2b5987a8201ba8ec6
       path: modules/lib/open-amp
     - name: openthread
-      revision: 25942910ab57b32f73d9c56d8c6cf07c7cf98c49
+      revision: 1203ea6426a906d62a3921b6d4c6a4a6c8e0abde
       path: modules/lib/openthread
     - name: picolibc
       path: modules/lib/picolibc
@@ -238,7 +238,7 @@ manifest:
       groups:
         - debug
     - name: trusted-firmware-m
-      revision: 99825b3c1e06e906016bf7ecc14505377d0a26ec
+      revision: 8209cb2ed2bc9a768cc1d715c2059616192cc720
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee
