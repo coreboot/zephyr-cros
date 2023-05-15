@@ -5396,7 +5396,7 @@ void k_heap_free(struct k_heap *h, void *mem) __attribute_nonnull(1);
  * @param in_section __attribute__((section(name))
  */
 #define Z_HEAP_DEFINE_IN_SECT(name, bytes, in_section)		\
-	char in_section						\
+	char 					\
 	     __aligned(8) /* CHUNK_UNIT */			\
 	     kheap_##name[MAX(bytes, Z_HEAP_MIN_SIZE)];		\
 	STRUCT_SECTION_ITERABLE(k_heap, name) = {		\
