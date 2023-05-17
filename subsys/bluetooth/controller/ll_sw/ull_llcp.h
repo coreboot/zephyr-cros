@@ -25,6 +25,8 @@ void ull_llcp_init(struct ll_conn *conn);
  */
 void ull_cp_state_set(struct ll_conn *conn, uint8_t state);
 
+void ull_cp_release_nodes(struct ll_conn *conn);
+
 /*
  * @brief Update 'global' tx buffer allowance
  */
@@ -34,11 +36,6 @@ void ull_cp_update_tx_buffer_queue(struct ll_conn *conn);
  *
  */
 void ull_cp_release_tx(struct ll_conn *conn, struct node_tx *tx);
-
-/**
- *
- */
-void ull_cp_release_ntf(struct node_rx_pdu *ntf);
 
 /**
  * @brief Procedure Response Timeout Check
@@ -68,7 +65,7 @@ void ull_cp_tx_ntf(struct ll_conn *conn);
 /**
  * @brief Handle received LL Control PDU.
  */
-void ull_cp_rx(struct ll_conn *conn, struct node_rx_pdu *rx);
+void ull_cp_rx(struct ll_conn *conn, memq_link_t *link, struct node_rx_pdu *rx);
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
 /**

@@ -123,6 +123,22 @@ extern "C" {
 #define RTIO_SQE_MEMPOOL_BUFFER BIT(2)
 
 /**
+ * @brief The SQE should not execute if possible
+ *
+ * If possible (not yet executed), the SQE should be canceled by flagging it as failed and returning
+ * -ECANCELED as the result.
+ */
+#define RTIO_SQE_CANCELED BIT(3)
+
+/**
+ * @brief The SQE should continue producing CQEs until canceled
+ *
+ * This flag must exist along :c:macro:`RTIO_SQE_MEMPOOL_BUFFER` and signals that when a read is
+ * complete. It should be placed back in queue until canceled.
+ */
+#define RTIO_SQE_MULTISHOT BIT(4)
+
+/**
  * @}
  */
 
@@ -260,22 +276,6 @@ struct rtio_cqe {
 	void *userdata; /**< Associated userdata with operation */
 	uint32_t flags; /**< Flags associated with the operation */
 };
-
-/**
- * Internal state of the mempool sqe map entry.
- */
-enum rtio_mempool_entry_state {
-	/** The SQE has no mempool buffer allocated */
-	RTIO_MEMPOOL_ENTRY_STATE_FREE = 0,
-	/** The SQE has an active mempool buffer allocated */
-	RTIO_MEMPOOL_ENTRY_STATE_ALLOCATED,
-	/** The SQE has a mempool buffer allocated that is currently owned by a CQE */
-	RTIO_MEMPOOL_ENTRY_STATE_ZOMBIE,
-	RTIO_MEMPOOL_ENTRY_STATE_COUNT,
-};
-
-/* Check that we can always fit the state in 2 bits */
-BUILD_ASSERT(RTIO_MEMPOOL_ENTRY_STATE_COUNT < 4);
 
 struct rtio_sqe_pool {
 	struct rtio_mpsc free_q;
@@ -447,6 +447,7 @@ static inline void rtio_sqe_prep_nop(struct rtio_sqe *sqe,
 				const struct rtio_iodev *iodev,
 				void *userdata)
 {
+	memset(sqe, 0, sizeof(struct rtio_sqe));
 	sqe->op = RTIO_OP_NOP;
 	sqe->iodev = iodev;
 	sqe->userdata = userdata;
@@ -462,6 +463,7 @@ static inline void rtio_sqe_prep_read(struct rtio_sqe *sqe,
 				      uint32_t len,
 				      void *userdata)
 {
+	memset(sqe, 0, sizeof(struct rtio_sqe));
 	sqe->op = RTIO_OP_RX;
 	sqe->prio = prio;
 	sqe->iodev = iodev;
@@ -483,6 +485,14 @@ static inline void rtio_sqe_prep_read_with_pool(struct rtio_sqe *sqe,
 	sqe->flags = RTIO_SQE_MEMPOOL_BUFFER;
 }
 
+static inline void rtio_sqe_prep_read_multishot(struct rtio_sqe *sqe,
+						const struct rtio_iodev *iodev, int8_t prio,
+						void *userdata)
+{
+	rtio_sqe_prep_read_with_pool(sqe, iodev, prio, userdata);
+	sqe->flags |= RTIO_SQE_MULTISHOT;
+}
+
 /**
  * @brief Prepare a write op submission
  */
@@ -493,6 +503,7 @@ static inline void rtio_sqe_prep_write(struct rtio_sqe *sqe,
 				       uint32_t len,
 				       void *userdata)
 {
+	memset(sqe, 0, sizeof(struct rtio_sqe));
 	sqe->op = RTIO_OP_TX;
 	sqe->prio = prio;
 	sqe->iodev = iodev;
@@ -520,6 +531,7 @@ static inline void rtio_sqe_prep_tiny_write(struct rtio_sqe *sqe,
 {
 	__ASSERT_NO_MSG(tiny_write_len <= sizeof(sqe->tiny_buf));
 
+	memset(sqe, 0, sizeof(struct rtio_sqe));
 	sqe->op = RTIO_OP_TINY_TX;
 	sqe->prio = prio;
 	sqe->iodev = iodev;
@@ -541,6 +553,7 @@ static inline void rtio_sqe_prep_callback(struct rtio_sqe *sqe,
 					  void *arg0,
 					  void *userdata)
 {
+	memset(sqe, 0, sizeof(struct rtio_sqe));
 	sqe->op = RTIO_OP_CALLBACK;
 	sqe->prio = 0;
 	sqe->iodev = NULL;
@@ -560,6 +573,7 @@ static inline void rtio_sqe_prep_transceive(struct rtio_sqe *sqe,
 					    uint32_t buf_len,
 					    void *userdata)
 {
+	memset(sqe, 0, sizeof(struct rtio_sqe));
 	sqe->op = RTIO_OP_TXRX;
 	sqe->prio = prio;
 	sqe->iodev = iodev;
@@ -578,8 +592,6 @@ static inline struct rtio_iodev_sqe *rtio_sqe_pool_alloc(struct rtio_sqe_pool *p
 	}
 
 	struct rtio_iodev_sqe *iodev_sqe = CONTAINER_OF(node, struct rtio_iodev_sqe, q);
-
-	memset(iodev_sqe, 0, sizeof(struct rtio_iodev_sqe));
 
 	pool->pool_free--;
 
@@ -1218,6 +1230,71 @@ static inline void rtio_access_grant(struct rtio *r, struct k_thread *t)
 }
 
 /**
+ * @brief Attempt to cancel an SQE
+ *
+ * If possible (not currently executing), cancel an SQE and generate a failure with -ECANCELED
+ * result.
+ *
+ * @param[in] sqe The SQE to cancel
+ * @return 0 if the SQE was flagged for cancellation
+ * @return <0 on error
+ */
+__syscall int rtio_sqe_cancel(struct rtio_sqe *sqe);
+
+static inline int z_impl_rtio_sqe_cancel(struct rtio_sqe *sqe)
+{
+	struct rtio_iodev_sqe *iodev_sqe = CONTAINER_OF(sqe, struct rtio_iodev_sqe, sqe);
+
+	do {
+		iodev_sqe->sqe.flags |= RTIO_SQE_CANCELED;
+		iodev_sqe = rtio_iodev_sqe_next(iodev_sqe);
+	} while (iodev_sqe != NULL);
+
+	return 0;
+}
+
+/**
+ * @brief Copy an array of SQEs into the queue and get resulting handles back
+ *
+ * Copies one or more SQEs into the RTIO context and optionally returns their generated SQE handles.
+ * Handles can be used to cancel events via the :c:func:`rtio_sqe_cancel` call.
+ *
+ * @param[in]  r RTIO context
+ * @param[in]  sqes Pointer to an array of SQEs
+ * @param[out] handle Optional pointer to :c:struct:`rtio_sqe` pointer to store the handle of the
+ *             first generated SQE. Use NULL to ignore.
+ * @param[in]  sqe_count Count of sqes in array
+ *
+ * @retval 0 success
+ * @retval -ENOMEM not enough room in the queue
+ */
+__syscall int rtio_sqe_copy_in_get_handles(struct rtio *r, const struct rtio_sqe *sqes,
+					   struct rtio_sqe **handle, size_t sqe_count);
+
+static inline int z_impl_rtio_sqe_copy_in_get_handles(struct rtio *r, const struct rtio_sqe *sqes,
+						      struct rtio_sqe **handle,
+						      size_t sqe_count)
+{
+	struct rtio_sqe *sqe;
+	uint32_t acquirable = rtio_sqe_acquirable(r);
+
+	if (acquirable < sqe_count) {
+		return -ENOMEM;
+	}
+
+	for (unsigned long i = 0; i < sqe_count; i++) {
+		sqe = rtio_sqe_acquire(r);
+		__ASSERT_NO_MSG(sqe != NULL);
+		if (handle != NULL && i == 0) {
+			*handle = sqe;
+		}
+		*sqe = sqes[i];
+	}
+
+	return 0;
+}
+
+/**
  * @brief Copy an array of SQEs into the queue
  *
  * Useful if a batch of submissions is stored in ROM or
@@ -1233,27 +1310,9 @@ static inline void rtio_access_grant(struct rtio *r, struct k_thread *t)
  * @retval 0 success
  * @retval -ENOMEM not enough room in the queue
  */
-__syscall int rtio_sqe_copy_in(struct rtio *r,
-			       const struct rtio_sqe *sqes,
-			       size_t sqe_count);
-static inline int z_impl_rtio_sqe_copy_in(struct rtio *r,
-					  const struct rtio_sqe *sqes,
-					  size_t sqe_count)
+static inline int rtio_sqe_copy_in(struct rtio *r, const struct rtio_sqe *sqes, size_t sqe_count)
 {
-	struct rtio_sqe *sqe;
-	uint32_t acquirable = rtio_sqe_acquirable(r);
-
-	if (acquirable < sqe_count) {
-		return -ENOMEM;
-	}
-
-	for (unsigned long i = 0; i < sqe_count; i++) {
-		sqe = rtio_sqe_acquire(r);
-		__ASSERT_NO_MSG(sqe != NULL);
-		*sqe = sqes[i];
-	}
-
-	return 0;
+	return rtio_sqe_copy_in_get_handles(r, sqes, NULL, sqe_count);
 }
 
 /**
@@ -1280,17 +1339,25 @@ static inline int z_impl_rtio_cqe_copy_out(struct rtio *r,
 					   size_t cqe_count,
 					   k_timeout_t timeout)
 {
-	size_t copied;
+	size_t copied = 0;
 	struct rtio_cqe *cqe;
+	uint64_t end = sys_clock_timeout_end_calc(timeout);
 
-	for (copied = 0; copied < cqe_count; copied++) {
-		cqe = rtio_cqe_consume_block(r);
+	do {
+		cqe = K_TIMEOUT_EQ(timeout, K_FOREVER) ? rtio_cqe_consume_block(r)
+						       : rtio_cqe_consume(r);
 		if (cqe == NULL) {
-			break;
+#ifdef CONFIG_BOARD_NATIVE_POSIX
+			/* Native posix fakes the clock and only moves it forward when sleeping. */
+			k_sleep(K_TICKS(1));
+#else
+			Z_SPIN_DELAY(1);
+#endif
+			continue;
 		}
-		cqes[copied] = *cqe;
+		cqes[copied++] = *cqe;
 		rtio_cqe_release(r, cqe);
-	}
+	} while (copied < cqe_count && end > k_uptime_ticks());
 
 	return copied;
 }

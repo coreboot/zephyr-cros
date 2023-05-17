@@ -20,10 +20,13 @@ LOG_MODULE_REGISTER(rtio_executor, CONFIG_RTIO_LOG_LEVEL);
  */
 static inline void rtio_iodev_submit(struct rtio_iodev_sqe *iodev_sqe)
 {
+	if (FIELD_GET(RTIO_SQE_CANCELED, iodev_sqe->sqe.flags)) {
+		/* Canceled */
+		rtio_iodev_sqe_err(iodev_sqe, -ECANCELED);
+		return;
+	}
 	iodev_sqe->sqe.iodev->api->submit(iodev_sqe);
 }
-
-
 
 /**
  * @brief Executor handled submissions
@@ -55,6 +58,7 @@ void rtio_executor_submit(struct rtio *r)
 
 	while (node != NULL) {
 		struct rtio_iodev_sqe *iodev_sqe = CONTAINER_OF(node, struct rtio_iodev_sqe, q);
+		uint16_t canceled_mask = iodev_sqe->sqe.flags & RTIO_SQE_CANCELED;
 
 		iodev_sqe->r = r;
 
@@ -74,12 +78,14 @@ void rtio_executor_submit(struct rtio *r)
 #endif
 				node = rtio_mpsc_pop(&iodev_sqe->r->sq);
 				next = CONTAINER_OF(node, struct rtio_iodev_sqe, q);
+				next->sqe.flags |= canceled_mask;
 				curr->next = next;
 				curr = next;
 				curr->r = r;
 
-				__ASSERT(curr != NULL,
-					 "Expected a valid sqe following transaction or chain flag");
+				__ASSERT(
+					curr != NULL,
+					"Expected a valid sqe following transaction or chain flag");
 			}
 
 			curr->next = NULL;
@@ -93,12 +99,40 @@ void rtio_executor_submit(struct rtio *r)
 }
 
 /**
- * @brief Callback from an iodev describing success
+ * @brief Handle common logic when :c:macro:`RTIO_SQE_MULTISHOT` is set
+ *
+ * @param[in] r RTIO context
+ * @param[in] curr Current IODev SQE that's being marked for finished.
+ * @param[in] is_canceled Whether or not the SQE is canceled
  */
-void rtio_executor_ok(struct rtio_iodev_sqe *iodev_sqe, int result)
+static inline void rtio_executor_handle_multishot(struct rtio *r, struct rtio_iodev_sqe *curr,
+						  bool is_canceled)
 {
+	/* Reset the mempool if needed */
+	if (curr->sqe.op == RTIO_OP_RX && FIELD_GET(RTIO_SQE_MEMPOOL_BUFFER, curr->sqe.flags)) {
+		if (is_canceled) {
+			/* Free the memory first since no CQE will be generated */
+			LOG_DBG("Releasing memory @%p size=%u", (void *)curr->sqe.buf,
+				curr->sqe.buf_len);
+			rtio_release_buffer(r, curr->sqe.buf, curr->sqe.buf_len);
+		}
+		/* Reset the buffer info so the next request can get a new one */
+		curr->sqe.buf = NULL;
+		curr->sqe.buf_len = 0;
+	}
+	if (!is_canceled) {
+		/* Request was not canceled, put the SQE back in the queue */
+		rtio_mpsc_push(&r->sq, &curr->q);
+		rtio_executor_submit(r);
+	}
+}
+
+static inline void rtio_executor_done(struct rtio_iodev_sqe *iodev_sqe, int result, bool is_ok)
+{
+	const bool is_multishot = FIELD_GET(RTIO_SQE_MULTISHOT, iodev_sqe->sqe.flags) == 1;
+	const bool is_canceled = FIELD_GET(RTIO_SQE_CANCELED, iodev_sqe->sqe.flags) == 1;
+	struct rtio *r = iodev_sqe->r;
 	struct rtio_iodev_sqe *curr = iodev_sqe, *next;
-	struct rtio *r = curr->r;
 	void *userdata;
 	uint32_t sqe_flags, cqe_flags;
 
@@ -108,15 +142,36 @@ void rtio_executor_ok(struct rtio_iodev_sqe *iodev_sqe, int result)
 		cqe_flags = rtio_cqe_compute_flags(iodev_sqe);
 
 		next = rtio_iodev_sqe_next(curr);
-		rtio_sqe_pool_free(r->sqe_pool, curr);
-		rtio_cqe_submit(r, result, userdata, cqe_flags);
+		if (is_multishot) {
+			rtio_executor_handle_multishot(r, curr, is_canceled);
+		}
+		if (!is_multishot || is_canceled) {
+			/* SQE is no longer needed, release it */
+			rtio_sqe_pool_free(r->sqe_pool, curr);
+		}
+		if (!is_canceled) {
+			/* Request was not canceled, generate a CQE */
+			rtio_cqe_submit(r, result, userdata, cqe_flags);
+		}
 		curr = next;
+		if (!is_ok) {
+			/* This is an error path, so cancel any chained SQEs */
+			result = -ECANCELED;
+		}
 	} while (sqe_flags & RTIO_SQE_TRANSACTION);
 
 	/* Curr should now be the last sqe in the transaction if that is what completed */
 	if (sqe_flags & RTIO_SQE_CHAINED) {
 		rtio_iodev_submit(curr);
 	}
+}
+
+/**
+ * @brief Callback from an iodev describing success
+ */
+void rtio_executor_ok(struct rtio_iodev_sqe *iodev_sqe, int result)
+{
+	rtio_executor_done(iodev_sqe, result, true);
 }
 
 /**
@@ -128,24 +183,5 @@ void rtio_executor_ok(struct rtio_iodev_sqe *iodev_sqe, int result)
  */
 void rtio_executor_err(struct rtio_iodev_sqe *iodev_sqe, int result)
 {
-	struct rtio *r = iodev_sqe->r;
-	struct rtio_iodev_sqe *curr = iodev_sqe, *next;
-	void *userdata = curr->sqe.userdata;
-	uint32_t sqe_flags = iodev_sqe->sqe.flags;
-	uint32_t cqe_flags = rtio_cqe_compute_flags(curr);
-
-	while (sqe_flags & (RTIO_SQE_CHAINED | RTIO_SQE_TRANSACTION)) {
-		userdata = curr->sqe.userdata;
-		sqe_flags = curr->sqe.flags;
-		cqe_flags = rtio_cqe_compute_flags(curr);
-
-		next = rtio_iodev_sqe_next(curr);
-		rtio_sqe_pool_free(r->sqe_pool, curr);
-		rtio_cqe_submit(r, result, userdata, cqe_flags);
-		curr = next;
-		result = -ECANCELED;
-	}
-
-	rtio_sqe_pool_free(r->sqe_pool, curr);
-	rtio_cqe_submit(r, result, userdata, cqe_flags);
+	rtio_executor_done(iodev_sqe, result, false);
 }
