@@ -1091,13 +1091,6 @@ static int i2c_it8xxx2_init(const struct device *dev)
 	uint32_t bitrate_cfg;
 	int error, status;
 
-	/*
-	 * This register is a pre-define hardware slave A and can
-	 * be accessed through I2C0. It is not currently used, so
-	 * it can be disabled to avoid illegal access.
-	 */
-	IT8XXX2_SMB_SFFCTL &= ~IT8XXX2_SMB_HSAPE;
-
 	/* Initialize mutex and semaphore */
 	k_mutex_init(&data->mutex);
 	k_sem_init(&data->device_sync_sem, 0, K_SEM_MAX_LIMIT);
@@ -1279,7 +1272,7 @@ BUILD_ASSERT(((DT_INST_PROP(SMB_CHANNEL_B, fifo_enable) == true) &&
 				  &i2c_it8xxx2_data_##inst,                     \
 				  &i2c_it8xxx2_cfg_##inst,                      \
 				  POST_KERNEL,                                  \
-				  CONFIG_KERNEL_INIT_PRIORITY_DEVICE,           \
+				  CONFIG_I2C_INIT_PRIORITY,                     \
 				  &i2c_it8xxx2_driver_api);                     \
 										\
 	static void i2c_it8xxx2_config_func_##inst(void)                        \

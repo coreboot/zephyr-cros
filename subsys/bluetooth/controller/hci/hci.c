@@ -63,6 +63,7 @@
 #include "ll_sw/ull_conn_iso_types.h"
 #include "ll_sw/ull_conn_iso_internal.h"
 #include "ll_sw/ull_df_types.h"
+#include "ll_sw/ull_internal.h"
 
 #include "ll_sw/ull_adv_internal.h"
 #include "ll_sw/ull_sync_internal.h"
@@ -861,6 +862,10 @@ static void read_supported_commands(struct net_buf *buf, struct net_buf **evt)
 #if defined(CONFIG_BT_CTLR_ADV_PERIODIC)
 	/* LE Set PA Params, LE Set PA Data, LE Set PA Enable */
 	rp->commands[37] |= BIT(2) | BIT(3) | BIT(4);
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+	/* LE Create BIG, LE Create BIG Test, LE Terminate BIG */
+	rp->commands[42] |= BIT(5) | BIT(6) | BIT(7);
+#endif /* CONFIG_BT_CTLR_ADV_ISO */
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* CONFIG_BT_BROADCASTER */
@@ -885,6 +890,10 @@ static void read_supported_commands(struct net_buf *buf, struct net_buf **evt)
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_ADV_LIST */
 	/* LE Set PA Receive Enable */
 	rp->commands[40] |= BIT(5);
+#if defined(CONFIG_BT_CTLR_SYNC_ISO)
+	/* LE BIG Create Sync, LE BIG Terminate Sync */
+	rp->commands[43] |= BIT(0) | BIT(1);
+#endif /* CONFIG_BT_CTLR_SYNC_ISO */
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 
@@ -1047,7 +1056,7 @@ static void read_supported_commands(struct net_buf *buf, struct net_buf **evt)
 	/* LE Read ISO Link Quality */
 	rp->commands[44] |= BIT(2);
 #endif /* CONFIG_BT_CTLR_READ_ISO_LINK_QUALITY */
-#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
+#endif /* CONFIG_BT_CTLR_SYNC_ISO || CONFIG_BT_CTLR_CONN_ISO */
 
 #if defined(CONFIG_BT_CTLR_ISO)
 	/* LE Setup ISO Data Path, LE Remove ISO Data Path */
@@ -5677,7 +5686,7 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 		/* Overwrite time stamp with HCI provided time stamp */
 		time_stamp = net_buf_pull_mem(buf, sizeof(*time_stamp));
 		len -= sizeof(*time_stamp);
-		sdu_frag_tx.time_stamp = *time_stamp;
+		sdu_frag_tx.time_stamp = sys_le32_to_cpu(*time_stamp);
 	} else {
 		sdu_frag_tx.time_stamp =
 			HAL_TICKER_TICKS_TO_US(ticker_ticks_now_get());
@@ -5687,8 +5696,8 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 	if ((pb_flag & 0x01) == 0) {
 		iso_data_hdr = net_buf_pull_mem(buf, sizeof(*iso_data_hdr));
 		len -= sizeof(*iso_data_hdr);
-		sdu_frag_tx.packet_sn = iso_data_hdr->sn;
-		sdu_frag_tx.iso_sdu_length = iso_data_hdr->slen;
+		sdu_frag_tx.packet_sn = sys_le16_to_cpu(iso_data_hdr->sn);
+		sdu_frag_tx.iso_sdu_length = sys_le16_to_cpu(iso_data_hdr->slen);
 	} else {
 		sdu_frag_tx.packet_sn = 0;
 		sdu_frag_tx.iso_sdu_length = 0;
@@ -5719,43 +5728,35 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 		}
 
 		struct ll_conn_iso_group *cig = cis->group;
+		uint8_t event_offset;
 
 		hdr = &(cis->hdr);
 
-		/* Set target event as the current event. This might cause some
-		 * misalignment between SDU interval and ISO interval in the
-		 * case of a burst from the application or late release. However
-		 * according to the specifications:
-		 * BT Core V5.3 : Vol 6 Low Energy Controller : Part B LL Spec:
-		 * 4.5.13.3 Connected Isochronous Data:
-		 * This burst is associated with the corresponding CIS event but
-		 * the payloads may be transmitted in later events as well.
-		 * If flush timeout is greater than one, use the current event,
-		 * otherwise postpone to the next.
+		/* We must ensure sufficient time for ISO-AL to fragment SDU and
+		 * deliver PDUs to the TX queue. By checking ull_ref_get, we
+		 * know if we are within the subevents of an ISO event. If so,
+		 * we can assume that we have enough time to deliver in the next
+		 * ISO event. If we're not active within the ISO event, we don't
+		 * know if there is enough time to deliver in the next event,
+		 * and for safety we set the target to current event + 2.
 		 *
-		 * TODO: Calculate the best possible target event based on CIS
-		 * reference, FT and event_count.
+		 * For FT > 1, we have the opportunity to retransmit in later
+		 * event(s), in which case we have the option to target an
+		 * earlier event (this or next) because being late does not
+		 * instantly flush the payload.
 		 */
-		sdu_frag_tx.target_event = cis->lll.event_count +
-					   ((cis->lll.tx.ft > 1U) ? 0U : 1U);
 
-		/* FIXME: Remove the below temporary hack to buffer up ISO data
-		 * if the SDU interval and ISO interval misalign.
-		 */
-		uint64_t pkt_seq_num = cis->lll.event_count + 1U;
+		event_offset = ull_ref_get(&cig->ull) ? 1 : 2;
 
-		if (((pkt_seq_num - cis->lll.tx.payload_count) &
-		     BIT64_MASK(39)) <= BIT64_MASK(38)) {
-			cis->lll.tx.payload_count = pkt_seq_num;
-		} else {
-			pkt_seq_num = cis->lll.tx.payload_count;
+		if (cis->lll.tx.ft > 1) {
+			/* FT > 1, target an earlier event */
+			event_offset -= 1;
 		}
 
-		sdu_frag_tx.target_event = pkt_seq_num;
-
-		cis->lll.tx.payload_count++;
-
-		sdu_frag_tx.grp_ref_point = cig->cig_ref_point;
+		sdu_frag_tx.target_event = cis->lll.event_count + event_offset;
+		sdu_frag_tx.grp_ref_point = isoal_get_wrapped_time_us(cig->cig_ref_point,
+						(event_offset * cig->iso_interval *
+							ISO_INT_UNIT_US));
 
 		/* Get controller's input data path for CIS */
 		dp_in = hdr->datapath_in;
@@ -5945,7 +5946,7 @@ static void dup_periodic_adv_reset(uint8_t addr_type, const uint8_t *addr,
 			struct dup_ext_adv_set *adv_set;
 
 			adv_set = &dup_mode->set[set_idx];
-			if (adv_set->adi.sid != sid) {
+			if (PDU_ADV_ADI_SID_GET(&adv_set->adi) != sid) {
 				continue;
 			}
 
@@ -5992,13 +5993,14 @@ static inline bool is_dup_or_update(struct dup_entry *dup, uint8_t adv_type,
 			struct dup_ext_adv_set *adv_set;
 
 			adv_set = &dup_mode->set[j];
-			if (adv_set->adi.sid != adi->sid) {
+			if (PDU_ADV_ADI_SID_GET(&adv_set->adi) != PDU_ADV_ADI_SID_GET(adi)) {
 				continue;
 			}
 
-			if (adv_set->adi.did != adi->did) {
+			if (PDU_ADV_ADI_DID_GET(&adv_set->adi) != PDU_ADV_ADI_DID_GET(adi)) {
 				/* report different DID */
-				adv_set->adi.did = adi->did;
+				adv_set->adi.did_sid_packed[0] = adi->did_sid_packed[0];
+				adv_set->adi.did_sid_packed[1] = adi->did_sid_packed[1];
 				/* set new data status */
 				if (data_status == BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS_COMPLETE) {
 					adv_set->data_cmplt = 1U;
@@ -6593,7 +6595,7 @@ static void ext_adv_info_fill(uint8_t evt_type, uint8_t phy, uint8_t sec_phy,
 
 	adv_info->prim_phy = find_lsb_set(phy);
 	adv_info->sec_phy = sec_phy;
-	adv_info->sid = (adi) ? adi->sid : BT_HCI_LE_EXT_ADV_SID_INVALID;
+	adv_info->sid = (adi) ? PDU_ADV_ADI_SID_GET(adi) : BT_HCI_LE_EXT_ADV_SID_INVALID;
 	adv_info->tx_power = tx_pwr;
 	adv_info->rssi = rssi;
 	adv_info->interval = interval_le16;
@@ -6863,8 +6865,8 @@ static void le_ext_adv_report(struct pdu_data *pdu_data,
 
 			ptr += sizeof(*adi);
 
-			LOG_DBG("    AdvDataInfo DID = 0x%x, SID = 0x%x", adi_curr->did,
-				adi_curr->sid);
+			LOG_DBG("    AdvDataInfo DID = 0x%x, SID = 0x%x",
+				PDU_ADV_ADI_DID_GET(adi_curr), PDU_ADV_ADI_SID_GET(adi_curr));
 		}
 
 		if (h->aux_ptr) {

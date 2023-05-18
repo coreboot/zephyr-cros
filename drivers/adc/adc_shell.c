@@ -33,6 +33,8 @@
 #define DT_DRV_COMPAT nxp_kinetis_adc12
 #elif DT_HAS_COMPAT_STATUS_OKAY(nxp_kinetis_adc16)
 #define DT_DRV_COMPAT nxp_kinetis_adc16
+#elif DT_HAS_COMPAT_STATUS_OKAY(nxp_vf610_adc)
+#define DT_DRV_COMPAT nxp_vf610_adc
 #elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_adc)
 #define DT_DRV_COMPAT st_stm32_adc
 #elif DT_HAS_COMPAT_STATUS_OKAY(nuvoton_npcx_adc)
@@ -124,19 +126,19 @@ static struct adc_hdl *get_adc(const char *device_label)
 	return NULL;
 }
 
-static int cmd_adc_ch_id(const struct shell *shell, size_t argc, char **argv)
+static int cmd_adc_ch_id(const struct shell *sh, size_t argc, char **argv)
 {
 	/* -2: index of ADC label name */
 	struct adc_hdl *adc = get_adc(argv[-2]);
 	int retval = 0;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
 	if (isdigit((unsigned char)argv[1][0]) == 0) {
-		shell_error(shell, "<channel> must be digits");
+		shell_error(sh, "<channel> must be digits");
 		return -EINVAL;
 	}
 
@@ -147,7 +149,7 @@ static int cmd_adc_ch_id(const struct shell *shell, size_t argc, char **argv)
 	return retval;
 }
 
-static int cmd_adc_ch_neg(const struct shell *shell, size_t argc, char **argv)
+static int cmd_adc_ch_neg(const struct shell *sh, size_t argc, char **argv)
 {
 #if CONFIG_ADC_CONFIGURABLE_INPUTS
 	/* -2: index of ADC label name */
@@ -155,12 +157,12 @@ static int cmd_adc_ch_neg(const struct shell *shell, size_t argc, char **argv)
 	int retval = 0;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
 	if (isdigit((unsigned char)argv[1][0]) == 0) {
-		shell_error(shell, "<negative input> must be digits");
+		shell_error(sh, "<negative input> must be digits");
 		return -EINVAL;
 	}
 
@@ -174,7 +176,7 @@ static int cmd_adc_ch_neg(const struct shell *shell, size_t argc, char **argv)
 #endif
 }
 
-static int cmd_adc_ch_pos(const struct shell *shell, size_t argc, char **argv)
+static int cmd_adc_ch_pos(const struct shell *sh, size_t argc, char **argv)
 {
 #if CONFIG_ADC_CONFIGURABLE_INPUTS
 	/* -2: index of ADC label name */
@@ -182,12 +184,12 @@ static int cmd_adc_ch_pos(const struct shell *shell, size_t argc, char **argv)
 	int retval = 0;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
 	if (isdigit((unsigned char)argv[1][0]) == 0) {
-		shell_error(shell, "<positive input> must be digits");
+		shell_error(sh, "<positive input> must be digits");
 		return -EINVAL;
 	}
 
@@ -201,7 +203,7 @@ static int cmd_adc_ch_pos(const struct shell *shell, size_t argc, char **argv)
 #endif
 }
 
-static int cmd_adc_gain(const struct shell *shell, size_t argc, char **argv,
+static int cmd_adc_gain(const struct shell *sh, size_t argc, char **argv,
 			void *data)
 {
 	/* -2: index of ADC label name */
@@ -210,7 +212,7 @@ static int cmd_adc_gain(const struct shell *shell, size_t argc, char **argv,
 	int retval = -EINVAL;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
@@ -225,7 +227,7 @@ static int cmd_adc_gain(const struct shell *shell, size_t argc, char **argv,
 	return retval;
 }
 
-static int cmd_adc_acq(const struct shell *shell, size_t argc, char **argv)
+static int cmd_adc_acq(const struct shell *sh, size_t argc, char **argv)
 {
 	/* -1 index of ADC label name */
 	struct adc_hdl *adc = get_adc(argv[-1]);
@@ -233,12 +235,12 @@ static int cmd_adc_acq(const struct shell *shell, size_t argc, char **argv)
 	int retval;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
 	if (isdigit((unsigned char)argv[1][0]) == 0) {
-		shell_error(shell, "<time> must be digits");
+		shell_error(sh, "<time> must be digits");
 		return -EINVAL;
 	}
 
@@ -261,19 +263,19 @@ static int cmd_adc_acq(const struct shell *shell, size_t argc, char **argv)
 
 	return retval;
 }
-static int cmd_adc_reso(const struct shell *shell, size_t argc, char **argv)
+static int cmd_adc_reso(const struct shell *sh, size_t argc, char **argv)
 {
 	/* -1 index of ADC label name */
 	struct adc_hdl *adc = get_adc(argv[-1]);
 	int retval;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
 	if (isdigit((unsigned char)argv[1][0]) == 0) {
-		shell_error(shell, "<resolution> must be digits");
+		shell_error(sh, "<resolution> must be digits");
 		return -EINVAL;
 	}
 
@@ -283,7 +285,7 @@ static int cmd_adc_reso(const struct shell *shell, size_t argc, char **argv)
 	return retval;
 }
 
-static int cmd_adc_ref(const struct shell *shell, size_t argc, char **argv,
+static int cmd_adc_ref(const struct shell *sh, size_t argc, char **argv,
 		       void *data)
 {
 	/* -2 index of ADC label name */
@@ -292,7 +294,7 @@ static int cmd_adc_ref(const struct shell *shell, size_t argc, char **argv,
 	int retval = -EINVAL;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
@@ -309,7 +311,7 @@ static int cmd_adc_ref(const struct shell *shell, size_t argc, char **argv,
 }
 
 #define BUFFER_SIZE 1
-static int cmd_adc_read(const struct shell *shell, size_t argc, char **argv)
+static int cmd_adc_read(const struct shell *sh, size_t argc, char **argv)
 {
 	uint8_t adc_channel_id = strtol(argv[1], NULL, 10);
 	/* -1 index of adc label name */
@@ -318,7 +320,7 @@ static int cmd_adc_read(const struct shell *shell, size_t argc, char **argv)
 	int retval;
 
 	if (!device_is_ready(adc->dev)) {
-		shell_error(shell, "ADC device not ready");
+		shell_error(sh, "ADC device not ready");
 		return -ENODEV;
 	}
 
@@ -332,18 +334,18 @@ static int cmd_adc_read(const struct shell *shell, size_t argc, char **argv)
 
 	retval = adc_read(adc->dev, &sequence);
 	if (retval >= 0) {
-		shell_print(shell, "read: %i", m_sample_buffer[0]);
+		shell_print(sh, "read: %i", m_sample_buffer[0]);
 	}
 
 	return retval;
 }
 
-static int cmd_adc_print(const struct shell *shell, size_t argc, char **argv)
+static int cmd_adc_print(const struct shell *sh, size_t argc, char **argv)
 {
 	/* -1 index of ADC label name */
 	struct adc_hdl *adc = get_adc(argv[-1]);
 
-	shell_print(shell, "%s:\n"
+	shell_print(sh, "%s:\n"
 			   "Gain: %s\n"
 			   "Reference: %s\n"
 			   "Acquisition Time: %u\n"

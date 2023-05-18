@@ -447,7 +447,7 @@ uint8_t ll_feature_req_send(uint16_t handle)
 
 	uint8_t err;
 
-	err = ull_cp_feature_exchange(conn);
+	err = ull_cp_feature_exchange(conn, 1U);
 	if (err) {
 		return err;
 	}
@@ -824,13 +824,11 @@ int ull_conn_rx(memq_link_t *link, struct node_rx_pdu **rx)
 	switch (pdu_rx->ll_id) {
 	case PDU_DATA_LLID_CTRL:
 	{
-		ARG_UNUSED(link);
-		ARG_UNUSED(pdu_rx);
-
-		ull_cp_rx(conn, *rx);
-
 		/* Mark buffer for release */
 		(*rx)->hdr.type = NODE_RX_TYPE_RELEASE;
+
+		ull_cp_rx(conn, link, *rx);
+
 		return 0;
 	}
 
@@ -868,11 +866,13 @@ int ull_conn_rx(memq_link_t *link, struct node_rx_pdu **rx)
 	return 0;
 }
 
-int ull_conn_llcp(struct ll_conn *conn, uint32_t ticks_at_expire, uint16_t lazy)
+int ull_conn_llcp(struct ll_conn *conn, uint32_t ticks_at_expire,
+		  uint32_t remainder, uint16_t lazy)
 {
 	LL_ASSERT(conn->lll.handle != LLL_HANDLE_INVALID);
 
 	conn->llcp.prep.ticks_at_expire = ticks_at_expire;
+	conn->llcp.prep.remainder = remainder;
 	conn->llcp.prep.lazy = lazy;
 
 	ull_cp_run(conn);
@@ -1727,6 +1727,7 @@ static void conn_cleanup_finalize(struct ll_conn *conn)
 #if defined(LLCP_TX_CTRL_BUF_QUEUE_ENABLE)
 	ull_cp_update_tx_buffer_queue(conn);
 #endif /* LLCP_TX_CTRL_BUF_QUEUE_ENABLE */
+	ull_cp_release_nodes(conn);
 
 	/* flush demux-ed Tx buffer still in ULL context */
 	tx_ull_flush(conn);
@@ -1936,10 +1937,6 @@ static int empty_data_start_release(struct ll_conn *conn, struct node_tx *tx)
 }
 #endif /* CONFIG_BT_CTLR_LLID_DATA_START_EMPTY */
 
-/*
- * TODO: struct lll_conn *lll_conn gives a CI error that tag names
- * must be unique. This may be a false positive
- */
 #if defined(CONFIG_BT_CTLR_FORCE_MD_AUTO)
 static uint8_t force_md_cnt_calc(struct lll_conn *lll_connection, uint32_t tx_rate)
 {
@@ -2088,7 +2085,7 @@ static void ull_conn_update_ticker(struct ll_conn *conn,
 }
 
 void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_t win_size,
-				uint16_t win_offset_us, uint16_t interval, uint16_t latency,
+				uint32_t win_offset_us, uint16_t interval, uint16_t latency,
 				uint16_t timeout, uint16_t instant)
 {
 	struct lll_conn *lll;
@@ -2159,7 +2156,7 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 			lll->periph.window_widening_periodic_us * instant_latency;
 
 		lll->periph.window_widening_periodic_us =
-			ceiling_fraction(((lll_clock_ppm_local_get() +
+			DIV_ROUND_UP(((lll_clock_ppm_local_get() +
 					   lll_clock_ppm_get(conn->periph.sca)) *
 					  conn_interval_us), 1000000U);
 		lll->periph.window_widening_max_us = (conn_interval_us >> 1U) - EVENT_IFS_US;
@@ -2242,7 +2239,7 @@ void ull_conn_update_peer_sca(struct ll_conn *conn)
 	periodic_us = conn_interval_us;
 
 	lll->periph.window_widening_periodic_us =
-		ceiling_fraction(((lll_clock_ppm_local_get() +
+		DIV_ROUND_UP(((lll_clock_ppm_local_get() +
 				   lll_clock_ppm_get(conn->periph.sca)) *
 				  conn_interval_us), 1000000U);
 

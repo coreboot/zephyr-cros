@@ -180,6 +180,16 @@ ZTEST(devicetree_api, test_inst_props)
 			      strlen(label_startswith)), "");
 }
 
+#undef DT_DRV_COMPAT
+#define DT_DRV_COMPAT vnd_device_with_props
+ZTEST(devicetree_api, test_any_inst_prop)
+{
+	zassert_equal(DT_ANY_INST_HAS_PROP_STATUS_OKAY(foo), 1, "");
+	zassert_equal(DT_ANY_INST_HAS_PROP_STATUS_OKAY(bar), 1, "");
+	zassert_equal(DT_ANY_INST_HAS_PROP_STATUS_OKAY(baz), 0, "");
+	zassert_equal(DT_ANY_INST_HAS_PROP_STATUS_OKAY(does_not_exist), 0, "");
+}
+
 ZTEST(devicetree_api, test_default_prop_access)
 {
 	/*
@@ -1659,7 +1669,17 @@ ZTEST(devicetree_api, test_enums)
 		MY_ENUM_ZERO = 0xaa,
 	};
 
+	/* DT_ENUM_IDX and DT_ENUM_HAS_VALUE on string enum */
 	zassert_equal(DT_ENUM_IDX(TEST_ENUM_0, val), 0, "0");
+	zassert_true(DT_ENUM_HAS_VALUE(TEST_ENUM_0, val, zero), "");
+	zassert_false(DT_ENUM_HAS_VALUE(TEST_ENUM_0, val, one), "");
+	zassert_false(DT_ENUM_HAS_VALUE(TEST_ENUM_0, val, two), "");
+
+	/* DT_ENUM_IDX and DT_ENUM_HAS_VALUE on int enum */
+	zassert_equal(DT_ENUM_IDX(DT_NODELABEL(test_enum_int_default_0), val), 0, "0");
+	zassert_true(DT_ENUM_HAS_VALUE(DT_NODELABEL(test_enum_int_default_0), val, 5), "");
+	zassert_false(DT_ENUM_HAS_VALUE(DT_NODELABEL(test_enum_int_default_0), val, 6), "");
+	zassert_false(DT_ENUM_HAS_VALUE(DT_NODELABEL(test_enum_int_default_0), val, 7), "");
 }
 #undef TO_MY_ENUM
 #undef TO_MY_ENUM_2
@@ -1686,10 +1706,16 @@ ZTEST(devicetree_api, test_inst_enums)
 #define DT_DRV_COMPAT vnd_enum_holder_inst
 	zassert_equal(DT_INST_ENUM_IDX(0, val), 0, "");
 	zassert_equal(DT_INST_ENUM_IDX_OR(0, val, 2), 0, "");
+	zassert_true(DT_INST_ENUM_HAS_VALUE(0, val, zero), "");
+	zassert_false(DT_INST_ENUM_HAS_VALUE(0, val, one), "");
+	zassert_false(DT_INST_ENUM_HAS_VALUE(0, val, two), "");
 
 #undef DT_DRV_COMPAT
 #define DT_DRV_COMPAT vnd_enum_required_false_holder_inst
 	zassert_equal(DT_INST_ENUM_IDX_OR(0, val, 2), 2, "");
+	zassert_false(DT_INST_ENUM_HAS_VALUE(0, val, zero), "");
+	zassert_false(DT_INST_ENUM_HAS_VALUE(0, val, one), "");
+	zassert_false(DT_INST_ENUM_HAS_VALUE(0, val, two), "");
 }
 
 #undef DT_DRV_COMPAT
@@ -2467,17 +2493,10 @@ ZTEST(devicetree_api, test_pinctrl)
 	zassert_equal(DT_INST_PINCTRL_HAS_NAME(0, f_o_o2), 0, "");
 }
 
-static int test_mbox_init(const struct device *dev)
-{
-	ARG_UNUSED(dev);
-
-	return 0;
-}
-
-DEVICE_DT_DEFINE(DT_NODELABEL(test_mbox), test_mbox_init, NULL,
-		 NULL, NULL, POST_KERNEL, 90, NULL);
-DEVICE_DT_DEFINE(DT_NODELABEL(test_mbox_zero_cell), test_mbox_init, NULL,
-		 NULL, NULL, POST_KERNEL, 90, NULL);
+DEVICE_DT_DEFINE(DT_NODELABEL(test_mbox), NULL, NULL, NULL, NULL, POST_KERNEL,
+		 90, NULL);
+DEVICE_DT_DEFINE(DT_NODELABEL(test_mbox_zero_cell), NULL, NULL, NULL, NULL,
+		 POST_KERNEL, 90, NULL);
 
 ZTEST(devicetree_api, test_mbox)
 {

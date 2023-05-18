@@ -61,6 +61,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include "lwm2m_engine.h"
 #include "lwm2m_rd_client.h"
 #include "lwm2m_rw_link_format.h"
+#include "lwm2m_util.h"
 
 #define LWM2M_RD_CLIENT_URI "rd"
 
@@ -502,6 +503,12 @@ static int do_registration_reply_cb(const struct coap_packet *response,
 			client.server_ep);
 
 		return 0;
+	} else if (code == COAP_RESPONSE_CODE_CONTINUE) {
+#if defined(CONFIG_LWM2M_COAP_BLOCK_TRANSFER)
+		return 0;
+#else
+		LOG_ERR("Response code CONTINUE not supported");
+#endif
 	}
 
 	LOG_ERR("Failed with code %u.%u (%s). Not Retrying.",
@@ -1556,10 +1563,8 @@ int lwm2m_rd_client_init(void)
 
 }
 
-static int sys_lwm2m_rd_client_init(const struct device *dev)
+static int sys_lwm2m_rd_client_init(void)
 {
-	ARG_UNUSED(dev);
-
 	return lwm2m_rd_client_init();
 }
 

@@ -65,9 +65,6 @@ extern "C" {
 /** Peripheral to act as Controller. */
 #define I2C_MODE_CONTROLLER		BIT(4)
 
-/** @deprecated Use I2C_MODE_CONTROLLER instead. */
-#define I2C_MODE_MASTER	__DEPRECATED_MACRO BIT(4)
-
 /**
  * @brief Complete I2C DT information
  *
@@ -510,8 +507,7 @@ static inline void i2c_xfer_stats(const struct device *dev, struct i2c_msg *msgs
 	for (uint8_t i = 0U; i < num_msgs; i++) {
 		if (msgs[i].flags & I2C_MSG_READ) {
 			bytes_read += msgs[i].len;
-		}
-		if (msgs[i].flags & I2C_MSG_WRITE) {
+		} else {
 			bytes_written += msgs[i].len;
 		}
 	}
@@ -542,7 +538,11 @@ static inline void i2c_xfer_stats(const struct device *dev, struct i2c_msg *msgs
 		stats_init(&state->stats.s_hdr, STATS_SIZE_32, 4,	\
 			   STATS_NAME_INIT_PARMS(i2c));			\
 		stats_register(dev->name, &(state->stats.s_hdr));	\
-		return init_fn(dev);					\
+		if (init_fn != NULL) {					\
+			return init_fn(dev);				\
+		}							\
+									\
+		return 0;						\
 	}
 
 /** @endcond */
@@ -556,7 +556,7 @@ static inline void i2c_xfer_stats(const struct device *dev, struct i2c_msg *msgs
  *
  * @param node_id The devicetree node identifier.
  *
- * @param init_fn Name of the init function of the driver.
+ * @param init_fn Name of the init function of the driver. Can be `NULL`.
  *
  * @param pm PM device resources reference (NULL if device does not use PM).
  *
@@ -597,7 +597,7 @@ static inline void i2c_xfer_stats(const struct device *dev, struct i2c_msg *msgs
 
 #define I2C_DEVICE_DT_DEFINE(node_id, init_fn, pm, data, config, level,	\
 			     prio, api, ...)				\
-	DEVICE_DT_DEFINE(node_id, &init_fn, pm, data, config, level,	\
+	DEVICE_DT_DEFINE(node_id, init_fn, pm, data, config, level,	\
 			 prio, api, __VA_ARGS__)
 
 #endif /* CONFIG_I2C_STATS */

@@ -11,6 +11,7 @@
 #include <zephyr/sys/printk.h>
 
 #include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/byteorder.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap.h>
@@ -30,7 +31,7 @@
 
 NET_BUF_POOL_FIXED_DEFINE(tx_pool, CONFIG_BT_ASCS_ASE_SRC_COUNT,
 			  BT_ISO_SDU_BUF_SIZE(CONFIG_BT_ISO_TX_MTU),
-			  8, NULL);
+			  CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
 
 static struct bt_codec lc3_codec =
 	BT_CODEC_LC3(BT_CODEC_LC3_FREQ_ANY, BT_CODEC_LC3_DURATION_10,
@@ -56,10 +57,8 @@ static K_SEM_DEFINE(sem_disconnected, 0, 1);
 static uint8_t unicast_server_addata[] = {
 	BT_UUID_16_ENCODE(BT_UUID_ASCS_VAL), /* ASCS UUID */
 	BT_AUDIO_UNICAST_ANNOUNCEMENT_TARGETED, /* Target Announcement */
-	(((AVAILABLE_SINK_CONTEXT) >>  0) & 0xFF),
-	(((AVAILABLE_SINK_CONTEXT) >>  8) & 0xFF),
-	(((AVAILABLE_SOURCE_CONTEXT) >>  0) & 0xFF),
-	(((AVAILABLE_SOURCE_CONTEXT) >>  8) & 0xFF),
+	BT_BYTES_LIST_LE16(AVAILABLE_SINK_CONTEXT),
+	BT_BYTES_LIST_LE16(AVAILABLE_SOURCE_CONTEXT),
 	0x00, /* Metadata length */
 };
 
@@ -123,7 +122,7 @@ static void print_codec(const struct bt_codec *codec)
 	if (codec->id == BT_CODEC_LC3_ID) {
 		/* LC3 uses the generic LTV format - other codecs might do as well */
 
-		uint32_t chan_allocation;
+		enum bt_audio_location chan_allocation;
 
 		printk("  Frequency: %d Hz\n", bt_codec_cfg_get_freq(codec));
 		printk("  Frame Duration: %d us\n", bt_codec_cfg_get_frame_duration_us(codec));
@@ -717,7 +716,7 @@ static int set_available_contexts(void)
 	return 0;
 }
 
-void main(void)
+int main(void)
 {
 	struct bt_le_ext_adv *adv;
 	int err;
@@ -725,7 +724,7 @@ void main(void)
 	err = bt_enable(NULL);
 	if (err != 0) {
 		printk("Bluetooth init failed (err %d)\n", err);
-		return;
+		return 0;
 	}
 
 	printk("Bluetooth initialized\n");
@@ -746,30 +745,30 @@ void main(void)
 
 	err = set_location();
 	if (err != 0) {
-		return;
+		return 0;
 	}
 
 	err = set_supported_contexts();
 	if (err != 0) {
-		return;
+		return 0;
 	}
 
 	err = set_available_contexts();
 	if (err != 0) {
-		return;
+		return 0;
 	}
 
 	/* Create a non-connectable non-scannable advertising set */
 	err = bt_le_ext_adv_create(BT_LE_EXT_ADV_CONN_NAME, NULL, &adv);
 	if (err) {
 		printk("Failed to create advertising set (err %d)\n", err);
-		return;
+		return 0;
 	}
 
 	err = bt_le_ext_adv_set_data(adv, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		printk("Failed to set advertising data (err %d)\n", err);
-		return;
+		return 0;
 	}
 
 	while (true) {
@@ -778,7 +777,7 @@ void main(void)
 		err = bt_le_ext_adv_start(adv, BT_LE_EXT_ADV_START_DEFAULT);
 		if (err) {
 			printk("Failed to start advertising set (err %d)\n", err);
-			return;
+			return 0;
 		}
 
 		printk("Advertising successfully started\n");
@@ -788,7 +787,7 @@ void main(void)
 		err = k_sem_take(&sem_disconnected, K_FOREVER);
 		if (err != 0) {
 			printk("failed to take sem_disconnected (err %d)\n", err);
-			return;
+			return 0;
 		}
 
 		/* reset data */
@@ -796,4 +795,5 @@ void main(void)
 		k_work_cancel_delayable_sync(&audio_send_work, &sync);
 
 	}
+	return 0;
 }

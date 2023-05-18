@@ -130,7 +130,7 @@ In case of error the CBOR data takes the form:
 .. code-block:: none
 
     {
-        (str)"rc" : (int)
+        (str)"rc"      : (int)
         (str,opt)"rsn" : (str)
     }
 
@@ -187,7 +187,7 @@ where:
     | "splitStatus"         | states whether loader of split image is compatible|
     |                       | with application part; this is unused by Zephyr   |
     +-----------------------+---------------------------------------------------+
-    | "rc"                  | :ref:`mcumgr_smp_protocol_status_codes`           |
+    | "rc"                  | :c:enum:`mcumgr_err_t`                            |
     |                       | only appears if non-zero (error condition).       |
     +-----------------------+---------------------------------------------------+
     | "rsn"                 | optional string that clarifies reason for an      |
@@ -229,9 +229,9 @@ CBOR data of request:
         }
     }
 
-If "confirm" is false an image with the "hash" will be set for test, which means
-that it will not be marked as permanent and upon hard reset the previous
-application will be restored to the primary slot.
+If "confirm" is false or not provided, an image with the "hash" will be set for
+test, which means that it will not be marked as permanent and upon hard reset
+the previous application will be restored to the primary slot.
 In case when "confirm" is true, the "hash" is optional as the currently running
 application will be assumed as target for confirmation.
 
@@ -251,7 +251,7 @@ Image upload request
 The image upload request is sent for each chunk of image that is uploaded, until
 complete image gets uploaded to a device.
 
-Set state of image request header fields:
+Image upload request header fields:
 
 .. table::
     :align: center
@@ -294,11 +294,14 @@ where:
     | "off"                 | offset of image chunk the request carries         |
     +-----------------------+---------------------------------------------------+
     | "sha"                 | SHA256 hash of an upload; this is used to         |
-    |                       | identify an upload session, for example to allow  |
-    |                       | MCUmgr to continue a broken session. This must be |
-    |                       | a full SHA256 of the whole image being uploaded,  |
-    |                       | and is optionally used for image verification     |
-    |                       | purposes. Should only be present if "off" is zero |
+    |                       | identify an upload session (e.g. to allow MCUmgr  |
+    |                       | to continue a broken session), and for image      |
+    |                       | verification purposes. This must be a full SHA256 |
+    |                       | hash of the whole image being uploaded, or not    |
+    |                       | included if the hash is not available (in which   |
+    |                       | case, upload session continuation and image       |
+    |                       | verification functionality will be unavailable).  |
+    |                       | Should only be present if "off" is zero.          |
     +-----------------------+---------------------------------------------------+
     | "data"                | optional image data                               |
     +-----------------------+---------------------------------------------------+
@@ -314,16 +317,20 @@ where:
     There is no field representing size of chunk that is carried as "data" because
     that information is embedded within "data" field itself.
 
-The mcumgr library uses "sha" field to tag ongoing update session, to be able
-to continue it in case when it gets broken.
+The MCUmgr library uses "sha" field to tag ongoing update session, to be able
+to continue it in case when it gets broken, and for upload verification
+purposes.
 If library gets request with "off" equal zero it checks stored "sha" within its
 state and if it matches it will respond to update client application with
 offset that it should continue with.
+If this hash is not available (e.g. because a file is being streamed) then it
+must not be provided, image verification and upload session continuation
+features will be unavailable in this case.
 
 Image upload response
 =====================
 
-Set state of image request header fields:
+Image upload response header fields:
 
 .. table::
     :align: center
@@ -366,7 +373,7 @@ where:
     |                       | :kconfig:option:`CONFIG_IMG_ENABLE_IMAGE_CHECK` is  |
     |                       | enabled.                                            |
     +-----------------------+-----------------------------------------------------+
-    | "rc"                  | :ref:`mcumgr_smp_protocol_status_codes` only        |
+    | "rc"                  | :c:enum:`mcumgr_err_t` only                         |
     |                       | appears if non-zero (error condition).              |
     +-----------------------+-----------------------------------------------------+
     | "rsn"                 | Optional string that clarifies reason for an error; |
@@ -384,7 +391,7 @@ The command is used for erasing image slot on a target device.
 
 .. note::
     This is synchronous command which means that a sender of request will not
-    receive response until the command completes.
+    receive response until the command completes, which can take a long time.
 
 Image erase request
 ===================
@@ -449,16 +456,16 @@ where:
 .. table::
     :align: center
 
-    +-----------------------+---------------------------------------------------+
-    | "rc"                  | :ref:`mcumgr_smp_protocol_status_codes`           |
-    |                       | only appears if non-zero (error condition).       |
-    +-----------------------+---------------------------------------------------+
-    | "rsn"                 | Optional string that clarifies reason for an      |
-    |                       | error; specifically useful for error code ``1``,  |
-    |                       | unknown error                                     |
-    +-----------------------+---------------------------------------------------+
+    +-----------------------+--------------------------------------------------+
+    | "rc"                  | :c:enum:`mcumgr_err_t`                           |
+    |                       | only appears if non-zero (error condition).      |
+    +-----------------------+--------------------------------------------------+
+    | "rsn"                 | Optional string that clarifies reason for an     |
+    |                       | error; specifically useful when rc value is      |
+    |                       | :c:enum:`MGMT_ERR_EUNKNOWN`                      |
+    +-----------------------+--------------------------------------------------+
 
 .. note::
-    Response from Zephyr running device may have "rc" value of 6, bad state
-    (:ref:`mcumgr_smp_protocol_status_codes`), which means that the secondary
+    Response from Zephyr running device may have "rc" value of
+    :c:enum:`MGMT_ERR_EBADSTATE`, which means that the secondary
     image has been marked for next boot already and may not be erased.

@@ -88,12 +88,13 @@ static int mcux_pwm_set_cycles(const struct device *dev, uint32_t channel,
 			return -EINVAL;
 		}
 
-		pwm_freq = (clock_freq >> config->prescale) / period_cycles;
+		pwm_freq = DIV_ROUND_UP(clock_freq >> config->prescale, period_cycles);
 
 		if (pwm_freq == 0) {
 			LOG_ERR("Could not set up pwm_freq=%d", pwm_freq);
 			return -EINVAL;
 		}
+		data->channel[channel].pwmchannelenable = true;
 
 		PWM_StopTimer(config->base, 1U << config->index);
 

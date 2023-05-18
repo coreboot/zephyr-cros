@@ -14,6 +14,7 @@
 #include <zephyr/linker/sections.h>
 #include <zephyr/sys/device_mmio.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -108,7 +109,7 @@ typedef int16_t device_handle_t;
  * device_get_binding(). This must be less than Z_DEVICE_MAX_NAME_LEN characters
  * (including terminating `NULL`) in order to be looked up from user mode.
  * @param init_fn Pointer to the device's initialization function, which will be
- * run by the kernel during system initialization.
+ * run by the kernel during system initialization. Can be `NULL`.
  * @param pm Pointer to the device's power management resources, a
  * @ref pm_device, which will be stored in @ref device.pm field. Use `NULL` if
  * the device does not use PM.
@@ -159,7 +160,7 @@ typedef int16_t device_handle_t;
  *
  * @param node_id The devicetree node identifier.
  * @param init_fn Pointer to the device's initialization function, which will be
- * run by the kernel during system initialization.
+ * run by the kernel during system initialization. Can be `NULL`.
  * @param pm Pointer to the device's power management resources, a
  * @ref pm_device, which will be stored in @ref device.pm. Use `NULL` if the
  * device does not use PM.
@@ -415,13 +416,13 @@ struct device {
 static inline device_handle_t device_handle_get(const struct device *dev)
 {
 	device_handle_t ret = DEVICE_HANDLE_NULL;
-	extern const struct device __device_start[];
+	STRUCT_SECTION_START_EXTERN(device);
 
 	/* TODO: If/when devices can be constructed that are not part of the
 	 * fixed sequence we'll need another solution.
 	 */
 	if (dev != NULL) {
-		ret = 1 + (device_handle_t)(dev - __device_start);
+		ret = 1 + (device_handle_t)(dev - STRUCT_SECTION_START(device));
 	}
 
 	return ret;
@@ -438,13 +439,14 @@ static inline device_handle_t device_handle_get(const struct device *dev)
 static inline const struct device *
 device_from_handle(device_handle_t dev_handle)
 {
-	extern const struct device __device_start[];
-	extern const struct device __device_end[];
+	STRUCT_SECTION_START_EXTERN(device);
 	const struct device *dev = NULL;
-	size_t numdev = __device_end - __device_start;
+	size_t numdev;
+
+	STRUCT_SECTION_COUNT(device, &numdev);
 
 	if ((dev_handle > 0) && ((size_t)dev_handle <= numdev)) {
-		dev = &__device_start[dev_handle - 1];
+		dev = &STRUCT_SECTION_START(device)[dev_handle - 1];
 	}
 
 	return dev;
@@ -777,6 +779,12 @@ static inline bool z_impl_device_is_ready(const struct device *dev)
 #define Z_DEVICE_HANDLES_SECTION                                               \
 	__attribute__((__section__(".__device_handles_pass1")))
 
+#ifdef __cplusplus
+#define Z_DEVICE_HANDLES_EXTERN extern
+#else
+#define Z_DEVICE_HANDLES_EXTERN
+#endif
+
 /**
  * @brief Define device handles.
  *
@@ -816,7 +824,8 @@ static inline bool z_impl_device_is_ready(const struct device *dev)
 	extern Z_DEVICE_HANDLES_CONST device_handle_t Z_DEVICE_HANDLES_NAME(   \
 		dev_id)[];                                                     \
 	Z_DEVICE_HANDLES_CONST Z_DECL_ALIGN(device_handle_t)                   \
-	Z_DEVICE_HANDLES_SECTION __weak Z_DEVICE_HANDLES_NAME(dev_id)[] = {    \
+	Z_DEVICE_HANDLES_SECTION Z_DEVICE_HANDLES_EXTERN __weak                \
+		Z_DEVICE_HANDLES_NAME(dev_id)[] = {                            \
 		COND_CODE_1(                                                   \
 			DT_NODE_EXISTS(node_id),                               \
 			(DT_DEP_ORD(node_id), DT_REQUIRES_DEP_ORDS(node_id)),  \
@@ -859,25 +868,22 @@ static inline bool z_impl_device_is_ready(const struct device *dev)
 #define Z_DEVICE_INIT(name_, pm_, data_, config_, api_, state_, handles_)      \
 	{                                                                      \
 		.name = name_,                                                 \
-		.data = (data_),                                               \
 		.config = (config_),                                           \
 		.api = (api_),                                                 \
 		.state = (state_),                                             \
+		.data = (data_),                                               \
 		.handles = (handles_),                                         \
 		IF_ENABLED(CONFIG_PM_DEVICE, (.pm = (pm_),)) /**/              \
 	}
 
 /**
- * @brief Device section
- *
- * Each device is placed in a section with a name crafted so that it allows
- * linker scripts to sort them according to the specified level/priority.
+ * @brief Device section name (used for sorting purposes).
  *
  * @param level Initialization level
  * @param prio Initialization priority
  */
-#define Z_DEVICE_SECTION(level, prio)                                          \
-	__attribute__((__section__(".z_device_" #level STRINGIFY(prio) "_")))
+#define Z_DEVICE_SECTION_NAME(level, prio)                                     \
+	_CONCAT(INIT_LEVEL_ORD(level), _##prio)
 
 /**
  * @brief Define a @ref device
@@ -898,21 +904,26 @@ static inline bool z_impl_device_is_ready(const struct device *dev)
 #define Z_DEVICE_BASE_DEFINE(node_id, dev_id, name, pm, data, config, level,   \
 			     prio, api, state, handles)                        \
 	COND_CODE_1(DT_NODE_EXISTS(node_id), (), (static))                     \
-	const Z_DECL_ALIGN(struct device) DEVICE_NAME_GET(                     \
-		dev_id) Z_DEVICE_SECTION(level, prio) __used =                 \
+	const STRUCT_SECTION_ITERABLE_NAMED(device,                            \
+		Z_DEVICE_SECTION_NAME(level, prio),                            \
+		DEVICE_NAME_GET(dev_id)) =                                     \
 		Z_DEVICE_INIT(name, pm, data, config, api, state, handles)
 
 /**
  * @brief Define the init entry for a device.
  *
  * @param dev_id Device identifier.
- * @param init_fn Device init function.
+ * @param init_fn_ Device init function.
  * @param level Initialization level.
  * @param prio Initialization priority.
  */
-#define Z_DEVICE_INIT_ENTRY_DEFINE(dev_id, init_fn, level, prio)               \
-	Z_INIT_ENTRY_DEFINE(DEVICE_NAME_GET(dev_id), init_fn,                  \
-			    (&DEVICE_NAME_GET(dev_id)), level, prio)
+#define Z_DEVICE_INIT_ENTRY_DEFINE(dev_id, init_fn_, level, prio)              \
+	static const Z_DECL_ALIGN(struct init_entry)                           \
+		Z_INIT_ENTRY_SECTION(level, prio) __used __noasan              \
+		Z_INIT_ENTRY_NAME(DEVICE_NAME_GET(dev_id)) = {                 \
+			.init_fn = {.dev = (init_fn_)},                        \
+			.dev = &DEVICE_NAME_GET(dev_id),                       \
+	}
 
 /**
  * @brief Define a @ref device and all other required objects.

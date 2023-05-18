@@ -3192,11 +3192,11 @@ static void sc_restore_rsp(struct bt_conn *conn,
 }
 
 static struct bt_gatt_indicate_params sc_restore_params[CONFIG_BT_MAX_CONN];
+static uint16_t sc_range[CONFIG_BT_MAX_CONN][2];
 
 static void sc_restore(struct bt_conn *conn)
 {
 	struct gatt_sc_cfg *cfg;
-	uint16_t sc_range[2];
 	uint8_t index;
 
 	cfg = find_sc_cfg(conn->id, &conn->le.dst);
@@ -3212,14 +3212,15 @@ static void sc_restore(struct bt_conn *conn)
 	LOG_DBG("peer %s start 0x%04x end 0x%04x", bt_addr_le_str(&cfg->peer), cfg->data.start,
 		cfg->data.end);
 
-	sc_range[0] = sys_cpu_to_le16(cfg->data.start);
-	sc_range[1] = sys_cpu_to_le16(cfg->data.end);
-
 	index = bt_conn_index(conn);
+
+	sc_range[index][0] = sys_cpu_to_le16(cfg->data.start);
+	sc_range[index][1] = sys_cpu_to_le16(cfg->data.end);
+
 	sc_restore_params[index].attr = &_1_gatt_svc.attrs[2];
 	sc_restore_params[index].func = sc_restore_rsp;
-	sc_restore_params[index].data = &sc_range[0];
-	sc_restore_params[index].len = sizeof(sc_range);
+	sc_restore_params[index].data = &sc_range[index][0];
+	sc_restore_params[index].len = sizeof(sc_range[index]);
 
 	if (bt_gatt_indicate(conn, &sc_restore_params[index])) {
 		LOG_ERR("SC restore indication failed");
@@ -3662,7 +3663,7 @@ static int gatt_exchange_mtu_encode(struct net_buf *buf, size_t len,
 	struct bt_att_exchange_mtu_req *req;
 	uint16_t mtu;
 
-	mtu = BT_ATT_MTU;
+	mtu = BT_LOCAL_ATT_MTU_UATT;
 
 	LOG_DBG("Client MTU %u", mtu);
 

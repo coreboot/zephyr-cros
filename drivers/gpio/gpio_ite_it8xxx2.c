@@ -684,11 +684,6 @@ static const struct gpio_driver_api gpio_ite_driver_api = {
 	.manage_callback = gpio_ite_manage_callback,
 };
 
-static int gpio_ite_init(const struct device *dev)
-{
-	return 0;
-}
-
 #define GPIO_ITE_DEV_CFG_DATA(inst)                                \
 static struct gpio_ite_data gpio_ite_data_##inst;                  \
 static const struct gpio_ite_cfg gpio_ite_cfg_##inst = {           \
@@ -712,7 +707,7 @@ static const struct gpio_ite_cfg gpio_ite_cfg_##inst = {           \
 	.gpio_irq[7] = DT_INST_IRQ_BY_IDX(inst, 7, irq),           \
 	};                                                         \
 DEVICE_DT_INST_DEFINE(inst,                                        \
-		gpio_ite_init,                                     \
+		NULL,                                              \
 		NULL,                                              \
 		&gpio_ite_data_##inst,                             \
 		&gpio_ite_cfg_##inst,                              \
@@ -722,9 +717,8 @@ DEVICE_DT_INST_DEFINE(inst,                                        \
 
 DT_INST_FOREACH_STATUS_OKAY(GPIO_ITE_DEV_CFG_DATA)
 
-static int gpio_it8xxx2_init_set(const struct device *arg)
+static int gpio_it8xxx2_init_set(void)
 {
-	ARG_UNUSED(arg);
 
 	if (IS_ENABLED(CONFIG_SOC_IT8XXX2_GPIO_GROUP_K_L_DEFAULT_PULL_DOWN)) {
 		const struct device *const gpiok = DEVICE_DT_GET(DT_NODELABEL(gpiok));

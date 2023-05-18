@@ -119,4 +119,8 @@ source "drivers/spi/Kconfig.xmc4xxx"
 
 source "drivers/spi/Kconfig.pw"
 
+source "drivers/spi/Kconfig.smartbond"
+
+source "drivers/spi/Kconfig.opentitan"
+
 endif # SPI

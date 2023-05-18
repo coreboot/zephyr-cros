@@ -6,8 +6,8 @@
 #include <stdint.h>
 
 #include <zephyr/devicetree.h>
-#include <soc.h>
-#include <zephyr/arch/xtensa/cache.h>
+#include <soc_util.h>
+#include <zephyr/cache.h>
 #include <adsp_shim.h>
 #include <adsp_memory.h>
 #include <cpu_init.h>
@@ -107,7 +107,7 @@ __imr void hp_sram_init(uint32_t memory_size)
 	 * Calculate total number of used SRAM banks (EBB)
 	 * to power up only necessary banks
 	 */
-	ebb_in_use = ceiling_fraction(memory_size, SRAM_BANK_SIZE);
+	ebb_in_use = DIV_ROUND_UP(memory_size, SRAM_BANK_SIZE);
 
 	hp_sram_pm_banks(ebb_in_use);
 

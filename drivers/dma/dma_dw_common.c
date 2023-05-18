@@ -70,7 +70,7 @@ void dw_dma_isr(const struct device *dev)
 			 */
 			chan_data->dma_blkcallback(dev,
 						   chan_data->blkuser_data,
-						   channel, 0);
+						   channel, DMA_STATUS_BLOCK);
 		}
 	}
 
@@ -89,7 +89,7 @@ void dw_dma_isr(const struct device *dev)
 			LOG_DBG("Dispatching transfer callback");
 			chan_data->dma_tfrcallback(dev,
 						   chan_data->tfruser_data,
-						   channel, 0);
+						   channel, DMA_STATUS_COMPLETE);
 		}
 	}
 }
@@ -665,7 +665,6 @@ out:
 int dw_dma_setup(const struct device *dev)
 {
 	const struct dw_dma_dev_cfg *const dev_cfg = dev->config;
-	struct dw_dma_dev_data *const dev_data = dev->data;
 
 	int i, ret = 0;
 
@@ -718,13 +717,6 @@ int dw_dma_setup(const struct device *dev)
 #endif /* CONFIG_DMA_DW_FIFO_PARTITION */
 
 	/* TODO add baytrail/cherrytrail workaround */
-
-
-	/* Setup context and atomics for channels */
-	dev_data->dma_ctx.magic = DMA_MAGIC;
-	dev_data->dma_ctx.dma_channels = DW_MAX_CHAN;
-	dev_data->dma_ctx.atomic = dev_data->channels_atomic;
-
 out:
 	return ret;
 }

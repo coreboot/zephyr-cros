@@ -324,6 +324,20 @@ Build system:
   labels:
     - "area: Build System"
 
+Board/SoC configuration:
+  status: maintained
+  maintainers:
+    - tejlmand
+  collaborators:
+    - galak
+    - nashif
+    - nordicjm
+  files:
+    - soc/Kconfig
+    - boards/Kconfig
+  labels:
+    - "area: Board/SoC configuration"
+
 "C++":
   status: maintained
   maintainers:
@@ -416,8 +430,25 @@ Coding Guidelines:
     - carlescufi
     - jfischer-no
   files:
+    - .checkpatch.conf
     - .clang-format
+    - .editorconfig
+    - .gitlint
+    - .yamllint
     - doc/contribute/guidelines.rst
+    - doc/contribute/coding_guidelines/
+    - scripts/checkpatch.pl
+    - scripts/checkpatch/
+    - scripts/ci/check_compliance.py
+    - scripts/ci/guideline_check.py
+    - scripts/ci/pylintrc
+    - scripts/coccicheck
+    - scripts/coccinelle/
+    - scripts/gitlint/
+    - scripts/pylint/
+    - scripts/spelling.txt
+  labels:
+    - "area: Coding Guidelines"
 
 Common Architecture Interface:
   status: odd fixes
@@ -458,8 +489,9 @@ Debug:
 Device Driver Model:
   status: maintained
   maintainers:
-    - tbursztyka
+    - gmarull
   collaborators:
+    - tbursztyka
     - dcpleung
     - nashif
   files:
@@ -563,6 +595,8 @@ Documentation:
     - doc/known-warnings.txt
     - doc/templates/sample.tmpl
     - doc/templates/board.tmpl
+  files-exclude:
+    - doc/releases/release-notes-*
   labels:
     - "area: Documentation"
 
@@ -587,6 +621,7 @@ Release Notes:
   status: maintained
   maintainers:
     - nashif
+    - jgl-meta
   files:
     - doc/releases/release-notes-*
   labels:
@@ -658,6 +693,7 @@ Release Notes:
     - samples/subsys/canbus/
     - subsys/canbus/
     - subsys/net/l2/canbus/
+    - tests/drivers/build_all/can/
     - tests/drivers/can/
     - tests/net/socket/can/
     - tests/subsys/canbus/
@@ -1663,9 +1699,9 @@ Mbed TLS:
 MCU Manager:
   status: maintained
   maintainers:
-    - de-nordic
-  collaborators:
     - nordicjm
+  collaborators:
+    - de-nordic
   files:
     - subsys/mgmt/mcumgr/
     - include/zephyr/mgmt/mcumgr/
@@ -1942,6 +1978,17 @@ RISCV arch:
   labels:
     - "area: RISCV"
 
+Retention:
+  status: maintained
+  maintainers:
+    - nordicjm
+  files:
+    - dts/bindings/retention/
+    - include/zephyr/retention/
+    - subsys/retention/
+  labels:
+    - "area: Retention"
+
 Twister:
   status: maintained
   maintainers:
@@ -2194,6 +2241,8 @@ NXP Platforms:
     - EmilioCBen
     - decsny
     - manuargue
+    - dbaluta
+    - iuliana-prodan
   files:
     - boards/arm/mimx*/
     - boards/arm/frdm_k*/
@@ -2453,6 +2502,8 @@ RTIO:
   status: maintained
   maintainers:
     - teburd
+  collaborators:
+    - yperess
   files:
     - samples/subsys/rtio/
     - include/zephyr/rtio/

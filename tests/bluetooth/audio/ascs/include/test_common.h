@@ -17,6 +17,26 @@ struct test_ase_chrc_value_hdr {
 	uint8_t params[0];
 } __packed;
 
+struct test_ase_cp_chrc_value_param {
+	uint8_t ase_id;
+	uint8_t response_code;
+	uint8_t reason;
+} __packed;
+
+struct test_ase_cp_chrc_value_hdr {
+	uint8_t opcode;
+	uint8_t number_of_ases;
+	struct test_ase_cp_chrc_value_param params[0];
+} __packed;
+
+#define TEST_ASE_CP_CHRC_VALUE_SIZE(number_of_ases)                                                \
+	(sizeof(struct test_ase_cp_chrc_value_hdr) +                                               \
+	 number_of_ases * sizeof(struct test_ase_cp_chrc_value_param))
+
+void test_mocks_init(void);
+void test_mocks_cleanup(void);
+void test_mocks_reset(void);
+
 /* Initialize connection object for test */
 void test_conn_init(struct bt_conn *conn);
 uint8_t test_ase_get(const struct bt_uuid *uuid, int num_ase, ...);
@@ -31,3 +51,18 @@ void test_ase_control_client_enable(struct bt_conn *conn, uint8_t ase_id);
 void test_ase_control_client_disable(struct bt_conn *conn, uint8_t ase_id);
 void test_ase_control_client_release(struct bt_conn *conn, uint8_t ase_id);
 void test_ase_control_client_update_metadata(struct bt_conn *conn, uint8_t ase_id);
+void test_ase_control_client_receiver_start_ready(struct bt_conn *conn, uint8_t ase_id);
+void test_ase_control_client_receiver_stop_ready(struct bt_conn *conn, uint8_t ase_id);
+
+/* preambles */
+void test_preamble_state_codec_configured(struct bt_conn *conn, uint8_t ase_id,
+					  struct bt_bap_stream *stream);
+void test_preamble_state_qos_configured(struct bt_conn *conn, uint8_t ase_id,
+					struct bt_bap_stream *stream);
+void test_preamble_state_enabling(struct bt_conn *conn, uint8_t ase_id,
+				  struct bt_bap_stream *stream);
+void test_preamble_state_streaming(struct bt_conn *conn, uint8_t ase_id,
+				   struct bt_bap_stream *stream, struct bt_iso_chan **chan,
+				   bool source);
+void test_preamble_state_disabling(struct bt_conn *conn, uint8_t ase_id,
+				   struct bt_bap_stream *stream);

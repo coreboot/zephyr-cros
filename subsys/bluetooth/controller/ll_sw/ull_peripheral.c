@@ -190,7 +190,7 @@ void ull_periph_setup(struct node_rx_hdr *rx, struct node_rx_ftr *ftr,
 	/* calculate the window widening */
 	conn->periph.sca = pdu_adv->connect_ind.sca;
 	lll->periph.window_widening_periodic_us =
-		ceiling_fraction(((lll_clock_ppm_local_get() +
+		DIV_ROUND_UP(((lll_clock_ppm_local_get() +
 				   lll_clock_ppm_get(conn->periph.sca)) *
 				  conn_interval_us), USEC_PER_SEC);
 	lll->periph.window_widening_max_us = (conn_interval_us >> 1) -
@@ -523,7 +523,7 @@ void ull_periph_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 		int ret;
 
 		/* Handle any LL Control Procedures */
-		ret = ull_conn_llcp(conn, ticks_at_expire, lazy);
+		ret = ull_conn_llcp(conn, ticks_at_expire, remainder, lazy);
 		if (ret) {
 			/* NOTE: Under BT_CTLR_LOW_LAT, ULL_LOW context is
 			 *       disabled inside radio events, hence, abort any

@@ -99,11 +99,20 @@ static struct ll_conn *ll_cis_get_acl_awaiting_reply(uint16_t handle, uint8_t *e
 uint8_t ll_cis_accept(uint16_t handle)
 {
 	uint8_t status = BT_HCI_ERR_SUCCESS;
-	struct ll_conn *acl_conn = ll_cis_get_acl_awaiting_reply(handle, &status);
+	struct ll_conn *conn = ll_cis_get_acl_awaiting_reply(handle, &status);
 
-	if (acl_conn) {
+	if (conn) {
+		uint32_t cis_offset_min;
+
+		if (IS_ENABLED(CONFIG_BT_CTLR_JIT_SCHEDULING)) {
+			cis_offset_min = MAX(400, EVENT_OVERHEAD_CIS_SETUP_US);
+		} else {
+			cis_offset_min = HAL_TICKER_TICKS_TO_US(conn->ull.ticks_slot) +
+					 (EVENT_TICKER_RES_MARGIN_US << 1U);
+		}
+
 		/* Accept request */
-		ull_cp_cc_accept(acl_conn);
+		ull_cp_cc_accept(conn, cis_offset_min);
 	}
 
 	return status;
@@ -191,7 +200,7 @@ uint8_t ull_peripheral_iso_acquire(struct ll_conn *acl,
 		cig->lll.window_widening_max_us = (iso_interval_us >> 1) -
 						  EVENT_IFS_US;
 		cig->lll.window_widening_periodic_us_frac =
-			ceiling_fraction(((lll_clock_ppm_local_get() +
+			DIV_ROUND_UP(((lll_clock_ppm_local_get() +
 					 lll_clock_ppm_get(acl->periph.sca)) *
 					 EVENT_US_TO_US_FRAC(iso_interval_us)), USEC_PER_SEC);
 
@@ -315,6 +324,7 @@ uint8_t ull_peripheral_iso_setup(struct pdu_data_llctrl_cis_ind *ind,
 	cis->lll.sn = 0U;
 	cis->lll.nesn = 0U;
 	cis->lll.cie = 0U;
+	cis->lll.npi = 0U;
 	cis->lll.flushed = 0U;
 	cis->lll.active = 0U;
 	cis->lll.datapath_ready_rx = 0U;

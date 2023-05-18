@@ -411,13 +411,16 @@ static int tcp_conn_unref(struct tcp *conn)
 
 	NET_DBG("conn: %p, ref_count=%d", conn, ref_count);
 
+	k_mutex_lock(&conn->lock, K_FOREVER);
+
 #if !defined(CONFIG_NET_TEST_PROTOCOL)
 	if (conn->in_connect) {
-		NET_DBG("conn: %p is waiting on connect semaphore", conn);
-		tcp_send_queue_flush(conn);
-		goto out;
+		conn->in_connect = false;
+		k_sem_reset(&conn->connect_sem);
 	}
 #endif /* CONFIG_NET_TEST_PROTOCOL */
+
+	k_mutex_unlock(&conn->lock);
 
 	ref_count = atomic_dec(&conn->ref_count) - 1;
 	if (ref_count != 0) {
@@ -469,7 +472,7 @@ static int tcp_conn_unref(struct tcp *conn)
 	k_mem_slab_free(&tcp_conns_slab, (void **)&conn);
 
 	k_mutex_unlock(&tcp_lock);
-out:
+
 	return ref_count;
 }
 
@@ -486,6 +489,15 @@ static int tcp_conn_close(struct tcp *conn, int status)
 #if CONFIG_NET_TCP_LOG_LEVEL >= LOG_LEVEL_DBG
 	NET_DBG("conn: %p closed by TCP stack (%s():%d)", conn, caller, line);
 #endif
+
+	if (conn->in_connect) {
+		if (conn->connect_cb) {
+			conn->connect_cb(conn->context, status, conn->context->user_data);
+
+			/* Make sure the connect_cb is only called once. */
+			conn->connect_cb = NULL;
+		}
+	}
 
 	if (conn->context->recv_cb) {
 		conn->context->recv_cb(conn->context, NULL, NULL, NULL,
@@ -1390,14 +1402,14 @@ static void tcp_send_zwp(struct k_work *work)
 	tcp_derive_rto(conn);
 
 	if (conn->send_win == 0) {
-		uint64_t timeout;
+		uint64_t timeout = TCP_RTO_MS;
 
 		/* Make sure the retry counter does not overflow. */
 		if (conn->zwp_retries < UINT8_MAX) {
 			conn->zwp_retries++;
 		}
 
-		timeout = TCP_RTO_MS << conn->zwp_retries;
+		timeout <<= conn->zwp_retries;
 		if (timeout == 0 || timeout > ZWP_MAX_DELAY_MS) {
 			timeout = ZWP_MAX_DELAY_MS;
 		}
@@ -2464,39 +2476,102 @@ next_state:
 		do_close = true;
 		break;
 	case TCP_FIN_WAIT_1:
-		/* Acknowledge but drop any data */
-		conn_ack(conn, + len);
+		if (th) {
+			/* Acknowledge but drop any new data */
+			if (len > 0) {
+				int32_t new_len = len - net_tcp_seq_cmp(conn->ack, th_seq(th));
+				/* Cases:
+				 * - Data already received earlier: len > 0 , new_len <= 0
+				 * - Partially new data len > 0, new_len > 0
+				 * - Out of order data len > 0, new_len > 0, ignore the data in
+				 *   between
+				 */
+				if (new_len > 0) {
+					conn_ack(conn, + new_len);
+				}
+			}
 
-		if (th && FL(&fl, ==, (FIN | ACK), th_seq(th) == conn->ack)) {
-			tcp_send_timer_cancel(conn);
-			conn_ack(conn, + 1);
-			tcp_out(conn, ACK);
-			next = TCP_TIME_WAIT;
-			verdict = NET_OK;
-		} else if (th && FL(&fl, ==, FIN, th_seq(th) == conn->ack)) {
-			tcp_send_timer_cancel(conn);
-			conn_ack(conn, + 1);
-			tcp_out(conn, ACK);
-			next = TCP_CLOSING;
-			verdict = NET_OK;
-		} else if (th && FL(&fl, ==, ACK, th_seq(th) == conn->ack)) {
-			tcp_send_timer_cancel(conn);
-			next = TCP_FIN_WAIT_2;
-			verdict = NET_OK;
+			/*
+			 * Only if our FIN flag has been acknowledged and all the data has been
+			 * received, it can go to the TIME_WAIT state
+			 */
+			if (FL(&fl, ==, (FIN | ACK),
+			    (th_ack(th) == conn->seq) && (th_seq(th) == conn->ack))) {
+				tcp_send_timer_cancel(conn);
+				conn_ack(conn, + 1);
+				tcp_out(conn, ACK);
+				next = TCP_TIME_WAIT;
+				NET_DBG("FIN acknowledged, going to TIME_WAIT_STATE");
+				verdict = NET_OK;
+			} else if (th &&
+				   (FL(&fl, ==, FIN, th_seq(th) == conn->ack) ||
+				    FL(&fl, ==, (FIN | ACK), th_seq(th) == conn->ack))) {
+				tcp_send_timer_cancel(conn);
+				conn_ack(conn, + 1);
+				NET_DBG("FIN not yet acknowleged, going to CLOSING state");
+				if (th_ack(th) != conn->seq) {
+					/* Not acknowledged the FIN flag yet, so resend */
+					tcp_out_ext(conn, (FIN | ACK), NULL, conn->seq - 1);
+				} else {
+					tcp_out(conn, ACK);
+				}
+				next = TCP_CLOSING;
+				verdict = NET_OK;
+			} else if (th && FL(&fl, ==, ACK, th_ack(th) == conn->seq)) {
+				tcp_send_timer_cancel(conn);
+				next = TCP_FIN_WAIT_2;
+				verdict = NET_OK;
+				NET_DBG("FIN acknowledged, going to FIN_WAIT_2 state seq %u, ack %u"
+					, conn->seq, conn->ack);
+
+				/* Acknowledge any received data */
+				if (len > 0) {
+					tcp_out(conn, ACK);
+				}
+			} else if (th) {
+				NET_DBG("Staying in FIN_WAIT_1 flags 0x%x state seq %u, ack %u",
+					fl, conn->seq, conn->ack);
+				if (len > 0) {
+					tcp_send_timer_cancel(conn);
+					/* Send out a duplicate ACK, with the pending FIN flag */
+					tcp_out(conn, FIN | ACK);
+				}
+				verdict = NET_OK;
+			}
 		}
 		break;
 	case TCP_FIN_WAIT_2:
-		if (th && (FL(&fl, ==, FIN, th_seq(th) == conn->ack) ||
-			   FL(&fl, ==, FIN | ACK, th_seq(th) == conn->ack) ||
-			   FL(&fl, ==, FIN | PSH | ACK,
-			      th_seq(th) == conn->ack))) {
-			/* Received FIN on FIN_WAIT_2, so cancel the timer */
-			k_work_cancel_delayable(&conn->fin_timer);
+		/* Acknowledge but drop any data, but subtract any duplicate data */
+		if (th) {
+			if (len > 0) {
+				int32_t new_len = len - net_tcp_seq_cmp(conn->ack, th_seq(th));
+				/* Cases:
+				 * - Data already received earlier: len > 0 , new_len <= 0
+				 * - Partially new data len > 0, new_len > 0
+				 * - Out of order data len > 0, new_len > 0, ignore the data in
+				 *   between
+				 */
+				if (new_len > 0) {
+					conn_ack(conn, + new_len);
+				}
+			}
 
-			conn_ack(conn, + 1);
-			tcp_out(conn, ACK);
-			next = TCP_TIME_WAIT;
-			verdict = NET_OK;
+			if (FL(&fl, ==, FIN, th_seq(th) == conn->ack) ||
+				   FL(&fl, ==, FIN | ACK, th_seq(th) == conn->ack) ||
+				   FL(&fl, ==, FIN | PSH | ACK,
+				      th_seq(th) == conn->ack)) {
+				/* Received FIN on FIN_WAIT_2, so cancel the timer */
+				k_work_cancel_delayable(&conn->fin_timer);
+
+				conn_ack(conn, + 1);
+				tcp_out(conn, ACK);
+				next = TCP_TIME_WAIT;
+				verdict = NET_OK;
+			} else if (len > 0) {
+				/* Send out a duplicate ACK */
+				tcp_out(conn,  ACK);
+				verdict = NET_OK;
+			}
 		}
 		break;
 	case TCP_CLOSING:
@@ -2539,6 +2614,14 @@ next_state:
 		next = 0;
 
 		if (connection_ok) {
+			conn->in_connect = false;
+			if (conn->connect_cb) {
+				conn->connect_cb(conn->context, 0, conn->context->user_data);
+
+				/* Make sure the connect_cb is only called once. */
+				conn->connect_cb = NULL;
+			}
+
 			k_sem_give(&conn->connect_sem);
 		}
 
@@ -2628,6 +2711,8 @@ int net_tcp_put(struct net_context *context)
 
 			conn_state(conn, TCP_FIN_WAIT_1);
 		}
+	} else if (conn && conn->in_connect) {
+		conn->in_connect = false;
 	}
 
 	k_mutex_unlock(&conn->lock);
@@ -2905,6 +2990,9 @@ int net_tcp_connect(struct net_context *context,
 		goto out;
 	}
 
+	conn->connect_cb = cb;
+	context->user_data = user_data;
+
 	/* Input of a (nonexistent) packet with no flags set will cause
 	 * a TCP connection to be established
 	 */
@@ -2912,10 +3000,17 @@ int net_tcp_connect(struct net_context *context,
 	(void)tcp_in(conn, NULL);
 
 	if (!IS_ENABLED(CONFIG_NET_TEST_PROTOCOL)) {
-		if (k_sem_take(&conn->connect_sem, timeout) != 0 &&
+		if ((K_TIMEOUT_EQ(timeout, K_NO_WAIT)) &&
 		    conn->state != TCP_ESTABLISHED) {
-			conn->in_connect = false;
-			tcp_conn_close(conn, -ETIMEDOUT);
+			ret = -EINPROGRESS;
+			goto out;
+		} else if (k_sem_take(&conn->connect_sem, timeout) != 0 &&
+			   conn->state != TCP_ESTABLISHED) {
+			if (conn->in_connect) {
+				conn->in_connect = false;
+				tcp_conn_close(conn, -ETIMEDOUT);
+			}
+
 			ret = -ETIMEDOUT;
 			goto out;
 		}
@@ -3345,13 +3440,20 @@ uint16_t net_tcp_get_supported_mss(const struct tcp *conn)
 	if (family == AF_INET) {
 #if defined(CONFIG_NET_IPV4)
 		struct net_if *iface = net_context_get_iface(conn->context);
+		int mss = 0;
 
 		if (iface && net_if_get_mtu(iface) >= NET_IPV4TCPH_LEN) {
 			/* Detect MSS based on interface MTU minus "TCP,IP
 			 * header size"
 			 */
-			return net_if_get_mtu(iface) - NET_IPV4TCPH_LEN;
+			mss = net_if_get_mtu(iface) - NET_IPV4TCPH_LEN;
 		}
+
+		if (mss == 0) {
+			mss = NET_IPV4_MTU - NET_IPV4TCPH_LEN;
+		}
+
+		return mss;
 #else
 		return 0;
 #endif /* CONFIG_NET_IPV4 */
@@ -3368,8 +3470,8 @@ uint16_t net_tcp_get_supported_mss(const struct tcp *conn)
 			mss = net_if_get_mtu(iface) - NET_IPV6TCPH_LEN;
 		}
 
-		if (mss < NET_IPV6_MTU) {
-			mss = NET_IPV6_MTU;
+		if (mss == 0) {
+			mss = NET_IPV6_MTU - NET_IPV6TCPH_LEN;
 		}
 
 		return mss;
@@ -3439,6 +3541,13 @@ struct k_sem *net_tcp_tx_sem_get(struct net_context *context)
 	struct tcp *conn = context->tcp;
 
 	return &conn->tx_sem;
+}
+
+struct k_sem *net_tcp_conn_sem_get(struct net_context *context)
+{
+	struct tcp *conn = context->tcp;
+
+	return &conn->connect_sem;
 }
 
 void net_tcp_init(void)

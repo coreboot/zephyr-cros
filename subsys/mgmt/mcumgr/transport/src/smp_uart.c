@@ -90,15 +90,20 @@ static int smp_uart_tx_pkt(struct net_buf *nb)
 	return rc;
 }
 
-static int smp_uart_init(const struct device *dev)
+static int smp_uart_init(void)
 {
-	ARG_UNUSED(dev);
+	int rc;
 
-	smp_transport_init(&smp_uart_transport, smp_uart_tx_pkt,
-			   smp_uart_get_mtu, NULL, NULL, NULL);
-	uart_mcumgr_register(smp_uart_rx_frag);
+	smp_uart_transport.functions.output = smp_uart_tx_pkt;
+	smp_uart_transport.functions.get_mtu = smp_uart_get_mtu;
 
-	return 0;
+	rc = smp_transport_init(&smp_uart_transport);
+
+	if (rc == 0) {
+		uart_mcumgr_register(smp_uart_rx_frag);
+	}
+
+	return rc;
 }
 
 SYS_INIT(smp_uart_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

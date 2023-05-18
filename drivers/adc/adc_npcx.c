@@ -740,9 +740,8 @@ struct k_work_q adc_npcx_work_q;
 static K_KERNEL_STACK_DEFINE(adc_npcx_work_q_stack,
 			CONFIG_ADC_CMP_NPCX_WORKQUEUE_STACK_SIZE);
 
-static int adc_npcx_init_cmp_work_q(const struct device *dev)
+static int adc_npcx_init_cmp_work_q(void)
 {
-	ARG_UNUSED(dev);
 	struct k_work_queue_config cfg = {
 		.name = "adc_cmp_work",
 		.no_yield = false,
@@ -799,7 +798,7 @@ static int adc_npcx_init(const struct device *dev)
 	}
 
 	/* Configure the ADC clock */
-	prescaler = ceiling_fraction(data->input_clk, NPCX_ADC_CLK);
+	prescaler = DIV_ROUND_UP(data->input_clk, NPCX_ADC_CLK);
 	if (prescaler > 0x40) {
 		prescaler = 0x40;
 	}

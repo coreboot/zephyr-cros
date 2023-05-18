@@ -41,6 +41,8 @@ config SENSOR_INFO
 
 comment "Device Drivers"
 
+source "drivers/sensor/adt7310/Kconfig"
+
 source "drivers/sensor/adt7420/Kconfig"
 
 source "drivers/sensor/adxl345/Kconfig"
@@ -76,6 +78,8 @@ source "drivers/sensor/bmg160/Kconfig"
 source "drivers/sensor/bmi160/Kconfig"
 
 source "drivers/sensor/bmi270/Kconfig"
+
+source "drivers/sensor/bmi323/Kconfig"
 
 source "drivers/sensor/bmm150/Kconfig"
 
@@ -135,6 +139,8 @@ source "drivers/sensor/iis3dhhc/Kconfig"
 
 source "drivers/sensor/ina23x/Kconfig"
 
+source "drivers/sensor/ina3221/Kconfig"
+
 source "drivers/sensor/isl29035/Kconfig"
 
 source "drivers/sensor/ina219/Kconfig"
@@ -168,6 +174,8 @@ source "drivers/sensor/lsm6ds0/Kconfig"
 source "drivers/sensor/lsm6dsl/Kconfig"
 
 source "drivers/sensor/lsm6dso/Kconfig"
+
+source "drivers/sensor/lsm6dso16is/Kconfig"
 
 source "drivers/sensor/lsm9ds0_gyro/Kconfig"
 
@@ -206,6 +214,8 @@ source "drivers/sensor/mpu9250/Kconfig"
 source "drivers/sensor/ms5837/Kconfig"
 
 source "drivers/sensor/ms5607/Kconfig"
+
+source "drivers/sensor/npm1300_charger/Kconfig"
 
 source "drivers/sensor/nrf5/Kconfig"
 
@@ -261,6 +271,8 @@ source "drivers/sensor/tmp116/Kconfig"
 
 source "drivers/sensor/vcnl4040/Kconfig"
 
+source "drivers/sensor/veml7700/Kconfig"
+
 source "drivers/sensor/vl53l0x/Kconfig"
 
 source "drivers/sensor/vl53l1x/Kconfig"
@@ -270,6 +282,10 @@ source "drivers/sensor/nxp_kinetis_temp/Kconfig"
 source "drivers/sensor/wsen_hids/Kconfig"
 
 source "drivers/sensor/wsen_itds/Kconfig"
+
+source "drivers/sensor/wsen_pads/Kconfig"
+
+source "drivers/sensor/wsen_pdus/Kconfig"
 
 source "drivers/sensor/wsen_tids/Kconfig"
 
@@ -293,6 +309,8 @@ source "drivers/sensor/xmc4xxx_temp/Kconfig"
 
 source "drivers/sensor/tmd2620/Kconfig"
 
-source "drivers/sensor/zephyr_thermistor/Kconfig"
+source "drivers/sensor/ntc_thermistor/Kconfig"
+
+source "drivers/sensor/s11059/Kconfig"
 
 endif # SENSOR

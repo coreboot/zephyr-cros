@@ -127,6 +127,8 @@ source "drivers/gpio/Kconfig.rv32m1"
 
 source "drivers/gpio/Kconfig.lmp90xxx"
 
+source "drivers/gpio/Kconfig.ads114s0x"
+
 source "drivers/gpio/Kconfig.litex"
 
 source "drivers/gpio/Kconfig.lpc11u6x"
@@ -182,6 +184,8 @@ source "drivers/gpio/Kconfig.smartbond"
 source "drivers/gpio/Kconfig.nxp_s32"
 
 source "drivers/gpio/Kconfig.tca6424a"
+
+source "drivers/gpio/Kconfig.npm1300"
 
 source "drivers/gpio/Kconfig.npm6001"
 

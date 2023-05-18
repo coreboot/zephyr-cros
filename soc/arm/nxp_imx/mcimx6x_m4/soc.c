@@ -139,6 +139,14 @@ static void SOC_RdcInit(void)
 	/* Set access to PWM-8 for M4 core */
 	RDC_SetPdapAccess(RDC, rdcPdapPwm8, RDC_DT_VAL(pwm8), false, false);
 #endif
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(adc1), okay)
+	/* Set access to ADC-1 for M4 core */
+	RDC_SetPdapAccess(RDC, rdcPdapAdc1, RDC_DT_VAL(adc1), false, false);
+#endif
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(adc2), okay)
+	/* Set access to ADC-2 for M4 core */
+	RDC_SetPdapAccess(RDC, rdcPdapAdc2, RDC_DT_VAL(adc2), false, false);
+#endif
 }
 
 /* Initialize cache. */
@@ -277,9 +285,8 @@ static void SOC_ClockInit(void)
  *
  * @return 0
  */
-static int mcimx6x_m4_init(const struct device *arg)
+static int mcimx6x_m4_init(void)
 {
-	ARG_UNUSED(arg);
 
 	unsigned int oldLevel; /* Old interrupt lock level */
 

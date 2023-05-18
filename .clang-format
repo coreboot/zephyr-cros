@@ -24,6 +24,7 @@ AttributeMacros:
   - __packed
   - __printf_like
   - __syscall
+  - __syscall_always_inline
   - __subsystem
 BitFieldColonSpacing: After
 BreakBeforeBraces: Linux
@@ -82,7 +83,7 @@ IndentWidth: 8
 InsertBraces: true
 SpaceBeforeParens: ControlStatementsExceptControlMacros
 SortIncludes: Never
-UseTab: Always
+UseTab: ForContinuationAndIndentation
 WhitespaceSensitiveMacros:
   - STRINGIFY
   - Z_STRINGIFY

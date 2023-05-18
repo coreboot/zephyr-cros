@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/check.h>
 #include <zephyr/arch/cpu.h>
+#include <zephyr/pm/pm.h>
 
 #include <soc.h>
 #include <adsp_boot.h>
@@ -15,8 +16,9 @@
 #include <adsp_memory.h>
 #include <adsp_interrupt.h>
 #include <zephyr/irq.h>
+#include <zephyr/cache.h>
 
-#define CORE_POWER_CHECK_NUM 32
+#define CORE_POWER_CHECK_NUM 128
 #define ACE_INTC_IRQ DT_IRQN(DT_NODELABEL(ace_intc))
 
 static void ipc_isr(void *arg)
@@ -47,7 +49,7 @@ static void ipc_isr(void *arg)
 
 unsigned int soc_num_cpus;
 
-static __imr int soc_num_cpus_init(const struct device *dev)
+static __imr int soc_num_cpus_init(void)
 {
 	/* Need to set soc_num_cpus early to arch_num_cpus() works properly */
 	soc_num_cpus = ((sys_read32(DFIDCCP) >> CAP_INST_SHIFT) & CAP_INST_MASK) + 1;
@@ -84,8 +86,24 @@ void soc_start_core(int cpu_num)
 	if (cpu_num > 0) {
 		/* Initialize the ROM jump address */
 		uint32_t *rom_jump_vector = (uint32_t *) ROM_JUMP_ADDR;
+#if CONFIG_PM
+		extern void dsp_restore_vector(void);
+
+		/* We need to find out what type of booting is taking place here. Secondary cores
+		 * can be disabled and enabled multiple times during runtime. During kernel
+		 * initialization, the next pm state is set to ACTIVE. This way we can determine
+		 * whether the core is being turned on again or for the first time.
+		 */
+		if (pm_state_next_get(cpu_num)->state == PM_STATE_ACTIVE) {
+			*rom_jump_vector = (uint32_t) z_soc_mp_asm_entry;
+		} else {
+			*rom_jump_vector = (uint32_t) dsp_restore_vector;
+		}
+#else
 		*rom_jump_vector = (uint32_t) z_soc_mp_asm_entry;
-		z_xtensa_cache_flush(rom_jump_vector, sizeof(*rom_jump_vector));
+#endif
+
+		sys_cache_data_flush_range(rom_jump_vector, sizeof(*rom_jump_vector));
 		ACE_PWRCTL->wpdsphpxpg |= BIT(cpu_num);
 
 		while ((ACE_PWRSTS->dsphpxpgs & BIT(cpu_num)) == 0) {

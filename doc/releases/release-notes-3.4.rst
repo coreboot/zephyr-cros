@@ -129,6 +129,33 @@ Changes in this release
   * Touchscreen drivers converted to use the input APIs can use the
     :dtcompatible:`zephyr,kscan-input` driver to maintain Kscan compatilibity.
 
+* The declaration of :c:func:`main` has been changed from ``void
+  main(void)`` to ``int main(void)``. The main function is required to
+  return the value zero. All other return values are reserved. This aligns
+  Zephyr with the C and C++ language specification requirements for
+  "hosted" environments, avoiding compiler warnings and errors. These
+  compiler messages are generated when applications are built in "hosted"
+  mode (which means without the ``-ffreestanding`` compiler flag). As the
+  ``-ffreestanding`` flag is currently enabled unless the application is
+  using picolibc, only applications using picolibc will be affected by this
+  change at this time.
+
+* The following network interface APIs now take additional,
+  ``struct net_if * iface`` parameter:
+
+  * :c:func:`net_if_ipv4_maddr_join`
+  * :c:func:`net_if_ipv4_maddr_leave`
+  * :c:func:`net_if_ipv6_maddr_join`
+  * :c:func:`net_if_ipv6_maddr_leave`
+
+* MCUmgr transports now need to set up the struct before registering it by
+  setting the function pointers to the function handlers, these have been
+  moved to a ``functions`` struct object of type
+  :c:struct:`smp_transport_api_t`. Because of these changes, the legacy
+  transport registration function and object are no longer available. The
+  registration function now returns a value which is 0 for success or a
+  negative error code if an error occurred.
+
 Removed APIs in this release
 ============================
 
@@ -140,12 +167,32 @@ Deprecated in this release
   board-specific configuration in board Kconfig fragments in the ``boards``
   folder of the application.
 
+* On nRF51 and nRF52-based boards, the behaviour of the reset reason being
+  provided to :c:func:`sys_reboot` and being set in the GPREGRET register has
+  been dropped. This function will now just reboot the device without changing
+  the register contents. The new method for setting this register uses the boot
+  mode feature of the retention subsystem, see the
+  :ref:`boot mode API <boot_mode_api>` for details. To restore the deprecated
+  functionality, enable
+  :kconfig:option:`CONFIG_NRF_STORE_REBOOT_TYPE_GPREGRET`.
+
 Stable API changes in this release
 ==================================
 
 * Removed `bt_set_oob_data_flag` and replaced it with two new API calls:
   * :c:func:`bt_le_oob_set_sc_flag` for setting/clearing OOB flag in SC pairing
   * :c:func:`bt_le_oob_set_legacy_flag` for setting/clearing OOB flag in legacy paring
+
+* :c:macro:`SYS_INIT` callback no longer requires a :c:struct:`device` argument.
+  The new callback signature is ``int f(void)``. A utility script to
+  automatically migrate existing projects can be found in
+  :zephyr_file:`scripts/utils/migrate_sys_init.py`.
+
+* Changed :c:struct:`spi_config` ``cs`` (:c:struct:`spi_cs_control`) from
+  pointer to struct member. This allows using the existing SPI dt-spec macros in
+  C++. SPI controller drivers doing ``NULL`` checks on the ``cs`` field to check
+  if CS is GPIO-based or not, must now use :c:func:`spi_cs_is_gpio` or
+  :c:func:`spi_cs_is_gpio_dt` calls.
 
 New APIs in this release
 ========================
@@ -156,19 +203,50 @@ New APIs in this release
   :kconfig:option:`CONFIG_FLASH_EX_OP_ENABLED` which depends on
   :kconfig:option:`CONFIG_FLASH_HAS_EX_OP` selected by driver.
 
+* Introduced :ref:`rtc_api` API which adds experimental support for real-time clock
+  devices. These devices previously used the :ref:`counter_api` API combined with
+  conversion between unix-time and broken-down time. The new API adds the mandatory
+  functions :c:func:`rtc_set_time` and :c:func:`rtc_get_time`, the optional functions
+  :c:func:`rtc_alarm_get_supported_fields`, :c:func:`rtc_alarm_set_time`,
+  :c:func:`rtc_alarm_get_time`, :c:func:`rtc_alarm_is_pending` and
+  :c:func:`rtc_alarm_set_callback` are enabled with
+  :kconfig:option:`CONFIG_RTC_ALARM`, the optional function
+  :c:func:`rtc_update_set_callback` is enabled with
+  :kconfig:option:`CONFIG_RTC_UPDATE`, and lastly, the optional functions
+  :c:func:`rtc_set_calibration` and :c:func:`rtc_get_calibration` are enabled with
+  :kconfig:option:`CONFIG_RTC_CALIBRATION`.
+
 Kernel
 ******
+
+* Removed absolute symbols :c:macro:`___cpu_t_SIZEOF`,
+  :c:macro:`_STRUCT_KERNEL_SIZE`, :c:macro:`K_THREAD_SIZEOF` and
+  :c:macro:`_DEVICE_STRUCT_SIZEOF`
 
 Architectures
 *************
 
-* ARM
+* ARC
+  * Removed absolute symbols :c:macro:`___callee_saved_t_SIZEOF` and
+  :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
 
 * ARM
+  * Removed absolute symbols :c:macro:`___basic_sf_t_SIZEOF`,
+  :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`, :c:macro:`___cpu_context_t_SIZEOF`
+  and :c:macro:`___thread_stack_info_t_SIZEOF`
 
 * ARM64
+  * Removed absolute symbol :c:macro:`___callee_saved_t_SIZEOF`
+
+* NIOS2
+  * Removed absolute symbol :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
 
 * RISC-V
+
+* SPARC
+  * Removed absolute symbol :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
+
+* X86
 
 * Xtensa
 
@@ -261,6 +339,15 @@ Build system and infrastructure
   see :ref:`West extending signing <west-extending-signing>` for further
   details.
 
+* Fixed an issue whereby when using ``*_ROOT`` variables with Sysbuild, these
+  were lost for images.
+
+* Enhanced ``zephyr_get`` CMake helper function to optionally support merging
+  of scoped variables into a list.
+
+* Added a new CMake helper function for setting/updating sysbuild CMake cache
+  variables: ``sysbuild_cache_set``.
+
 Drivers and Sensors
 *******************
 
@@ -270,6 +357,10 @@ Drivers and Sensors
    configuration buffer. Use ``zephyr,input-positive`` and
    ``zephyr,input-negative`` devicetree properties to select the hardware
    channel(s) to link a software channel configuration to.
+
+ * MCUX LPADC driver ``voltage-ref`` and ``power-level`` devicetree properties
+   were shifted to match the hardware as described in reference manual instead
+   of matching the NXP SDK enum identifers.
 
 * Battery-backed RAM
 
@@ -312,6 +403,15 @@ Drivers and Sensors
     selected by the driver to indicate that extra operations are supported.
     To enable extra operations user should select
     :kconfig:option:`CONFIG_FLASH_EX_OP_ENABLED`.
+  * nrf_qspi_nor: Replaced custom API function ``nrf_qspi_nor_base_clock_div_force``
+    with ``nrf_qspi_nor_xip_enable`` which apart from forcing the clock divider
+    prevents the driver from deactivating the QSPI peripheral so that the XIP
+    operation is actually possible.
+  * flash_simulator: A memory region can now be used as the storage area for the
+    flash simulator. Using the memory region allows the flash simulator to keep
+    its contents over a device reboot.
+  * spi_flash_at45: Fixed erase procedure to properly handle chips that have
+    their initial sector split into two parts (usually marked as 0a and 0b).
 
 * FPGA
 
@@ -381,6 +481,9 @@ Trusted Firmware-M
 
 * Timer
 
+  * Support added for stopping Nordic nRF RTC system timer, which fixes an
+    issue when booting applications built in prior version of Zephyr.
+
 * USB
 
 * W1
@@ -410,6 +513,13 @@ Libraries / Subsystems
   * With LittleFS as backend, :c:func:`fs_mount` return code was corrected to ``EFAULT`` when
     called with ``FS_MOUNT_FLAG_NO_FORMAT`` and the designated LittleFS area could not be
     mounted because it has not yet been mounted or it required reformatting.
+  * The FAT FS initialization order has been updated to match LittleFS, fixing an issue where
+    attempting to mount the disk in a global function caused FAT FS to fail due to not being registered beforehand.
+    FAT FS is now initialized in POST_KERNEL.
+
+* IPC
+
+  * :c:func:`ipc_service_close_instance` now only acts on bounded endpoints.
 
 * Management
 
@@ -431,6 +541,26 @@ Libraries / Subsystems
     correctly, allowing other transports or other parts of the application
     code to use it.
 
+  * A new version of the SMP protocol used by MCUmgr has been introduced in the
+    header, which is used to indicate the version of the protocol being used.
+    This updated protocol allows returning much more detailed error responses
+    per group, see the
+    :ref:`MCUmgr SMP protocol specification <mcumgr_smp_protocol_specification>`
+    for details.
+
+* Retention
+
+  * Retention subsystem has been added which adds enhanced features over
+    retained memory drivers allowing for partitioning, magic headers and
+    checksum validation. See :ref:`retention API <retention_api>` for details.
+    Support for the retention subsystem is experimental.
+
+  * Boot mode retention module has been added which allows for setting/checking
+    the boot mode of an application, initial support has also been added to
+    MCUboot to allow for applications to use this as an entrance method for
+    MCUboot serial recovery mode. See :ref:`boot mode API <boot_mode_api>` for
+    details.
+
 * RTIO
 
   * Added policy that every ``sqe`` will generate a ``cqe`` (previously an RTIO_SQE_TRANSACTION
@@ -448,11 +578,24 @@ MCUboot
 Storage
 *******
 
+* Added :kconfig:option:`CONFIG_FLASH_MAP_LABELS`, which will enable runtime access to the labels
+  property of fixed partitions. This option is implied if kconfig:option:`CONFIG_FLASH_MAP_SHELL`
+  is enabled. These labels will be displayed in a separate column when using the ``flash_map list``
+  shell command.
+
 Trusted Firmware-M
 ******************
 
 zcbor
 *****
+
+Updated from 0.6.0 to 0.7.0.
+Among other things, this update brings:
+
+* C++ improvements
+* float16 support
+* Improved docs
+* -Wall and -Wconversion compliance
 
 Documentation
 *************

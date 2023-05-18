@@ -283,9 +283,10 @@ static void setup_ipv6(struct net_if *iface, uint32_t flags)
 
 exit:
 
-#if !defined(CONFIG_NET_IPV6_DAD)
-	services_notify_ready(NET_CONFIG_NEED_IPV6);
-#endif
+	if (!IS_ENABLED(CONFIG_NET_IPV6_DAD) ||
+	    net_if_flag_is_set(iface, NET_IF_IPV6_NO_ND)) {
+		services_notify_ready(NET_CONFIG_NEED_IPV6);
+	}
 
 	return;
 }
@@ -495,9 +496,8 @@ int net_config_init_app(const struct device *dev, const char *app_info)
 }
 
 #if defined(CONFIG_NET_CONFIG_AUTO_INIT)
-static int init_app(const struct device *dev)
+static int init_app(void)
 {
-	ARG_UNUSED(dev);
 
 	(void)net_config_init_app(NULL, "Initializing network");
 

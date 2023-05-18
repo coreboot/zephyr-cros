@@ -454,7 +454,13 @@ static ALWAYS_INLINE void clock_init(void)
 
 #ifdef CONFIG_DISPLAY_MCUX_ELCDIF
 	rootCfg.mux = kCLOCK_LCDIF_ClockRoot_MuxSysPll2Out;
-	rootCfg.div = 9;
+	/*
+	 * PLL2 is fixed at 528MHz. Use desired panel clock clock to
+	 * calculate LCDIF clock.
+	 */
+	rootCfg.div = ((SYS_PLL2_FREQ /
+			DT_PROP(DT_CHILD(DT_NODELABEL(lcdif), display_timings),
+			clock_frequency)) + 1);
 	CLOCK_SetRootClock(kCLOCK_Root_Lcdif, &rootCfg);
 #endif
 
@@ -622,9 +628,8 @@ void imxrt_post_init_display_interface(void)
  * @return 0
  */
 
-static int imxrt_init(const struct device *arg)
+static int imxrt_init(void)
 {
-	ARG_UNUSED(arg);
 
 	unsigned int oldLevel; /* old interrupt lock level */
 
@@ -660,6 +665,11 @@ static int imxrt_init(const struct device *arg)
 #ifndef CONFIG_IMXRT1XXX_CODE_CACHE
 	/* SystemInit enables code cache, disable it here */
 	SCB_DisableICache();
+#else
+	/* z_arm_init_arch_hw_at_boot() disables code cache if CONFIG_ARCH_CACHE is enabled,
+	 * enable it here.
+	 */
+	SCB_EnableICache();
 #endif
 
 	if (IS_ENABLED(CONFIG_IMXRT1XXX_DATA_CACHE)) {
@@ -712,7 +722,7 @@ SYS_INIT(imxrt_init, PRE_KERNEL_1, 0);
  *
  * @return 0
  */
-static int second_core_boot(const struct device *arg)
+static int second_core_boot(void)
 {
 	/* Kick CM4 core out of reset */
 	SRC->CTRL_M4CORE = SRC_CTRL_M4CORE_SW_RESET_MASK;

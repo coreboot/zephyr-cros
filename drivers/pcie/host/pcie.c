@@ -494,8 +494,15 @@ static bool pcie_dev_cb(pcie_bdf_t bdf, pcie_id_t id, void *cb_data)
 			continue;
 		}
 
-		if (dev->id == id) {
+		if (dev->id != id) {
+			continue;
+		}
+
+		uint32_t class_rev = pcie_conf_read(bdf, PCIE_CONF_CLASSREV);
+
+		if (dev->class_rev == (class_rev & dev->class_rev_mask)) {
 			dev->bdf = bdf;
+			dev->class_rev = class_rev;
 			data->found++;
 			break;
 		}
@@ -505,7 +512,7 @@ static bool pcie_dev_cb(pcie_bdf_t bdf, pcie_id_t id, void *cb_data)
 	return (data->found != data->max_dev);
 }
 
-static int pcie_init(const struct device *dev)
+static int pcie_init(void)
 {
 	struct scan_data data;
 	struct pcie_scan_opt opt = {
@@ -514,7 +521,6 @@ static int pcie_init(const struct device *dev)
 		.flags = PCIE_SCAN_RECURSIVE,
 	};
 
-	ARG_UNUSED(dev);
 
 	STRUCT_SECTION_COUNT(pcie_dev, &data.max_dev);
 	/* Don't bother calling pcie_scan() if there are no devices to look for */

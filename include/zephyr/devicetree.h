@@ -39,6 +39,7 @@
  * are missing from this list, please add them. It should be complete.
  *
  * _ENUM_IDX: property's value as an index into bindings enum
+ * _ENUM_VAL_<val>_EXISTS property's value as a token exists
  * _ENUM_TOKEN: property's value as a token into bindings enum (string
  *              enum values are identifiers) [deprecated, use _STRING_TOKEN]
  * _ENUM_UPPER_TOKEN: like _ENUM_TOKEN, but uppercased [deprecated, use
@@ -826,6 +827,17 @@
 #define DT_ENUM_IDX_OR(node_id, prop, default_idx_value) \
 	COND_CODE_1(DT_NODE_HAS_PROP(node_id, prop), \
 		    (DT_ENUM_IDX(node_id, prop)), (default_idx_value))
+
+/**
+ * @brief Does a node enumeration property have a given value?
+ *
+ * @param node_id node identifier
+ * @param prop lowercase-and-underscores property name
+ * @param value lowercase-and-underscores enumeration value
+ * @return 1 if the node property has the value @a value, 0 otherwise.
+ */
+#define DT_ENUM_HAS_VALUE(node_id, prop, value) \
+	IS_ENABLED(DT_CAT6(node_id, _P_, prop, _ENUM_VAL_, value, _EXISTS))
 
 /**
  * @brief Get a string property's value as a token.
@@ -3337,6 +3349,17 @@
 	DT_ENUM_IDX_OR(DT_DRV_INST(inst), prop, default_idx_value)
 
 /**
+ * @brief Does a `DT_DRV_COMPAT` enumeration property have a given value?
+ *
+ * @param inst instance number
+ * @param prop lowercase-and-underscores property name
+ * @param value lowercase-and-underscores enumeration value
+ * @return 1 if the node property has the value @a value, 0 otherwise.
+ */
+#define DT_INST_ENUM_HAS_VALUE(inst, prop, value) \
+	DT_ENUM_HAS_VALUE(DT_DRV_INST(inst), prop, value)
+
+/**
  * @brief Get a `DT_DRV_COMPAT` instance property
  * @param inst instance number
  * @param prop lowercase-and-underscores property name
@@ -3791,6 +3814,53 @@
 	DT_COMPAT_ON_BUS_INTERNAL(DT_DRV_COMPAT, bus)
 
 /**
+ * @brief Check if any `DT_DRV_COMPAT` node with status `okay` has a given
+ *        property.
+ *
+ * @param prop lowercase-and-underscores property name
+ *
+ * Example devicetree overlay:
+ *
+ * @code{.dts}
+ *     &i2c0 {
+ *         sensor0: sensor@0 {
+ *             compatible = "vnd,some-sensor";
+ *             status = "okay";
+ *             reg = <0>;
+ *             foo = <1>;
+ *             bar = <2>;
+ *         };
+ *
+ *         sensor1: sensor@1 {
+ *             compatible = "vnd,some-sensor";
+ *             status = "okay";
+ *             reg = <1>;
+ *             foo = <2>;
+ *         };
+ *
+ *         sensor2: sensor@2 {
+ *             compatible = "vnd,some-sensor";
+ *             status = "disabled";
+ *             reg = <2>;
+ *             baz = <1>;
+ *         };
+ *     };
+ * @endcode
+ *
+ * Example usage:
+ *
+ * @code{.c}
+ *     #define DT_DRV_COMPAT vnd_some_sensor
+ *
+ *     DT_ANY_INST_HAS_PROP_STATUS_OKAY(foo) // 1
+ *     DT_ANY_INST_HAS_PROP_STATUS_OKAY(bar) // 1
+ *     DT_ANY_INST_HAS_PROP_STATUS_OKAY(baz) // 0
+ * @endcode
+ */
+#define DT_ANY_INST_HAS_PROP_STATUS_OKAY(prop) \
+	(DT_INST_FOREACH_STATUS_OKAY_VARGS(DT_INST_NODE_HAS_PROP_AND_OR, prop) 0)
+
+/**
  * @brief Call @p fn on all nodes with compatible `DT_DRV_COMPAT`
  *        and status `okay`
  *
@@ -4076,6 +4146,10 @@
 /** @brief Helper for test cases and DT_ANY_INST_ON_BUS_STATUS_OKAY() */
 #define DT_COMPAT_ON_BUS_INTERNAL(compat, bus) \
 	IS_ENABLED(UTIL_CAT(DT_CAT(DT_COMPAT_, compat), _BUS_##bus))
+
+/** @brief Helper macro to OR multiple has property checks in a loop macro */
+#define DT_INST_NODE_HAS_PROP_AND_OR(inst, prop) \
+	DT_INST_NODE_HAS_PROP(inst, prop) ||
 
 /** @endcond */
 

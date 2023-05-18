@@ -8,7 +8,7 @@
 #include <zephyr/mgmt/updatehub.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/net_event.h>
-#include <zephyr/net/net_conn_mgr.h>
+#include <zephyr/net/conn_mgr.h>
 #include <zephyr/net/wifi_mgmt.h>
 
 #if defined(CONFIG_UPDATEHUB_DTLS)
@@ -83,7 +83,7 @@ static void event_handler(struct net_mgmt_event_callback *cb,
 	}
 }
 
-void main(void)
+int main(void)
 {
 	int ret;
 
@@ -95,7 +95,7 @@ void main(void)
 			       server_certificate,
 			       sizeof(server_certificate)) < 0) {
 		LOG_ERR("Failed to register server certificate");
-		return;
+		return 0;
 	}
 
 	if (tls_credential_add(CA_CERTIFICATE_TAG,
@@ -103,7 +103,7 @@ void main(void)
 			       private_key,
 			       sizeof(private_key)) < 0) {
 		LOG_ERR("Failed to register private key");
-		return;
+		return 0;
 	}
 #endif
 
@@ -150,5 +150,6 @@ void main(void)
 
 	net_mgmt_init_event_callback(&mgmt_cb, event_handler, EVENT_MASK);
 	net_mgmt_add_event_callback(&mgmt_cb);
-	net_conn_mgr_resend_status();
+	conn_mgr_resend_status();
+	return 0;
 }
