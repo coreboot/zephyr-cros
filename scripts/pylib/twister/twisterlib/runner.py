@@ -398,6 +398,7 @@ class CMake:
             results = {"returncode": p.returncode}
 
         if out:
+            os.makedirs(self.build_dir, exist_ok=True)
             with open(os.path.join(self.build_dir, self.log), "a", encoding=self.default_encoding) as log:
                 log_msg = out.decode(self.default_encoding)
                 log.write(log_msg)
@@ -675,6 +676,7 @@ class ProjectBuilder(FilterBuilder):
 
         logger.debug(f"Test instance {self.instance.name} already has {len(self.instance.testcases)} cases.")
         new_ztest_unit_test_regex = re.compile(r"z_ztest_unit_test__([^\s]*)__([^\s]*)")
+        detected_cases = []
         for section in elf.iter_sections():
             if isinstance(section, SymbolTableSection):
                 for sym in section.iter_symbols():
@@ -685,18 +687,23 @@ class ProjectBuilder(FilterBuilder):
                     # The 2nd capture group is new ztest unit test name.
                     matches = new_ztest_unit_test_regex.findall(sym.name)
                     if matches:
-                        # this is new ztest fx
-                        self.instance.testcases.clear()
-                        self.instance.testsuite.testcases.clear()
                         for m in matches:
                             # new_ztest_suite = m[0] # not used for now
                             test_func_name = m[1].replace("test_", "")
                             testcase_id = f"{yaml_testsuite_name}.{test_func_name}"
-                            # When the old regex-based test case collection is fully deprecated,
-                            # this will be the sole place where test cases get added to the test instance.
-                            # Then we can further include the new_ztest_suite info in the testcase_id.
-                            self.instance.add_testcase(name=testcase_id)
-                            self.instance.testsuite.add_testcase(name=testcase_id)
+                            detected_cases.append(testcase_id)
+
+        if detected_cases:
+            self.instance.testcases.clear()
+            self.instance.testsuite.testcases.clear()
+
+            # When the old regex-based test case collection is fully deprecated,
+            # this will be the sole place where test cases get added to the test instance.
+            # Then we can further include the new_ztest_suite info in the testcase_id.
+
+            for testcase_id in detected_cases:
+                self.instance.add_testcase(name=testcase_id)
+                self.instance.testsuite.add_testcase(name=testcase_id)
 
 
     def cleanup_artifacts(self, additional_keep=[]):

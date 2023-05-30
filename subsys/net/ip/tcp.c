@@ -497,9 +497,7 @@ static int tcp_conn_close(struct tcp *conn, int status)
 			/* Make sure the connect_cb is only called once. */
 			conn->connect_cb = NULL;
 		}
-	}
-
-	if (conn->context->recv_cb) {
+	} else if (conn->context->recv_cb) {
 		conn->context->recv_cb(conn->context, NULL, NULL, NULL,
 				       status, conn->recv_user_data);
 	}
@@ -1404,8 +1402,8 @@ static void tcp_send_zwp(struct k_work *work)
 	if (conn->send_win == 0) {
 		uint64_t timeout = TCP_RTO_MS;
 
-		/* Make sure the retry counter does not overflow. */
-		if (conn->zwp_retries < UINT8_MAX) {
+		/* Make sure the bitwise shift does not result in undefined behaviour */
+		if (conn->zwp_retries < 63) {
 			conn->zwp_retries++;
 		}
 

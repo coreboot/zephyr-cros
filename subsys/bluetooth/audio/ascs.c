@@ -27,6 +27,8 @@ LOG_MODULE_REGISTER(bt_ascs, CONFIG_BT_ASCS_LOG_LEVEL);
 #include "common/bt_str.h"
 #include "common/assert.h"
 
+#include "../host/att_internal.h"
+
 #include "audio_internal.h"
 #include "bap_iso.h"
 #include "bap_endpoint.h"
@@ -79,6 +81,19 @@ static struct bt_ascs_ase {
 #define ASE_BUF_SIZE MIN(BT_ATT_MAX_ATTRIBUTE_LEN, \
 			 MAX(MIN_CONFIG_STATE_SIZE + MAX_CODEC_CONFIG, \
 			     MIN_QOS_STATE_SIZE + MAX_METADATA))
+
+/* Verify that the prepare count is large enough to cover the maximum value we support a client
+ * writing
+ */
+BUILD_ASSERT(
+	BT_ATT_BUF_SIZE - 3 >= ASE_BUF_SIZE ||
+		DIV_ROUND_UP(ASE_BUF_SIZE, (BT_ATT_BUF_SIZE - 3)) <= CONFIG_BT_ATT_PREPARE_COUNT,
+	"CONFIG_BT_ATT_PREPARE_COUNT not large enough to cover the maximum supported ASCS value");
+
+/* It is mandatory to support long writes in ASCS unconditionally, and thus
+ * CONFIG_BT_ATT_PREPARE_COUNT must be at least 1 to support the feature
+ */
+BUILD_ASSERT(CONFIG_BT_ATT_PREPARE_COUNT > 0, "CONFIG_BT_ATT_PREPARE_COUNT shall be at least 1");
 
 static const struct bt_bap_unicast_server_cb *unicast_server_cb;
 
@@ -989,7 +1004,6 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(ase_pool); i++) {
 		struct bt_ascs_ase *ase = &ase_pool[i];
-		struct bt_bap_stream *stream = ase->ep.stream;
 
 		if (ase->conn != conn) {
 			continue;
@@ -998,23 +1012,6 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 		if (ase->ep.status.state != BT_BAP_EP_STATE_IDLE) {
 			ase_release(ase);
 			/* At this point, `ase` object have been free'd */
-
-			if (stream != NULL) {
-				const struct bt_bap_stream_ops *ops;
-
-				/* Notify upper layer */
-				ops = stream->ops;
-				if (ops != NULL && ops->released != NULL) {
-					ops->released(stream);
-				} else {
-					LOG_WRN("No callback for released set");
-				}
-			}
-		}
-
-		if (stream != NULL && stream->conn != NULL) {
-			bt_conn_unref(stream->conn);
-			stream->conn = NULL;
 		}
 	}
 }
@@ -1872,7 +1869,7 @@ static bool ascs_parse_metadata(struct bt_data *data, void *user_data)
 
 	if (result->count > CONFIG_BT_CODEC_MAX_METADATA_COUNT) {
 		LOG_ERR("Not enough buffers for Codec Config Metadata: %zu > %zu", result->count,
-			CONFIG_BT_CODEC_MAX_METADATA_LEN);
+			CONFIG_BT_CODEC_MAX_DATA_LEN);
 		*result->rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NO_MEM,
 					       BT_BAP_ASCS_REASON_NONE);
 		result->err = -ENOMEM;
@@ -1880,9 +1877,9 @@ static bool ascs_parse_metadata(struct bt_data *data, void *user_data)
 		return false;
 	}
 
-	if (data_len > CONFIG_BT_CODEC_MAX_METADATA_LEN) {
+	if (data_len > CONFIG_BT_CODEC_MAX_DATA_LEN) {
 		LOG_ERR("Not enough space for Codec Config Metadata: %u > %zu", data->data_len,
-			CONFIG_BT_CODEC_MAX_METADATA_LEN);
+			CONFIG_BT_CODEC_MAX_DATA_LEN);
 		*result->rsp = BT_BAP_ASCS_RSP(BT_BAP_ASCS_RSP_CODE_NO_MEM,
 					       BT_BAP_ASCS_REASON_NONE);
 		result->err = -ENOMEM;

@@ -126,6 +126,9 @@ Changes in this release
     option from ``KSCAN_SDL`` to :kconfig:option:`CONFIG_INPUT_SDL_TOUCH` and the
     compatible from ``zephyr,sdl-kscan`` to
     :dtcompatible:`zephyr,input-sdl-touch`.
+  * ``nuvoton,npcx-kscan`` moved to :ref:`input`, renamed the Kconfig option
+    names from ``KSCAN_NPCX_...`` to ``INPUT_NPCX_KBD...`` and the compatible
+    from ``nuvoton,npcx-kscan`` to :dtcompatible:`nuvoton,npcx-kbd`.
   * Touchscreen drivers converted to use the input APIs can use the
     :dtcompatible:`zephyr,kscan-input` driver to maintain Kscan compatilibity.
 
@@ -155,6 +158,20 @@ Changes in this release
   transport registration function and object are no longer available. The
   registration function now returns a value which is 0 for success or a
   negative error code if an error occurred.
+
+* Added a new flag :c:struct:`dac_channel_cfg` ``buffered`` for DAC channels in
+  :c:struct:`dac_channel_cfg` to allow the configuration of the output buffer.
+  The actual interpretation of this depends on the hardware and is so far only
+  implemented for the STM32 DAC driver. Implicitly for this driver this changes
+  the default from being buffered to unbuffered.
+
+* MCUmgr fs_mgmt group's file access hook is now called for all fs_mgmt group
+  functions (adding support for file status and file hash/checksum). In
+  addition, if the file access state is not lost, it will now only be called
+  once for the file access instead of each time a command is received.
+  Note that the structure for the notification has changed, the ``upload`` bool
+  has been replaced with an enum to indicate what function is used, see
+  :c:struct:`fs_mgmt_file_access` for the new structure definition.
 
 Removed APIs in this release
 ============================
@@ -215,6 +232,8 @@ New APIs in this release
   :kconfig:option:`CONFIG_RTC_UPDATE`, and lastly, the optional functions
   :c:func:`rtc_set_calibration` and :c:func:`rtc_get_calibration` are enabled with
   :kconfig:option:`CONFIG_RTC_CALIBRATION`.
+
+* Introduced :ref:`auxdisplay_api` for auxiliary (alphanumeric-based) displays.
 
 Kernel
 ******
@@ -296,6 +315,13 @@ Boards & SoC Support
 
 * Made these changes for ARM boards:
 
+  * Changed the default board revision to 0.14.0 for the Nordic boards
+    ``nrf9160dk_nrf9160`` and ``nrf9160dk_nrf52840``. To build for an
+    older revision of the nRF9160 DK without external flash, specify that
+    older board revision when building.
+
+  * Enabled external_flash_pins_routing switch in ``nrf9160dk_nrf52840`` by default.
+
 * Made these changes for ARM64 boards:
 
 * Made these changes for RISC-V boards:
@@ -348,8 +374,38 @@ Build system and infrastructure
 * Added a new CMake helper function for setting/updating sysbuild CMake cache
   variables: ``sysbuild_cache_set``.
 
+* Enhanced ``zephyr_get`` CMake helper function to lookup multiple variables
+  and return the result in a variable of different name.
+
+* Introduced ``EXTRA_CONF_FILE``, ``EXTRA_DTC_OVERLAY_FILE``, and
+  ``EXTRA_ZEPHYR_MODULES`` for better naming consistency and uniform behavior
+  for applying extra build settings in addition to Zephyr automatic build
+  setting lookup.
+  ``EXTRA_CONF_FILE`` replaces ``OVERLAY_CONFIG``.
+  ``EXTRA_ZEPHYR_MODULES`` replaces ``ZEPHYR_EXTRA_MODULES``.
+  ``EXTRA_DTC_OVERLAY_FILE`` is new, see
+  :ref:`Set devicetree overlays <set-devicetree-overlays>` for further details.
+
+* Twister now supports ``gtest`` harness for running tests written in gTest.
+
+* Added an option to validate device initialization priorities at build time.
+  To use it, enable :kconfig:option:`CONFIG_CHECK_INIT_PRIORITIES`, see
+  :ref:`check_init_priorities.py` for more details.
+
 Drivers and Sensors
 *******************
+
+* Auxiliary display
+
+  * New auxiliary display (auxdisplay) peripheral has been added, this allows
+    for interfacing with simple alphanumeric displays that do not feature
+    graphic capabilities. This peripheral is marked as unstable.
+
+  * HD44780 driver added.
+
+  * Noritake Itron driver added.
+
+  * Grove LCD driver added (ported from existing sample).
 
 * ADC
 
@@ -516,6 +572,9 @@ Libraries / Subsystems
   * The FAT FS initialization order has been updated to match LittleFS, fixing an issue where
     attempting to mount the disk in a global function caused FAT FS to fail due to not being registered beforehand.
     FAT FS is now initialized in POST_KERNEL.
+  * Added :kconfig:option:`CONFIG_FS_LITTLEFS_FMP_DEV` to enable possibility of using LittleFS
+    for block devices only, e.g. without Flash support. The option is set to 'y' by default in
+    order to keep previous behaviour.
 
 * IPC
 
@@ -548,6 +607,8 @@ Libraries / Subsystems
     :ref:`MCUmgr SMP protocol specification <mcumgr_smp_protocol_specification>`
     for details.
 
+  * MCUmgr has now been marked as a stable Zephyr API.
+
 * Retention
 
   * Retention subsystem has been added which adds enhanced features over
@@ -571,6 +632,11 @@ HALs
 
 MCUboot
 *******
+
+* Relocated the MCUboot Kconfig options from the main ``Kconfig.zephyr`` file to
+  a new ``modules/Kconfig.mcuboot`` module-specific file. This means that, for
+  interactive Kconfig interfaces, the MCUboot options will now be located under
+  ``Modules`` instead of under ``Boot Options``.
 
 * Added :kconfig:option:`CONFIG_MCUBOOT_CMAKE_WEST_SIGN_PARAMS` that allows to pass arguments to
   west sign when invoked from cmake.

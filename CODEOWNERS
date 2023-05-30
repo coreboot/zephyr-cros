@@ -235,6 +235,7 @@
 /drivers/adc/adc_ads1x1x.c                @XenuIsWatching
 /drivers/adc/adc_stm32.c                  @cybertale
 /drivers/audio/*nrfx*                     @anangl
+/drivers/auxdisplay/*                      @thedjnK
 /drivers/bbram/*                          @yperess @sjg20 @jackrosenthal
 /drivers/bluetooth/                       @alwa-nordic @jhedberg @Vudentz
 /drivers/bluetooth/hci/hci_esp32.c        @sylvioalves
@@ -256,6 +257,7 @@
 /drivers/counter/*esp32*                  @sylvioalves
 /drivers/crypto/*nrf_ecb*                 @maciekfabia @anangl
 /drivers/display/*rm68200*                @mmahadevan108
+/drivers/display/display_ili9342c.*       @extremegtx
 /drivers/dac/                             @martinjaeger
 /drivers/dai/                             @juimonen @marcinszkudlinski @abonislawski
 /drivers/dai/intel/                       @juimonen @marcinszkudlinski @abonislawski
@@ -284,8 +286,11 @@
 /drivers/ethernet/*w5500*                 @parthitce
 /drivers/ethernet/*xlnx_gem*              @ibirnbaum
 /drivers/ethernet/*smsc91x*               @sgrrzhf
+/drivers/ethernet/*adin2111*              @GeorgeCGV
 /drivers/ethernet/phy/                    @rlubos @tbursztyka @arvinf
+/drivers/ethernet/phy/*adin2111*          @GeorgeCGV
 /drivers/mdio/                            @rlubos @tbursztyka @arvinf
+/drivers/mdio/*adin2111*                  @GeorgeCGV
 /drivers/flash/                           @nashif @de-nordic
 /drivers/flash/*stm32_qspi*               @lmajewski
 /drivers/flash/*b91*                      @andy-liu-telink
@@ -473,6 +478,7 @@
 /drivers/watchdog/wdt_counter.c           @nordic-krch
 /drivers/watchdog/*rpi_pico*              @thedjnK
 /drivers/watchdog/*dw*                    @softwarecki
+/drivers/watchdog/*ifx*                   @sreeramIfx
 /drivers/wifi/                            @rlubos @tbursztyka
 /drivers/wifi/esp_at/                     @mniestroj
 /drivers/wifi/eswifi/                     @loicpoulain @nandojve
@@ -564,6 +570,7 @@
 /dts/bindings/i3c/                        @dcpleung
 /dts/bindings/pm_cpu_ops/*                @carlocaione
 /dts/bindings/ethernet/*gem.yaml          @ibirnbaum
+/dts/bindings/auxdisplay/*                 @thedjnK
 /dts/posix/                               @aescolar @daor-oti
 /dts/bindings/sensor/*bme680*             @BoschSensortec
 /dts/bindings/sensor/*ina23*              @bbilas
@@ -575,6 +582,7 @@
 /include/                                 @nashif @carlescufi @galak @MaureenHelm
 /include/zephyr/drivers/*/*litex*                @mateusz-holenko @kgugala @pgielda
 /include/zephyr/drivers/adc.h                    @anangl
+/include/zephyr/drivers/auxdisplay.h       @thedjnK
 /include/zephyr/drivers/can.h                    @alexanderwachter @henrikbrixandersen
 /include/zephyr/drivers/can/                     @alexanderwachter @henrikbrixandersen
 /include/zephyr/drivers/counter.h                @nordic-krch
@@ -809,7 +817,6 @@ scripts/build/gen_image_info.py           @tejlmand
 /subsys/mgmt/ec_host_cmd/                 @jettr
 /subsys/mgmt/mcumgr/                      @carlescufi @de-nordic @nordicjm
 /subsys/mgmt/hawkbit/                     @Navin-Sankar
-/subsys/mgmt/mcumgr/transport/src/smp_udp.c @aunsbjerg
 /subsys/mgmt/updatehub/                   @nandojve @otavio
 /subsys/mgmt/osdp/                        @sidcha
 /subsys/modbus/                           @jfischer-no

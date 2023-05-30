@@ -7,12 +7,14 @@ import shlex
 from collections import OrderedDict
 import xml.etree.ElementTree as ET
 import logging
+import time
+import sys
 
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
 
 # pylint: disable=anomalous-backslash-in-string
-result_re = re.compile(".*(PASS|FAIL|SKIP) - (test_)?(.*) in (\d*[.,]?\d*) seconds")
+result_re = re.compile(".*(PASS|FAIL|SKIP) - (test_)?(.*) in (\\d*[.,]?\\d*) seconds")
 class Harness:
     GCOV_START = "GCOV_COVERAGE_DUMP_START"
     GCOV_END = "GCOV_COVERAGE_DUMP_END"
@@ -96,6 +98,52 @@ class Harness:
             self.capture_coverage = True
         elif self.GCOV_END in line:
             self.capture_coverage = False
+
+class Robot(Harness):
+
+    is_robot_test = True
+
+    def configure(self, instance):
+        super(Robot, self).configure(instance)
+        self.instance = instance
+
+        config = instance.testsuite.harness_config
+        if config:
+            self.path = config.get('robot_test_path', None)
+
+    def handle(self, line):
+        ''' Test cases that make use of this harness care about results given
+            by Robot Framework which is called in run_robot_test(), so works of this
+            handle is trying to give a PASS or FAIL to avoid timeout, nothing
+            is writen into handler.log
+        '''
+        self.instance.state = "passed"
+        tc = self.instance.get_case_or_create(self.id)
+        tc.status = "passed"
+
+    def run_robot_test(self, command, handler):
+
+        start_time = time.time()
+        env = os.environ.copy()
+        env["ROBOT_FILES"] = self.path
+
+        with subprocess.Popen(command, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, cwd=self.instance.build_dir, env=env) as cmake_proc:
+            out, _ = cmake_proc.communicate()
+
+            self.instance.execution_time = time.time() - start_time
+
+            if cmake_proc.returncode == 0:
+                self.instance.status = "passed"
+            else:
+                logger.error("Robot test failure: %s for %s" %
+                             (handler.sourcedir, self.instance.platform.name))
+                self.instance.status = "failed"
+
+            if out:
+                with open(os.path.join(self.instance.build_dir, handler.log), "wt") as log:
+                    log_msg = out.decode(sys.getdefaultencoding())
+                    log.write(log_msg)
 
 class Console(Harness):
 
@@ -253,6 +301,91 @@ class Pytest(Harness):
         log.write(outs.decode('UTF-8'))
         log.write(errs.decode('UTF-8'))
         log.close()
+
+
+class Gtest(Harness):
+    ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    TEST_START_PATTERN = r"\[ RUN      \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
+    TEST_PASS_PATTERN = r"\[       OK \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
+    TEST_FAIL_PATTERN = r"\[  FAILED  \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
+    FINISHED_PATTERN = r"\[==========\] Done running all tests\.$"
+    has_failures = False
+    tc = None
+
+    def handle(self, line):
+        # Strip the ANSI characters, they mess up the patterns
+        non_ansi_line = self.ANSI_ESCAPE.sub('', line)
+
+        # Check if we started running a new test
+        test_start_match = re.search(self.TEST_START_PATTERN, non_ansi_line)
+        if test_start_match:
+            # Add the suite name
+            suite_name = test_start_match.group("suite_name")
+            if suite_name not in self.detected_suite_names:
+                self.detected_suite_names.append(suite_name)
+
+            # Generate the internal name of the test
+            name = "{}.{}.{}".format(self.id, suite_name, test_start_match.group("test_name"))
+
+            # Assert that we don't already have a running test
+            assert (
+                self.tc is None
+            ), "gTest error, {} didn't finish".format(self.tc)
+
+            # Check that the instance doesn't exist yet (prevents re-running)
+            tc = self.instance.get_case_by_name(name)
+            assert tc is None, "gTest error, {} running twice".format(tc)
+
+            # Create the test instance and set the context
+            tc = self.instance.get_case_or_create(name)
+            self.tc = tc
+            self.tc.status = "started"
+            self.testcase_output += line + "\n"
+            self._match = True
+
+        # Check if the test run finished
+        finished_match = re.search(self.FINISHED_PATTERN, non_ansi_line)
+        if finished_match:
+            tc = self.instance.get_case_or_create(self.id)
+            if self.has_failures or self.tc is not None:
+                self.state = "failed"
+                tc.status = "failed"
+            else:
+                self.state = "passed"
+                tc.status = "passed"
+            return
+
+        # Check if the individual test finished
+        state, name = self._check_result(non_ansi_line)
+        if state is None or name is None:
+            # Nothing finished, keep processing lines
+            return
+
+        # Get the matching test and make sure it's the same as the current context
+        tc = self.instance.get_case_by_name(name)
+        assert (
+            tc is not None and tc == self.tc
+        ), "gTest error, mismatched tests. Expected {} but got {}".format(self.tc, tc)
+
+        # Test finished, clear the context
+        self.tc = None
+
+        # Update the status of the test
+        tc.status = state
+        if tc.status == "failed":
+            self.has_failures = True
+            tc.output = self.testcase_output
+        self.testcase_output = ""
+        self._match = False
+
+    def _check_result(self, line):
+        test_pass_match = re.search(self.TEST_PASS_PATTERN, line)
+        if test_pass_match:
+            return "passed", "{}.{}.{}".format(self.id, test_pass_match.group("suite_name"), test_pass_match.group("test_name"))
+        test_fail_match = re.search(self.TEST_FAIL_PATTERN, line)
+        if test_fail_match:
+            return "failed", "{}.{}.{}".format(self.id, test_fail_match.group("suite_name"), test_fail_match.group("test_name"))
+        return None, None
 
 
 class Test(Harness):

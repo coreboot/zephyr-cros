@@ -191,6 +191,8 @@ class BinaryHandler(Handler):
             harness.handle(None)
             return
 
+        suffix = '\\r\\n'
+
         with open(self.log, "wt") as log_out_fp:
             timeout_extended = False
             timeout_time = time.time() + self.timeout
@@ -203,7 +205,10 @@ class BinaryHandler(Handler):
                 reader_t.join(this_timeout)
                 if not reader_t.is_alive() and self.line != b"":
                     line_decoded = self.line.decode('utf-8', "replace")
-                    stripped_line = line_decoded.rstrip()
+                    if line_decoded.endswith(suffix):
+                        stripped_line = line_decoded[:-len(suffix)].rstrip()
+                    else:
+                        stripped_line = line_decoded.rstrip()
                     logger.debug("OUTPUT: %s", stripped_line)
                     log_out_fp.write(line_decoded)
                     log_out_fp.flush()
@@ -232,7 +237,11 @@ class BinaryHandler(Handler):
         harness = harness_import.instance
         harness.configure(self.instance)
 
-        if self.call_make_run:
+        robot_test = getattr(harness, "is_robot_test", False)
+
+        if robot_test:
+            command = [self.generator_cmd, "run_renode_test"]
+        elif self.call_make_run:
             command = [self.generator_cmd, "run"]
         elif self.call_west_flash:
             command = ["west", "flash", "--skip-rebuild", "-d", self.build_dir]
@@ -271,6 +280,10 @@ class BinaryHandler(Handler):
         if self.options.enable_ubsan:
             env["UBSAN_OPTIONS"] = "log_path=stdout:halt_on_error=1:" + \
                                   env.get("UBSAN_OPTIONS", "")
+
+        if robot_test:
+            harness.run_robot_test(command, self)
+            return
 
         with subprocess.Popen(command, stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE, cwd=self.build_dir, env=env) as proc:
