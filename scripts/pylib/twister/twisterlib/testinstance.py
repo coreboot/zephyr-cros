@@ -15,6 +15,7 @@ from twisterlib.testsuite import TestCase
 from twisterlib.error import BuildError
 from twisterlib.size_calc import SizeCalculator
 from twisterlib.handlers import Handler, SimulationHandler, BinaryHandler, QEMUHandler, DeviceHandler, SUPPORTED_SIMS
+from twisterlib.harness import SUPPORTED_SIMS_IN_PYTEST
 
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
@@ -195,14 +196,16 @@ class TestInstance:
                         self.platform.simulation in SUPPORTED_SIMS or \
                         filter == 'runnable')
 
-        for sim in ['nsim', 'mdb-nsim', 'renode', 'tsim', 'native']:
-            if self.platform.simulation == sim and self.platform.simulation_exec:
-                if not shutil.which(self.platform.simulation_exec):
-                    target_ready = False
-                break
-            else:
-                target_ready = True
+        # check if test is runnable in pytest
+        if self.testsuite.harness == 'pytest':
+            target_ready = bool(filter == 'runnable' or self.platform.simulation in SUPPORTED_SIMS_IN_PYTEST)
 
+        SUPPORTED_SIMS_WITH_EXEC = ['nsim', 'mdb-nsim', 'renode', 'tsim', 'native']
+        if filter != 'runnable' and \
+                self.platform.simulation in SUPPORTED_SIMS_WITH_EXEC and \
+                self.platform.simulation_exec:
+            if not shutil.which(self.platform.simulation_exec):
+                target_ready = False
 
         testsuite_runnable = self.testsuite_runnable(self.testsuite, fixtures)
 
@@ -227,7 +230,7 @@ class TestInstance:
                 if cond_config[0] == "arch" and len(cond_config) == 3:
                     if self.platform.arch == cond_config[1]:
                         new_config_list.append(cond_config[2])
-                elif cond_config[0] == "plaform" and len(cond_config) == 3:
+                elif cond_config[0] == "platform" and len(cond_config) == 3:
                     if self.platform.name == cond_config[1]:
                         new_config_list.append(cond_config[2])
                 else:

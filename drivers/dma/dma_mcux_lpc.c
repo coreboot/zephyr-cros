@@ -56,7 +56,8 @@ struct dma_mcux_lpc_dma_data {
 	int8_t *channel_index;
 	uint8_t num_channels_used;
 };
-K_SEM_DEFINE(is_otrig_being_configured, 1, 1)
+
+struct k_spinlock configuring_otrigs;
 
 #define NXP_LPC_DMA_MAX_XFER ((DMA_CHANNEL_XFERCFG_XFERCOUNT_MASK >> \
 			      DMA_CHANNEL_XFERCFG_XFERCOUNT_SHIFT) + 1)
@@ -373,11 +374,7 @@ static int dma_mcux_lpc_configure(const struct device *dev, uint32_t channel,
 
 	LOG_DBG("channel is %d", p_handle->channel);
 
-	if (k_sem_take(&is_otrig_being_configured, K_MSEC(200))) {
-		LOG_ERR("DMA attempted to configure an Otrig mux"
-		" while the mux was in use.");
-		return -EACCES;
-	}
+	k_spinlock_key_t otrigs_key = k_spin_lock(&configuring_otrigs);
 
 	data->descriptors_queued = false;
 	data->num_of_descriptors = 0;
@@ -389,7 +386,7 @@ static int dma_mcux_lpc_configure(const struct device *dev, uint32_t channel,
 			LOG_ERR("Calling function tried to setup up channel"
 			" chaining but the current platform is missing"
 			" the correct trigger base addresses.");
-			k_sem_give(&is_otrig_being_configured);
+			k_spin_unlock(&configuring_otrigs, otrigs_key);
 			return -ENXIO;
 		}
 
@@ -416,7 +413,7 @@ static int dma_mcux_lpc_configure(const struct device *dev, uint32_t channel,
 			LOG_ERR("Calling function tried to setup up multiple"
 			" channels to be configured but the dma driver has"
 			" run out of OTrig Muxes");
-			k_sem_give(&is_otrig_being_configured);
+			k_spin_unlock(&configuring_otrigs, otrigs_key);
 			return -EINVAL;
 		}
 
@@ -455,7 +452,7 @@ static int dma_mcux_lpc_configure(const struct device *dev, uint32_t channel,
 		}
 	}
 
-	k_sem_give(&is_otrig_being_configured);
+	k_spin_unlock(&configuring_otrigs, otrigs_key);
 
 	/* Check if we need to queue DMA descriptors */
 	if ((block_config->block_size / width > NXP_LPC_DMA_MAX_XFER) ||
@@ -730,7 +727,7 @@ static const struct dma_driver_api dma_mcux_lpc_api = {
 static const struct dma_mcux_lpc_config dma_##n##_config = {		\
 	.base = (DMA_Type *)DT_INST_REG_ADDR(n),			\
 	.num_of_channels = DT_INST_PROP(n, dma_channels),		\
-	.num_of_otrigs = DT_INST_PROP(n, nxp_dma_num_of_otrigs),			\
+	.num_of_otrigs = DT_INST_PROP_OR(n, nxp_dma_num_of_otrigs, 0),			\
 	.otrig_base_address = DT_INST_PROP_OR(n, nxp_dma_otrig_base_address, 0x0),	\
 	.itrig_base_address = DT_INST_PROP_OR(n, nxp_dma_itrig_base_address, 0x0),	\
 	IRQ_FUNC_INIT							\
@@ -751,7 +748,7 @@ static const struct dma_mcux_lpc_config dma_##n##_config = {		\
 				[DT_INST_PROP(n, dma_channels)] = {0};	\
 									\
 	static struct dma_otrig dma_##n##_otrig_arr			\
-			[DT_INST_PROP(n, nxp_dma_num_of_otrigs)] = {0};	\
+			[DT_INST_PROP_OR(n, nxp_dma_num_of_otrigs, 0)]; \
 									\
 	static int8_t							\
 		dma_##n##_channel_index_arr[TOTAL_DMA_CHANNELS] = {0};	\

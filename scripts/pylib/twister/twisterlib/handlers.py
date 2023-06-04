@@ -41,17 +41,6 @@ logger.setLevel(logging.DEBUG)
 
 SUPPORTED_SIMS = ["mdb-nsim", "nsim", "renode", "qemu", "tsim", "armfvp", "xt-sim", "native"]
 
-class HarnessImporter:
-
-    def __init__(self, name):
-        sys.path.insert(0, os.path.join(ZEPHYR_BASE, "scripts/pylib/twister/twisterlib"))
-        module = __import__("harness")
-        if name:
-            my_class = getattr(module, name)
-        else:
-            my_class = getattr(module, "Test")
-
-        self.instance = my_class()
 
 class Handler:
     def __init__(self, instance, type_str="build"):
@@ -187,10 +176,6 @@ class BinaryHandler(Handler):
         self.line = proc.stdout.readline()
 
     def _output_handler(self, proc, harness):
-        if harness.is_pytest:
-            harness.handle(None)
-            return
-
         suffix = '\\r\\n'
 
         with open(self.log, "wt") as log_out_fp:
@@ -230,12 +215,7 @@ class BinaryHandler(Handler):
             except subprocess.TimeoutExpired:
                 self.terminate(proc)
 
-    def handle(self):
-
-        harness_name = self.instance.testsuite.harness.capitalize()
-        harness_import = HarnessImporter(harness_name)
-        harness = harness_import.instance
-        harness.configure(self.instance)
+    def handle(self, harness):
 
         robot_test = getattr(harness, "is_robot_test", False)
 
@@ -309,9 +289,6 @@ class BinaryHandler(Handler):
         if sys.stdout.isatty():
             subprocess.call(["stty", "sane"], stdin=sys.stdout)
 
-        if harness.is_pytest:
-            harness.pytest_run(self.log)
-
         self.instance.execution_time = handler_time
         if not self.terminated and self.returncode != 0:
             self.instance.status = "failed"
@@ -358,10 +335,6 @@ class DeviceHandler(Handler):
         super().__init__(instance, type_str)
 
     def monitor_serial(self, ser, halt_event, harness):
-        if harness.is_pytest:
-            harness.handle(None)
-            return
-
         log_out_fp = open(self.log, "wt")
 
         if self.options.coverage:
@@ -470,9 +443,7 @@ class DeviceHandler(Handler):
                 proc.communicate()
                 logger.error("{} timed out".format(script))
 
-    def handle(self):
-        runner = None
-
+    def get_hardware(self):
         try:
             hardware = self.device_is_available(self.instance)
             while not hardware:
@@ -482,6 +453,12 @@ class DeviceHandler(Handler):
             self.instance.status = "failed"
             self.instance.reason = str(error)
             logger.error(self.instance.reason)
+        return hardware
+
+    def handle(self, harness):
+        runner = None
+        hardware = self.get_hardware()
+        if not hardware:
             return
 
         runner = hardware.runner or self.options.west_runner
@@ -588,10 +565,6 @@ class DeviceHandler(Handler):
                 self.make_device_available(serial_device)
             return
 
-        harness_name = self.instance.testsuite.harness.capitalize()
-        harness_import = HarnessImporter(harness_name)
-        harness = harness_import.instance
-        harness.configure(self.instance)
         halt_monitor_evt = threading.Event()
 
         t = threading.Thread(target=self.monitor_serial, daemon=True,
@@ -660,9 +633,6 @@ class DeviceHandler(Handler):
             logger.debug("Process {} terminated outs: {} errs {}".format(serial_pty, outs, errs))
 
         handler_time = time.time() - start_time
-
-        if harness.is_pytest:
-            harness.pytest_run(self.log)
 
         self.instance.execution_time = handler_time
         if harness.state:
@@ -783,11 +753,6 @@ class QEMUHandler(Handler):
             if pid == 0 and os.path.exists(pid_fn):
                 pid = int(open(pid_fn).read())
 
-            if harness.is_pytest:
-                harness.handle(None)
-                out_state = harness.state
-                break
-
             try:
                 c = in_fp.read(1).decode("utf-8")
             except UnicodeDecodeError:
@@ -831,10 +796,6 @@ class QEMUHandler(Handler):
                         timeout_time = time.time() + 2
             line = ""
 
-        if harness.is_pytest:
-            harness.pytest_run(logfile)
-            out_state = harness.state
-
         handler_time = time.time() - start_time
         logger.debug(f"QEMU ({pid}) complete ({out_state}) after {handler_time} seconds")
 
@@ -866,7 +827,7 @@ class QEMUHandler(Handler):
         os.unlink(fifo_in)
         os.unlink(fifo_out)
 
-    def handle(self):
+    def handle(self, harness):
         self.results = {}
         self.run = True
 
@@ -893,10 +854,6 @@ class QEMUHandler(Handler):
             os.unlink(self.pid_fn)
 
         self.log_fn = self.log
-
-        harness_import = HarnessImporter(self.instance.testsuite.harness.capitalize())
-        harness = harness_import.instance
-        harness.configure(self.instance)
 
         self.thread = threading.Thread(name=self.name, target=QEMUHandler._thread,
                                        args=(self, self.timeout, self.build_dir,
