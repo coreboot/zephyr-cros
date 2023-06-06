@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import pkg_resources
 import sys
 from pathlib import Path
 import json
@@ -37,6 +38,9 @@ import zephyr_module
 # components directly.
 # Note "normalization" is different from canonicalization, see os.path.
 canonical_zephyr_base = os.path.realpath(ZEPHYR_BASE)
+
+installed_packages = [pkg.project_name for pkg in pkg_resources.working_set]  # pylint: disable=not-an-iterable
+PYTEST_PLUGIN_INSTALLED = 'pytest-twister-harness' in installed_packages
 
 
 def add_parse_arguments(parser = None):
@@ -239,6 +243,11 @@ Artificially long but functional example:
         help="""Directory to search for board configuration files. All .yaml
 files in the directory will be processed. The directory should have the same
 structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
+
+    parser.add_argument(
+        "--allow-installed-plugin", action="store_true", default=None,
+        help="Allow to use pytest plugin installed by pip for pytest tests."
+    )
 
     parser.add_argument(
         "-a", "--arch", action="append",
@@ -474,7 +483,7 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
                         """)
 
     parser.add_argument(
-        "-p", "--platform", action="append",
+        "-p", "--platform", action="append", default=[],
         help="Platform filter for testing. This option may be used multiple "
              "times. Test suites will only be built/run on the platforms "
              "specified. If this option is not used, then platforms marked "
@@ -660,6 +669,13 @@ structure in the main Zephyr tree: boards/<arch>/<board_name>/""")
     parser.add_argument("extra_test_args", nargs=argparse.REMAINDER,
         help="Additional args following a '--' are passed to the test binary")
 
+    parser.add_argument("--alt-config-root", action="append", default=[],
+        help="Alternative test configuration root/s. When a test is found, "
+             "Twister will check if a test configuration file exist in any of "
+             "the alternative test configuration root folders. For example, "
+             "given $test_root/tests/foo/testcase.yaml, Twister will use "
+             "$alt_config_root/tests/foo/testcase.yaml if it exists")
+
     return parser
 
 
@@ -758,6 +774,16 @@ def parse_arguments(parser, args, options = None):
         # Strip off the initial "--" following validation.
         options.extra_test_args = options.extra_test_args[1:]
 
+    if not options.allow_installed_plugin and PYTEST_PLUGIN_INSTALLED:
+        logger.error("By default Twister should work without pytest-twister-harness "
+                     "plugin being installed, so please, uninstall it by "
+                     "`pip uninstall pytest-twister-harness` and `git clean "
+                     "-dxf scripts/pylib/pytest-twister-harness`.")
+        sys.exit(1)
+    elif options.allow_installed_plugin and PYTEST_PLUGIN_INSTALLED:
+        logger.warning("You work with installed version of "
+                       "pytest-twister-harness plugin.")
+
     return options
 
 
@@ -794,6 +820,8 @@ class TwisterEnv:
         self.hwm = None
 
         self.test_config = options.test_config
+
+        self.alt_config_root = options.alt_config_root
 
     def discover(self):
         self.check_zephyr_version()

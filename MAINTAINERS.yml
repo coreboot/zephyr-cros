@@ -667,6 +667,17 @@ Release Notes:
   labels:
     - "area: Battery Backed RAM (bbram)"
 
+"Drivers: Aux display":
+  status: maintained
+  maintainers:
+    - thedjnK
+  files:
+    - include/zephyr/drivers/auxdisplay.h
+    - drivers/auxdisplay/*
+    - dts/bindings/auxdisplay/*
+  labels:
+    - "area: Aux display"
+
 "Drivers: CAN":
   status: maintained
   maintainers:
@@ -1126,12 +1137,14 @@ Release Notes:
     - gmarull
   collaborators:
     - danieldegrasse
+    - aasinclair
   files:
     - drivers/regulator/
     - include/zephyr/drivers/regulator/
     - include/zephyr/drivers/regulator.h
     - include/zephyr/dt-bindings/regulator/
     - tests/drivers/regulator/
+    - tests/drivers/build_all/regulator/
     - doc/hardware/peripherals/regulators.rst
   labels:
     - "area: Regulators"
@@ -3034,7 +3047,7 @@ West:
     - de-nordic
     - nordicjm
   files:
-    - modules/Kconfig.mcuboot_bootutil
+    - modules/Kconfig.mcuboot
     - tests/boot/test_mcuboot/
   labels:
     - manifest-mcuboot

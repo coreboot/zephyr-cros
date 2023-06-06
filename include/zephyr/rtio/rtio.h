@@ -36,6 +36,7 @@
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/mem_blocks.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/sys/iterable_sections.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +46,7 @@ extern "C" {
 /**
  * @brief RTIO
  * @defgroup rtio RTIO
+ * @ingroup os_services
  * @{
  * @}
  */
@@ -110,6 +112,26 @@ extern "C" {
  * that will be returned in a single completion on failure/success.
  */
 #define RTIO_SQE_TRANSACTION BIT(1)
+
+
+/**
+ * @brief Equivalent to the I2C_MSG_STOP flag
+ */
+#define RTIO_IODEV_I2C_STOP BIT(0)
+
+/**
+ * @brief Equivalent to the I2C_MSG_RESTART flag
+ */
+#define RTIO_IODEV_I2C_RESTART BIT(1)
+
+/**
+ * @brief Equivalent to the I2C_MSG_10_BITS
+ */
+#define RTIO_IODEV_I2C_10_BITS BIT(2)
+
+/**
+ * @brief Equivalent to the I2C_MSG_ADDR_10_BITS
+ */
 
 /**
  * @brief The buffer should be allocated by the RTIO mempool
@@ -219,6 +241,10 @@ struct rtio_sqe {
 	uint8_t prio; /**< Op priority */
 
 	uint16_t flags; /**< Op Flags */
+
+	uint16_t iodev_flags; /**< Op iodev flags */
+
+	uint16_t _resv0;
 
 	const struct rtio_iodev *iodev; /**< Device to operation on */
 
@@ -1341,7 +1367,7 @@ static inline int z_impl_rtio_cqe_copy_out(struct rtio *r,
 {
 	size_t copied = 0;
 	struct rtio_cqe *cqe;
-	uint64_t end = sys_clock_timeout_end_calc(timeout);
+	int64_t end = sys_clock_timeout_end_calc(timeout);
 
 	do {
 		cqe = K_TIMEOUT_EQ(timeout, K_FOREVER) ? rtio_cqe_consume_block(r)

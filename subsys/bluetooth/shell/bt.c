@@ -32,9 +32,6 @@
 #include <zephyr/bluetooth/rfcomm.h>
 #include <zephyr/bluetooth/sdp.h>
 #include <zephyr/bluetooth/iso.h>
-#include <zephyr/bluetooth/audio/audio.h>
-#include <zephyr/bluetooth/audio/pacs.h>
-#include <zephyr/bluetooth/audio/csip.h>
 
 #include <zephyr/shell/shell.h>
 
@@ -139,7 +136,7 @@ static struct bt_auto_connect {
 static struct bt_scan_filter {
 	char name[NAME_LEN];
 	bool name_set;
-	char addr[18]; /* fits xx:xx:xx:xx:xx:xx\0 */
+	char addr[BT_ADDR_STR_LEN];
 	bool addr_set;
 	int8_t rssi;
 	bool rssi_set;
@@ -1296,7 +1293,7 @@ static int cmd_scan_filter_set_addr(const struct shell *sh, size_t argc,
 		}
 	}
 
-	strcpy(scan_filter.addr, addr_arg);
+	strncpy(scan_filter.addr, addr_arg, sizeof(scan_filter.addr));
 	scan_filter.addr_set = true;
 
 	return 0;

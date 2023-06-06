@@ -8,7 +8,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/debug/stack.h>
-
+#include <zephyr/sys/iterable_sections.h>
 #include <zephyr/net/buf.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
@@ -307,8 +307,10 @@ static void send_pending_adv(struct k_work *work)
 		return;
 	}
 
-	if (!bt_mesh_adv_gatt_send()) {
-		atomic_set_bit(adv->flags, ADV_FLAG_PROXY);
+	atomic_set_bit(adv->flags, ADV_FLAG_PROXY);
+
+	if (bt_mesh_adv_gatt_send()) {
+		atomic_clear_bit(adv->flags, ADV_FLAG_PROXY);
 	}
 
 	if (atomic_test_and_clear_bit(adv->flags, ADV_FLAG_SCHEDULE_PENDING)) {
