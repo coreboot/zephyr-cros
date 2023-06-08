@@ -1330,6 +1330,13 @@ static uint8_t unicast_client_cp_notify(struct bt_conn *conn,
 
 	rsp = net_buf_simple_pull_mem(&buf, sizeof(*rsp));
 
+	if (rsp->num_ase == BT_ASCS_UNSUPP_OR_LENGTH_ERR_NUM_ASE) {
+		/* This is a special case where num_ase == BT_ASCS_UNSUPP_OR_LENGTH_ERR_NUM_ASE
+		 * but really there is only one ASE response
+		 */
+		rsp->num_ase = 1U;
+	}
+
 	for (uint8_t i = 0U; i < rsp->num_ase; i++) {
 		struct bt_bap_unicast_client_ep *client_ep;
 		struct bt_ascs_cp_ase_rsp *ase_rsp;
@@ -1355,10 +1362,7 @@ static uint8_t unicast_client_cp_notify(struct bt_conn *conn,
 		stream = audio_stream_by_ep_id(conn, ase_rsp->id);
 		if (stream == NULL) {
 			LOG_DBG("Could not find stream by id %u", ase_rsp->id);
-			continue;
 		}
-
-		client_ep = CONTAINER_OF(stream->ep, struct bt_bap_unicast_client_ep, ep);
 
 		switch (rsp->op) {
 		case BT_ASCS_CONFIG_OP:
@@ -1398,9 +1402,14 @@ static uint8_t unicast_client_cp_notify(struct bt_conn *conn,
 			}
 			break;
 		case BT_ASCS_RELEASE_OP:
-			if (client_ep->release_requested) {
-				/* Set to false to only handle the callback here */
-				client_ep->release_requested = false;
+			if (stream != NULL) {
+				client_ep = CONTAINER_OF(stream->ep,
+							 struct bt_bap_unicast_client_ep, ep);
+
+				if (client_ep->release_requested) {
+					/* Set to false to only handle the callback here */
+					client_ep->release_requested = false;
+				}
 			}
 
 			if (unicast_client_cbs->release != NULL) {
@@ -2178,8 +2187,13 @@ static void audio_stream_qos_cleanup(const struct bt_conn *conn,
 	struct bt_bap_stream *stream;
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&group->streams, stream, _node) {
-		if (stream->conn != conn && stream->ep != NULL) {
+		if (stream->conn != conn) {
 			/* Channel not part of this ACL, skip */
+			continue;
+		}
+
+		if (stream->ep == NULL) {
+			/* Stream did not have a endpoint configured yet */
 			continue;
 		}
 
@@ -2727,6 +2741,14 @@ int bt_bap_unicast_client_config(struct bt_bap_stream *stream, const struct bt_c
 	struct net_buf_simple *buf;
 	int err;
 
+	LOG_DBG("stream %p", stream);
+
+	if (stream->conn == NULL) {
+		LOG_DBG("Stream %p does not have a connection", stream);
+
+		return -ENOTCONN;
+	}
+
 	buf = bt_bap_unicast_client_ep_create_pdu(stream->conn, BT_ASCS_CONFIG_OP);
 	if (buf == NULL) {
 		LOG_DBG("Could not create PDU");
@@ -2758,6 +2780,12 @@ int bt_bap_unicast_client_qos(struct bt_conn *conn, struct bt_bap_unicast_group 
 	bool conn_stream_found;
 	bool cig_connected;
 	int err;
+
+	if (conn == NULL) {
+		LOG_DBG("conn is NULL");
+
+		return -ENOTCONN;
+	}
 
 	/* Used to determine if a stream for the supplied connection pointer
 	 * was actually found
@@ -2880,6 +2908,12 @@ int bt_bap_unicast_client_enable(struct bt_bap_stream *stream, struct bt_codec_d
 
 	LOG_DBG("stream %p", stream);
 
+	if (stream->conn == NULL) {
+		LOG_DBG("Stream %p does not have a connection", stream);
+
+		return -ENOTCONN;
+	}
+
 	buf = bt_bap_unicast_client_ep_create_pdu(stream->conn, BT_ASCS_ENABLE_OP);
 	if (buf == NULL) {
 		LOG_DBG("Could not create PDU");
@@ -2907,6 +2941,12 @@ int bt_bap_unicast_client_metadata(struct bt_bap_stream *stream, struct bt_codec
 
 	LOG_DBG("stream %p", stream);
 
+	if (stream->conn == NULL) {
+		LOG_DBG("Stream %p does not have a connection", stream);
+
+		return -ENOTCONN;
+	}
+
 	buf = bt_bap_unicast_client_ep_create_pdu(stream->conn, BT_ASCS_METADATA_OP);
 	if (buf == NULL) {
 		LOG_DBG("Could not create PDU");
@@ -2930,6 +2970,12 @@ int bt_bap_unicast_client_start(struct bt_bap_stream *stream)
 	int err;
 
 	LOG_DBG("stream %p", stream);
+
+	if (stream->conn == NULL) {
+		LOG_DBG("Stream %p does not have a connection", stream);
+
+		return -ENOTCONN;
+	}
 
 	/* If an ASE is in the Enabling state, and if the Unicast Client has
 	 * not yet established a CIS for that ASE, the Unicast Client shall
@@ -2978,6 +3024,12 @@ int bt_bap_unicast_client_disable(struct bt_bap_stream *stream)
 
 	LOG_DBG("stream %p", stream);
 
+	if (stream->conn == NULL) {
+		LOG_DBG("Stream %p does not have a connection", stream);
+
+		return -ENOTCONN;
+	}
+
 	buf = bt_bap_unicast_client_ep_create_pdu(stream->conn, BT_ASCS_DISABLE_OP);
 	if (buf == NULL) {
 		LOG_DBG("Could not create PDU");
@@ -3003,6 +3055,12 @@ int bt_bap_unicast_client_stop(struct bt_bap_stream *stream)
 	int err;
 
 	LOG_DBG("stream %p", stream);
+
+	if (stream->conn == NULL) {
+		LOG_DBG("Stream %p does not have a connection", stream);
+
+		return -ENOTCONN;
+	}
 
 	buf = bt_bap_unicast_client_ep_create_pdu(stream->conn, BT_ASCS_STOP_OP);
 	if (buf == NULL) {
@@ -3039,7 +3097,9 @@ int bt_bap_unicast_client_release(struct bt_bap_stream *stream)
 
 	LOG_DBG("stream %p", stream);
 
-	if (stream->conn == NULL || stream->conn->state != BT_CONN_CONNECTED) {
+	if (stream->conn == NULL) {
+		LOG_DBG("Stream %p does not have a connection", stream);
+
 		return -ENOTCONN;
 	}
 

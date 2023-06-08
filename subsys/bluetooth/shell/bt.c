@@ -136,7 +136,7 @@ static struct bt_auto_connect {
 static struct bt_scan_filter {
 	char name[NAME_LEN];
 	bool name_set;
-	char addr[18]; /* fits xx:xx:xx:xx:xx:xx\0 */
+	char addr[BT_ADDR_STR_LEN];
 	bool addr_set;
 	int8_t rssi;
 	bool rssi_set;
@@ -1271,10 +1271,11 @@ static int cmd_scan_filter_set_name(const struct shell *sh, size_t argc,
 static int cmd_scan_filter_set_addr(const struct shell *sh, size_t argc,
 				    char *argv[])
 {
+	const size_t max_cpy_len = sizeof(scan_filter.addr) - 1;
 	const char *addr_arg = argv[1];
 
 	/* Validate length including null terminator. */
-	if (strlen(addr_arg) >= sizeof(scan_filter.addr)) {
+	if (strlen(addr_arg) > max_cpy_len) {
 		shell_error(ctx_shell, "Invalid address string: %s\n",
 			    addr_arg);
 		return -ENOEXEC;
@@ -1293,7 +1294,8 @@ static int cmd_scan_filter_set_addr(const struct shell *sh, size_t argc,
 		}
 	}
 
-	strcpy(scan_filter.addr, addr_arg);
+	strncpy(scan_filter.addr, addr_arg, max_cpy_len);
+	scan_filter.addr[max_cpy_len] = '\0'; /* ensure NULL termination */
 	scan_filter.addr_set = true;
 
 	return 0;
