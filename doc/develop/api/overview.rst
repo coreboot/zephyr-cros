@@ -30,8 +30,8 @@ between major releases are available in the :ref:`zephyr_release_notes`.
      - 1.13
 
    * - :ref:`auxdisplay_api`
-     - Unstable
-     - 3.3
+     - Experimental
+     - 3.4
 
    * - :ref:`barriers_api`
      - Experimental
@@ -94,7 +94,7 @@ between major releases are available in the :ref:`zephyr_release_notes`.
      - 2.4
 
    * - :ref:`edac_api`
-     - Experimental
+     - Unstable
      - 2.5
 
    * - :ref:`eeprom_api`

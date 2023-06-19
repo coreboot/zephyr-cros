@@ -13,8 +13,8 @@
 
 #include <zephyr/kernel.h>
 
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/hci_types.h>
+#include <zephyr/bluetooth/conn.h>
 
 #include "util/memq.h"
 
@@ -315,7 +315,7 @@ isoal_status_t isoal_sink_create(
 	 *   BIG reference anchor point +
 	 *   BIG_Sync_Delay + SDU_interval + ISO_Interval - Time_Offset.
 	 */
-	if (role == BT_CONN_ROLE_PERIPHERAL) {
+	if (role == ISOAL_ROLE_PERIPHERAL) {
 		if (framed) {
 			session->sdu_sync_const = stream_sync_delay + sdu_interval +
 							(flush_timeout * iso_interval_us);
@@ -323,7 +323,7 @@ isoal_status_t isoal_sink_create(
 			session->sdu_sync_const = stream_sync_delay +
 							((flush_timeout - 1UL) * iso_interval_us);
 		}
-	} else if (role == BT_CONN_ROLE_CENTRAL) {
+	} else if (role == ISOAL_ROLE_CENTRAL) {
 		if (framed) {
 			session->sdu_sync_const = stream_sync_delay - group_sync_delay;
 		} else {
@@ -331,7 +331,7 @@ isoal_status_t isoal_sink_create(
 							(((iso_interval_us / sdu_interval) - 1UL) *
 								iso_interval_us);
 		}
-	} else if (role == BT_ROLE_BROADCAST) {
+	} else if (role == ISOAL_ROLE_BROADCAST_SINK) {
 		if (framed) {
 			session->sdu_sync_const = group_sync_delay + sdu_interval + iso_interval_us;
 		} else {
@@ -1749,8 +1749,9 @@ uint16_t isoal_tx_unframed_get_next_payload_number(isoal_source_handle_t source_
 		/* Start of a new SDU */
 		time_diff_valid = false;
 		time_diff = 0;
+
 		/* Adjust payload number */
-		if (session->sn) {
+		if (IS_ENABLED(CONFIG_BT_CTLR_ISOAL_SN_STRICT) && session->sn) {
 			/* Not the first SDU in this session, so reference
 			 * information should be valid. At this point, the
 			 * current payload number should be at the first PDU of
@@ -1804,6 +1805,44 @@ uint16_t isoal_tx_unframed_get_next_payload_number(isoal_source_handle_t source_
 
 	return sdus_skipped;
 }
+
+/* NOTE: Use of target_event and grp_ref_point as input from upper layer.
+ *
+ * For unframed:
+ * Before the modification to use the PSN to decide the position of an SDU in a
+ * stream of SDU, the target event was what was used in deciding the event for
+ * each SDU. This meant that there would possibly have been skews on the
+ * receiver for each SDU and we had trouble with LL/CIS/PER/BV-39-C which
+ * expects clustering within an event.
+ *
+ * After the change, the PSN is used to decide the position of an SDU in the
+ * stream anchored at the first PSN received. However for the first SDU
+ * (assume that PSN=0), it will be the target event that decides which event
+ * will be used for the fragmented payloads. Although the same interface from
+ * the original is retained, the target event and group reference point only
+ * impacts the event chosen for the first SDU and all subsequent SDUs will be
+ * decided relative to the first.
+ *
+ * The target event and related group reference point is still used to provide
+ * the ISO-AL with a notion of time, for example when storing information
+ * required for the TX Sync command. For example if for PSN 4, target event is
+ * 8 but event 7 is chosen as the correct position for the SDU with PSN 4, the
+ * group reference point stored is obtained by subtracting an ISO interval from
+ * the group reference provided with target event 8 to get the BIG/CIG reference
+ * for event 7. It is also expected that this value is the latest reference and
+ * is drift compensated.
+ *
+ * The PSN alone is not sufficient for this because as far as I am aware, host
+ * and controller have no common reference time for when CIG/BIG event 0 starts.
+ * Therefore I would expect it is possible to receive PSN 0 in event 2 for
+ * example. If the target event provided is event 3, then PSN 0 will be
+ * fragmented into payloads for event 3 and that will serve as the anchor for
+ * the stream and subsequent SDUs. If for example target event provided was
+ * event 2 instead, then it could very well be that PSN 0 might not be
+ * transmitted as is was received midway through event 2 and the payloads
+ * expired. If this happens then subsequent SDUs might also all be late for
+ * their transmission slots as they are positioned relative to PSN 0.
+ */
 
 /**
  * @brief Fragment received SDU and produce unframed PDUs
@@ -1888,9 +1927,10 @@ static isoal_status_t isoal_tx_unframed_produce(isoal_source_handle_t source_hdl
 		 * this seems to be the best candidate.
 		 */
 		if (actual_event != tx_sdu->target_event) {
-			actual_grp_ref_point = isoal_get_wrapped_time_us(tx_sdu->grp_ref_point,
-				((actual_event - tx_sdu->target_event) * session->iso_interval *
-					ISO_INT_UNIT_US));
+			actual_grp_ref_point =
+				isoal_get_wrapped_time_us(tx_sdu->grp_ref_point,
+							  (actual_event - tx_sdu->target_event) *
+							  session->iso_interval * ISO_INT_UNIT_US);
 		}
 
 		/* Store timing info for TX Sync command */
