@@ -1015,6 +1015,8 @@ Release Notes:
   collaborators:
     - rlubos
     - jciupis
+    - cfriedt
+    - fgrandel
   files:
     - drivers/ieee802154/
   labels:
@@ -1547,6 +1549,7 @@ Input:
     - include/zephyr/input/
     - samples/subsys/input/
     - subsys/input/
+    - tests/drivers/build_all/input/
     - tests/subsys/input/
   description: >-
     Input subsystem and drivers
@@ -2002,6 +2005,24 @@ Retention:
   labels:
     - "area: Retention"
 
+Sensor Subsystem:
+  status: maintained
+  maintainers:
+    - lixuzha
+    - ghu0510
+    - yperess
+  collaborators:
+    - qianruh
+  files:
+    - dts/bindings/sensor/zephyr,sensing.yaml
+    - dts/bindings/sensor/zephyr,sensing*.yaml
+    - include/zephyr/sensing/
+    - doc/services/sensing/
+    - subsys/sensing/
+    - samples/subsys/sensing/
+  labels:
+    - "area: Sensor Subsystem"
+
 Twister:
   status: maintained
   maintainers:
@@ -2012,11 +2033,14 @@ Twister:
     - hakehuang
     - gopiotr
     - golowanow
+    - gchwier
   files:
     - scripts/twister
     - scripts/pylib/twister/
     - scripts/tests/twister/
     - doc/develop/test/twister.rst
+    - scripts/pylib/pytest-twister-harness/
+    - doc/develop/test/pytest.rst
   labels:
     - "area: Twister"
 

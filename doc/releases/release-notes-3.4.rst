@@ -2,8 +2,8 @@
 
 .. _zephyr_3.4:
 
-Zephyr 3.4.0 (Working Draft)
-############################
+Zephyr 3.4.0
+############
 
 We are pleased to announce the release of Zephyr version 3.4.0.
 
@@ -11,7 +11,7 @@ Major enhancements with this release include:
 
 * Input subsystem: handles input events from various types of input devices and
   distributes them to other threads in the application.
-* Barrier API: add architecture agnostic API for data memory barriers.
+* Barrier API: added architecture agnostic API for data memory barriers.
 * USB Device support:
 
   * USB device controller API (UDC API) and nRF USBD controller driver.
@@ -308,6 +308,23 @@ Architectures
 
 * ARC
 
+  * Added MPUv8 support
+  * Add support of virtual UART over ARC hostlink channel
+  * Improved ARCv2 HS4x processors handling - added proper Kconfig options, provided default mcpu
+  * Improved ARCMWDT toolchain handling:
+
+    * added rollback to check METAWARE_ROOT if ARCMWDT_TOOLCHAIN_PATH missing
+    * reworked extra warnings options handling in twister so it can be used with ARCMWDT
+    * used 64bit MDB binary by default
+
+  * Fixed excessive ROM memory consumption if MPU is enabled and ROM & RAM are located in different
+    memory regions
+  * Fixed DSP registers handling in case of ARCMWDT
+  * Improved SMP handling:
+
+    * Fixed potential livelock in thread abort due to exception
+    * Fixed IDU mask setup
+
   * Removed absolute symbols :c:macro:`___callee_saved_t_SIZEOF` and
     :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
 
@@ -354,8 +371,6 @@ Architectures
 * SPARC
 
   * Removed absolute symbol :c:macro:`_K_THREAD_NO_FLOAT_SIZEOF`
-
-* X86
 
 * Xtensa
 
@@ -421,20 +436,32 @@ Bluetooth
 
     * Enhanced Provisioning Authentication support.
     * Mesh Remote Provisioning support including:
+
       * Remote Provisioning Server and Client models.
       * Composition Data Page 128 and Models Metadata Page 128 support.
+
     * Large Composition Data support including:
+
       * Large Composition Data Server and Client models.
       * Models Metadata Page 0 support.
+
     * New Transport Segmentation and Reassembly (SAR) implementation including:
+
       * SAR Configuration Server and Client models.
+
     * Mesh Private Beacons support including:
+
       * Mesh Private Beacon Server and Client models.
+
     * Opcodes Aggregator support including:
+
       * Opcodes Aggregator Server and Client models.
+
     * Proxy Solicitation support including:
+
       * Solicitation PDU RPL Configuration Server and Client models.
       * On-Demand Private Proxy Server and Client models.
+
     * Composition Data Page 1 support.
     * Other Mesh Profile Enhancements.
   * Added experimental support for Mesh Binary Large Object Transfer Model d1.0r04_PRr00 specification.
@@ -477,6 +504,7 @@ Boards & SoC Support
   * STM32C0 series are now supported (with introduction of STM32C031 SoC).
   * STM32H5 series are now supported (with introduction of STM32H503 and STM32H573 SoCs).
   * Added support for STM32U599 SoC variants
+  * Nordic Semiconductor nRF9161
 
 * Removed support for these SoC series:
 
@@ -484,8 +512,8 @@ Boards & SoC Support
 
 * Added support for these ARC boards:
 
-  * DesignWare ARC HS4x/HS4xD Development Kit
-  * DesignWare ARC nSIM and HAPS FPGA
+  * DesignWare ARC HS4x/HS4xD Development Kit (HSDK4xD) - ARCv2 HS47D, SMP 4 cores
+  * nsim_hs3x_hostlink - simulation (nSIM-based) platform with hostlink UART
 
 * Added support for these ARM boards:
 
@@ -534,6 +562,12 @@ Boards & SoC Support
 
 * Made these changes for ARC boards:
 
+  * Added ARC MWDT toolchain support for qemu_arc_hs
+  * Improved emsdp platform support:
+
+    * Added DFSS driver support
+    * Added pinctrl support
+
 * Made these changes for ARM boards:
 
   * ``atsamc21n_xpro``: Enable support to CAN.
@@ -546,6 +580,8 @@ Boards & SoC Support
   * ``nrf9160dk_nrf9160``: Changed the order of buttons and switches on the GPIO
     expander to match the order when using GPIO directly on the nRF9160 SoC.
   * ``STM32H747i_disco``: Enabled support for ST B-LCD40-DSI1 display extension
+  * ``qemu_cortex_m0``: Fixed prescaler of the system timer so that its frequency
+    is actually 1 MHz, not 2 MHz.
 
 * Made these changes for ARM64 boards:
 
@@ -734,22 +770,23 @@ Drivers and Sensors
 
 * ADC
 
- * MCUX LPADC driver now uses the channel parameter to select a software channel
-   configuration buffer. Use ``zephyr,input-positive`` and
-   ``zephyr,input-negative`` devicetree properties to select the hardware
-   channel(s) to link a software channel configuration to.
-
- * MCUX LPADC driver ``voltage-ref`` and ``power-level`` devicetree properties
-   were shifted to match the hardware as described in reference manual instead
-   of matching the NXP SDK enum identifers.
-
- * Added support for STM32C0 and STM32H5.
-
- * Added DMA support for STM32H7.
-
- * STM32: Resolutions are now listed in the device tree for each ADC instance
-
- * STM32: Sampling times are now listed in the device tree for each ADC instance
+  * MCUX LPADC driver now uses the channel parameter to select a software channel
+    configuration buffer. Use ``zephyr,input-positive`` and
+    ``zephyr,input-negative`` devicetree properties to select the hardware
+    channel(s) to link a software channel configuration to.
+  * MCUX LPADC driver ``voltage-ref`` and ``power-level`` devicetree properties
+    were shifted to match the hardware as described in reference manual instead
+    of matching the NXP SDK enum identifers.
+  * Added support for STM32C0 and STM32H5.
+  * Added DMA support for STM32H7.
+  * STM32: Resolutions are now listed in the device tree for each ADC instance
+  * STM32: Sampling times are now listed in the device tree for each ADC instance
+  * Added driver for Atmel SAM family ADC.
+  * Added driver for Gecko Incremental ADC.
+  * Added driver for Infineon CAT1 ADC.
+  * Added driver for TI ADS7052.
+  * Added driver for TI ADS114S0x family.
+  * Added drivers for Renesas SmartBond GPADC and SDADC.
 
 * Battery-backed RAM
 
@@ -778,7 +815,7 @@ Drivers and Sensors
 
 * Clock control
 
-  * Atmel SAM/SAM0: Introduce peripheral clock control.
+  * Atmel SAM/SAM0: Introduced peripheral clock control.
   * Atmel SAM0: Improved ``samd20``/``samd21``/``samr21`` clocking mechanism.
   * STM32F4: Added support for PLL I2S
 
@@ -799,8 +836,6 @@ Drivers and Sensors
 * DAC
 
   * Added support on STM32H5 series.
-
-* DFU
 
 * Disk
 
@@ -827,10 +862,6 @@ Drivers and Sensors
 * Entropy
 
   * Added support for STM32H5 series.
-
-* ESPI
-
-* Ethernet
 
 * Flash
 
@@ -860,10 +891,6 @@ Drivers and Sensors
     their initial sector split into two parts (usually marked as 0a and 0b).
   * STM32H5 now supports OSPI
 
-* FPGA
-
-* Fuel Gauge
-
 * GPIO
 
   * Converted the ``gpio_keys`` driver to the input subsystem.
@@ -871,8 +898,6 @@ Drivers and Sensors
 
   * STM32: Supports newly introduced experimental API to enable/disable interrupts
     without re-config
-
-* hwinfo
 
 * I2C
 
@@ -882,28 +907,14 @@ Drivers and Sensors
 
   * STM32: Domain clock should now be configured by device tree.
 
-* I3C
-
-* IEEE 802.15.4
-
 * Input
 
   * Introduced the :ref:`input` subsystem.
-
-* Interrupt Controller
-
-* IPM
 
 * KSCAN
 
   * Added a :dtcompatible:`zephyr,kscan-input` input to kscan compatibility driver.
   * Converted the ``ft5336`` and ``kscan_sdl`` drivers to the input subsystem.
-
-* LED
-
-* MBOX
-
-* MEMC
 
 * MIPI-DSI
 
@@ -934,6 +945,7 @@ Drivers and Sensors
 
   * Added support for STM32C0.
   * STM32: Now supports 6-PWM channels
+  * Added PWM driver for Microchip XEC BBLED.
 
 * Power domain
 
@@ -946,8 +958,6 @@ Drivers and Sensors
   * Added support for ADP5360 PMIC
   * Added support for nPM1300 PMIC
   * Added support for Raspberry Pi Pico core supply regulator
-
-* Reset
 
 * SDHC
 
@@ -966,7 +976,7 @@ Drivers and Sensors
 
 * Serial
 
-  * Add UART3 and UART4 configuration for ``gd32vf103`` SoCs.
+  * Added UART3 and UART4 configuration for ``gd32vf103`` SoCs.
   * uart_altera: added new driver for Altera Avalon UART.
   * uart_emul: added new driver for emulated UART.
   * uart_esp32:
@@ -1019,8 +1029,6 @@ Drivers and Sensors
 * Watchdog
 
   * Added support for STM32C0 and STM32H5 series
-
-* WiFi
 
 Networking
 **********
@@ -1236,9 +1244,6 @@ USB
   * Added USB Mass Storage class and CDC ECM class implementations for the new
     device support.
 
-Devicetree
-**********
-
 Libraries / Subsystems
 **********************
 
@@ -1377,6 +1382,10 @@ Libraries / Subsystems
 HALs
 ****
 
+* Nordic
+
+  * Updated nrfx to version 3.0.0.
+
 * STM32
 
   * stm32cube: updated STM32F0 to cube version V1.11.4.
@@ -1427,9 +1436,6 @@ Among other things, this update brings:
 * Improved docs
 * -Wall and -Wconversion compliance
 
-Documentation
-*************
-
 Tests and Samples
 *****************
 
@@ -1437,12 +1443,4 @@ Tests and Samples
   system. One of them including the OpenThread stack.
 * For native_posix and the nrf52_bsim: Many tests have been fixed and enabled.
 * LittleFS sample has been given SPI example configuration for nrf52840dk_nrf52840.
-
-Issue Related Items
-*******************
-
-Known Issues
-============
-
-Addressed issues
-================
+* Migrated all tests to new Ztest API and deprecated legacy Ztest.
