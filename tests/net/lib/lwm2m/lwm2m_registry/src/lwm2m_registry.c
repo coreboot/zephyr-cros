@@ -130,12 +130,12 @@ ZTEST(lwm2m_registry, test_connmon)
 	int ret;
 	uint16_t u16_buf = 0;
 	uint32_t u32_buf = 0;
-	int8_t s8_buf = 0;
+	int16_t s16_buf = 0;
 	int32_t s32_buf = 0;
 
 	uint16_t u16_getbuf = 0;
 	uint32_t u32_getbuf = 0;
-	int8_t s8_getbuf = 0;
+	int16_t s16_getbuf = 0;
 	int32_t s32_getbuf = 0;
 
 	ret = lwm2m_set_res_buf(&LWM2M_OBJ(4, 0, 9), &u16_buf, sizeof(u16_buf),
@@ -144,8 +144,8 @@ ZTEST(lwm2m_registry, test_connmon)
 	ret = lwm2m_set_res_buf(&LWM2M_OBJ(4, 0, 8), &u32_buf, sizeof(u32_buf),
 				sizeof(u32_buf), 0);
 	zassert_equal(ret, 0);
-	ret = lwm2m_set_res_buf(&LWM2M_OBJ(4, 0, 2), &s8_buf, sizeof(s8_buf),
-				sizeof(s8_buf), 0);
+	ret = lwm2m_set_res_buf(&LWM2M_OBJ(4, 0, 2), &s16_buf, sizeof(s16_buf),
+				sizeof(s16_buf), 0);
 	zassert_equal(ret, 0);
 	ret = lwm2m_set_res_buf(&LWM2M_OBJ(4, 0, 11), &s32_buf, sizeof(s32_buf),
 				sizeof(s32_buf), 0);
@@ -155,28 +155,28 @@ ZTEST(lwm2m_registry, test_connmon)
 	zassert_equal(ret, 0);
 	ret = lwm2m_set_u32(&LWM2M_OBJ(4, 0, 8), 0xDEADBEEF);
 	zassert_equal(ret, 0);
-	ret = lwm2m_set_s8(&LWM2M_OBJ(4, 0, 2), -5);
+	ret = lwm2m_set_s16(&LWM2M_OBJ(4, 0, 2), -5);
 	zassert_equal(ret, 0);
 	ret = lwm2m_set_s32(&LWM2M_OBJ(4, 0, 11), 0xCC00CC00);
 	zassert_equal(ret, 0);
 
 	zassert_equal(u16_buf, 0x5A5A);
 	zassert_equal(u32_buf, 0xDEADBEEF);
-	zassert_equal(s8_buf, -5);
+	zassert_equal(s16_buf, -5);
 	zassert_equal(s32_buf, 0xCC00CC00);
 
 	ret = lwm2m_get_u16(&LWM2M_OBJ(4, 0, 9), &u16_getbuf);
 	zassert_equal(ret, 0);
 	ret = lwm2m_get_u32(&LWM2M_OBJ(4, 0, 8), &u32_getbuf);
 	zassert_equal(ret, 0);
-	ret = lwm2m_get_s8(&LWM2M_OBJ(4, 0, 2), &s8_getbuf);
+	ret = lwm2m_get_s16(&LWM2M_OBJ(4, 0, 2), &s16_getbuf);
 	zassert_equal(ret, 0);
 	ret = lwm2m_get_s32(&LWM2M_OBJ(4, 0, 11), &s32_getbuf);
 	zassert_equal(ret, 0);
 
 	zassert_equal(u16_buf, u16_getbuf);
 	zassert_equal(u32_buf, u32_getbuf);
-	zassert_equal(s8_buf, s8_getbuf);
+	zassert_equal(s16_buf, s16_getbuf);
 	zassert_equal(s32_buf, s32_getbuf);
 }
 
@@ -350,4 +350,38 @@ ZTEST(lwm2m_registry, test_strings)
 	/* but because we request as a string, it must have room for terminator. */
 	ret = lwm2m_get_string(&path, buf, len);
 	zassert_equal(ret, -ENOMEM);
+}
+
+ZTEST(lwm2m_registry, test_null_strings)
+{
+	int ret;
+	char buf[256] = {0};
+	struct lwm2m_obj_path path = LWM2M_OBJ(0, 0, 0);
+
+	ret = lwm2m_register_post_write_callback(&path, post_write_cb);
+	zassert_equal(ret, 0);
+
+	callback_checker = 0;
+	ret = lwm2m_set_string(&path, "string");
+	zassert_equal(ret, 0);
+	zassert_equal(callback_checker, 0x02);
+	ret = lwm2m_get_string(&path, buf, sizeof(buf));
+	zassert_equal(ret, 0);
+	zassert_equal(strlen(buf), strlen("string"));
+
+	callback_checker = 0;
+	ret = lwm2m_set_string(&path, "");
+	zassert_equal(ret, 0);
+	zassert_equal(callback_checker, 0x02);
+	ret = lwm2m_get_string(&path, buf, sizeof(buf));
+	zassert_equal(ret, 0);
+	zassert_equal(strlen(buf), 0);
+
+	callback_checker = 0;
+	ret = lwm2m_set_opaque(&path, NULL, 0);
+	zassert_equal(ret, 0);
+	zassert_equal(callback_checker, 0x02);
+	ret = lwm2m_get_string(&path, buf, sizeof(buf));
+	zassert_equal(ret, 0);
+	zassert_equal(strlen(buf), 0);
 }

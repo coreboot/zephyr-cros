@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(net_if, CONFIG_NET_IF_LOG_LEVEL);
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/ethernet.h>
+#include <zephyr/net/offloaded_netdev.h>
 #include <zephyr/net/virtual.h>
 #include <zephyr/sys/iterable_sections.h>
 
@@ -616,7 +617,9 @@ struct net_if *net_if_get_default(void)
 #if defined(CONFIG_NET_DEFAULT_IF_UP)
 	iface = net_if_get_first_up();
 #endif
-
+#if defined(CONFIG_NET_DEFAULT_IF_WIFI)
+	iface = net_if_get_first_wifi();
+#endif
 	return iface ? iface : _net_if_list_start;
 }
 
@@ -1807,7 +1810,9 @@ bool net_if_ipv6_addr_rm(struct net_if *iface, const struct in6_addr *addr)
 {
 	bool ret = false;
 	struct net_if_ipv6 *ipv6;
-	int i;
+	struct in6_addr maddr;
+	int found = -1;
+	unsigned int maddr_count = 0;
 
 	NET_ASSERT(addr);
 
@@ -1818,11 +1823,22 @@ bool net_if_ipv6_addr_rm(struct net_if *iface, const struct in6_addr *addr)
 		goto out;
 	}
 
-	for (i = 0; i < NET_IF_MAX_IPV6_ADDR; i++) {
-		struct in6_addr maddr;
+	net_ipv6_addr_create_solicited_node(addr, &maddr);
+
+	for (int i = 0; i < NET_IF_MAX_IPV6_ADDR; i++) {
+		struct in6_addr unicast_maddr;
 
 		if (!ipv6->unicast[i].is_used) {
 			continue;
+		}
+
+		/* count how many times this solicited-node multicast address is identical
+		 * for all the used unicast addresses
+		 */
+		net_ipv6_addr_create_solicited_node(&ipv6->unicast[i].address.in6_addr,
+						    &unicast_maddr);
+		if (net_ipv6_addr_cmp(&maddr, &unicast_maddr)) {
+			maddr_count++;
 		}
 
 		if (!net_ipv6_addr_cmp(&ipv6->unicast[i].address.in6_addr,
@@ -1830,12 +1846,16 @@ bool net_if_ipv6_addr_rm(struct net_if *iface, const struct in6_addr *addr)
 			continue;
 		}
 
-		if (!ipv6->unicast[i].is_infinite) {
+		found = i;
+	}
+
+	if (found >= 0) {
+		if (!ipv6->unicast[found].is_infinite) {
 			k_mutex_lock(&lock, K_FOREVER);
 
 			sys_slist_find_and_remove(
 				&active_address_lifetime_timers,
-				&ipv6->unicast[i].lifetime.node);
+				&ipv6->unicast[found].lifetime.node);
 
 			if (sys_slist_is_empty(
 				    &active_address_lifetime_timers)) {
@@ -1849,20 +1869,24 @@ bool net_if_ipv6_addr_rm(struct net_if *iface, const struct in6_addr *addr)
 #if defined(CONFIG_NET_IPV6_DAD)
 		if (!net_if_flag_is_set(iface, NET_IF_IPV6_NO_ND)) {
 			k_mutex_lock(&lock, K_FOREVER);
-			sys_slist_find_and_remove(&active_dad_timers, &ipv6->unicast[i].dad_node);
+			sys_slist_find_and_remove(&active_dad_timers,
+						  &ipv6->unicast[found].dad_node);
 			k_mutex_unlock(&lock);
 		}
 #endif
 
-		ipv6->unicast[i].is_used = false;
+		ipv6->unicast[found].is_used = false;
 
-		net_ipv6_addr_create_solicited_node(addr, &maddr);
-
-		net_if_ipv6_maddr_rm(iface, &maddr);
+		if (maddr_count == 1) {
+			/* remove the solicited-node multicast address only if no other
+			 * unicast address is also using it
+			 */
+			net_if_ipv6_maddr_rm(iface, &maddr);
+		}
 
 		NET_DBG("[%d] interface %p address %s type %s removed",
-			i, iface, net_sprint_ipv6_addr(addr),
-			net_addr_type2str(ipv6->unicast[i].addr_type));
+			found, iface, net_sprint_ipv6_addr(addr),
+			net_addr_type2str(ipv6->unicast[found].addr_type));
 
 		/* Using the IPv6 address pointer here can give false
 		 * info if someone adds a new IP address into this position
@@ -1871,7 +1895,7 @@ bool net_if_ipv6_addr_rm(struct net_if *iface, const struct in6_addr *addr)
 		net_mgmt_event_notify_with_info(
 			NET_EVENT_IPV6_ADDR_DEL,
 			iface,
-			&ipv6->unicast[i].address.in6_addr,
+			&ipv6->unicast[found].address.in6_addr,
 			sizeof(struct in6_addr));
 
 		ret = true;
@@ -4593,6 +4617,28 @@ void net_if_add_tx_timestamp(struct net_pkt *pkt)
 	k_fifo_put(&tx_ts_queue, pkt);
 }
 #endif /* CONFIG_NET_PKT_TIMESTAMP_THREAD */
+
+bool net_if_is_wifi(struct net_if *iface)
+{
+	if (is_iface_offloaded(iface)) {
+		return net_off_is_wifi_offloaded(iface);
+	}
+#if defined(CONFIG_NET_L2_ETHERNET)
+	return net_if_l2(iface) == &NET_L2_GET_NAME(ETHERNET) &&
+		net_eth_type_is_wifi(iface);
+#endif
+	return false;
+}
+
+struct net_if *net_if_get_first_wifi(void)
+{
+	STRUCT_SECTION_FOREACH(net_if, iface) {
+		if (net_if_is_wifi(iface)) {
+			return iface;
+		}
+	}
+	return NULL;
+}
 
 void net_if_init(void)
 {
