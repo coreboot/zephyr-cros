@@ -5,8 +5,9 @@
  */
 
 #include <zephyr/kernel.h>
-#include <zephyr/bluetooth/buf.h>
 #include <zephyr/sys/byteorder.h>
+
+#include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/iso.h>
 
 #include "util/util.h"
@@ -49,7 +50,7 @@
 #include "ll.h"
 #include "ll_feat.h"
 
-#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/hci_types.h>
 
 #include "hal/debug.h"
 
@@ -138,7 +139,6 @@ uint8_t ll_cis_parameters_set(uint8_t cis_id,
  */
 uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 {
-	struct ll_conn_iso_stream *cis;
 	struct ll_conn_iso_group *cig;
 	uint32_t iso_interval_us;
 	uint32_t cig_sync_delay;
@@ -167,7 +167,6 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 			/* No space for new CIG */
 			return BT_HCI_ERR_INSUFFICIENT_RESOURCES;
 		}
-		cig->state = CIG_STATE_CONFIGURABLE;
 		cig->lll.num_cis = 0U;
 
 	} else if (cig->state != CIG_STATE_CONFIGURABLE) {
@@ -180,6 +179,8 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 
 	/* Transfer parameters from configuration cache and clear LLL fields */
 	memcpy(cig, &ll_iso_setup.group, sizeof(struct ll_conn_iso_group));
+
+	cig->state = CIG_STATE_CONFIGURABLE;
 
 	/* Setup LLL parameters */
 	cig->lll.handle = ll_conn_iso_group_handle_get(cig);
@@ -226,7 +227,9 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 
 	/* Create all configurable CISes */
 	for (uint8_t i = 0U; i < ll_iso_setup.cis_count; i++) {
+		struct ll_conn_iso_stream *cis;
 		memq_link_t *link_tx_free;
+		memq_link_t link_tx;
 
 		cis = ll_conn_iso_stream_get_by_id(ll_iso_setup.stream[i].cis_id);
 		if (cis) {
@@ -253,8 +256,9 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 			cig->lll.num_cis++;
 		}
 
-		/* Store TX free link before transfer */
+		/* Store TX link and free link before transfer */
 		link_tx_free = cis->lll.link_tx_free;
+		link_tx = cis->lll.link_tx;
 
 		/* Transfer parameters from configuration cache */
 		memcpy(cis, &ll_iso_setup.stream[i], sizeof(struct ll_conn_iso_stream));
@@ -263,6 +267,7 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 		cis->framed = cig->central.framing || force_framed;
 
 		cis->lll.link_tx_free = link_tx_free;
+		cis->lll.link_tx = link_tx;
 		cis->lll.handle = ll_conn_iso_stream_handle_get(cis);
 		handles[i] = cis->lll.handle;
 	}
@@ -285,6 +290,7 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 	 * ISO_Interval      |.................|..     |.................|..
 	 */
 	for (uint8_t i = 0U; i < num_cis; i++) {
+		struct ll_conn_iso_stream *cis;
 		uint32_t mpt_c;
 		uint32_t mpt_p;
 		bool tx;
@@ -367,7 +373,6 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 	if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
 		/* Sequential CISes - add up the total duration */
 		for (uint8_t i = 0U; i < num_cis; i++) {
-			cis = ll_conn_iso_stream_get_by_group(cig, &handle_iter);
 			total_time += se[i].total_count * se[i].length;
 		}
 	}
@@ -386,6 +391,8 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 	 * 4) Calculate CIG_Sync_Delay
 	 */
 	for (uint8_t i = 0U; i < num_cis; i++) {
+		struct ll_conn_iso_stream *cis;
+
 		cis = ll_conn_iso_stream_get_by_group(cig, &handle_iter);
 
 		if (!cig->central.test) {
@@ -451,6 +458,7 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 	 * 2) Lay out CISes by updating CIS_Sync_Delay, distributing according to the packing.
 	 */
 	for (uint8_t i = 0U; i < num_cis; i++) {
+		struct ll_conn_iso_stream *cis;
 		uint32_t c_latency;
 		uint32_t p_latency;
 
@@ -761,11 +769,18 @@ uint8_t ull_central_iso_setup(uint16_t cis_handle,
 
 		/* CIG is started. Use the CIG reference point and latest ticks_at_expire
 		 * for associated ACL, to calculate the offset.
+		 * NOTE: The following calculations are done in a 32-bit time
+		 * range with full consideration and expectation that the
+		 * controller clock does not support the full 32-bit range in
+		 * microseconds. However it is valid as the purpose is to
+		 * calculate the difference and the spare higher order bits will
+		 * ensure that no wrapping can occur before the termination
+		 * condition of the while loop is met. Using time wrapping will
+		 * complicate this.
 		 */
-		time_of_intant = isoal_get_wrapped_time_us(
-			HAL_TICKER_TICKS_TO_US(conn->llcp.prep.ticks_at_expire),
-			EVENT_OVERHEAD_START_US +
-			(instant - event_counter) * conn->lll.interval * CONN_INT_UNIT_US);
+		time_of_intant = HAL_TICKER_TICKS_TO_US(conn->llcp.prep.ticks_at_expire) +
+				EVENT_OVERHEAD_START_US +
+				((instant - event_counter) * conn->lll.interval * CONN_INT_UNIT_US);
 
 		cig_ref_point = cig->cig_ref_point;
 		while (cig_ref_point < time_of_intant) {
@@ -846,8 +861,7 @@ int ull_central_iso_cis_offset_get(uint16_t cis_handle,
 			  cig->sync_delay;
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_JIT_SCHEDULING)) {
-		*cis_offset_min = MAX(400, EVENT_OVERHEAD_CIS_SETUP_US);
-
+		*cis_offset_min = MAX(CIS_MIN_OFFSET_MIN, EVENT_OVERHEAD_CIS_SETUP_US);
 		return 0;
 	}
 
@@ -900,13 +914,13 @@ static void mfy_cig_offset_get(void *param)
 	LL_ASSERT(!err);
 
 	offset_min_us = HAL_TICKER_TICKS_TO_US(ticks_to_expire) +
-			(EVENT_TICKER_RES_MARGIN_US << 1U);
+			(EVENT_TICKER_RES_MARGIN_US << 2U);
 	offset_min_us += cig->sync_delay - cis->sync_delay;
 
 	conn = ll_conn_get(cis->lll.acl_handle);
 
 	conn_interval_us = (uint32_t)conn->lll.interval * CONN_INT_UNIT_US;
-	while (offset_min_us > conn_interval_us) {
+	while (offset_min_us >= (conn_interval_us + PDU_CIS_OFFSET_MIN_US)) {
 		offset_min_us -= conn_interval_us;
 	}
 
@@ -1037,7 +1051,7 @@ static void mfy_cis_offset_get(void *param)
 
 	/* Compensate for the difference between ACL elapsed vs CIG elapsed */
 	offset_min_us += elapsed_cig_us - elapsed_acl_us;
-	while (offset_min_us > (cig_interval_us + PDU_CIS_OFFSET_MIN_US)) {
+	while (offset_min_us >= (cig_interval_us + PDU_CIS_OFFSET_MIN_US)) {
 		offset_min_us -= cig_interval_us;
 	}
 

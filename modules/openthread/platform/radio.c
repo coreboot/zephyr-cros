@@ -154,8 +154,7 @@ void energy_detected(const struct device *dev, int16_t max_ed)
 	}
 }
 
-enum net_verdict ieee802154_radio_handle_ack(struct net_if *iface,
-					     struct net_pkt *pkt)
+enum net_verdict ieee802154_handle_ack(struct net_if *iface, struct net_pkt *pkt)
 {
 	ARG_UNUSED(iface);
 
@@ -181,7 +180,7 @@ enum net_verdict ieee802154_radio_handle_ack(struct net_if *iface,
 	ack_frame.mPsdu = ack_psdu;
 	ack_frame.mLength = ack_len;
 	ack_frame.mInfo.mRxInfo.mLqi = net_pkt_ieee802154_lqi(pkt);
-	ack_frame.mInfo.mRxInfo.mRssi = net_pkt_ieee802154_rssi(pkt);
+	ack_frame.mInfo.mRxInfo.mRssi = net_pkt_ieee802154_rssi_dbm(pkt);
 
 #if defined(CONFIG_NET_PKT_TIMESTAMP)
 	struct net_ptp_time *pkt_time = net_pkt_timestamp(pkt);
@@ -390,7 +389,7 @@ static void openthread_handle_received_frame(otInstance *instance,
 	recv_frame.mLength = net_buf_frags_len(pkt->buffer);
 	recv_frame.mChannel = platformRadioChannelGet(instance);
 	recv_frame.mInfo.mRxInfo.mLqi = net_pkt_ieee802154_lqi(pkt);
-	recv_frame.mInfo.mRxInfo.mRssi = net_pkt_ieee802154_rssi(pkt);
+	recv_frame.mInfo.mRxInfo.mRssi = net_pkt_ieee802154_rssi_dbm(pkt);
 	recv_frame.mInfo.mRxInfo.mAckedWithFramePending = net_pkt_ieee802154_ack_fpb(pkt);
 
 #if defined(CONFIG_NET_PKT_TIMESTAMP)
@@ -843,7 +842,7 @@ void otPlatRadioSetPromiscuous(otInstance *aInstance, bool aEnable)
 	promiscuous = aEnable;
 	/* TODO: Should check whether the radio driver actually supports
 	 *       promiscuous mode, see net_if_l2(iface)->get_flags() and
-	 *       ieee802154_get_hw_capabilities(iface).
+	 *       ieee802154_radio_get_hw_capabilities(iface).
 	 */
 	radio_api->configure(radio_dev, IEEE802154_CONFIG_PROMISCUOUS, &config);
 }

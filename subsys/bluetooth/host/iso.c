@@ -124,7 +124,7 @@ void hci_iso(struct net_buf *buf)
 		return;
 	}
 
-	iso = bt_conn_lookup_handle(iso(buf)->handle);
+	iso = bt_conn_lookup_handle(iso(buf)->handle, BT_CONN_TYPE_ISO);
 	if (iso == NULL) {
 		LOG_ERR("Unable to find conn for handle %u", iso(buf)->handle);
 		net_buf_unref(buf);
@@ -979,10 +979,10 @@ void hci_le_cis_established(struct net_buf *buf)
 	uint16_t handle = sys_le16_to_cpu(evt->conn_handle);
 	struct bt_conn *iso;
 
-	LOG_DBG("status %u handle %u", evt->status, handle);
+	LOG_DBG("status 0x%02x handle %u", evt->status, handle);
 
 	/* ISO connection handles are already assigned at this point */
-	iso = bt_conn_lookup_handle(handle);
+	iso = bt_conn_lookup_handle(handle, BT_CONN_TYPE_ISO);
 	if (!iso) {
 		LOG_ERR("No connection found for handle %u", handle);
 		return;
@@ -1229,7 +1229,7 @@ void hci_le_cis_req(struct net_buf *buf)
 	}
 
 	/* Lookup existing connection with same handle */
-	iso = bt_conn_lookup_handle(cis_handle);
+	iso = bt_conn_lookup_handle(cis_handle, BT_CONN_TYPE_ISO);
 	if (iso) {
 		LOG_ERR("Invalid ISO handle %u", cis_handle);
 		hci_le_reject_cis(cis_handle, BT_HCI_ERR_CONN_LIMIT_EXCEEDED);
@@ -1238,7 +1238,7 @@ void hci_le_cis_req(struct net_buf *buf)
 	}
 
 	/* Lookup ACL connection to attach */
-	acl = bt_conn_lookup_handle(acl_handle);
+	acl = bt_conn_lookup_handle(acl_handle, BT_CONN_TYPE_LE);
 	if (!acl) {
 		LOG_ERR("Invalid ACL handle %u", acl_handle);
 		hci_le_reject_cis(cis_handle, BT_HCI_ERR_UNKNOWN_CONN_ID);
@@ -2473,7 +2473,7 @@ void hci_le_big_complete(struct net_buf *buf)
 	big = lookup_big_by_handle(evt->big_handle);
 	atomic_clear_bit(big->flags, BT_BIG_PENDING);
 
-	LOG_DBG("BIG[%u] %p completed, status %u", big->handle, big, evt->status);
+	LOG_DBG("BIG[%u] %p completed, status 0x%02x", big->handle, big, evt->status);
 
 	if (evt->status || evt->num_bis != big->num_bis) {
 		if (evt->status == BT_HCI_ERR_SUCCESS && evt->num_bis != big->num_bis) {
@@ -2647,7 +2647,7 @@ void hci_le_big_sync_established(struct net_buf *buf)
 	big = lookup_big_by_handle(evt->big_handle);
 	atomic_clear_bit(big->flags, BT_BIG_SYNCING);
 
-	LOG_DBG("BIG[%u] %p sync established, status %u", big->handle, big, evt->status);
+	LOG_DBG("BIG[%u] %p sync established, status 0x%02x", big->handle, big, evt->status);
 
 	if (evt->status || evt->num_bis != big->num_bis) {
 		if (evt->status == BT_HCI_ERR_SUCCESS && evt->num_bis != big->num_bis) {

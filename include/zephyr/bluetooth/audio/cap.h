@@ -78,10 +78,12 @@ struct bt_cap_initiator_cb {
 	 *
 	 * @param unicast_group  The unicast group pointer supplied to
 	 *                       bt_cap_initiator_unicast_audio_start().
-	 * @param err            0 if success, else BT_GATT_ERR() with a
-	 *                       specific ATT (BT_ATT_ERR_*) error code.
+	 * @param err            0 if success, BT_GATT_ERR() with a
+	 *                       specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
+	 *                       by bt_cap_initiator_unicast_audio_cancel().
 	 * @param conn           Pointer to the connection where the error
-	 *                       occurred. NULL if @p err is 0.
+	 *                       occurred. NULL if @p err is 0 or if cancelled by
+	 *                       bt_cap_initiator_unicast_audio_cancel()
 	 */
 	void (*unicast_start_complete)(struct bt_bap_unicast_group *unicast_group,
 				       int err, struct bt_conn *conn);
@@ -89,10 +91,12 @@ struct bt_cap_initiator_cb {
 	/**
 	 * @brief Callback for bt_cap_initiator_unicast_audio_update().
 	 *
-	 * @param err            0 if success, else BT_GATT_ERR() with a
-	 *                       specific ATT (BT_ATT_ERR_*) error code.
+	 * @param err            0 if success, BT_GATT_ERR() with a
+	 *                       specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
+	 *                       by bt_cap_initiator_unicast_audio_cancel().
 	 * @param conn           Pointer to the connection where the error
-	 *                       occurred. NULL if @p err is 0.
+	 *                       occurred. NULL if @p err is 0 or if cancelled by
+	 *                       bt_cap_initiator_unicast_audio_cancel()
 	 */
 	void (*unicast_update_complete)(int err, struct bt_conn *conn);
 
@@ -107,10 +111,12 @@ struct bt_cap_initiator_cb {
 	 *
 	 * @param unicast_group  The unicast group pointer supplied to
 	 *                       bt_cap_initiator_unicast_audio_stop().
-	 * @param err            0 if success, else BT_GATT_ERR() with a
-	 *                       specific ATT (BT_ATT_ERR_*) error code.
+	 * @param err            0 if success, BT_GATT_ERR() with a
+	 *                       specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
+	 *                       by bt_cap_initiator_unicast_audio_cancel().
 	 * @param conn           Pointer to the connection where the error
-	 *                       occurred. NULL if @p err is 0.
+	 *                       occurred. NULL if @p err is 0 or if cancelled by
+	 *                       bt_cap_initiator_unicast_audio_cancel()
 	 */
 	void (*unicast_stop_complete)(struct bt_bap_unicast_group *unicast_group,
 				      int err, struct bt_conn *conn);
@@ -173,14 +179,14 @@ struct bt_cap_unicast_audio_start_stream_param {
 	/**
 	 * @brief Codec configuration.
 	 *
-	 * The @p codec.meta shall include a list of CCIDs
+	 * The @p codec_cfg.meta shall include a list of CCIDs
 	 * (@ref BT_AUDIO_METADATA_TYPE_CCID_LIST) as well as a non-0
 	 * stream context (@ref BT_AUDIO_METADATA_TYPE_STREAM_CONTEXT) bitfield.
 	 */
-	struct bt_codec *codec;
+	struct bt_audio_codec_cfg *codec_cfg;
 
 	/** Quality of Service configuration. */
-	struct bt_codec_qos *qos;
+	struct bt_audio_codec_qos *qos;
 };
 
 struct bt_cap_unicast_audio_start_param {
@@ -206,7 +212,7 @@ struct bt_cap_unicast_audio_update_param {
 	 * The metadata shall a list of CCIDs as
 	 * well as a non-0 context bitfield.
 	 */
-	struct bt_codec_data *meta;
+	struct bt_audio_codec_data *meta;
 };
 
 /**
@@ -269,6 +275,30 @@ int bt_cap_initiator_unicast_audio_update(const struct bt_cap_unicast_audio_upda
  */
 int bt_cap_initiator_unicast_audio_stop(struct bt_bap_unicast_group *unicast_group);
 
+/** @brief Cancel any current Common Audio Profile procedure
+ *
+ * This will stop the current procedure from continuing and making it possible to run a new
+ * Common Audio Profile procedure.
+ *
+ * It is recommended to do this if any existing procedure take longer time than expected, which
+ * could indicate a missing response from the Common Audio Profile Acceptor.
+ *
+ * This does not send any requests to any Common Audio Profile Acceptors involved with the current
+ * procedure, and thus notifications from the Common Audio Profile Acceptors may arrive after this
+ * has been called. It is thus recommended to either only use this if a procedure has stalled, or
+ * wait a short while before starting any new Common Audio Profile procedure after this has been
+ * called to avoid getting notifications from the cancelled procedure. The wait time depends on
+ * the connection interval, the number of devices in the previous procedure and the behavior of the
+ * Common Audio Profile Acceptors.
+ *
+ * The respective callbacks of the procedure will be called as part of this with the connection
+ * pointer set to 0 and the err value set to -ECANCELED.
+ *
+ * @retval 0 on success
+ * @retval -EALREADY if no procedure is active
+ */
+int bt_cap_initiator_unicast_audio_cancel(void);
+
 struct bt_cap_initiator_broadcast_stream_param {
 	/** Audio stream */
 	struct bt_cap_stream *stream;
@@ -280,7 +310,7 @@ struct bt_cap_initiator_broadcast_stream_param {
 	size_t data_count;
 
 	/** BIS Codec Specific Configuration */
-	struct bt_codec_data *data;
+	struct bt_audio_codec_data *data;
 };
 
 struct bt_cap_initiator_broadcast_subgroup_param {
@@ -291,7 +321,7 @@ struct bt_cap_initiator_broadcast_subgroup_param {
 	struct bt_cap_initiator_broadcast_stream_param *stream_params;
 
 	/** Subgroup Codec configuration. */
-	struct bt_codec *codec;
+	struct bt_audio_codec_cfg *codec_cfg;
 };
 
 struct bt_cap_initiator_broadcast_create_param {
@@ -302,7 +332,7 @@ struct bt_cap_initiator_broadcast_create_param {
 	struct bt_cap_initiator_broadcast_subgroup_param *subgroup_params;
 
 	/** Quality of Service configuration. */
-	struct bt_codec_qos *qos;
+	struct bt_audio_codec_qos *qos;
 
 	/** @brief Broadcast Source packing mode.
 	 *
@@ -385,7 +415,7 @@ int bt_cap_initiator_broadcast_audio_start(struct bt_cap_broadcast_source *broad
  * @return 0 on success or negative error value on failure.
  */
 int bt_cap_initiator_broadcast_audio_update(struct bt_cap_broadcast_source *broadcast_source,
-					    const struct bt_codec_data meta[],
+					    const struct bt_audio_codec_data meta[],
 					    size_t meta_count);
 
 /**
