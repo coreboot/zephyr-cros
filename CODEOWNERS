@@ -236,6 +236,7 @@
 /drivers/adc/adc_ads1x1x.c                @XenuIsWatching
 /drivers/adc/adc_stm32.c                  @cybertale
 /drivers/audio/*nrfx*                     @anangl
+/drivers/auxdisplay/*pt6314*              @xingrz
 /drivers/auxdisplay/*                      @thedjnK
 /drivers/bbram/*                          @yperess @sjg20 @jackrosenthal
 /drivers/bluetooth/                       @alwa-nordic @jhedberg @Vudentz
@@ -445,7 +446,7 @@
 /drivers/timer/*riscv_machine*            @kgugala @pgielda
 /drivers/timer/*ite_it8xxx2*              @ite
 /drivers/timer/*xlnx_psttc*               @wjliang @stephanosio
-/drivers/timer/*cc13x2_cc26x2_rtc*        @vanti
+/drivers/timer/*cc13xx_cc26xx_rtc*        @vanti
 /drivers/timer/*cavs*                     @dcpleung
 /drivers/timer/*stm32_lptim*              @FRASTM
 /drivers/timer/*leon_gptimer*             @julius-barendt
@@ -571,6 +572,7 @@
 /dts/bindings/i3c/                        @dcpleung
 /dts/bindings/pm_cpu_ops/*                @carlocaione
 /dts/bindings/ethernet/*gem.yaml          @ibirnbaum
+/dts/bindings/auxdisplay/*pt6314.yaml     @xingrz
 /dts/bindings/auxdisplay/*                 @thedjnK
 /dts/posix/                               @aescolar @daor-oti
 /dts/bindings/sensor/*bme680*             @BoschSensortec
@@ -755,6 +757,7 @@
 /scripts/footprint/                       @nashif
 /scripts/kconfig/                         @ulfalizer
 /scripts/logging/dictionary/              @dcpleung
+/scripts/native_simulator/                @aescolar
 /scripts/pylib/twister/expr_parser.py     @nashif
 /scripts/schemas/twister/                 @nashif
 /scripts/build/gen_app_partitions.py            @dcpleung @nashif
