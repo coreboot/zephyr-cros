@@ -938,7 +938,6 @@ Release Notes:
   status: odd fixes
   collaborators:
     - henrikbrixandersen
-    - cfriedt
     - mnkp
   files:
     - doc/hardware/peripherals/gpio.rst
@@ -1610,6 +1609,7 @@ Kernel:
     - ceolin
     - dcpleung
     - peter-mitsis
+    - cfriedt
   files:
     - doc/kernel/
     - include/zephyr/kernel*.h
@@ -1794,7 +1794,7 @@ Native POSIX/Sim and POSIX arch:
     - drivers/*/*/*native*
     - dts/posix/
     - include/zephyr/arch/posix/
-    - scripts/native_simulator/*
+    - scripts/native_simulator/
     - scripts/valgrind.supp
     - soc/posix/
     - tests/boards/native_posix/

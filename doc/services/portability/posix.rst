@@ -376,16 +376,17 @@ required for error and event handling.
     pause(),
     raise(),
     sigaction(),
-    igaddset(),
-    sigdelset(),
-    sigemptyset(),
-    sigfillset(),
-    igismember(),
+    sigaddset(),yes
+    sigdelset(),yes
+    sigemptyset(),yes
+    sigfillset(),yes
+    sigismember(),yes
     signal(),
     sigpending(),
     sigprocmask(),
     igsuspend(),
-    sigwait()
+    sigwait(),
+    strsignal(),yes
 
 .. csv-table:: POSIX_SPIN_LOCKS
    :header: API, Supported
