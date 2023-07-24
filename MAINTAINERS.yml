@@ -620,8 +620,8 @@ Documentation Infrastructure:
 Release Notes:
   status: maintained
   maintainers:
-    - nashif
-    - jgl-meta
+    - jhedberg
+    - fabiobaltieri
   files:
     - doc/releases/release-notes-*
   labels:
@@ -1594,6 +1594,7 @@ Kconfig:
   files:
     - scripts/kconfig/
     - doc/build/kconfig/
+    - Kconfig.zephyr
   labels:
     - "area: Kconfig"
   description: >-
@@ -2910,10 +2911,12 @@ West:
   collaborators:
     - mmahadevan108
     - danieldegrasse
+    - manuargue
   files:
     - modules/hal_nxp/
     - modules/Kconfig.imx
     - modules/Kconfig.mcux
+    - modules/Kconfig.s32
   labels:
     - manifest-hal_nxp
 

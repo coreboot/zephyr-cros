@@ -178,7 +178,7 @@ manifest:
       groups:
         - hal
     - name: hal_nuvoton
-      revision: 8a2b5de1670b59fcacd20d7495cb1c0f26fbe7bd
+      revision: 3e0a4c4d3328b2f72b164219add19d5308b53cb5
       path: modules/hal/nuvoton
       groups:
         - hal
@@ -287,7 +287,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: 33b999d50093da88cf935383da2bdac70ffd9456
+      revision: 7a5b67d9ee66d84e4ef5cb1f56c8f0f3252d5aa2
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: c904a01d4a882bcbb39987e0e2ce5308f49ac7ad

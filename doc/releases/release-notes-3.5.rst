@@ -160,6 +160,10 @@ Drivers and Sensors
 
 * Flash
 
+  * Introduce npcx flash driver that supports two or more spi nor flashes via a
+    single Flash Interface Unit (FIU) module and Direct Read Access (DRA) mode
+    for better performance.
+
 * FPGA
 
 * Fuel Gauge
@@ -212,6 +216,8 @@ Drivers and Sensors
 
 * SPI
 
+  * Remove npcx spi driver implemented by Flash Interface Unit (FIU) module.
+
 * Timer
 
   * The TI CC13xx/26xx system clock timer compatible was changed from
@@ -248,6 +254,11 @@ Libraries / Subsystems
 
   * Added response checking to MCUmgr's :c:enumerator:`MGMT_EVT_OP_CMD_RECV`
     notification callback to allow applications to reject MCUmgr commands.
+
+  * MCUmgr SMP version 2 error translation (to legacy MCUmgr error code) is now
+    supported in function handlers by setting ``mg_translate_error`` of
+    :c:struct:`mgmt_group` when registering a transport. See
+    :c:type:`smp_translate_error_fn` for function details.
 
 HALs
 ****

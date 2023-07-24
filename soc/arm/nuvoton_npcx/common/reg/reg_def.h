@@ -254,6 +254,7 @@ static inline uint32_t npcx_lv_gpio_ctl_offset(uint32_t ctl_no)
 }
 
 /* Macro functions for SCFG multi-registers */
+#define NPCX_DEV_CTL(base, n) (*(volatile uint8_t *)(base + n))
 #define NPCX_DEVALT(base, n) (*(volatile uint8_t *)(base + \
 						npcx_devalt_offset(n)))
 #define NPCX_DEVALT_LK(base, n) (*(volatile uint8_t *)(base + \
@@ -1515,11 +1516,23 @@ struct fiu_reg {
 	volatile uint8_t FIU_DMM_CYC;
 	/* 0x033: FIU Extended Configuration */
 	volatile uint8_t FIU_EXT_CFG;
+#if defined(CONFIG_SOC_SERIES_NPCX9)
+	/* 0x034: UMA address byte 0-3 */
+	volatile uint32_t UMA_AB0_3;
+	/* 0x038-0x3C */
+	volatile uint8_t reserved8[5];
+	/* 0x03D: SPI Device */
+	volatile uint8_t SPI1_DEV;
+	/* 0x03E-0x3F */
+	volatile uint8_t reserved9[2];
+#endif
 };
 
 /* FIU register fields */
 #define NPCX_RESP_CFG_IAD_EN             0
 #define NPCX_RESP_CFG_DEV_SIZE_EX        2
+#define NPCX_RESP_CFG_QUAD_EN            3
+#define NPCX_SPI_FL_CFG_RD_MODE          FIELD(6, 2)
 #define NPCX_UMA_CTS_A_SIZE              3
 #define NPCX_UMA_CTS_C_SIZE              4
 #define NPCX_UMA_CTS_RD_WR               5
@@ -1529,6 +1542,12 @@ struct fiu_reg {
 #define NPCX_UMA_ECTS_SW_CS1             1
 #define NPCX_UMA_ECTS_SEC_CS             2
 #define NPCX_UMA_ECTS_UMA_LOCK           3
+#define NPCX_SPI1_DEV_FOUR_BADDR_CS10    6
+#define NPCX_SPI1_DEV_FOUR_BADDR_CS11    7
+#define NPCX_SPI1_DEV_SPI1_LO_DEV_SIZE   FIELD(0, 4)
+#define NPCX_FIU_EXT_CFG_SPI1_2DEV       7
+#define NPCX_FIU_EXT_CFG_SET_DMM_EN      2
+#define NPCX_FIU_EXT_CFG_SET_CMD_EN      1
 
 /* UMA fields selections */
 #define UMA_FLD_ADDR     BIT(NPCX_UMA_CTS_A_SIZE)  /* 3-bytes ADR field */
