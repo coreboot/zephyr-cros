@@ -1,8 +1,6 @@
 # Texas Instruments Keystone 3 (K3) Family
 #
-# Copyright (c) 2023 Texas Instruments Incorporated
-# Copyright (c) 2023 L Lakshmanan
-#
+# Copyright (c) 2023 Enphase Energy
 # SPDX-License-Identifier: Apache-2.0
 
 config SOC_FAMILY_TI_K3
@@ -14,6 +12,6 @@ config SOC_FAMILY
 	string
 	default "ti_k3"
 
-source "soc/arm/ti_k3/*/Kconfig.soc"
+source "soc/arm64/ti_k3/*/Kconfig.soc"
 
 endif # SOC_FAMILY_TI_K3

@@ -638,8 +638,7 @@ static bt_conn_tx_cb_t att_cb(const struct net_buf *buf)
 	return att_unknown;
 }
 
-struct net_buf *bt_att_chan_create_pdu(struct bt_att_chan *chan, uint8_t op,
-				       size_t len)
+static struct net_buf *bt_att_chan_create_pdu(struct bt_att_chan *chan, uint8_t op, size_t len)
 {
 	struct bt_att_hdr *hdr;
 	struct net_buf *buf;
@@ -3946,11 +3945,6 @@ bool bt_att_tx_meta_data_match(const struct net_buf *buf, bt_gatt_complete_func_
 	return ((bt_att_tx_meta_data(buf)->func == func) &&
 		(bt_att_tx_meta_data(buf)->user_data == user_data) &&
 		(bt_att_tx_meta_data(buf)->chan_opt == chan_opt));
-}
-
-void bt_att_free_tx_meta_data(const struct net_buf *buf)
-{
-	tx_meta_data_free(bt_att_tx_meta_data(buf));
 }
 
 bool bt_att_chan_opt_valid(struct bt_conn *conn, enum bt_att_chan_opt chan_opt)
