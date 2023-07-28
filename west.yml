@@ -147,7 +147,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: 9531c1c17873aa4935f85864ebafd20c02062a8f
+      revision: ae1bd648a1ac701672c46b6ff4eadfa716937ce3
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -173,7 +173,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 20ae0a7be9030dd58fb59db1c74315a60efb076f
+      revision: cf6e9fc5f7c2c98df26f2a4227a95df9a50823e7
       path: modules/hal/nordic
       groups:
         - hal
@@ -183,7 +183,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: e0116b8eae46c2d90f2c1b23baef73bb082d00bd
+      revision: 35b0e5afc4f061cedc5a0411e024dad6d9e8101f
       path: modules/hal/nxp
       groups:
         - hal
@@ -209,7 +209,7 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: a143f03e846eb1b7b3135f3c8192820ce1b6d9c4
+      revision: 5fbe78d3676b5500585f8e4534a8e56e7dae74a8
       path: modules/hal/silabs
       groups:
         - hal
@@ -271,7 +271,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 6a8746d7acd75ff81fb6888d7776f412663f7897
+      revision: 76d19b3b8885ea7ae25a6f4f5d8501f7ec646447
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -287,10 +287,10 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: 7a5b67d9ee66d84e4ef5cb1f56c8f0f3252d5aa2
+      revision: cee41373eb0bb720a370586de1ee5eb693e62c95
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
-      revision: c904a01d4a882bcbb39987e0e2ce5308f49ac7ad
+      revision: 42b7c577714b8f22ce82a901e19c1814af4609a8
       path: modules/lib/open-amp
     - name: openthread
       revision: f7690fe7e9d638341921808cba6a3e695ec0131e

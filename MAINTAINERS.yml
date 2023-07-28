@@ -1073,6 +1073,8 @@ Release Notes:
   maintainers:
     - Mani-Sadhasivam
     - simonguinot
+  collaborators:
+    - bbilas
   files:
     - drivers/led/
     - include/zephyr/drivers/led/
@@ -1234,6 +1236,9 @@ Release Notes:
   status: maintained
   maintainers:
     - carlocaione
+  collaborators:
+    - gdengi
+    - nbalabak
   files:
     - drivers/pm_cpu_ops/
     - include/zephyr/drivers/pm_cpu_ops/
@@ -2072,8 +2077,6 @@ Twister:
 
 Settings:
   status: odd fixes
-  collaborators:
-    - de-nordic
   files:
     - include/zephyr/settings/
     - subsys/settings/
@@ -2151,7 +2154,6 @@ GD32 Platforms:
     - boards/arm/gd32*/
     - boards/riscv/gd32*/
     - boards/riscv/longan_nano/
-    - drivers/*/*gd32*/
     - drivers/*/*gd32*
     - dts/*/gigadevice/
     - dts/bindings/*/*gd32*
@@ -2288,6 +2290,22 @@ Intel Platforms (Xtensa):
     - dts/bindings/*/intel,adsp*
   labels:
     - "platform: Intel ADSP"
+
+Intel Platforms (Agilex):
+  status: maintained
+  maintainers:
+    - gdengi
+  collaborators:
+    - nbalabak
+    - chongteikheng
+  files:
+    - boards/arm64/intel_*/
+    - soc/arm64/intel_*/
+    - dts/arm64/intel/
+    - samples/boards/intel_adsp/
+    - dts/bindings/*/intel,agilex*
+  labels:
+    - "platform: Intel SoC FPGA Agilex"
 
 NXP Platforms:
   status: maintained
@@ -2460,9 +2478,9 @@ Espressif Platforms:
   files:
     - drivers/*/*esp32*.c
     - boards/xtensa/esp32*/
-    - soc/xtensa/esp32*/
+    - soc/xtensa/espressif_esp32*/
     - boards/riscv/esp32*/
-    - soc/riscv/esp32*/
+    - soc/riscv/espressif_esp32*/
     - dts/xtensa/espressif/
     - dts/riscv/espressif/
     - dts/bindings/*/*esp32*
@@ -2505,10 +2523,10 @@ TI SimpleLink Platforms:
     - boards/arm/cc26*/
     - boards/arm/cc32*/
     - boards/*/msp*/
-    - drivers/*/*cc13*/
-    - drivers/*/*cc25*/
-    - drivers/*/*cc26*/
-    - drivers/*/*cc32*/
+    - drivers/*/*cc13*
+    - drivers/*/*cc25*
+    - drivers/*/*cc26*
+    - drivers/*/*cc32*
     - dts/arm/ti/
     - dts/bindings/*/ti,*
     - soc/arm/ti*/
@@ -2525,8 +2543,7 @@ TI K3 Platforms:
   files:
     - boards/*/*phycore_am6*/
     - boards/*/*ti_am6*/
-    - drivers/*/*ti_k3*/
-    - dts/*/ti/*ti_am6*/
+    - drivers/*/*ti_k3*
     - dts/bindings/*/ti,k3*
     - soc/*/ti_k3/
   labels:
@@ -2557,8 +2574,6 @@ Infineon Platforms:
     - boards/arm/cy8ckit_*/
     - boards/arm/cy8cproto_*/
     - boards/arm/xmc*_relax*/
-    - drivers/*/*ifx_cat1*/
-    - drivers/*/*ifx_cat1*.c
     - drivers/*/*ifx_cat1*
     - drivers/*/*xmc*/
     - drivers/*/*xmc*.c

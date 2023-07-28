@@ -25,6 +25,8 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/mbox.h>
 
+#include <stdlib.h>
+
 #define TEST_CHILDREN	DT_PATH(test, test_children)
 #define TEST_DEADBEEF	DT_PATH(test, gpio_deadbeef)
 #define TEST_ABCD1234	DT_PATH(test, gpio_abcd1234)
@@ -2440,6 +2442,28 @@ ZTEST(devicetree_api, test_dep_ord)
 	}
 }
 
+ZTEST(devicetree_api, test_dep_ord_str_sortable)
+{
+	const char *root_ord = STRINGIFY(DT_DEP_ORD_STR_SORTABLE(DT_ROOT));
+
+	/* Root ordinal is always 0 */
+	zassert_mem_equal(root_ord, "00000", 6);
+
+	/* Test string sortable versions equal decimal values.
+	 * We go through the STRINGIFY()->atoi conversion cycle to avoid
+	 * the C compiler treating the number as octal due to leading zeros.
+	 * atoi() simply ignores them.
+	 */
+	zassert_equal(atoi(STRINGIFY(DT_DEP_ORD_STR_SORTABLE(DT_ROOT))),
+		      DT_DEP_ORD(DT_ROOT), "Invalid sortable string");
+	zassert_equal(atoi(STRINGIFY(DT_DEP_ORD_STR_SORTABLE(TEST_DEADBEEF))),
+		      DT_DEP_ORD(TEST_DEADBEEF), "Invalid sortable string");
+	zassert_equal(atoi(STRINGIFY(DT_DEP_ORD_STR_SORTABLE(TEST_TEMP))),
+		      DT_DEP_ORD(TEST_TEMP), "Invalid sortable string");
+	zassert_equal(atoi(STRINGIFY(DT_DEP_ORD_STR_SORTABLE(TEST_REG))),
+		      DT_DEP_ORD(TEST_REG), "Invalid sortable string");
+}
+
 ZTEST(devicetree_api, test_path)
 {
 	zassert_true(!strcmp(DT_NODE_PATH(DT_ROOT), "/"), "");
@@ -2665,6 +2689,70 @@ ZTEST(devicetree_api, test_mbox)
 
 	zassert_true(DT_SAME_NODE(DT_MBOX_CTLR_BY_NAME(TEST_TEMP, zero),
 				  DT_NODELABEL(test_mbox_zero_cell)), "");
+}
+
+ZTEST(devicetree_api, test_memory_attr)
+{
+	#define REGION_RAM_ATTR		(0xDEDE)
+	#define REGION_RAM_NOCACHE_ATTR	(0xCACA)
+
+	#define TEST_FUNC(p_name, p_base, p_size, p_attr)	\
+		{ .name = (p_name),				\
+		  .base = (p_base),				\
+		  .size = (p_size),				\
+		  .attr = (p_attr),				\
+		}
+
+	struct vnd_memory_binding {
+		char *name;
+		uintptr_t base;
+		size_t size;
+		unsigned int attr;
+	};
+
+	struct vnd_memory_binding val_apply[] = {
+		DT_MEMORY_ATTR_APPLY(TEST_FUNC)
+	};
+
+	zassert_true(!strcmp(val_apply[0].name, "memory@aabbccdd"), "");
+	zassert_equal(val_apply[0].base, 0xaabbccdd, "");
+	zassert_equal(val_apply[0].size, 0x4000, "");
+	zassert_equal(val_apply[0].attr, 0xDEDE, "");
+
+	zassert_true(!strcmp(val_apply[1].name, "memory@44332211"), "");
+	zassert_equal(val_apply[1].base, 0x44332211, "");
+	zassert_equal(val_apply[1].size, 0x2000, "");
+	zassert_equal(val_apply[1].attr, 0xCACA, "");
+
+	#undef TEST_FUNC
+	#undef REGION_RAM_ATTR
+	#undef REGION_RAM_NOCACHE_ATTR
+
+	#define TEST_FUNC(node_id) DT_NODE_FULL_NAME(node_id),
+
+	static const char * const val_func[] = {
+		DT_MEMORY_ATTR_FOREACH_NODE(TEST_FUNC)
+	};
+
+	zassert_true(!strcmp(val_func[0], "memory@aabbccdd"), "");
+	zassert_true(!strcmp(val_func[1], "memory@44332211"), "");
+
+	#undef TEST_FUNC
+
+	#define TEST_FUNC(node_id) \
+		COND_CODE_1(DT_ENUM_HAS_VALUE(node_id,			\
+					      zephyr_memory_attr,	\
+					      RAM_NOCACHE),		\
+			    (DT_REG_ADDR(node_id)),			\
+			    ())
+
+	uintptr_t val_filt[] = {
+		DT_MEMORY_ATTR_FOREACH_NODE(TEST_FUNC)
+	};
+
+	zassert_equal(val_filt[0], 0x44332211, "");
+
+	#undef TEST_FUNC
 }
 
 ZTEST(devicetree_api, test_string_token)

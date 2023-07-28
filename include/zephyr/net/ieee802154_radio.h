@@ -115,7 +115,16 @@ enum ieee802154_hw_caps {
 	IEEE802154_HW_SUB_GHZ = BIT(13),       /* Sub-GHz radio supported
 						* TODO: Replace with channel page attribute.
 						*/
+	/* Note: Update also IEEE802154_HW_CAPS_BITS_COMMON_COUNT when changing
+	 * the ieee802154_hw_caps type.
+	 */
 };
+
+/** @brief Number of bits used by ieee802154_hw_caps type. */
+#define IEEE802154_HW_CAPS_BITS_COMMON_COUNT (14)
+
+/** @brief This and higher values are specific to the protocol- or driver-specific extensions. */
+#define IEEE802154_HW_CAPS_BITS_PRIV_START IEEE802154_HW_CAPS_BITS_COMMON_COUNT
 
 enum ieee802154_filter_type {
 	IEEE802154_FILTER_TYPE_IEEE_ADDR,
@@ -188,6 +197,12 @@ enum ieee802154_tx_mode {
 	 * Requires IEEE802154_HW_TXTIME capability.
 	 */
 	IEEE802154_TX_MODE_TXTIME_CCA,
+
+	/** Number of modes defined in ieee802154_tx_mode. */
+	IEEE802154_TX_MODE_COMMON_COUNT,
+
+	/** This and higher values are specific to the protocol- or driver-specific extensions. */
+	IEEE802154_TX_MODE_PRIV_START = IEEE802154_TX_MODE_COMMON_COUNT,
 };
 
 /** IEEE802.15.4 Frame Pending Bit table address matching mode. */
@@ -296,6 +311,12 @@ enum ieee802154_config_type {
 	 *  should disable it for all enabled addresses.
 	 */
 	IEEE802154_CONFIG_ENH_ACK_HEADER_IE,
+
+	/** Number of types defined in ieee802154_config_type. */
+	IEEE802154_CONFIG_COMMON_COUNT,
+
+	/** This and higher values are specific to the protocol- or driver-specific extensions. */
+	IEEE802154_CONFIG_PRIV_START = IEEE802154_CONFIG_COMMON_COUNT,
 };
 
 /** IEEE802.15.4 driver configuration data. */
@@ -373,6 +394,23 @@ struct ieee802154_config {
 			 */
 			const uint8_t *ext_addr; /* in big endian */
 		} ack_ie;
+	};
+};
+
+/** IEEE 802.15.4 attributes. */
+enum ieee802154_attr {
+	/** Number of attributes defined in ieee802154_attr. */
+	IEEE802154_ATTR_COMMON_COUNT,
+
+	/** This and higher values are specific to the protocol- or driver-specific extensions. */
+	IEEE802154_ATTR_PRIV_START = IEEE802154_ATTR_COMMON_COUNT,
+};
+
+/** IEEE 802.15.4 attribute value data. */
+struct ieee802154_attr_value {
+	union {
+		/* TODO: Please remove when first attribute is added. */
+		uint8_t dummy;
 	};
 };
 
@@ -455,6 +493,15 @@ struct ieee802154_radio_api {
 	 *  Requires IEEE802154_HW_TXTIME and/or IEEE802154_HW_RXTIME capabilities.
 	 */
 	uint8_t (*get_sch_acc)(const struct device *dev);
+
+	/** Get the value of an attribute.
+	 *  If the requested attribute is supported by implementation, this function returns 0
+	 *  and fills appropriate version of union in `value`.
+	 *  If requested attribute is not supported, this function returns -ENOENT.
+	 */
+	int (*attr_get)(const struct device *dev,
+			enum ieee802154_attr attr,
+			struct ieee802154_attr_value *value);
 };
 
 /* Make sure that the network interface API is properly setup inside
