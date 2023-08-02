@@ -23,6 +23,7 @@ long long strtoll(const char *nptr, char **endptr, int base);
 int atoi(const char *s);
 
 void *malloc(size_t size);
+struct mallinfo2 mallinfo2(void);
 void *aligned_alloc(size_t alignment, size_t size); /* From C11 */
 
 void free(void *ptr);
