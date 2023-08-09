@@ -13,4 +13,18 @@ config UART_CONSOLE
 
 endif # SERIAL
 
+if CAN
+
+config GPIO
+	default y
+
+endif # CAN
+
+if NETWORKING
+
+config NET_L2_ETHERNET
+	default y
+
+endif # NETWORKING
+
 endif # BOARD_MR_CANHUBK3

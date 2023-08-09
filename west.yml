@@ -141,6 +141,11 @@ manifest:
       path: modules/hal/altera
       groups:
         - hal
+    - name: hal_ambiq
+      revision: c8203b6fc752e51fb3cb1e98441f392cc4493623
+      path: modules/hal/ambiq
+      groups:
+        - hal
     - name: hal_atmel
       revision: 5ab43007eda3f380c125f957f03638d2e8d1144d
       path: modules/hal/atmel
@@ -167,6 +172,11 @@ manifest:
       path: modules/hal/infineon
       groups:
         - hal
+    - name: hal_intel
+      revision: b04f13d58bd7b5b9349d6fc2e248679ce1b5579d
+      path: modules/hal/intel
+      groups:
+        - hal
     - name: hal_microchip
       revision: 5d079f1683a00b801373bbbbf5d181d4e33b30d5
       path: modules/hal/microchip
@@ -183,7 +193,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 35b0e5afc4f061cedc5a0411e024dad6d9e8101f
+      revision: 674aa3834a60720adab03b2ba70c8b4db90f4916
       path: modules/hal/nxp
       groups:
         - hal
@@ -200,7 +210,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: f2d791d28cd8fdbc5861652b863822632c91f690
+      revision: 346e87d5425f3a12ec8aed87cfc14d949d5ce8c7
       groups:
         - hal
     - name: hal_rpi_pico
@@ -209,7 +219,7 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: 5fbe78d3676b5500585f8e4534a8e56e7dae74a8
+      revision: fbb47a4067c460a2c26917ff34189fb4f32f654f
       path: modules/hal/silabs
       groups:
         - hal
@@ -287,7 +297,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: cee41373eb0bb720a370586de1ee5eb693e62c95
+      revision: 23bc852e3e4eaf64caa415b47e365ac1685ed91d
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: 42b7c577714b8f22ce82a901e19c1814af4609a8
@@ -299,7 +309,7 @@ manifest:
       path: modules/lib/picolibc
       revision: d07c38ff051386f8e09a143ea0a6c1d6d66dd1d8
     - name: segger
-      revision: 5792675a2470d0f3857de1e77bff57b38c28de3b
+      revision: 9d0191285956cef43daf411edc2f1a7788346def
       path: modules/debug/segger
       groups:
         - debug
@@ -316,7 +326,7 @@ manifest:
       groups:
         - crypto
     - name: TraceRecorderSource
-      revision: bc839bf94904bcdb91b33760e918afbef82e3ab4
+      revision: 1ede7ce8e7ab226e9a84d95266241ba3f38d91d2
       path: modules/debug/TraceRecorder
       groups:
         - debug
@@ -341,7 +351,7 @@ manifest:
       groups:
         - tee
     - name: uoscore-uedhoc
-      revision: e8920192b66db4f909eb9cd3f155d5245c1ae825
+      revision: 5fe2cb613bd7e4590bd1b00c2adf181ac0229379
       path: modules/lib/uoscore-uedhoc
     - name: zcbor
       revision: 67fd8bb88d3136738661fa8bb5f9989103f4599e

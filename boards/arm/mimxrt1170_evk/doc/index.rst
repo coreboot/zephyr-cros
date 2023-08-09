@@ -81,6 +81,27 @@ these references:
 - `MIMXRT1170-EVK Website`_
 - `MIMXRT1170-EVK Board Hardware User's Guide`_
 
+External Memory
+===============
+
+This platform has the following external memories:
+
++--------------------+------------+-------------------------------------+
+| Device             | Controller | Status                              |
++====================+============+=====================================+
+| W9825G6KH          | SEMC       | Enabled via device configuration    |
+|                    |            | data block, which sets up SEMC at   |
+|                    |            | boot time                           |
++--------------------+------------+-------------------------------------+
+| IS25WP128          | FLEXSPI    | Enabled via flash configurationn    |
+| (RT1170 EVK)       |            | block, which sets up FLEXSPI at     |
+|                    |            | boot time.                          |
++--------------------+------------+-------------------------------------+
+| W25Q512NWEIQ       | FLEXSPI    | Enabled via flash configurationn    |
+| (RT1170 EVKB)      |            | block, which sets up FLEXSPI at     |
+|                    |            | boot time. Supported for XIP only.  |
++--------------------+------------+-------------------------------------+
+
 Supported Features
 ==================
 
@@ -131,8 +152,9 @@ RT1170 EVKB (`mimxrt1170_evkb_cm7/cm4`)
 | HWINFO    | on-chip    | Unique device serial number         | Supported (M7)  | Supported (M7)  |
 +-----------+------------+-------------------------------------+-----------------+-----------------+
 | DISPLAY   | on-chip    | eLCDIF; MIPI-DSI. Tested with       | Supported (M7)  | Supported (M7)  |
-|           |            | :ref:`rk055hdmipi4m` and            |                 |                 |
-|           |            | :ref:`g1120b0mipi` shields          |                 |                 |
+|           |            | :ref:`rk055hdmipi4m`,               |                 |                 |
+|           |            | :ref:`rk055hdmipi4ma0`,             |                 |                 |
+|           |            | and :ref:`g1120b0mipi` shields      |                 |                 |
 +-----------+------------+-------------------------------------+-----------------+-----------------+
 | ACMP      | on-chip    | analog comparator                   | Supported       | No support      |
 +-----------+------------+-------------------------------------+-----------------+-----------------+

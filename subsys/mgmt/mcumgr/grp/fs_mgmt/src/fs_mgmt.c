@@ -280,9 +280,9 @@ static int fs_mgmt_file_download(struct smp_streamer *ctxt)
 		rc = fs_open(&fs_mgmt_ctxt.file, path, FS_O_READ);
 
 		if (rc != 0) {
-			if (rc == EINVAL) {
+			if (rc == -EINVAL) {
 				rc = FS_MGMT_RET_RC_FILE_INVALID_NAME;
-			} else if (ENOENT) {
+			} else if (rc == -ENOENT) {
 				rc = FS_MGMT_RET_RC_FILE_NOT_FOUND;
 			} else {
 				rc = FS_MGMT_RET_RC_UNKNOWN;
@@ -422,9 +422,9 @@ static int fs_mgmt_file_upload(struct smp_streamer *ctxt)
 		rc = fs_open(&fs_mgmt_ctxt.file, file_name, FS_O_CREATE | FS_O_WRITE);
 
 		if (rc != 0) {
-			if (rc == EINVAL) {
+			if (rc == -EINVAL) {
 				rc = FS_MGMT_RET_RC_FILE_INVALID_NAME;
-			} else if (ENOENT) {
+			} else if (rc == -ENOENT) {
 				rc = FS_MGMT_RET_RC_FILE_NOT_FOUND;
 			} else {
 				rc = FS_MGMT_RET_RC_UNKNOWN;
@@ -741,9 +741,9 @@ static int fs_mgmt_file_hash_checksum(struct smp_streamer *ctxt)
 	rc = fs_open(&file, path, FS_O_READ);
 
 	if (rc != 0) {
-		if (rc == EINVAL) {
+		if (rc == -EINVAL) {
 			rc = FS_MGMT_RET_RC_FILE_INVALID_NAME;
-		} else if (ENOENT) {
+		} else if (rc == -ENOENT) {
 			rc = FS_MGMT_RET_RC_FILE_NOT_FOUND;
 		} else {
 			rc = FS_MGMT_RET_RC_UNKNOWN;
@@ -911,13 +911,13 @@ static int fs_mgmt_translate_error_code(uint16_t ret)
 	switch (ret) {
 	case FS_MGMT_RET_RC_FILE_INVALID_NAME:
 	case FS_MGMT_RET_RC_CHECKSUM_HASH_NOT_FOUND:
-	rc = MGMT_ERR_EINVAL;
-	break;
+		rc = MGMT_ERR_EINVAL;
+		break;
 
 	case FS_MGMT_RET_RC_FILE_NOT_FOUND:
 	case FS_MGMT_RET_RC_FILE_IS_DIRECTORY:
-	rc = MGMT_ERR_ENOENT;
-	break;
+		rc = MGMT_ERR_ENOENT;
+		break;
 
 	case FS_MGMT_RET_RC_UNKNOWN:
 	case FS_MGMT_RET_RC_FILE_OPEN_FAILED:
@@ -928,8 +928,8 @@ static int fs_mgmt_translate_error_code(uint16_t ret)
 	case FS_MGMT_RET_RC_FILE_WRITE_FAILED:
 	case FS_MGMT_RET_RC_FILE_OFFSET_NOT_VALID:
 	case FS_MGMT_RET_RC_FILE_OFFSET_LARGER_THAN_FILE:
-	default:
-	rc = MGMT_ERR_EUNKNOWN;
+		default:
+		rc = MGMT_ERR_EUNKNOWN;
 	}
 
 	return rc;

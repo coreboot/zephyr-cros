@@ -122,6 +122,14 @@ does this work is up to the author of the iodev, perhaps the entire queue of
 operations can be converted to a set of DMA transfer descriptors, meaning the
 hardware does almost all of the real work.
 
+Cancellation
+************
+
+Canceling an already queued operation is possible but not guaranteed. If the
+SQE has not yet started, it's likely that a call to :c:func:`rtio_sqe_cancel`
+will remove the SQE and never run it. If, however, the SQE already started
+running, the cancel request will be ignored.
+
 Memory pools
 ************
 
@@ -202,7 +210,7 @@ Many requests to the same SPI peripheral for example might be translated to hard
 descriptors entirely. Meaning the hardware can potentially do more than ever.
 
 There is a small cost to each RTIO context and iodev. This cost could be weighed
-against using a thread for each concurent I/O operation or custom queues and
+against using a thread for each concurrent I/O operation or custom queues and
 threads per peripheral. RTIO is much lower cost than that.
 
 Examples
@@ -417,3 +425,13 @@ API Reference
 *************
 
 .. doxygengroup:: rtio
+
+MPSC Lock-free Queue API
+========================
+
+.. doxygengroup:: rtio_mpsc
+
+SPSC Lock-free Queue API
+========================
+
+.. doxygengroup:: rtio_spsc
