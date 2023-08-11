@@ -266,6 +266,36 @@ extern void k_thread_foreach_unlocked(
 
 #if !defined(_ASMLANGUAGE)
 /**
+ * @brief Dynamically allocate a thread stack.
+ *
+ * Relevant stack creation flags include:
+ * - @ref K_USER allocate a userspace thread (requires `CONFIG_USERSPACE=y`)
+ *
+ * @param size Stack size in bytes.
+ * @param flags Stack creation flags, or 0.
+ *
+ * @retval the allocated thread stack on success.
+ * @retval NULL on failure.
+ *
+ * @see CONFIG_DYNAMIC_THREAD
+ */
+__syscall k_thread_stack_t *k_thread_stack_alloc(size_t size, int flags);
+
+/**
+ * @brief Free a dynamically allocated thread stack.
+ *
+ * @param stack Pointer to the thread stack.
+ *
+ * @retval 0 on success.
+ * @retval -EBUSY if the thread stack is in use.
+ * @retval -EINVAL if @p stack is invalid.
+ * @retval -ENOSYS if dynamic thread stack allocation is disabled
+ *
+ * @see CONFIG_DYNAMIC_THREAD
+ */
+__syscall int k_thread_stack_free(k_thread_stack_t *stack);
+
+/**
  * @brief Create a thread.
  *
  * This routine initializes a thread, then schedules it for execution.
@@ -2420,9 +2450,9 @@ struct k_fifo {
 #define k_fifo_alloc_put(fifo, data) \
 	({ \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_fifo, alloc_put, fifo, data); \
-	int ret = k_queue_alloc_append(&(fifo)->_queue, data); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, alloc_put, fifo, data, ret); \
-	ret; \
+	int fap_ret = k_queue_alloc_append(&(fifo)->_queue, data); \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, alloc_put, fifo, data, fap_ret); \
+	fap_ret; \
 	})
 
 /**
@@ -2486,9 +2516,9 @@ struct k_fifo {
 #define k_fifo_get(fifo, timeout) \
 	({ \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_fifo, get, fifo, timeout); \
-	void *ret = k_queue_get(&(fifo)->_queue, timeout); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, get, fifo, timeout, ret); \
-	ret; \
+	void *fg_ret = k_queue_get(&(fifo)->_queue, timeout); \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, get, fifo, timeout, fg_ret); \
+	fg_ret; \
 	})
 
 /**
@@ -2523,9 +2553,9 @@ struct k_fifo {
 #define k_fifo_peek_head(fifo) \
 	({ \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_fifo, peek_head, fifo); \
-	void *ret = k_queue_peek_head(&(fifo)->_queue); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, peek_head, fifo, ret); \
-	ret; \
+	void *fph_ret = k_queue_peek_head(&(fifo)->_queue); \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, peek_head, fifo, fph_ret); \
+	fph_ret; \
 	})
 
 /**
@@ -2542,9 +2572,9 @@ struct k_fifo {
 #define k_fifo_peek_tail(fifo) \
 	({ \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_fifo, peek_tail, fifo); \
-	void *ret = k_queue_peek_tail(&(fifo)->_queue); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, peek_tail, fifo, ret); \
-	ret; \
+	void *fpt_ret = k_queue_peek_tail(&(fifo)->_queue); \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, peek_tail, fifo, fpt_ret); \
+	fpt_ret; \
 	})
 
 /**
@@ -2637,9 +2667,9 @@ struct k_lifo {
 #define k_lifo_alloc_put(lifo, data) \
 	({ \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_lifo, alloc_put, lifo, data); \
-	int ret = k_queue_alloc_prepend(&(lifo)->_queue, data); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_lifo, alloc_put, lifo, data, ret); \
-	ret; \
+	int lap_ret = k_queue_alloc_prepend(&(lifo)->_queue, data); \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_lifo, alloc_put, lifo, data, lap_ret); \
+	lap_ret; \
 	})
 
 /**
@@ -2662,9 +2692,9 @@ struct k_lifo {
 #define k_lifo_get(lifo, timeout) \
 	({ \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_lifo, get, lifo, timeout); \
-	void *ret = k_queue_get(&(lifo)->_queue, timeout); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_lifo, get, lifo, timeout, ret); \
-	ret; \
+	void *lg_ret = k_queue_get(&(lifo)->_queue, timeout); \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_lifo, get, lifo, timeout, lg_ret); \
+	lg_ret; \
 	})
 
 /**

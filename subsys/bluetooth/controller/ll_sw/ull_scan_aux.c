@@ -537,6 +537,10 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 
 	} else {
 		aux->data_len += data_len;
+
+		if (aux->data_len >= CONFIG_BT_CTLR_SCAN_DATA_LEN_MAX) {
+			goto ull_scan_aux_rx_flush;
+		}
 	}
 
 	/* In sync context we can dispatch rx immediately, in scan context we
@@ -591,6 +595,8 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 
 	/* Switching to ULL scheduling to receive auxiliary PDUs */
 	if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) || lll) {
+		LL_ASSERT(scan);
+
 		/* Do not ULL schedule if scan disable requested */
 		if (unlikely(scan->is_stop)) {
 			goto ull_scan_aux_rx_flush;
@@ -724,6 +730,8 @@ ull_scan_aux_rx_flush:
 		 * immediately since we are in sync context.
 		 */
 		if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) || aux->rx_last) {
+			LL_ASSERT(scan);
+
 			/* If scan is being disabled, rx could already be
 			 * enqueued before coming here to ull_scan_aux_rx_flush.
 			 * Check if rx not the last in the list of received PDUs

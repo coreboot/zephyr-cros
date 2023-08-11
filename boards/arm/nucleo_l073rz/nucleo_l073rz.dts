@@ -9,6 +9,7 @@
 #include <st/l0/stm32l073r(b-z)tx-pinctrl.dtsi>
 #include "arduino_r3_connector.dtsi"
 #include "st_morpho_connector.dtsi"
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 
 / {
 	model = "STMicroelectronics STM32L073RZ-NUCLEO board";
@@ -34,15 +35,7 @@
 		user_button: button {
 			label = "User";
 			gpios = <&gpioc 13 GPIO_ACTIVE_LOW>;
-		};
-	};
-
-	power-states {
-		stop: state {
-			compatible = "zephyr,power-state";
-			power-state-name = "suspend-to-idle";
-			min-residency-us = <2000>;
-			exit-latency-us = <750>;
+			zephyr,code = <INPUT_KEY_0>;
 		};
 	};
 
@@ -65,10 +58,6 @@
 		die-temp0 = &die_temp;
 		volt-sensor0 = &vref;
 	};
-};
-
-&cpu0 {
-	cpu-power-states = <&stop>;
 };
 
 &clk_hse {

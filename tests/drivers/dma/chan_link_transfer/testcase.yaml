@@ -7,6 +7,7 @@ tests:
       - dma
     platform_allow:
       - frdm_k64f
+      - mimxrt595_evk_cm33
       - mimxrt1050_evk
       - mimxrt1060_evk
       - mimxrt1064_evk
@@ -14,5 +15,6 @@ tests:
       - mimxrt1170_evk_cm7
       - mimxrt1024_evk
       - lpcxpresso55s69_cpu0
+      - lpcxpresso55s36
     integration_platforms:
       - frdm_k64f

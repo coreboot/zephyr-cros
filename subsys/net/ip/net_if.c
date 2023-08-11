@@ -16,6 +16,7 @@ LOG_MODULE_REGISTER(net_if, CONFIG_NET_IF_LOG_LEVEL);
 #include <string.h>
 #include <zephyr/net/igmp.h>
 #include <zephyr/net/net_core.h>
+#include <zephyr/net/net_event.h>
 #include <zephyr/net/net_pkt.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
@@ -1982,6 +1983,36 @@ bool z_vrfy_net_if_ipv6_addr_rm_by_index(int index,
 #include <syscalls/net_if_ipv6_addr_rm_by_index_mrsh.c>
 #endif /* CONFIG_USERSPACE */
 
+void net_if_ipv6_addr_foreach(struct net_if *iface, net_if_ip_addr_cb_t cb,
+			      void *user_data)
+{
+	struct net_if_ipv6 *ipv6;
+
+	if (iface == NULL) {
+		return;
+	}
+
+	net_if_lock(iface);
+
+	ipv6 = iface->config.ip.ipv6;
+	if (ipv6 == NULL) {
+		goto out;
+	}
+
+	for (int i = 0; i < NET_IF_MAX_IPV6_ADDR; i++) {
+		struct net_if_addr *if_addr = &ipv6->unicast[i];
+
+		if (!if_addr->is_used) {
+			continue;
+		}
+
+		cb(iface, if_addr, user_data);
+	}
+
+out:
+	net_if_unlock(iface);
+}
+
 struct net_if_mcast_addr *net_if_ipv6_maddr_add(struct net_if *iface,
 						const struct in6_addr *addr)
 {
@@ -2190,9 +2221,20 @@ static void prefix_lifetime_expired(struct net_if_ipv6_prefix *ifprefix)
 	remove_prefix_addresses(ifprefix->iface, ipv6, &ifprefix->prefix,
 				ifprefix->len);
 
-	net_mgmt_event_notify_with_info(
-		NET_EVENT_IPV6_PREFIX_DEL, ifprefix->iface,
-		&ifprefix->prefix, sizeof(struct in6_addr));
+	if (IS_ENABLED(CONFIG_NET_MGMT_EVENT_INFO)) {
+		struct net_event_ipv6_prefix info;
+
+		net_ipaddr_copy(&info.addr, &ifprefix->prefix);
+		info.len = ifprefix->len;
+		info.lifetime = 0;
+
+		net_mgmt_event_notify_with_info(NET_EVENT_IPV6_PREFIX_DEL,
+						ifprefix->iface,
+						(const void *) &info,
+						sizeof(struct net_event_ipv6_prefix));
+	} else {
+		net_mgmt_event_notify(NET_EVENT_IPV6_PREFIX_DEL, ifprefix->iface);
+	}
 
 	net_if_unlock(ifprefix->iface);
 }
@@ -2354,9 +2396,19 @@ struct net_if_ipv6_prefix *net_if_ipv6_prefix_add(struct net_if *iface,
 		NET_DBG("[%d] interface %p prefix %s/%d added", i, iface,
 			net_sprint_ipv6_addr(prefix), len);
 
-		net_mgmt_event_notify_with_info(
-			NET_EVENT_IPV6_PREFIX_ADD, iface,
-			&ipv6->prefix[i].prefix, sizeof(struct in6_addr));
+		if (IS_ENABLED(CONFIG_NET_MGMT_EVENT_INFO)) {
+			struct net_event_ipv6_prefix info;
+
+			net_ipaddr_copy(&info.addr, prefix);
+			info.len = len;
+			info.lifetime = lifetime;
+
+			net_mgmt_event_notify_with_info(NET_EVENT_IPV6_PREFIX_ADD,
+							iface, (const void *) &info,
+							sizeof(struct net_event_ipv6_prefix));
+		} else {
+			net_mgmt_event_notify(NET_EVENT_IPV6_PREFIX_ADD, iface);
+		}
 
 		ifprefix = &ipv6->prefix[i];
 		goto out;
@@ -2401,9 +2453,19 @@ bool net_if_ipv6_prefix_rm(struct net_if *iface, struct in6_addr *addr,
 		 */
 		remove_prefix_addresses(iface, ipv6, addr, len);
 
-		net_mgmt_event_notify_with_info(
-			NET_EVENT_IPV6_PREFIX_DEL, iface,
-			&ipv6->prefix[i].prefix, sizeof(struct in6_addr));
+		if (IS_ENABLED(CONFIG_NET_MGMT_EVENT_INFO)) {
+			struct net_event_ipv6_prefix info;
+
+			net_ipaddr_copy(&info.addr, addr);
+			info.len = len;
+			info.lifetime = 0;
+
+			net_mgmt_event_notify_with_info(NET_EVENT_IPV6_PREFIX_DEL,
+							iface, (const void *) &info,
+							sizeof(struct net_event_ipv6_prefix));
+		} else {
+			net_mgmt_event_notify(NET_EVENT_IPV6_PREFIX_DEL, iface);
+		}
 
 		ret = true;
 		goto out;
@@ -3194,8 +3256,8 @@ bool net_if_ipv4_is_addr_bcast(struct net_if *iface,
 		goto out;
 	}
 
-	STRUCT_SECTION_FOREACH(net_if, iface) {
-		ret = ipv4_is_broadcast_address(iface, addr);
+	STRUCT_SECTION_FOREACH(net_if, one_iface) {
+		ret = ipv4_is_broadcast_address(one_iface, addr);
 		if (ret) {
 			goto out;
 		}
@@ -3285,11 +3347,11 @@ static struct in_addr *if_ipv4_get_addr(struct net_if *iface,
 	struct net_if_ipv4 *ipv4;
 	int i;
 
-	net_if_lock(iface);
-
 	if (!iface) {
-		goto out;
+		return NULL;
 	}
+
+	net_if_lock(iface);
 
 	ipv4 = iface->config.ip.ipv4;
 	if (!ipv4) {
@@ -3783,6 +3845,36 @@ bool z_vrfy_net_if_ipv4_addr_rm_by_index(int index,
 
 #include <syscalls/net_if_ipv4_addr_rm_by_index_mrsh.c>
 #endif /* CONFIG_USERSPACE */
+
+void net_if_ipv4_addr_foreach(struct net_if *iface, net_if_ip_addr_cb_t cb,
+			      void *user_data)
+{
+	struct net_if_ipv4 *ipv4;
+
+	if (iface == NULL) {
+		return;
+	}
+
+	net_if_lock(iface);
+
+	ipv4 = iface->config.ip.ipv4;
+	if (ipv4 == NULL) {
+		goto out;
+	}
+
+	for (int i = 0; i < NET_IF_MAX_IPV4_ADDR; i++) {
+		struct net_if_addr *if_addr = &ipv4->unicast[i];
+
+		if (!if_addr->is_used) {
+			continue;
+		}
+
+		cb(iface, if_addr, user_data);
+	}
+
+out:
+	net_if_unlock(iface);
+}
 
 static struct net_if_mcast_addr *ipv4_maddr_find(struct net_if *iface,
 						 bool is_used,

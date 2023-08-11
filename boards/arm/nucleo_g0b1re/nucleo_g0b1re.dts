@@ -8,6 +8,7 @@
 #include <st/g0/stm32g0b1Xe.dtsi>
 #include <st/g0/stm32g0b1r(b-c-e)tx-pinctrl.dtsi>
 #include "arduino_r3_connector.dtsi"
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 
 / {
 	model = "STMicroelectronics STM32G0B1RE-NUCLEO board";
@@ -36,6 +37,7 @@
 		user_button: button {
 			label = "User";
 			gpios = <&gpioc 13 GPIO_ACTIVE_LOW>;
+			zephyr,code = <INPUT_KEY_0>;
 		};
 	};
 
@@ -207,10 +209,6 @@ zephyr_udc0: &usb {
 			reg = <0x00070000 DT_SIZE_K(64)>;
 		};
 	};
-};
-
-&cpu0 {
-	cpu-power-states = <&stop0 &stop1>;
 };
 
 &lptim1 {

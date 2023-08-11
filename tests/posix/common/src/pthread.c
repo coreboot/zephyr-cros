@@ -216,6 +216,9 @@ void *thread_top_term(void *p1)
 	}
 
 	if (id >= 2) {
+		if (IS_ENABLED(CONFIG_DYNAMIC_THREAD)) {
+			zassert_false(pthread_detach(self), "failed to set detach state");
+		}
 		ret = pthread_detach(self);
 		if (id == 2) {
 			zassert_equal(ret, EINVAL, "re-detached thread!");
@@ -345,8 +348,13 @@ ZTEST(posix_apis, test_pthread_execution)
 			      getschedparam.sched_priority,
 			      "scheduling priorities do not match!");
 
-		ret = pthread_create(&newthread[i], &attr[i], thread_top_exec,
-				INT_TO_POINTER(i));
+		if (IS_ENABLED(CONFIG_DYNAMIC_THREAD)) {
+			ret = pthread_create(&newthread[i], NULL, thread_top_exec,
+					INT_TO_POINTER(i));
+		} else {
+			ret = pthread_create(&newthread[i], &attr[i], thread_top_exec,
+					INT_TO_POINTER(i));
+		}
 
 		/* TESTPOINT: Check if thread is created successfully */
 		zassert_false(ret, "Number of threads exceed max limit");
@@ -500,8 +508,13 @@ ZTEST(posix_apis, test_pthread_termination)
 		schedparam.sched_priority = 2;
 		pthread_attr_setschedparam(&attr[i], &schedparam);
 		pthread_attr_setstack(&attr[i], &stack_t[i][0], STACKS);
-		ret = pthread_create(&newthread[i], &attr[i], thread_top_term,
-				     INT_TO_POINTER(i));
+		if (IS_ENABLED(CONFIG_DYNAMIC_THREAD)) {
+			ret = pthread_create(&newthread[i], NULL, thread_top_term,
+						INT_TO_POINTER(i));
+		} else {
+			ret = pthread_create(&newthread[i], &attr[i], thread_top_term,
+						INT_TO_POINTER(i));
+		}
 
 		zassert_false(ret, "Not enough space to create new thread");
 	}
@@ -571,8 +584,10 @@ ZTEST(posix_apis, test_pthread_create_negative)
 	pthread_attr_t attr1;
 
 	/* create pthread without attr initialized */
-	ret = pthread_create(&pthread1, NULL, create_thread1, (void *)1);
-	zassert_equal(ret, EINVAL, "create thread with NULL successful");
+	if (!IS_ENABLED(CONFIG_DYNAMIC_THREAD)) {
+		ret = pthread_create(&pthread1, NULL, create_thread1, (void *)1);
+		zassert_equal(ret, EAGAIN, "create thread with NULL successful");
+	}
 
 	/* initialized attr without set stack to create thread */
 	ret = pthread_attr_init(&attr1);
@@ -744,7 +759,7 @@ ZTEST(posix_apis, test_sched_policy)
 	}
 }
 
-ZTEST(posix_apis, test_posix_pthread_barrier)
+ZTEST(posix_apis, test_barrier)
 {
 	int ret, pshared;
 	pthread_barrierattr_t attr;
@@ -770,4 +785,78 @@ ZTEST(posix_apis, test_posix_pthread_barrier)
 
 	ret = pthread_barrierattr_destroy(&attr);
 	zassert_equal(ret, 0, "pthread_barrierattr_destroy failed");
+}
+
+ZTEST(posix_apis, test_pthread_equal)
+{
+	zassert_true(pthread_equal(pthread_self(), pthread_self()));
+	zassert_false(pthread_equal(pthread_self(), (pthread_t)4242));
+}
+
+/* A 32-bit value to use between threads for validation */
+#define BIOS_FOOD 0xB105F00D
+
+static void *fun(void *arg)
+{
+	*((uint32_t *)arg) = BIOS_FOOD;
+	return NULL;
+}
+
+ZTEST(posix_apis, test_pthread_dynamic_stacks)
+{
+	pthread_t th;
+	uint32_t x = 0;
+
+	if (!IS_ENABLED(CONFIG_DYNAMIC_THREAD)) {
+		ztest_test_skip();
+	}
+
+	zassert_ok(pthread_create(&th, NULL, fun, &x));
+	zassert_ok(pthread_join(th, NULL));
+	zassert_equal(BIOS_FOOD, x);
+}
+
+static void *non_null_retval(void *arg)
+{
+	ARG_UNUSED(arg);
+
+	return (void *)BIOS_FOOD;
+}
+
+ZTEST(posix_apis, test_pthread_return_val)
+{
+	pthread_t pth;
+	void *ret = NULL;
+	pthread_attr_t attr;
+
+	zassert_ok(pthread_attr_init(&attr));
+	zassert_ok(pthread_attr_setstack(&attr, &stack_e[0][0], STACKS));
+
+	zassert_ok(pthread_create(&pth, &attr, non_null_retval, NULL));
+	zassert_ok(pthread_join(pth, &ret));
+	zassert_equal(ret, (void *)BIOS_FOOD);
+}
+
+static void *detached(void *arg)
+{
+	ARG_UNUSED(arg);
+
+	return NULL;
+}
+
+ZTEST(posix_apis, test_pthread_join_detached)
+{
+	pthread_t pth;
+	pthread_attr_t attr;
+
+	zassert_ok(pthread_attr_init(&attr));
+	zassert_ok(pthread_attr_setstack(&attr, &stack_e[0][0], STACKS));
+
+	zassert_ok(pthread_create(&pth, &attr, detached, NULL));
+	zassert_ok(pthread_detach(pth));
+	/* note, this was required to be EINVAL previously but is now undefined behaviour */
+	zassert_not_equal(0, pthread_join(pth, NULL));
+
+	/* need to allow this thread to be clean-up by the recycler */
+	k_msleep(500);
 }

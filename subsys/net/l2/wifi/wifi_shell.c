@@ -241,25 +241,25 @@ static void print_twt_params(uint8_t dialog_token, uint8_t flow_id,
 			     bool trigger, uint32_t twt_wake_interval,
 			     uint64_t twt_interval)
 {
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT Dialog token: %d\n",
-		      dialog_token);
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT flow ID: %d\n",
-		      flow_id);
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT negotiation type: %s\n",
-		      wifi_twt_negotiation_type2str[negotiation_type]);
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT responder: %s\n",
-		      responder ? "true" : "false");
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT implicit: %s\n",
-		      implicit ? "true" : "false");
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT announce: %s\n",
-		      announce ? "true" : "false");
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT trigger: %s\n",
-		      trigger ? "true" : "false");
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT wake interval: %d us\n",
-		      twt_wake_interval);
-	shell_fprintf(context.sh, SHELL_NORMAL, "TWT interval: %lld us\n",
-		      twt_interval);
-	shell_fprintf(context.sh, SHELL_NORMAL, "========================\n");
+	print(context.sh, SHELL_NORMAL, "TWT Dialog token: %d\n",
+	      dialog_token);
+	print(context.sh, SHELL_NORMAL, "TWT flow ID: %d\n",
+	      flow_id);
+	print(context.sh, SHELL_NORMAL, "TWT negotiation type: %s\n",
+	      wifi_twt_negotiation_type2str[negotiation_type]);
+	print(context.sh, SHELL_NORMAL, "TWT responder: %s\n",
+	       responder ? "true" : "false");
+	print(context.sh, SHELL_NORMAL, "TWT implicit: %s\n",
+	      implicit ? "true" : "false");
+	print(context.sh, SHELL_NORMAL, "TWT announce: %s\n",
+	      announce ? "true" : "false");
+	print(context.sh, SHELL_NORMAL, "TWT trigger: %s\n",
+	      trigger ? "true" : "false");
+	print(context.sh, SHELL_NORMAL, "TWT wake interval: %d us\n",
+	      twt_wake_interval);
+	print(context.sh, SHELL_NORMAL, "TWT interval: %lld us\n",
+	      twt_interval);
+	print(context.sh, SHELL_NORMAL, "========================\n");
 }
 
 static void handle_wifi_twt_event(struct net_mgmt_event_callback *cb)
@@ -333,6 +333,9 @@ static int __wifi_args_to_params(size_t argc, char *argv[],
 	/* SSID */
 	params->ssid = argv[0];
 	params->ssid_length = strlen(params->ssid);
+	if (params->ssid_length > WIFI_SSID_MAX_LEN) {
+		return -EINVAL;
+	}
 
 	/* Channel (optional) */
 	if ((idx < argc) && (strlen(argv[idx]) <= 3)) {
@@ -377,6 +380,14 @@ static int __wifi_args_to_params(size_t argc, char *argv[],
 				}
 				idx++;
 			}
+		}
+
+		if (params->psk_length < WIFI_PSK_MIN_LEN ||
+		    (params->security != WIFI_SECURITY_TYPE_SAE &&
+		     params->psk_length > WIFI_PSK_MAX_LEN) ||
+		    (params->security == WIFI_SECURITY_TYPE_SAE &&
+		     params->psk_length > WIFI_SAE_PSWD_MAX_LEN)) {
+			return -EINVAL;
 		}
 	} else {
 		params->security = WIFI_SECURITY_TYPE_NONE;
@@ -1131,7 +1142,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(wifi_cmd_ap,
 	SHELL_CMD(disable, NULL,
 		  "Disable Access Point mode",
 		  cmd_wifi_ap_disable),
-	SHELL_CMD(enable, NULL, "<SSID> <SSID length> [channel] [PSK]",
+	SHELL_CMD(enable, NULL, "<SSID> [channel] [PSK]",
 		  cmd_wifi_ap_enable),
 	SHELL_SUBCMD_SET_END
 );

@@ -48,20 +48,12 @@ extern "C" {
  * @defgroup rtio RTIO
  * @ingroup os_services
  * @{
- * @}
- */
-
-/**
- * @brief RTIO API
- * @defgroup rtio_api RTIO API
- * @ingroup rtio
- * @{
  */
 
 /**
  * @brief RTIO Predefined Priorties
  * @defgroup rtio_sqe_prio RTIO Priorities
- * @ingroup rtio_api
+ * @ingroup rtio
  * @{
  */
 
@@ -88,7 +80,7 @@ extern "C" {
 /**
  * @brief RTIO SQE Flags
  * @defgroup rtio_sqe_flags RTIO SQE Flags
- * @ingroup rtio_api
+ * @ingroup rtio
  * @{
  */
 
@@ -153,7 +145,7 @@ extern "C" {
 /**
  * @brief RTIO CQE Flags
  * @defgroup rtio_cqe_flags RTIO CQE Flags
- * @ingroup rtio_api
+ * @ingroup rtio
  * @{
  */
 
@@ -354,6 +346,9 @@ struct rtio {
 	struct k_sem *consume_sem;
 #endif
 
+	/* Total number of completions */
+	atomic_t cq_count;
+
 	/* Number of completions that were unable to be submitted with results
 	 * due to the cq spsc being full
 	 */
@@ -425,9 +420,6 @@ struct rtio_iodev_api {
 	 *
 	 * This call should be short in duration and most likely
 	 * either enqueue or kick off an entry with the hardware.
-	 *
-	 * If polling is required the iodev should add itself to the execution
-	 * context (@see rtio_add_pollable())
 	 *
 	 * @param iodev_sqe Submission queue entry
 	 */
@@ -761,6 +753,7 @@ static inline void rtio_block_pool_free(struct rtio_block_pool *pool, void *buf,
 		IF_ENABLED(CONFIG_RTIO_SUBMIT_SEM, (.submit_sem = &_submit_sem_##name,))           \
 		IF_ENABLED(CONFIG_RTIO_SUBMIT_SEM, (.submit_count = 0,))                           \
 		IF_ENABLED(CONFIG_RTIO_CONSUME_SEM, (.consume_sem = &_consume_sem_##name,))        \
+		.cq_count = ATOMIC_INIT(0),                                                        \
 		.xcqcnt = ATOMIC_INIT(0),                                                          \
 		.sqe_pool = _sqe_pool,                                                             \
 		.cqe_pool = _cqe_pool,                                                             \
@@ -811,18 +804,6 @@ static inline void rtio_block_pool_free(struct rtio_block_pool *pool, void *buf,
 static inline uint32_t rtio_sqe_acquirable(struct rtio *r)
 {
 	return r->sqe_pool->pool_free;
-}
-
-/**
- * @brief Count of likely, but not gauranteed, consumable completion queue events
- *
- * @param r RTIO context
- *
- * @return Likely count of consumable completion queue events
- */
-static inline uint32_t rtio_cqe_consumable(struct rtio *r)
-{
-	return (r->cqe_pool->pool_size - r->cqe_pool->pool_free);
 }
 
 /**
@@ -1148,6 +1129,8 @@ static inline void rtio_cqe_submit(struct rtio *r, int result, void *userdata, u
 		cqe->flags = flags;
 		rtio_cqe_produce(r, cqe);
 	}
+
+	atomic_inc(&r->cq_count);
 #ifdef CONFIG_RTIO_SUBMIT_SEM
 	if (r->submit_count > 0) {
 		r->submit_count--;
@@ -1375,7 +1358,7 @@ static inline int z_impl_rtio_cqe_copy_out(struct rtio *r,
 {
 	size_t copied = 0;
 	struct rtio_cqe *cqe;
-	int64_t end = sys_clock_timeout_end_calc(timeout);
+	k_timepoint_t end = sys_timepoint_calc(timeout);
 
 	do {
 		cqe = K_TIMEOUT_EQ(timeout, K_FOREVER) ? rtio_cqe_consume_block(r)
@@ -1391,7 +1374,7 @@ static inline int z_impl_rtio_cqe_copy_out(struct rtio *r,
 		}
 		cqes[copied++] = *cqe;
 		rtio_cqe_release(r, cqe);
-	} while (copied < cqe_count && end > k_uptime_ticks());
+	} while (copied < cqe_count && !sys_timepoint_expired(end));
 
 	return copied;
 }
@@ -1425,6 +1408,8 @@ static inline int z_impl_rtio_submit(struct rtio *r, uint32_t wait_count)
 		k_sem_reset(r->submit_sem);
 		r->submit_count = wait_count;
 	}
+#else
+	uintptr_t cq_count = (uintptr_t)atomic_get(&r->cq_count) + wait_count;
 #endif
 
 	/* Submit the queue to the executor which consumes submissions
@@ -1444,7 +1429,7 @@ static inline int z_impl_rtio_submit(struct rtio *r, uint32_t wait_count)
 			 "semaphore was reset or timed out while waiting on completions!");
 	}
 #else
-	while (rtio_cqe_consumable(r) < wait_count) {
+	while ((uintptr_t)atomic_get(&r->cq_count) < cq_count) {
 		Z_SPIN_DELAY(10);
 		k_yield();
 	}

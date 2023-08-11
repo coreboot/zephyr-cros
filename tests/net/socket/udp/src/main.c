@@ -921,7 +921,7 @@ struct eth_fake_context {
 };
 
 static struct eth_fake_context eth_fake_data;
-static ZTEST_BMEM struct sockaddr_in6 server_addr;
+static ZTEST_BMEM struct sockaddr_in6 udp_server_addr;
 
 /* The semaphore is there to wait the data to be received. */
 static ZTEST_BMEM SYS_MUTEX_DEFINE(wait_data);
@@ -939,7 +939,7 @@ static struct net_linkaddr server_link_addr = {
 };
 #define MY_IPV6_ADDR_ETH   "2001:db8:100::1"
 #define PEER_IPV6_ADDR_ETH "2001:db8:100::2"
-#define TEST_TXTIME 0xff112233445566ff
+#define TEST_TXTIME INT64_MAX
 #define WAIT_TIME K_MSEC(250)
 
 static void eth_fake_iface_init(struct net_if *iface)
@@ -958,7 +958,7 @@ static void eth_fake_iface_init(struct net_if *iface)
 
 static int eth_fake_send(const struct device *dev, struct net_pkt *pkt)
 {
-	uint64_t txtime;
+	net_time_t txtime;
 
 	ARG_UNUSED(dev);
 	ARG_UNUSED(pkt);
@@ -967,7 +967,7 @@ static int eth_fake_send(const struct device *dev, struct net_pkt *pkt)
 		return 0;
 	}
 
-	txtime = net_pkt_txtime(pkt);
+	txtime = net_ptp_time_to_ns(net_pkt_timestamp(pkt));
 	if (txtime != TEST_TXTIME) {
 		test_failed = true;
 	} else {
@@ -1016,14 +1016,14 @@ ZTEST(net_socket_udp, test_17_setup_eth)
 
 	net_if_up(eth_iface);
 
-	(void)memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin6_family = AF_INET6;
-	server_addr.sin6_port = htons(1234);
-	ret = inet_pton(AF_INET6, PEER_IPV6_ADDR_ETH, &server_addr.sin6_addr);
+	(void)memset(&udp_server_addr, 0, sizeof(udp_server_addr));
+	udp_server_addr.sin6_family = AF_INET6;
+	udp_server_addr.sin6_port = htons(1234);
+	ret = inet_pton(AF_INET6, PEER_IPV6_ADDR_ETH, &udp_server_addr.sin6_addr);
 	zassert_equal(ret, 1, "inet_pton failed");
 
 	/* In order to avoid neighbor discovery, populate neighbor cache */
-	net_ipv6_nbr_add(eth_iface, &server_addr.sin6_addr, &server_link_addr,
+	net_ipv6_nbr_add(eth_iface, &udp_server_addr.sin6_addr, &server_link_addr,
 			 true, NET_IPV6_NBR_STATE_REACHABLE);
 }
 
@@ -1032,7 +1032,7 @@ ZTEST_USER(net_socket_udp, test_18_v6_sendmsg_with_txtime)
 	int rv;
 	int client_sock;
 	bool optval;
-	uint64_t txtime;
+	net_time_t txtime;
 	struct sockaddr_in6 client_addr;
 	struct msghdr msg;
 	struct cmsghdr *cmsg;
@@ -1057,8 +1057,8 @@ ZTEST_USER(net_socket_udp, test_18_v6_sendmsg_with_txtime)
 	msg.msg_controllen = sizeof(cmsgbuf.buf);
 	msg.msg_iov = io_vector;
 	msg.msg_iovlen = 1;
-	msg.msg_name = &server_addr;
-	msg.msg_namelen = sizeof(server_addr);
+	msg.msg_name = &udp_server_addr;
+	msg.msg_namelen = sizeof(udp_server_addr);
 
 	txtime = TEST_TXTIME;
 
@@ -1066,7 +1066,7 @@ ZTEST_USER(net_socket_udp, test_18_v6_sendmsg_with_txtime)
 	cmsg->cmsg_len = CMSG_LEN(sizeof(txtime));
 	cmsg->cmsg_level = SOL_SOCKET;
 	cmsg->cmsg_type = SCM_TXTIME;
-	*(uint64_t *)CMSG_DATA(cmsg) = txtime;
+	*(net_time_t *)CMSG_DATA(cmsg) = txtime;
 
 	optval = true;
 	rv = setsockopt(client_sock, SOL_SOCKET, SO_TXTIME, &optval,
@@ -1096,7 +1096,7 @@ void test_msg_trunc(int sock_c, int sock_s, struct sockaddr *addr_c,
 		    socklen_t addrlen_s)
 {
 	int rv;
-	uint8_t rx_buf[sizeof(TEST_STR_SMALL) - 1];
+	uint8_t str_buf[sizeof(TEST_STR_SMALL) - 1];
 
 	rv = bind(sock_s, addr_s, addrlen_s);
 	zassert_equal(rv, 0, "server bind failed");
@@ -1112,14 +1112,14 @@ void test_msg_trunc(int sock_c, int sock_s, struct sockaddr *addr_c,
 	rv = send(sock_c, BUF_AND_SIZE(TEST_STR_SMALL), 0);
 	zassert_equal(rv, sizeof(TEST_STR_SMALL) - 1, "send failed");
 
-	memset(rx_buf, 0, sizeof(rx_buf));
-	rv = recv(sock_s, rx_buf, 2, ZSOCK_MSG_TRUNC);
+	memset(str_buf, 0, sizeof(str_buf));
+	rv = recv(sock_s, str_buf, 2, ZSOCK_MSG_TRUNC);
 	zassert_equal(rv, sizeof(TEST_STR_SMALL) - 1, "MSG_TRUNC flag failed");
-	zassert_mem_equal(rx_buf, TEST_STR_SMALL, 2, "invalid rx data");
-	zassert_equal(rx_buf[2], 0, "received more than requested");
+	zassert_mem_equal(str_buf, TEST_STR_SMALL, 2, "invalid rx data");
+	zassert_equal(str_buf[2], 0, "received more than requested");
 
 	/* The remaining data should've been discarded */
-	rv = recv(sock_s, rx_buf, sizeof(rx_buf), ZSOCK_MSG_DONTWAIT);
+	rv = recv(sock_s, str_buf, sizeof(str_buf), ZSOCK_MSG_DONTWAIT);
 	zassert_equal(rv, -1, "consecutive recv should've failed");
 	zassert_equal(errno, EAGAIN, "incorrect errno value");
 
@@ -1128,15 +1128,15 @@ void test_msg_trunc(int sock_c, int sock_s, struct sockaddr *addr_c,
 	rv = send(sock_c, BUF_AND_SIZE(TEST_STR_SMALL), 0);
 	zassert_equal(rv, sizeof(TEST_STR_SMALL) - 1, "send failed");
 
-	memset(rx_buf, 0, sizeof(rx_buf));
-	rv = recv(sock_s, rx_buf, 2, ZSOCK_MSG_TRUNC | ZSOCK_MSG_PEEK);
+	memset(str_buf, 0, sizeof(str_buf));
+	rv = recv(sock_s, str_buf, 2, ZSOCK_MSG_TRUNC | ZSOCK_MSG_PEEK);
 	zassert_equal(rv, sizeof(TEST_STR_SMALL) - 1, "MSG_TRUNC flag failed");
 
 	/* The packet should still be available due to MSG_PEEK */
-	rv = recv(sock_s, rx_buf, sizeof(rx_buf), ZSOCK_MSG_TRUNC);
+	rv = recv(sock_s, str_buf, sizeof(str_buf), ZSOCK_MSG_TRUNC);
 	zassert_equal(rv, sizeof(TEST_STR_SMALL) - 1,
 		      "recv after MSG_PEEK failed");
-	zassert_mem_equal(rx_buf, BUF_AND_SIZE(TEST_STR_SMALL),
+	zassert_mem_equal(str_buf, BUF_AND_SIZE(TEST_STR_SMALL),
 			  "invalid rx data");
 
 	rv = close(sock_c);

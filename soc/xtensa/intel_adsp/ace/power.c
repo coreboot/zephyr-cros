@@ -223,7 +223,7 @@ __imr void pm_state_imr_restore(void)
 }
 #endif /* CONFIG_ADSP_IMR_CONTEXT_SAVE */
 
-__weak void pm_state_set(enum pm_state state, uint8_t substate_id)
+void pm_state_set(enum pm_state state, uint8_t substate_id)
 {
 	ARG_UNUSED(substate_id);
 	uint32_t cpu = arch_proc_id();
@@ -282,9 +282,12 @@ __weak void pm_state_set(enum pm_state state, uint8_t substate_id)
 					(void *)rom_entry;
 			sys_cache_data_flush_range(imr_layout, sizeof(*imr_layout));
 #endif /* CONFIG_ADSP_IMR_CONTEXT_SAVE */
+			uint32_t hpsram_mask = 0;
+#ifdef CONFIG_ADSP_POWER_DOWN_HPSRAM
 			/* turn off all HPSRAM banks - get a full bitmap */
 			uint32_t ebb_banks = ace_hpsram_get_bank_count();
-			uint32_t hpsram_mask = (1 << ebb_banks) - 1;
+			hpsram_mask = (1 << ebb_banks) - 1;
+#endif /* CONFIG_ADSP_POWER_DOWN_HPSRAM */
 			/* do power down - this function won't return */
 			power_down(true, uncache_to_cache(&hpsram_mask),
 				   true);
@@ -294,7 +297,7 @@ __weak void pm_state_set(enum pm_state state, uint8_t substate_id)
 	} else if (state == PM_STATE_RUNTIME_IDLE) {
 		DSPCS.bootctl[cpu].bctl &= ~DSPBR_BCTL_WAITIPPG;
 		DSPCS.bootctl[cpu].bctl &= ~DSPBR_BCTL_WAITIPCG;
-		ACE_PWRCTL->wpdsphpxpg &= ~BIT(cpu);
+		soc_cpu_power_down(cpu);
 		if (cpu == 0) {
 			uint32_t battr = DSPCS.bootctl[cpu].battr & (~LPSCTL_BATTR_MASK);
 
@@ -308,7 +311,7 @@ __weak void pm_state_set(enum pm_state state, uint8_t substate_id)
 }
 
 /* Handle SOC specific activity after Low Power Mode Exit */
-__weak void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
+void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 {
 	ARG_UNUSED(substate_id);
 	uint32_t cpu = arch_proc_id();
@@ -346,9 +349,9 @@ __weak void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 			return;
 		}
 
-		ACE_PWRCTL->wpdsphpxpg |= BIT(cpu);
+		soc_cpu_power_up(cpu);
 
-		while ((ACE_PWRSTS->dsphpxpgs & BIT(cpu)) == 0) {
+		while (!soc_cpu_is_powered(cpu)) {
 			k_busy_wait(HW_STATE_CHECK_DELAY);
 		}
 

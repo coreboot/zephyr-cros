@@ -99,8 +99,8 @@ static enum sensor_channel icm42688_get_channel_from_position(int pos)
 	}
 }
 
-int icm42688_convert_raw_to_q31(struct icm42688_cfg *cfg, enum sensor_channel chan,
-				int32_t reading, q31_t *out)
+int icm42688_convert_raw_to_q31(struct icm42688_cfg *cfg, enum sensor_channel chan, int32_t reading,
+				q31_t *out)
 {
 	int32_t whole;
 	int32_t fraction;
@@ -134,9 +134,11 @@ int icm42688_convert_raw_to_q31(struct icm42688_cfg *cfg, enum sensor_channel ch
 	}
 	intermediate = ((int64_t)whole * INT64_C(1000000) + fraction);
 	if (shift < 0) {
-		intermediate = intermediate * INT32_MAX * (1 << -shift) /  INT64_C(1000000);
+		intermediate =
+			intermediate * ((int64_t)INT32_MAX + 1) * (1 << -shift) / INT64_C(1000000);
 	} else if (shift > 0) {
-		intermediate = intermediate * INT32_MAX / (((1 << shift) - 1) * INT64_C(1000000));
+		intermediate =
+			intermediate * ((int64_t)INT32_MAX + 1) / ((1 << shift) * INT64_C(1000000));
 	}
 	*out = CLAMP(intermediate, INT32_MIN, INT32_MAX);
 
@@ -223,39 +225,39 @@ static int icm42688_one_shot_decode(const uint8_t *buffer, sensor_frame_iterator
 				    q31_t *values, uint8_t max_count)
 {
 	const struct icm42688_encoded_data *edata = (const struct icm42688_encoded_data *)buffer;
-	uint8_t channels_read = edata->channels;
+	uint8_t channel_pos_read = edata->channels;
 	struct icm42688_cfg cfg = {
 		.accel_fs = edata->header.accel_fs,
 		.gyro_fs = edata->header.gyro_fs,
 	};
-	int chan;
+	enum sensor_channel chan;
 	int pos;
 	int count = 0;
-	int num_samples = __builtin_popcount(channels_read);
+	int num_samples = __builtin_popcount(channel_pos_read);
 
-	channels_read = edata->channels;
+	channel_pos_read = edata->channels;
 
 	if (*fit != 0) {
 		return 0;
 	}
 
 	/* Skip channels already decoded */
-	for (int i = 0; i < *cit && channels_read; i++) {
-		chan = __builtin_ctz(channels_read);
-		channels_read &= ~BIT(chan);
+	for (int i = 0; i < *cit && channel_pos_read; i++) {
+		pos = __builtin_ctz(channel_pos_read);
+		channel_pos_read &= ~BIT(pos);
 	}
 
 	/* Decode remaining channels */
-	while (channels_read && *cit < num_samples && count < max_count) {
-		chan = icm42688_get_channel_from_position(__builtin_ctz(channels_read));
+	while (channel_pos_read && *cit < num_samples && count < max_count) {
+		pos = __builtin_ctz(channel_pos_read);
+		chan = icm42688_get_channel_from_position(pos);
 
 		channels[count] = chan;
-		pos = icm42688_get_channel_position(chan);
 
 		icm42688_convert_raw_to_q31(&cfg, chan, edata->readings[pos], &values[count]);
 
 		count++;
-		channels_read &= ~BIT(chan);
+		channel_pos_read &= ~BIT(pos);
 		*cit += 1;
 	}
 

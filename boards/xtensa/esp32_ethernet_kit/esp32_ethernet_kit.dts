@@ -5,7 +5,7 @@
  */
 /dts-v1/;
 
-#include <espressif/esp32.dtsi>
+#include <espressif/esp32/esp32_wrover_e_n4r8.dtsi>
 #include "esp32_ethernet_kit-pinctrl.dtsi"
 
 / {
@@ -115,7 +115,10 @@
 	};
 };
 
-&eth {
+&mdio {
+	pinctrl-0 = <&mdio_default>;
+	pinctrl-names = "default";
+
 	phy: phy {
 		compatible = "ethernet-phy";
 		status = "disabled";
@@ -124,7 +127,6 @@
 	};
 };
 
-&mdio {
-	pinctrl-0 = <&mdio_default>;
-	pinctrl-names = "default";
+&eth {
+	phy-handle = <&phy>;
 };

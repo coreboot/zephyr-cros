@@ -11,6 +11,7 @@
 /dts-v1/;
 #include <nordic/nrf52832_qfaa.dtsi>
 #include "pinetime_devkit0-pinctrl.dtsi"
+#include <zephyr/dt-bindings/input/input-event-codes.h>
 
 / {
 	model = "Pine64 PineTime DevKit0";
@@ -25,7 +26,7 @@
 		zephyr,flash = &flash0;
 		zephyr,code-partition = &slot0_partition;
 		zephyr,display = &st7789v;
-		zephyr,keyboard-scan = &cst816s;
+		zephyr,keyboard-scan = &kscan_input;
 	};
 
 	aliases {
@@ -34,7 +35,7 @@
 		led2 = &blled2;	/* backlight high */
 		led3 = &statusled;	/* status led, may be not populated */
 		sw0 = &key_in;  /* key in */
-		kscan0 = &cst816s;
+		kscan0 = &kscan_input;
 		watchdog0 = &wdt0;
 	};
 
@@ -63,6 +64,7 @@
 		key_in: button_0 {
 			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
 			label = "Key in";
+			zephyr,code = <INPUT_KEY_0>;
 		};
 	};
 
@@ -128,6 +130,10 @@
 		reg = <0x15>;
 		irq-gpios = <&gpio0 28 GPIO_ACTIVE_LOW>;
 		rst-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+
+		kscan_input: kscan-input {
+			compatible = "zephyr,kscan-input";
+		};
 	};
 };
 

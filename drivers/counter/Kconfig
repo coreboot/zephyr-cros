@@ -20,6 +20,8 @@ module = COUNTER
 module-str = counter
 source "subsys/logging/Kconfig.template.log_config"
 
+source "drivers/counter/Kconfig.ambiq"
+
 source "drivers/counter/Kconfig.gecko"
 
 source "drivers/counter/Kconfig.tmr_cmsdk_apb"
@@ -73,6 +75,8 @@ source "drivers/counter/Kconfig.smartbond_timer"
 source "drivers/counter/Kconfig.mcp7940n"
 
 source "drivers/counter/Kconfig.mcux_ctimer"
+
+source "drivers/counter/Kconfig.ifx_cat1"
 
 source "drivers/counter/Kconfig.andes_atcpit100"
 

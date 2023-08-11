@@ -1115,8 +1115,14 @@ static void generate_mac(uint8_t *mac_addr)
 	mac_addr[4] = CONFIG_ETH_STM32_HAL_MAC4;
 	mac_addr[5] = CONFIG_ETH_STM32_HAL_MAC5;
 #else
+	uint8_t unique_device_ID_12_bytes[12];
+	uint32_t result_mac_32_bits;
+
 	/* Nothing defined by the user, use device id */
-	hwinfo_get_device_id(&mac_addr[3], 3);
+	hwinfo_get_device_id(unique_device_ID_12_bytes, 12);
+	result_mac_32_bits = crc32_ieee((uint8_t *)unique_device_ID_12_bytes, 12);
+	memcpy(&mac_addr[3], &result_mac_32_bits, 3);
+
 #endif /* NODE_HAS_VALID_MAC_ADDR(DT_DRV_INST(0))) */
 #endif
 }

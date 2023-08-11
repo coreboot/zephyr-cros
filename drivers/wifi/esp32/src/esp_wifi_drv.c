@@ -289,6 +289,7 @@ static void esp_wifi_event_task(void)
 			break;
 		case ESP32_WIFI_EVENT_AP_STOP:
 			esp32_data.state = ESP32_AP_STOPPED;
+			net_eth_carrier_off(esp32_wifi_iface);
 			break;
 		case ESP32_WIFI_EVENT_AP_STACONNECTED:
 			esp32_data.state = ESP32_AP_CONNECTED;
@@ -430,7 +431,8 @@ static int esp32_wifi_ap_enable(const struct device *dev,
 	wifi_config_t wifi_config = {
 		.ap = {
 			.max_connection = 5,
-			.channel = params->channel
+			.channel = params->channel == WIFI_CHANNEL_ANY ?
+				0 : params->channel,
 		},
 	};
 
@@ -457,6 +459,8 @@ static int esp32_wifi_ap_enable(const struct device *dev,
 		LOG_ERR("Failed to enable Wi-Fi AP mode");
 		return -EAGAIN;
 	}
+
+	net_eth_carrier_on(esp32_wifi_iface);
 
 	return 0;
 };
@@ -624,18 +628,22 @@ static int esp32_wifi_dev_init(const struct device *dev)
 	return 0;
 }
 
-static const struct net_wifi_mgmt_offload esp32_api = {
-	.wifi_iface.iface_api.init = esp32_wifi_init,
-	.wifi_iface.send = esp32_wifi_send,
+static const struct wifi_mgmt_ops esp32_wifi_mgmt = {
+	.scan		   = esp32_wifi_scan,
+	.connect	   = esp32_wifi_connect,
+	.disconnect	   = esp32_wifi_disconnect,
+	.ap_enable	   = esp32_wifi_ap_enable,
+	.ap_disable	   = esp32_wifi_ap_disable,
+	.iface_status	   = esp32_wifi_status,
 #if defined(CONFIG_NET_STATISTICS_WIFI)
-	.get_stats			 = esp32_wifi_stats,
- #endif
-	.scan			   = esp32_wifi_scan,
-	.connect		   = esp32_wifi_connect,
-	.disconnect		   = esp32_wifi_disconnect,
-	.ap_enable		   = esp32_wifi_ap_enable,
-	.ap_disable		   = esp32_wifi_ap_disable,
-	.iface_status		   = esp32_wifi_status,
+	.get_stats	   = esp32_wifi_stats,
+#endif
+};
+
+static const struct net_wifi_mgmt_offload esp32_api = {
+	.wifi_iface.iface_api.init	  = esp32_wifi_init,
+	.wifi_iface.send = esp32_wifi_send,
+	.wifi_mgmt_api = &esp32_wifi_mgmt,
 };
 
 NET_DEVICE_DT_INST_DEFINE(0,
