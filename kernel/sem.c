@@ -129,6 +129,24 @@ static inline void z_vrfy_k_sem_give(struct k_sem *sem)
 #include <syscalls/k_sem_give_mrsh.c>
 #endif
 
+static int sem_suspend_state_count_func(struct k_thread *thread, void *arg)
+{
+    unsigned *count = arg;
+
+    (*count)++;
+    return 0;
+}
+
+unsigned int k_sem_suspend_state_count(struct k_sem *sem)
+{
+	unsigned count = 0;
+	k_spinlock_key_t key = k_spin_lock(&lock);
+
+	z_sched_waitq_walk(&sem->wait_q, sem_suspend_state_count_func, &count);
+	k_spin_unlock(&lock, key);
+	return count;
+}
+
 int z_impl_k_sem_take(struct k_sem *sem, k_timeout_t timeout)
 {
 	int ret = 0;

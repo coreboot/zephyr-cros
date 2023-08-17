@@ -3216,6 +3216,8 @@ static inline unsigned int z_impl_k_sem_count_get(struct k_sem *sem)
 	return sem->count;
 }
 
+unsigned int k_sem_suspend_state_count(struct k_sem *sem);
+
 /**
  * @brief Statically define and initialize a semaphore.
  *
