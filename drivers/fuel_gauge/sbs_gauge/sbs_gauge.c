@@ -11,14 +11,10 @@
 
 #include "sbs_gauge.h"
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <zephyr/devicetree.h>
 #include <zephyr/drivers/fuel_gauge.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
 
 LOG_MODULE_REGISTER(sbs_gauge);
 
@@ -177,27 +173,6 @@ static int sbs_gauge_get_prop(const struct device *dev, struct fuel_gauge_get_pr
 	return rc;
 }
 
-#if SBS_GAUGE_CUTOFF_SUPPORT()
-static int sbs_gauge_do_battery_cutoff(const struct device *dev)
-{
-	int rc;
-	const struct sbs_gauge_config *cfg = dev->config;
-
-	if (cfg->cutoff_support == false) {
-		return -ENOTSUP;
-	}
-
-	for (int i = 0; i < cfg->cutoff_payload_size; i++) {
-		rc = sbs_cmd_reg_write(dev, cfg->cutoff_reg, cfg->cutoff_payload[i]);
-		if (rc != 0) {
-			return rc;
-		}
-	}
-
-	return rc;
-}
-#endif /* SBS_GAUGE_CUTOFF_SUPPORT() */
-
 static int sbs_gauge_set_prop(const struct device *dev, struct fuel_gauge_set_property *prop)
 {
 	int rc = 0;
@@ -228,6 +203,7 @@ static int sbs_gauge_set_prop(const struct device *dev, struct fuel_gauge_set_pr
 		rc = sbs_cmd_reg_write(dev, SBS_GAUGE_CMD_AR, prop->value.sbs_at_rate);
 		prop->value.sbs_at_rate = val;
 		break;
+
 	default:
 		rc = -ENOTSUP;
 	}
@@ -331,32 +307,17 @@ static const struct fuel_gauge_driver_api sbs_gauge_driver_api = {
 	.get_property = &sbs_gauge_get_props,
 	.set_property = &sbs_gauge_set_props,
 	.get_buffer_property = &sbs_gauge_get_buffer_prop,
-#if SBS_GAUGE_CUTOFF_SUPPORT()
-	.battery_cutoff = &sbs_gauge_do_battery_cutoff,
-#endif
 };
 
-#if SBS_GAUGE_CUTOFF_SUPPORT()
-#define SBS_GAUGE_CONFIG_INIT(index)                                                               \
-	.cutoff_support = DT_INST_PROP(index, battery_cutoff_support),                             \
-	.cutoff_reg = DT_INST_PROP(index, battery_cutoff_reg_addr),                                \
-	.cutoff_payload = DT_INST_PROP(index, battery_cutoff_payload),                             \
-	.cutoff_payload_size = DT_INST_PROP_LEN(index, battery_cutoff_payload),
-#else
-#define SBS_GAUGE_CONFIG_INIT(index)
-#endif
-
+/* FIXME: fix init priority */
 #define SBS_GAUGE_INIT(index)                                                                      \
+                                                                                                   \
 	static const struct sbs_gauge_config sbs_gauge_config_##index = {                          \
-		.i2c = I2C_DT_SPEC_INST_GET(index), SBS_GAUGE_CONFIG_INIT(index)};                 \
+		.i2c = I2C_DT_SPEC_INST_GET(index),                                                \
+	};                                                                                         \
                                                                                                    \
 	DEVICE_DT_INST_DEFINE(index, &sbs_gauge_init, NULL, NULL, &sbs_gauge_config_##index,       \
 			      POST_KERNEL, CONFIG_FUEL_GAUGE_INIT_PRIORITY,                        \
 			      &sbs_gauge_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(SBS_GAUGE_INIT)
-
-#define CUTOFF_PAYLOAD_SIZE_ASSERT(inst)                                                           \
-	BUILD_ASSERT(DT_INST_PROP_LEN_OR(inst, battery_cutoff_payload, 0) <=                       \
-		     SBS_GAUGE_CUTOFF_PAYLOAD_MAX_SIZE);
-DT_INST_FOREACH_STATUS_OKAY(CUTOFF_PAYLOAD_SIZE_ASSERT)
