@@ -248,6 +248,10 @@
 #define TICKER_USER_ULL_HIGH_VENDOR_OPS 0
 #endif /* TICKER_USER_ULL_HIGH_VENDOR_OPS */
 
+#if !defined(TICKER_USER_ULL_LOW_VENDOR_OPS)
+#define TICKER_USER_ULL_LOW_VENDOR_OPS 0
+#endif /* TICKER_USER_ULL_LOW_VENDOR_OPS */
+
 #if !defined(TICKER_USER_THREAD_VENDOR_OPS)
 #define TICKER_USER_THREAD_VENDOR_OPS 0
 #endif /* TICKER_USER_THREAD_VENDOR_OPS */
@@ -271,7 +275,7 @@
 #define TICKER_USER_THREAD_OPS   (1 + TICKER_USER_THREAD_VENDOR_OPS + 1)
 #endif /* !CONFIG_BT_CTLR_LOW_LAT */
 
-#define TICKER_USER_ULL_LOW_OPS  (1 + 1)
+#define TICKER_USER_ULL_LOW_OPS  (1 + TICKER_USER_ULL_LOW_VENDOR_OPS + 1)
 
 /* NOTE: When ULL_LOW priority is configured to lower than ULL_HIGH, then extra
  *       ULL_HIGH operations queue elements are required to buffer the
@@ -359,6 +363,11 @@ static MFIFO_DEFINE(prep, sizeof(struct lll_event), EVENT_PIPELINE_MAX);
 #else
 #define EVENT_DONE_MAX VENDOR_EVENT_DONE_MAX
 #endif
+
+/* Maximum time allowed for comleting synchronous LLL disabling via
+ * ull_disable.
+ */
+#define ULL_DISABLE_TIMEOUT K_MSEC(1000)
 
 static RXFIFO_DEFINE(done, sizeof(struct node_rx_event_done),
 		     EVENT_DONE_MAX, 0U);
@@ -1091,11 +1100,11 @@ void ll_rx_dequeue(void)
 
 		LL_ASSERT(!lll_conn->link_tx_free);
 
-		memq_link_t *link = memq_deinit(&lll_conn->memq_tx.head,
-						&lll_conn->memq_tx.tail);
-		LL_ASSERT(link);
+		memq_link_t *memq_link = memq_deinit(&lll_conn->memq_tx.head,
+						     &lll_conn->memq_tx.tail);
+		LL_ASSERT(memq_link);
 
-		lll_conn->link_tx_free = link;
+		lll_conn->link_tx_free = memq_link;
 
 		struct ll_conn *conn = HDR_LLL2ULL(lll_conn);
 
@@ -1135,17 +1144,17 @@ void ll_rx_dequeue(void)
 			if (cc->status == BT_HCI_ERR_ADV_TIMEOUT) {
 				struct lll_conn *conn_lll;
 				struct ll_conn *conn;
-				memq_link_t *link;
+				memq_link_t *memq_link;
 
 				conn_lll = lll->conn;
 				LL_ASSERT(conn_lll);
 				lll->conn = NULL;
 
 				LL_ASSERT(!conn_lll->link_tx_free);
-				link = memq_deinit(&conn_lll->memq_tx.head,
-						   &conn_lll->memq_tx.tail);
-				LL_ASSERT(link);
-				conn_lll->link_tx_free = link;
+				memq_link = memq_deinit(&conn_lll->memq_tx.head,
+							&conn_lll->memq_tx.tail);
+				LL_ASSERT(memq_link);
+				conn_lll->link_tx_free = memq_link;
 
 				conn = HDR_LLL2ULL(conn_lll);
 				ll_conn_release(conn);
@@ -1796,26 +1805,54 @@ void ull_ticker_status_give(uint32_t status, void *param)
 	k_sem_give(&sem_ticker_api_cb);
 }
 
+/**
+ * @brief Take the ticker API semaphore (if applicable) and wait for operation
+ *        complete.
+ *
+ * Waits for ticker operation to complete by taking ticker API semaphore,
+ * unless the operation was executed inline due to same-priority caller/
+ * callee id.
+ *
+ * In case of asynchronous ticker operation (caller priority !=
+ * callee priority), the function grabs the semaphore and waits for
+ * ull_ticker_status_give, which assigns the ret_cb variable and releases
+ * the semaphore.
+ *
+ * In case of synchronous ticker operation, the result is already known at
+ * entry, and semaphore is only taken if ret_cb has been updated. This is done
+ * to balance take/give counts. If *ret_cb is still TICKER_STATUS_BUSY, but
+ * ret is not, the ticker operation has failed early, and no callback will be
+ * invoked. In this case the semaphore shall not be taken.
+ *
+ * @param ret    Return value from ticker API call:
+ *               TICKER_STATUS_BUSY:    Ticker operation is queued
+ *               TICKER_STATUS_SUCCESS: Operation completed OK
+ *               TICKER_STATUS_FAILURE: Operation failed
+ *
+ * @param ret_cb Pointer to user data passed to ticker operation
+ *               callback, which holds the operation result. Value
+ *               upon entry:
+ *               TICKER_STATUS_BUSY:    Ticker has not yet called CB
+ *               TICKER_STATUS_SUCCESS: Operation completed OK via CB
+ *               TICKER_STATUS_FAILURE: Operation failed via CB
+ *
+ *               NOTE: For correct operation, *ret_cb must be initialized
+ *               to TICKER_STATUS_BUSY before initiating the ticker API call.
+ *
+ * @return uint32_t Returns result of completed ticker operation
+ */
 uint32_t ull_ticker_status_take(uint32_t ret, uint32_t volatile *ret_cb)
 {
-	if (ret == TICKER_STATUS_BUSY) {
-		/* TODO: Enable ticker job in case of CONFIG_BT_CTLR_LOW_LAT */
-	} else {
-		/* Check for ticker operation enqueue failed, in which case
-		 * function return value (ret) will be TICKER_STATUS_FAILURE
-		 * and callback return value (ret_cb) will remain as
-		 * TICKER_STATUS_BUSY.
-		 * This assert check will avoid waiting forever to take the
-		 * semaphore that will never be given when the ticker operation
-		 * callback does not get called due to enqueue failure.
+	if ((ret == TICKER_STATUS_BUSY) || (*ret_cb != TICKER_STATUS_BUSY)) {
+		/* Operation is either pending of completed via callback
+		 * prior to this function call. Take the sempaphore and wait,
+		 * or take it to balance take/give counting.
 		 */
-		LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
-			  (*ret_cb != TICKER_STATUS_BUSY));
+		k_sem_take(&sem_ticker_api_cb, K_FOREVER);
+		return *ret_cb;
 	}
 
-	k_sem_take(&sem_ticker_api_cb, K_FOREVER);
-
-	return *ret_cb;
+	return ret;
 }
 
 void *ull_disable_mark(void *param)
@@ -1936,7 +1973,7 @@ int ull_disable(void *lll)
 			     &mfy);
 	LL_ASSERT(!ret);
 
-	return k_sem_take(&sem, K_FOREVER);
+	return k_sem_take(&sem, ULL_DISABLE_TIMEOUT);
 }
 
 void *ull_pdu_rx_alloc_peek(uint8_t count)

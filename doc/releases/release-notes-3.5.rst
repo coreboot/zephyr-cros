@@ -32,6 +32,9 @@ Changes in this release
   documentation. As this is largely an internal API, existing applications will
   most probably continue to work unchanged.
 
+* The Kconfig option CONFIG_GPIO_NCT38XX_INTERRUPT has been renamed to
+  :kconfig:option:`CONFIG_GPIO_NCT38XX_ALERT`.
+
 Removed APIs in this release
 ============================
 
@@ -46,6 +49,14 @@ Deprecated in this release
 
 Stable API changes in this release
 ==================================
+
+* MCUmgr SMP version 2 error codes entry has changed due to a collision with an
+  existing response in shell_mgmt. Previously, these errors had the entry ``ret``
+  but now have the entry ``err``. ``smp_add_cmd_ret()`` is now deprecated and
+  :c:func:`smp_add_cmd_err` should be used instead, ``MGMT_CB_ERROR_RET`` is
+  now deprecated and :c:enumerator:`MGMT_CB_ERROR_ERR` should be used instead.
+  SMP version 2 error code defines for in-tree modules have been updated to
+  replace the ``*_RET_RC_*`` parts with ``*_ERR_*``.
 
 New APIs in this release
 ========================
@@ -144,6 +155,10 @@ Boards & SoC Support
 
 Build system and infrastructure
 *******************************
+
+* SCA (Static Code Analysis)
+
+  * Added support for CodeChecker
 
 Drivers and Sensors
 *******************
@@ -297,6 +312,8 @@ Devicetree
   :c:macro:`DT_FOREACH_STATUS_OKAY_NODE_VARGS`
   :c:macro:`DT_MEMORY_ATTR_FOREACH_NODE`
   :c:macro:`DT_MEMORY_ATTR_APPLY`
+  :c:macro:`DT_MEM_FROM_FIXED_PARTITION`
+  :c:macro:`DT_FIXED_PARTITION_ADDR`
 
 Libraries / Subsystems
 **********************

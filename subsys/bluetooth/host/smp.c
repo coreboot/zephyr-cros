@@ -313,14 +313,15 @@ static bool le_sc_supported(void)
 
 static const struct bt_conn_auth_cb *latch_auth_cb(struct bt_smp *smp)
 {
-	atomic_ptr_cas(&smp->auth_cb, BT_SMP_AUTH_CB_UNINITIALIZED, (atomic_ptr_val_t)bt_auth);
+	(void)atomic_ptr_cas(&smp->auth_cb, BT_SMP_AUTH_CB_UNINITIALIZED,
+			     (atomic_ptr_val_t)bt_auth);
 
 	return atomic_ptr_get(&smp->auth_cb);
 }
 
 static bool latch_bondable(struct bt_smp *smp)
 {
-	atomic_cas(&smp->bondable, BT_SMP_BONDABLE_UNINITIALIZED, (atomic_val_t)bondable);
+	(void)atomic_cas(&smp->bondable, BT_SMP_BONDABLE_UNINITIALIZED, (atomic_val_t)bondable);
 
 	return atomic_get(&smp->bondable);
 }
@@ -4893,14 +4894,14 @@ static const uint8_t M[] = {
 	0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10
 };
 
-static int aes_test(const char *prefix, const uint8_t *key, const uint8_t *m,
+static int aes_test(const char *prefix, const uint8_t *in_key, const uint8_t *m,
 		    uint16_t len, const uint8_t *mac)
 {
 	uint8_t out[16];
 
 	LOG_DBG("%s: AES CMAC of message with len %u", prefix, len);
 
-	bt_crypto_aes_cmac(key, m, len, out);
+	bt_crypto_aes_cmac(in_key, m, len, out);
 	if (!memcmp(out, mac, 16)) {
 		LOG_DBG("%s: Success", prefix);
 	} else {
@@ -4954,7 +4955,7 @@ static int smp_aes_cmac_test(void)
 	return 0;
 }
 
-static int sign_test(const char *prefix, const uint8_t *key, const uint8_t *m,
+static int sign_test(const char *prefix, const uint8_t *sign_key, const uint8_t *m,
 		     uint16_t len, const uint8_t *sig)
 {
 	uint8_t msg[len + sizeof(uint32_t) + 8];
@@ -4970,7 +4971,7 @@ static int sign_test(const char *prefix, const uint8_t *key, const uint8_t *m,
 
 	memcpy(orig, msg, sizeof(msg));
 
-	err = smp_sign_buf(key, msg, len);
+	err = smp_sign_buf(sign_key, msg, len);
 	if (err) {
 		return err;
 	}

@@ -47,6 +47,10 @@ struct counter_alarm_cfg alarm_cfg;
 #define TIMER DT_NODELABEL(stimer0)
 #elif defined(CONFIG_COUNTER_INFINEON_CAT1)
 #define TIMER DT_NODELABEL(counter0_0)
+#elif defined(CONFIG_COUNTER_AMBIQ)
+#define TIMER DT_NODELABEL(counter0)
+#elif defined(CONFIG_COUNTER_SNPS_DW)
+#define TIMER DT_NODELABEL(timer0)
 #endif
 
 static void test_counter_interrupt_fn(const struct device *counter_dev,

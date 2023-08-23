@@ -109,6 +109,8 @@ static int esp32_wifi_send(const struct device *dev, struct net_pkt *pkt)
 {
 	struct esp32_wifi_runtime *data = dev->data;
 	const int pkt_len = net_pkt_get_len(pkt);
+	esp_interface_t ifx =
+		esp32_data.state == ESP32_AP_CONNECTED ? ESP_IF_WIFI_AP : ESP_IF_WIFI_STA;
 
 	/* Read the packet payload */
 	if (net_pkt_read(pkt, data->frame_buf, pkt_len) < 0) {
@@ -116,8 +118,7 @@ static int esp32_wifi_send(const struct device *dev, struct net_pkt *pkt)
 	}
 
 	/* Enqueue packet for transmission */
-	if (esp_wifi_internal_tx(ESP_IF_WIFI_STA, (void *)data->frame_buf,
-			pkt_len) != ESP_OK) {
+	if (esp_wifi_internal_tx(ifx, (void *)data->frame_buf, pkt_len) != ESP_OK) {
 		goto out;
 	}
 
@@ -289,6 +290,7 @@ static void esp_wifi_event_task(void)
 			break;
 		case ESP32_WIFI_EVENT_AP_STOP:
 			esp32_data.state = ESP32_AP_STOPPED;
+			net_eth_carrier_off(esp32_wifi_iface);
 			break;
 		case ESP32_WIFI_EVENT_AP_STACONNECTED:
 			esp32_data.state = ESP32_AP_CONNECTED;
@@ -430,7 +432,8 @@ static int esp32_wifi_ap_enable(const struct device *dev,
 	wifi_config_t wifi_config = {
 		.ap = {
 			.max_connection = 5,
-			.channel = params->channel
+			.channel = params->channel == WIFI_CHANNEL_ANY ?
+				0 : params->channel,
 		},
 	};
 
@@ -457,6 +460,8 @@ static int esp32_wifi_ap_enable(const struct device *dev,
 		LOG_ERR("Failed to enable Wi-Fi AP mode");
 		return -EAGAIN;
 	}
+
+	net_eth_carrier_on(esp32_wifi_iface);
 
 	return 0;
 };
