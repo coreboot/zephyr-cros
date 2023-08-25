@@ -206,14 +206,11 @@ Bluetooth:
     - sjanc
   files:
     - doc/connectivity/bluetooth/
-    - drivers/bluetooth/
     - include/zephyr/bluetooth/
     - include/zephyr/drivers/bluetooth/
     - samples/bluetooth/
     - subsys/bluetooth/
     - subsys/bluetooth/common/
-    - subsys/bluetooth/services/
-    - subsys/bluetooth/shell/
     - tests/bluetooth/
     - tests/bsim/bluetooth/
   files-exclude:
@@ -271,7 +268,10 @@ Bluetooth Host:
     - theob-pro
     - kruithofa
   files:
+    - drivers/bluetooth/
     - subsys/bluetooth/host/
+    - subsys/bluetooth/services/
+    - subsys/bluetooth/shell/
     - tests/bluetooth/host*/
     - tests/bsim/bluetooth/host/
   labels:
@@ -328,6 +328,7 @@ Build system:
     - jeremybettis
     - nashif
     - nordicjm
+    - "57300"
   files:
     - cmake/
     - CMakeLists.txt
@@ -348,6 +349,7 @@ Board/SoC configuration:
     - galak
     - nashif
     - nordicjm
+    - "57300"
   files:
     - soc/Kconfig
     - boards/Kconfig
@@ -419,7 +421,7 @@ CMSIS-DSP integration:
   collaborators:
     - galak
   files:
-    - modules/Kconfig.cmsis_dsp
+    - modules/cmsis/Kconfig.cmsis_dsp
     - tests/benchmarks/cmsis_dsp/
     - tests/lib/cmsis_dsp/
   labels:
@@ -432,7 +434,7 @@ CMSIS-NN integration:
   collaborators:
     - stephanosio
   files:
-    - modules/Kconfig.cmsis_nn
+    - modules/cmsis/Kconfig.cmsis_nn
     - tests/lib/cmsis_nn/
   labels:
     - "area: CMSIS-NN"
@@ -562,6 +564,7 @@ Disk:
     - danieldegrasse
   collaborators:
     - jfischer-no
+    - decsny
   files:
     - include/zephyr/storage/disk_access.h
     - include/zephyr/drivers/disk.h
@@ -1034,6 +1037,7 @@ Release Notes:
     - jciupis
     - cfriedt
     - fgrandel
+    - jukkar
   files:
     - drivers/ieee802154/
     - include/zephyr/net/ieee802154_radio.h
@@ -1418,6 +1422,7 @@ Release Notes:
   status: maintained
   maintainers:
     - tbursztyka
+    - jukkar
   collaborators:
     - rlubos
     - kludentwo
@@ -1832,6 +1837,7 @@ Networking:
   status: maintained
   maintainers:
     - rlubos
+    - jukkar
   collaborators:
     - tbursztyka
     - ssharks
@@ -1843,11 +1849,16 @@ Networking:
     - doc/connectivity/networking/
     - tests/net/
   files-exclude:
+    - doc/connectivity/networking/api/ieee802154.rst
+    - include/zephyr/net/ieee802154*.h
     - samples/net/sockets/coap_*/
     - samples/net/lwm2m_client/
+    - subsys/net/l2/ieee802154/
     - subsys/net/lib/coap/
+    - subsys/net/lib/config/ieee802154*
     - subsys/net/lib/lwm2m/
     - subsys/net/lib/tls_credentials/
+    - tests/net/ieee802154/
   labels:
     - "area: Networking"
 
@@ -1855,6 +1866,7 @@ Networking:
   status: odd fixes
   collaborators:
     - rlubos
+    - jukkar
   files:
     - samples/net/sockets/
     - subsys/net/lib/sockets/
@@ -1869,10 +1881,26 @@ Networking:
   collaborators:
     - rlubos
     - tbursztyka
+    - jukkar
   files:
     - include/zephyr/net/buf.h
     - subsys/net/buf.c
     - tests/net/buf/
+  labels:
+    - "area: Networking"
+
+"Networking: Connection Manager":
+  status: maintained
+  maintainers:
+    - rlubos
+  collaborators:
+    - glarsennordic
+    - jukkar
+  files:
+    - include/zephyr/net/conn_mgr*.h
+    - subsys/net/conn_mgr/
+    - tests/net/conn_mgr/
+    - tests/net/conn_mgr_conn/
   labels:
     - "area: Networking"
 
@@ -1936,13 +1964,12 @@ Networking:
   collaborators:
     - rlubos
     - fgrandel
+    - jukkar
   files:
     - doc/connectivity/networking/api/ieee802154.rst
-    - include/zephyr/net/ieee802154.h
-    - include/zephyr/net/ieee802154_pkt.h
-    - include/zephyr/net/ieee802154_mgmt.h
+    - include/zephyr/net/ieee802154*.h
     - subsys/net/l2/ieee802154/
-    - subsys/net/lib/config/ieee802154_*
+    - subsys/net/lib/config/ieee802154*
     - tests/net/ieee802154/
   labels:
     - "area: IEEE 802.15.4"
@@ -2127,6 +2154,7 @@ Shields:
   collaborators:
     - avisconti
     - jfischer-no
+    - kartben
   files:
     - boards/shields/
     - doc/hardware/porting/shields.rst
@@ -2453,34 +2481,25 @@ Renesas R-Car Platforms:
   status: maintained
   maintainers:
     - aaillet
+    - lorc
   collaborators:
-    - pmarzin
+    - xakep-amatop
   files:
     - boards/arm/rcar_*/
+    - boards/arm64/rcar_*/
     - drivers/*/*rcar*
     - drivers/clock_control/*cpg_mssr*
-    - dts/arm/renesas/gen3/
+    - dts/arm/renesas/rcar/
+    - dts/arm64/renesas/
     - dts/bindings/*/*rcar*
     - soc/arm/renesas_rcar/
+    - soc/arm64/renesas_rcar/
   labels:
     - "platform: Renesas R-Car"
   description: >-
-    Renesas R-Car SOCs, dts files and related drivers. Renesas boards based
-    on R-Car SOCs.
-
-Renesas R-Car ARM64 Platforms:
-  status: maintained
-  maintainers:
-    - lorc
-  files:
-    - boards/arm64/rcar_*/
-    - dts/arm64/renesas/
-    - soc/arm64/renesas_rcar/
-  labels:
-    - "platform: Renesas R-Car ARM64"
-  description: >-
-    Renesas R-Car SOCs and dts files, ARMv8 side. Zephyr running on ARMv8 CPUs on Renesas
-    boards based on R-Car SOCs.
+    Renesas R-Car SOCs, dts files (Cortex-R and Cortex-A sides).
+    Renesas boards based on R-Car SOCs (Cortex-R and Cortex-A sides).
+    Renesas R-Car related drivers.
 
 STM32 Platforms:
   status: maintained
@@ -2586,7 +2605,7 @@ TI K3 Platforms:
     - gramsay0
   files:
     - boards/*/*phycore_am6*/
-    - boards/*/*ti_am6*/
+    - boards/*/am6*/
     - drivers/*/*ti_k3*
     - dts/bindings/*/ti,k3*
     - soc/*/ti_k3/
@@ -2662,6 +2681,7 @@ Sysbuild:
     - tejlmand
   collaborators:
     - nordicjm
+    - "57300"
   files:
     - share/sysbuild/
     - samples/application_development/sysbuild/
@@ -2837,9 +2857,9 @@ West:
     - microbuilder
     - povergoing
   files:
-    - modules/Kconfig.cmsis
-    - modules/Kconfig.cmsis_dsp
-    - modules/Kconfig.cmsis_nn
+    - modules/cmsis/Kconfig
+    - modules/cmsis/Kconfig.cmsis_dsp
+    - modules/cmsis/Kconfig.cmsis_nn
   labels:
     - manifest-cmsis
 
@@ -2991,7 +3011,7 @@ West:
     - modules/hal_nxp/
     - modules/Kconfig.imx
     - modules/Kconfig.mcux
-    - modules/Kconfig.s32
+    - modules/Kconfig.nxp_s32
   labels:
     - manifest-hal_nxp
 
@@ -3159,12 +3179,14 @@ West:
     - manifest-loramac-node
 
 "West project: lvgl":
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - faxe1008
   collaborators:
     - brgl
     - pdgendt
   files:
-    - modules/Kconfig.lvgl
+    - modules/lvgl/
     - tests/lib/gui/lvgl/
   labels:
     - manifest-lvgl
@@ -3223,9 +3245,9 @@ West:
 "West project: net-tools":
   status: odd fixes
   maintainers:
-    - rlubos
-  collaborators:
     - jukkar
+  collaborators:
+    - rlubos
   files: []
   labels:
     - manifest-net-tools
