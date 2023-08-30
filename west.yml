@@ -122,7 +122,7 @@ manifest:
       revision: b7955c27e50485b7dafdc3888d7d6afdc2ac6d96
       path: modules/lib/chre
     - name: cmsis
-      revision: 74981bf893e8b10931464b9945e2143d99a3f0a3
+      revision: 1abf29132e608826752e2edd1f4799a065db4031
       path: modules/hal/cmsis
       groups:
         - hal
@@ -142,7 +142,7 @@ manifest:
       groups:
         - hal
     - name: hal_ambiq
-      revision: 446736a1c36199d1c8b9b2c4b3d14bf27006d440
+      revision: fbb1618df8b0946cc2abea817309dc85fe051c21
       path: modules/hal/ambiq
       groups:
         - hal
@@ -224,7 +224,7 @@ manifest:
       groups:
         - hal
     - name: hal_st
-      revision: 5948f7b3304f1628a45ee928cd607619a7f53bbb
+      revision: 9b128caf3e7b2e750169b880e83f210ea2213473
       path: modules/hal/st
       groups:
         - hal
@@ -249,7 +249,7 @@ manifest:
       groups:
         - hal
     - name: hal_xtensa
-      revision: 41a631d4aeeeaedc0daece21eecc338807296ad7
+      revision: 86b7ddf984d54f34b79f52b328a4fecdae307956
       path: modules/hal/xtensa
       groups:
         - hal
@@ -281,7 +281,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: fc658eb5a22b7b1721c3b7d0853a7115fae08939
+      revision: 11ecbf639d826c084973beed709a63d51d9b684e
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -297,7 +297,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: fa1daebb0f6f7ef135f9d2128590adfd88c0af44
+      revision: 5993de6656e9c9238e975393c402d2f70339a1b3
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: 42b7c577714b8f22ce82a901e19c1814af4609a8

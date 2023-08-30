@@ -1028,11 +1028,6 @@ void hci_le_cis_established(struct net_buf *buf)
 	iso = bt_conn_lookup_handle(handle, BT_CONN_TYPE_ISO);
 	if (!iso) {
 		LOG_ERR("No connection found for handle %u", handle);
-		return;
-	}
-
-	CHECKIF(iso->type != BT_CONN_TYPE_ISO) {
-		LOG_DBG("Invalid connection type %u", iso->type);
 		bt_conn_unref(iso);
 		return;
 	}
@@ -1376,7 +1371,7 @@ static int hci_le_remove_iso_data_path(struct bt_conn *iso, uint8_t dir)
 	}
 
 	cp = net_buf_add(buf, sizeof(*cp));
-	cp->handle = iso->handle;
+	cp->handle = sys_cpu_to_le16(iso->handle);
 	cp->path_dir = dir;
 
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_REMOVE_ISO_PATH, buf, &rsp);

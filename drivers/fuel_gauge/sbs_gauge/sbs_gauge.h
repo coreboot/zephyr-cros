@@ -62,23 +62,18 @@
  */
 #define SBS_GAUGE_CUTOFF_PAYLOAD_MAX_SIZE 2
 
-#define _SBS_GAUGE_INST_CUTOFF_SUPPORTED(inst)                                                     \
-	DT_PROP_OR(DT_DRV_INST(inst), battery_cutoff_support, false)
-#define SBS_GAUGE_CUTOFF_SUPPORT()                                                                 \
-	(false || DT_INST_FOREACH_STATUS_OKAY(_SBS_GAUGE_INST_CUTOFF_SUPPORTED))
+struct sbs_gauge_battery_cutoff_config {
+	/* Size of the payload array */
+	size_t payload_size;
+	/* Array SMBus word values to write to cut off the battery */
+	uint32_t payload[SBS_GAUGE_CUTOFF_PAYLOAD_MAX_SIZE];
+	/* Register to write cutoff payload */
+	uint8_t reg;
+};
 
 struct sbs_gauge_config {
 	struct i2c_dt_spec i2c;
-#if SBS_GAUGE_CUTOFF_SUPPORT()
-	/* Array SMBus word values to write to cut off the battery */
-	uint32_t cutoff_payload[SBS_GAUGE_CUTOFF_PAYLOAD_MAX_SIZE];
-	/* Size of the cutoff_payload array */
-	size_t cutoff_payload_size;
-	/* Register to write cutoff payload */
-	uint8_t cutoff_reg;
-	/* Whether this device instance supports battery cutoff. */
-	bool cutoff_support;
-#endif /* SBS_GAUGE_CUTOFF_SUPPORT() */
+	const struct sbs_gauge_battery_cutoff_config *cutoff_cfg;
 };
 
 #endif

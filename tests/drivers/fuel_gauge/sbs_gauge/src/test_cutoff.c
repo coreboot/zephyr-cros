@@ -26,5 +26,4 @@ ZTEST_F(sbs_gauge_new_api, test_cutoff)
 	/* Now we should've cutoff */
 	zassert_ok(emul_fuel_gauge_is_battery_cutoff(fixture->sbs_fuel_gauge, &is_cutoff));
 	zassert_true(is_cutoff);
-
 }

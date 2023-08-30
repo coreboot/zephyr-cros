@@ -35,6 +35,12 @@ extern "C" {
 			 NET_MGMT_LAYER_CODE(_NET_WIFI_CODE))
 #define _NET_WIFI_EVENT	(_NET_WIFI_BASE | NET_MGMT_EVENT_BIT)
 
+#ifdef CONFIG_WIFI_MGMT_SCAN_SSID_FILT_MAX
+#define WIFI_MGMT_SCAN_SSID_FILT_MAX CONFIG_WIFI_MGMT_SCAN_SSID_FILT_MAX
+#else
+#define WIFI_MGMT_SCAN_SSID_FILT_MAX 0
+#endif /* CONFIG_WIFI_MGMT_SCAN_SSID_FILT_MAX */
+
 /** Wi-Fi management commands */
 enum net_request_wifi_cmd {
 	/** Scan for Wi-Fi networks */
@@ -174,7 +180,11 @@ enum net_event_wifi_cmd {
 #define NET_EVENT_WIFI_DISCONNECT_COMPLETE			\
 	(_NET_WIFI_EVENT | NET_EVENT_WIFI_CMD_DISCONNECT_COMPLETE)
 
-/** Wi-Fi scan parameters */
+/**
+ * @brief Wi-Fi scan parameters structure.
+ * Used to specify parameters which can control how the Wi-Fi scan
+ * is performed.
+ */
 struct wifi_scan_params {
 	/** Scan type, see enum wifi_scan_type.
 	 *
@@ -184,6 +194,42 @@ struct wifi_scan_params {
 	 * restrictions etc.
 	 */
 	enum wifi_scan_type scan_type;
+	/** Bitmap of bands to be scanned.
+	 *  Refer to ::wifi_frequency_bands for bit position of each band.
+	 */
+	uint8_t bands;
+	/** Active scan dwell time (in ms) on a channel.
+	 */
+	uint16_t dwell_time_active;
+	/** Passive scan dwell time (in ms) on a channel.
+	 */
+	uint16_t dwell_time_passive;
+	/** Array of SSID strings to scan.
+	 */
+	char ssids[WIFI_MGMT_SCAN_SSID_FILT_MAX][WIFI_SSID_MAX_LEN + 1];
+	/** Specifies the maximum number of scan results to return. These results would be the
+	 * BSSIDS with the best RSSI values, in all the scanned channels. This should only be
+	 * used to limit the number of returned scan results, and cannot be counted upon to limit
+	 * the scan time, since the underlying Wi-Fi chip might have to scan all the channels to
+	 * find the max_bss_cnt number of APs with the best signal strengths. A value of 0
+	 * signifies that there is no restriction on the number of scan results to be returned.
+	 */
+	uint16_t max_bss_cnt;
+	/** Channel information array indexed on Wi-Fi frequency bands and channels within that
+	 * band.
+	 * E.g. to scan channel 6 and 11 on the 2.4 GHz band, channel 36 on the 5 GHz band:
+	 * @code{.c}
+	 *     chan[WIFI_FREQ_BAND_2_4_GHZ][0] = 6;
+	 *     chan[WIFI_FREQ_BAND_2_4_GHZ][1] = 11;
+	 *     chan[WIFI_FREQ_BAND_5_GHZ][0] = 36;
+	 * @endcode
+	 *
+	 *  This list specifies the channels to be __considered for scan__. The underlying
+	 *  Wi-Fi chip can silently omit some channels due to various reasons such as channels
+	 *  not conforming to regulatory restrictions etc. The invoker of the API should
+	 *  ensure that the channels specified follow regulatory rules.
+	 */
+	uint16_t chan[WIFI_FREQ_BAND_MAX + 1][WIFI_CHANNEL_MAX];
 };
 
 /** Wi-Fi scan result, each result is provided to the net_mgmt_event_callback
@@ -415,6 +461,19 @@ struct wifi_raw_scan_result {
 	uint8_t data[CONFIG_WIFI_MGMT_RAW_SCAN_RESULT_LENGTH];
 };
 #endif /* CONFIG_WIFI_MGMT_RAW_SCAN_RESULTS */
+
+/* for use in max info size calculations */
+union wifi_mgmt_events {
+	struct wifi_scan_result scan_result;
+	struct wifi_status connect_status;
+	struct wifi_iface_status iface_status;
+#ifdef CONFIG_WIFI_MGMT_RAW_SCAN_RESULTS
+	struct wifi_raw_scan_result raw_scan_result;
+#endif /* CONFIG_WIFI_MGMT_RAW_SCAN_RESULTS */
+	struct wifi_twt_params twt_params;
+};
+
+
 #include <zephyr/net/net_if.h>
 
 /** Scan result callback

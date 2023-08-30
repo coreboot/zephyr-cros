@@ -195,6 +195,8 @@ Drivers and Sensors
 
 * Ethernet
 
+  * Added :kconfig:option:`CONFIG_ETH_NATIVE_POSIX_RX_TIMEOUT` to set rx timeout for native posix.
+
 * Flash
 
   * Introduce npcx flash driver that supports two or more spi nor flashes via a
@@ -344,6 +346,10 @@ Libraries / Subsystems
 
   * Added optional mutex locking support to MCUmgr img_mgmt group, which can
     be enabled with :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_MUTEX`.
+
+  * Added MCUmgr settings management group, which allows for manipulation of
+    zephyr settings from a remote device, see :ref:`mcumgr_smp_group_3` for
+    details.
 
 * File systems
 

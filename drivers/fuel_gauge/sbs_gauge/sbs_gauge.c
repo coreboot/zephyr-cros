@@ -177,18 +177,17 @@ static int sbs_gauge_get_prop(const struct device *dev, struct fuel_gauge_get_pr
 	return rc;
 }
 
-#if SBS_GAUGE_CUTOFF_SUPPORT()
 static int sbs_gauge_do_battery_cutoff(const struct device *dev)
 {
-	int rc;
+	int rc = -ENOTSUP;
 	const struct sbs_gauge_config *cfg = dev->config;
 
-	if (cfg->cutoff_support == false) {
+	if (cfg->cutoff_cfg == NULL) {
 		return -ENOTSUP;
 	}
 
-	for (int i = 0; i < cfg->cutoff_payload_size; i++) {
-		rc = sbs_cmd_reg_write(dev, cfg->cutoff_reg, cfg->cutoff_payload[i]);
+	for (int i = 0; i < cfg->cutoff_cfg->payload_size; i++) {
+		rc = sbs_cmd_reg_write(dev, cfg->cutoff_cfg->reg, cfg->cutoff_cfg->payload[i]);
 		if (rc != 0) {
 			return rc;
 		}
@@ -196,7 +195,6 @@ static int sbs_gauge_do_battery_cutoff(const struct device *dev)
 
 	return rc;
 }
-#endif /* SBS_GAUGE_CUTOFF_SUPPORT() */
 
 static int sbs_gauge_set_prop(const struct device *dev, struct fuel_gauge_set_property *prop)
 {
@@ -331,24 +329,36 @@ static const struct fuel_gauge_driver_api sbs_gauge_driver_api = {
 	.get_property = &sbs_gauge_get_props,
 	.set_property = &sbs_gauge_set_props,
 	.get_buffer_property = &sbs_gauge_get_buffer_prop,
-#if SBS_GAUGE_CUTOFF_SUPPORT()
 	.battery_cutoff = &sbs_gauge_do_battery_cutoff,
-#endif
 };
 
-#if SBS_GAUGE_CUTOFF_SUPPORT()
-#define SBS_GAUGE_CONFIG_INIT(index)                                                               \
-	.cutoff_support = DT_INST_PROP(index, battery_cutoff_support),                             \
-	.cutoff_reg = DT_INST_PROP(index, battery_cutoff_reg_addr),                                \
-	.cutoff_payload = DT_INST_PROP(index, battery_cutoff_payload),                             \
-	.cutoff_payload_size = DT_INST_PROP_LEN(index, battery_cutoff_payload),
-#else
-#define SBS_GAUGE_CONFIG_INIT(index)
-#endif
+/* Concatenates index to battery config to create unique cfg variable name per instance. */
+#define _SBS_GAUGE_BATT_CUTOFF_CFG_VAR_NAME(index) sbs_gauge_batt_cutoff_cfg_##index
+
+/* Declare and define the battery config struct */
+#define _SBS_GAUGE_CONFIG_DEFINE(index)                                                            \
+	static const struct sbs_gauge_battery_cutoff_config _SBS_GAUGE_BATT_CUTOFF_CFG_VAR_NAME(   \
+		index) = {                                                                         \
+		.reg = DT_INST_PROP(index, battery_cutoff_reg_addr),                               \
+		.payload = DT_INST_PROP(index, battery_cutoff_payload),                            \
+		.payload_size = DT_INST_PROP_LEN(index, battery_cutoff_payload),                   \
+	};
+
+/* Conditionally defined battery config based on battery cutoff support */
+#define SBS_GAUGE_CONFIG_DEFINE(index)                                                             \
+	COND_CODE_1(DT_INST_PROP_OR(index, battery_cutoff_support, false),                         \
+		    (_SBS_GAUGE_CONFIG_DEFINE(index)), (;))
+
+/* Conditionally get the battery config variable name or NULL based on battery cutoff support */
+#define SBS_GAUGE_GET_BATTERY_CONFIG_NAME(index)                                                   \
+	COND_CODE_1(DT_INST_PROP_OR(index, battery_cutoff_support, false),                         \
+		    (&_SBS_GAUGE_BATT_CUTOFF_CFG_VAR_NAME(index)), (NULL))
 
 #define SBS_GAUGE_INIT(index)                                                                      \
+	SBS_GAUGE_CONFIG_DEFINE(index);                                                            \
 	static const struct sbs_gauge_config sbs_gauge_config_##index = {                          \
-		.i2c = I2C_DT_SPEC_INST_GET(index), SBS_GAUGE_CONFIG_INIT(index)};                 \
+		.i2c = I2C_DT_SPEC_INST_GET(index),                                                \
+		.cutoff_cfg = SBS_GAUGE_GET_BATTERY_CONFIG_NAME(index)};                           \
                                                                                                    \
 	DEVICE_DT_INST_DEFINE(index, &sbs_gauge_init, NULL, NULL, &sbs_gauge_config_##index,       \
 			      POST_KERNEL, CONFIG_FUEL_GAUGE_INIT_PRIORITY,                        \

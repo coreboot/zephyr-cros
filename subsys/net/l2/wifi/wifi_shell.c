@@ -14,13 +14,16 @@ LOG_MODULE_REGISTER(net_wifi_shell, LOG_LEVEL_INF);
 #include <zephyr/kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/init.h>
 
 #include <zephyr/net/net_if.h>
-#include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_event.h>
+#include <zephyr/net/wifi_mgmt.h>
+#include <zephyr/net/wifi_utils.h>
+#include <zephyr/posix/unistd.h>
 
 #include "net_private.h"
 
@@ -455,40 +458,155 @@ static int cmd_wifi_disconnect(const struct shell *sh, size_t argc,
 	return 0;
 }
 
-static int cmd_wifi_scan(const struct shell *sh, size_t argc, char *argv[])
+
+
+static int wifi_scan_args_to_params(const struct shell *sh,
+				    size_t argc,
+				    char *argv[],
+				    struct wifi_scan_params *params,
+				    bool *do_scan)
 {
-	struct net_if *iface = net_if_get_first_wifi();
-	struct wifi_scan_params params = { 0 };
+	struct getopt_state *state;
+	int opt;
+	static struct option long_options[] = {{"type", required_argument, 0, 't'},
+					       {"bands", required_argument, 0, 'b'},
+					       {"dwell_time_active", required_argument, 0, 'a'},
+					       {"dwell_time_passive", required_argument, 0, 'p'},
+					       {"ssids", required_argument, 0, 's'},
+					       {"max_bss", required_argument, 0, 'm'},
+					       {"chans", required_argument, 0, 'c'},
+					       {"help", no_argument, 0, 'h'},
+					       {0, 0, 0, 0}};
+	int opt_index = 0;
+	int val;
+	int opt_num = 0;
 
-	context.sh = sh;
+	*do_scan = true;
 
-	if (argc > 2) {
-		shell_fprintf(sh, SHELL_WARNING, "Invalid number of arguments\n");
-		return -ENOEXEC;
-	}
+	while ((opt = getopt_long(argc, argv, "t:b:a:p:s:m:c:h", long_options, &opt_index)) != -1) {
+		state = getopt_state_get();
+		switch (opt) {
+		case 't':
+			if (!strcmp(optarg, "passive")) {
+				params->scan_type = WIFI_SCAN_TYPE_PASSIVE;
+			} else if (!strcmp(optarg, "active")) {
+				params->scan_type = WIFI_SCAN_TYPE_ACTIVE;
+			} else {
+				shell_fprintf(sh, SHELL_ERROR, "Invalid scan type %s\n", optarg);
+				return -ENOEXEC;
+			}
 
-	if (argc == 2) {
-		if (!strcmp(argv[1], "passive")) {
-			params.scan_type = WIFI_SCAN_TYPE_PASSIVE;
-		} else if (!strcmp(argv[1], "active")) {
-			params.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-		} else {
-			shell_fprintf(sh, SHELL_WARNING, "Invalid argument\n");
-			shell_fprintf(sh, SHELL_INFO,
-				      "Valid argument : <active> / <passive>\n");
+			opt_num++;
+			break;
+		case 'b':
+			if (wifi_utils_parse_scan_bands(optarg, &params->bands)) {
+				shell_fprintf(sh, SHELL_ERROR, "Invalid band value(s)\n");
+				return -ENOEXEC;
+			}
+
+			opt_num++;
+			break;
+		case 'a':
+			val = atoi(optarg);
+
+			if ((val < 5) || (val > 1000)) {
+				shell_fprintf(sh, SHELL_ERROR, "Invalid dwell_time_active val\n");
+				return -ENOEXEC;
+			}
+
+			params->dwell_time_active = val;
+			opt_num++;
+			break;
+		case 'p':
+			val = atoi(optarg);
+
+			if ((val < 10) || (val > 1000)) {
+				shell_fprintf(sh, SHELL_ERROR, "Invalid dwell_time_passive val\n");
+				return -ENOEXEC;
+			}
+
+			params->dwell_time_passive = val;
+			opt_num++;
+			break;
+		case 's':
+			if (wifi_utils_parse_scan_ssids(optarg, params->ssids)) {
+				shell_fprintf(sh, SHELL_ERROR, "Invalid SSID(s)\n");
+				return -ENOEXEC;
+			}
+
+			opt_num++;
+			break;
+		case 'm':
+			val = atoi(optarg);
+
+			if ((val < 0) || (val > 65535)) {
+				shell_fprintf(sh, SHELL_ERROR, "Invalid max_bss val\n");
+				return -ENOEXEC;
+			}
+
+			params->max_bss_cnt = val;
+			opt_num++;
+			break;
+		case 'c':
+			if (wifi_utils_parse_scan_chan(optarg, params->chan)) {
+				shell_fprintf(sh,
+					      SHELL_ERROR,
+					      "Invalid band or channel value(s)\n");
+				return -ENOEXEC;
+			}
+
+			opt_num++;
+			break;
+		case 'h':
+			shell_help(sh);
+			*do_scan = false;
+			opt_num++;
+			break;
+		case '?':
+		default:
+			shell_fprintf(sh, SHELL_ERROR, "Invalid option or option usage: %s\n",
+						  argv[opt_index + 1]);
 			return -ENOEXEC;
 		}
 	}
 
-	if (net_mgmt(NET_REQUEST_WIFI_SCAN, iface, &params, sizeof(params))) {
-		shell_fprintf(sh, SHELL_WARNING, "Scan request failed\n");
+	return opt_num;
+}
 
-		return -ENOEXEC;
+static int cmd_wifi_scan(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct net_if *iface = net_if_get_first_wifi();
+	struct wifi_scan_params params = { 0 };
+	bool do_scan = true;
+	int opt_num;
+
+	context.sh = sh;
+
+	if (argc > 1) {
+		opt_num = wifi_scan_args_to_params(sh, argc, argv, &params, &do_scan);
+
+		if (opt_num < 0) {
+			shell_help(sh);
+			return -ENOEXEC;
+		} else if (!opt_num) {
+			shell_fprintf(sh, SHELL_WARNING, "No valid option(s) found\n");
+			do_scan = false;
+		}
 	}
 
-	shell_fprintf(sh, SHELL_NORMAL, "Scan requested\n");
+	if (do_scan) {
+		if (net_mgmt(NET_REQUEST_WIFI_SCAN, iface, &params, sizeof(params))) {
+			shell_fprintf(sh, SHELL_WARNING, "Scan request failed\n");
+			return -ENOEXEC;
+		}
 
-	return 0;
+		shell_fprintf(sh, SHELL_NORMAL, "Scan requested\n");
+
+		return 0;
+	}
+
+	shell_fprintf(sh, SHELL_WARNING, "Scan not initiated\n");
+	return -ENOEXEC;
 }
 
 static int cmd_wifi_status(const struct shell *sh, size_t argc, char *argv[])
@@ -538,7 +656,6 @@ static int cmd_wifi_status(const struct shell *sh, size_t argc, char *argv[])
 
 	return 0;
 }
-
 
 #if defined(CONFIG_NET_STATISTICS_WIFI) && \
 					defined(CONFIG_NET_STATISTICS_USER_API)
@@ -1192,12 +1309,19 @@ SHELL_STATIC_SUBCMD_SET_CREATE(wifi_commands,
 		      0),
 	SHELL_CMD(scan, NULL,
 		  "Scan for Wi-Fi APs\n"
-		  "<scan type (optional): <active> : <passive>>\n",
+		    "OPTIONAL PARAMETERS:\n"
+		    "[-t, --type <active/passive>] : Preferred mode of scan. The actual mode of scan can depend on factors such as the Wi-Fi chip implementation, regulatory domain restrictions. Default type is active.\n"
+		    "[-b, --bands <Comma separated list of band values (2/5/6)>] : Bands to be scanned where 2: 2.4 GHz, 5: 5 GHz, 6: 6 GHz.\n"
+		    "[-a, --dwell_time_active <val_in_ms>] : Active scan dwell time (in ms) on a channel. Range 5 ms to 1000 ms.\n"
+		    "[-p, --dwell_time_passive <val_in_ms>] : Passive scan dwell time (in ms) on a channel. Range 10 ms to 1000 ms.\n"
+		    "[-s, --ssids <Comma separate list of SSIDs>] : SSID list to scan for.\n"
+		    "[-m, --max_bss <val>] : Maximum BSSes to scan for. Range 1 - 65535.\n"
+		    "[-c, --chans <Comma separated list of channel ranges>] : Channels to be scanned. The channels must be specified in the form band1:chan1,chan2_band2:chan3,..etc. band1, band2 must be valid band values and chan1, chan2, chan3 must be specified as a list of comma separated values where each value is either a single channel or a channel range specified as chan_start-chan_end. Each band channel set has to be separated by a _. For example, a valid channel specification can be 2:1,6-11,14_5:36,149-165,44\n"
+		    "[-h, --help] : Print out the help for the scan command.",
 		  cmd_wifi_scan),
 	SHELL_CMD(statistics, NULL, "Wi-Fi interface statistics", cmd_wifi_stats),
 	SHELL_CMD(status, NULL, "Status of the Wi-Fi interface", cmd_wifi_status),
 	SHELL_CMD(twt, &wifi_twt_ops, "Manage TWT flows", NULL),
-	SHELL_CMD(ap, &wifi_cmd_ap, "Access Point mode commands", NULL),
 	SHELL_CMD(reg_domain, NULL,
 		"Set or Get Wi-Fi regulatory domain\n"
 		"Usage: wifi reg_domain [ISO/IEC 3166-1 alpha2] [-f]\n"

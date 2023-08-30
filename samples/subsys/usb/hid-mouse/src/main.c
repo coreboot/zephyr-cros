@@ -42,7 +42,7 @@ static void status_cb(enum usb_dc_status_code status, const uint8_t *param)
 	usb_status = status;
 }
 
-static void ALWAYS_INLINE rwup_if_suspended(void)
+static ALWAYS_INLINE void rwup_if_suspended(void)
 {
 	if (IS_ENABLED(CONFIG_USB_DEVICE_REMOTE_WAKEUP)) {
 		if (usb_status == USB_DC_SUSPEND) {
@@ -98,7 +98,7 @@ int main(void)
 	const struct device *hid_dev;
 	int ret;
 
-	if (!device_is_ready(led0.port)) {
+	if (!gpio_is_ready_dt(&led0)) {
 		LOG_ERR("LED device %s is not ready", led0.port->name);
 		return 0;
 	}
