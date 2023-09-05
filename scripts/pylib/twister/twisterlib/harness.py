@@ -24,8 +24,7 @@ logger.setLevel(logging.DEBUG)
 _WINDOWS = platform.system() == 'Windows'
 
 
-# pylint: disable=anomalous-backslash-in-string
-result_re = re.compile(".*(PASS|FAIL|SKIP) - (test_)?(.*) in (\\d*[.,]?\\d*) seconds")
+result_re = re.compile(r".*(PASS|FAIL|SKIP) - (test_)?(\S*) in (\d*[.,]?\d*) seconds")
 class Harness:
     GCOV_START = "GCOV_COVERAGE_DUMP_START"
     GCOV_END = "GCOV_COVERAGE_DUMP_END"
@@ -528,7 +527,7 @@ class Test(Harness):
 
         result_match = result_re.match(line)
 
-        if result_match and result_match.group(2):
+        if result_match:
             matched_status = result_match.group(1)
             name = "{}.{}".format(self.id, result_match.group(3))
             tc = self.instance.get_case_or_create(name)
