@@ -287,6 +287,7 @@ Bluetooth Mesh:
     - LingaoM
     - alxelax
     - Andrewpini
+    - akredalen
   files:
     - subsys/bluetooth/mesh/
     - include/zephyr/bluetooth/mesh/
@@ -1852,13 +1853,17 @@ Networking:
     - doc/connectivity/networking/
     - tests/net/
   files-exclude:
+    - doc/connectivity/networking/api/gptp.rst
     - doc/connectivity/networking/api/ieee802154.rst
     - doc/connectivity/networking/api/wifi.rst
+    - include/zephyr/net/gptp.h
     - include/zephyr/net/ieee802154*.h
     - include/zephyr/net/wifi*.h
+    - samples/net/gptp/
     - samples/net/sockets/coap_*/
     - samples/net/lwm2m_client/
     - samples/net/wifi/
+    - subsys/net/l2/ethernet/gptp/
     - subsys/net/l2/ieee802154/
     - subsys/net/l2/wifi/
     - subsys/net/lib/coap/
@@ -1907,7 +1912,7 @@ Networking:
   files:
     - include/zephyr/net/conn_mgr*.h
     - subsys/net/conn_mgr/
-    - tests/net/conn_mgr/
+    - tests/net/conn_mgr_monitor/
     - tests/net/conn_mgr_conn/
   labels:
     - "area: Networking"
@@ -1922,6 +1927,20 @@ Networking:
     - subsys/net/lib/coap/
     - samples/net/sockets/coap_*/
     - tests/net/lib/coap/
+  labels:
+    - "area: Networking"
+
+"Networking: gPTP":
+  status: maintained
+  maintainers:
+    - jukkar
+  collaborators:
+    - fgrandel
+  files:
+    - doc/connectivity/networking/api/gptp.rst
+    - include/zephyr/net/gptp.h
+    - samples/net/gptp/
+    - subsys/net/l2/ethernet/gptp/
   labels:
     - "area: Networking"
 
