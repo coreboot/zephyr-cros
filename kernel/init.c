@@ -25,6 +25,7 @@
 #include <zephyr/device.h>
 #include <zephyr/init.h>
 #include <zephyr/linker/linker-defs.h>
+#include <zephyr/platform/hooks.h>
 #include <ksched.h>
 #include <kthread.h>
 #include <zephyr/sys/dlist.h>
@@ -43,7 +44,7 @@
  * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
  * #line marks the *next* line, so it is off by one.
  */
-#line 47
+#line 48
 
 LOG_MODULE_REGISTER(os, CONFIG_KERNEL_LOG_LEVEL);
 
@@ -523,6 +524,13 @@ static void bg_thread_main(void *unused1, void *unused2, void *unused3)
 	z_sys_post_kernel = true;
 
 	z_sys_init_run_level(INIT_LEVEL_POST_KERNEL);
+#if CONFIG_SOC_LATE_INIT_HOOK
+	soc_late_init_hook();
+#endif
+#if CONFIG_BOARD_LATE_INIT_HOOK
+	board_late_init_hook();
+#endif
+
 #if defined(CONFIG_STACK_POINTER_RANDOM) && (CONFIG_STACK_POINTER_RANDOM != 0)
 	z_stack_adjust_initialized = 1;
 #endif /* CONFIG_STACK_POINTER_RANDOM */
@@ -764,6 +772,12 @@ FUNC_NORETURN void z_cstart(void)
 	/* do any necessary initialization of static devices */
 	z_device_state_init();
 
+#if CONFIG_SOC_EARLY_INIT_HOOK
+	soc_early_init_hook();
+#endif
+#if CONFIG_BOARD_EARLY_INIT_HOOK
+	board_early_init_hook();
+#endif
 	/* perform basic hardware initialization */
 	z_sys_init_run_level(INIT_LEVEL_PRE_KERNEL_1);
 #if defined(CONFIG_SMP)
