@@ -8,6 +8,7 @@ import abc
 import logging
 import os
 import queue
+import re
 import shutil
 import threading
 import time
@@ -39,8 +40,8 @@ class DeviceAdapter(abc.ABC):
         self.command: list[str] = []
         self._west: str | None = None
 
-        self.handler_log_path: Path = Path(device_config.build_dir) / 'handler.log'
-        self._initialize_log_file(self.handler_log_path)
+        self.handler_log_path: Path = device_config.build_dir / 'handler.log'
+        self._log_files: list[Path] = [self.handler_log_path]
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}()'
@@ -112,6 +113,50 @@ class DeviceAdapter(abc.ABC):
             logger.debug('#: %s', data)
         return data
 
+    def readlines_until(
+            self,
+            regex: str | None = None,
+            num_of_lines: int | None = None,
+            timeout: float | None = None,
+            print_output: bool = True,
+    ) -> list[str]:
+        """
+        Read available output lines produced by device from internal buffer
+        until following conditions:
+
+        1. If regex is provided - read until regex regex is found in read
+           line (or until timeout)
+        2. If num_of_lines is provided - read until number of read lines is
+           equal to num_of_lines (or until timeout)
+        3. If none of above is provided - return immediately lines collected so
+           far in internal queue
+
+        If timeout is not provided, then use base_timeout
+        """
+        timeout = timeout or self.base_timeout
+        if regex:
+            regex_compiled = re.compile(regex)
+        lines: list[str] = []
+        if regex or num_of_lines:
+            timeout_time: float = time.time() + timeout
+            while time.time() < timeout_time:
+                try:
+                    line = self.readline(0.1, print_output)
+                except TwisterHarnessTimeoutException:
+                    continue
+                lines.append(line)
+                if regex and regex_compiled.search(line):
+                    break
+                if num_of_lines and len(lines) == num_of_lines:
+                    break
+            else:
+                msg = 'Read from device timeout occurred'
+                logger.error(msg)
+                raise TwisterHarnessTimeoutException(msg)
+        else:
+            lines = self.readlines(print_output)
+        return lines
+
     def readlines(self, print_output: bool = True) -> list[str]:
         """
         Read all available output lines produced by device from internal buffer.
@@ -137,9 +182,14 @@ class DeviceAdapter(abc.ABC):
             raise TwisterHarnessException(msg)
         self._write_to_device(data)
 
-    def _initialize_log_file(self, log_file_path: Path) -> None:
-        with open(log_file_path, 'a+') as log_file:
-            log_file.write(f'\n==== Test started at {datetime.now()} ====\n')
+    def initialize_log_files(self, test_name: str = '') -> None:
+        """
+        Initialize log files (e.g. handler.log) by adding header with
+        information about performed test and current time.
+        """
+        for log_file_path in self._log_files:
+            with open(log_file_path, 'a+') as log_file:
+                log_file.write(f'\n==== Test {test_name} started at {datetime.now()} ====\n')
 
     def _start_reader_thread(self) -> None:
         self._reader_thread = threading.Thread(target=self._handle_device_output, daemon=True)

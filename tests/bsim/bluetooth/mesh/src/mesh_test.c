@@ -166,6 +166,14 @@ static struct bt_mesh_model_pub health_pub = {
 static struct bt_mesh_sar_cfg_cli sar_cfg_cli;
 #endif
 
+#if defined(CONFIG_BT_MESH_PRIV_BEACONS)
+static struct bt_mesh_priv_beacon_cli priv_beacon_cli;
+#endif
+
+#if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_CLI)
+static struct bt_mesh_od_priv_proxy_cli priv_proxy_cli;
+#endif
+
 static struct bt_mesh_model models[] = {
 	BT_MESH_MODEL_CFG_SRV,
 	BT_MESH_MODEL_CFG_CLI(&cfg_cli),
@@ -174,6 +182,16 @@ static struct bt_mesh_model models[] = {
 #if defined(CONFIG_BT_MESH_SAR_CFG)
 	BT_MESH_MODEL_SAR_CFG_SRV,
 	BT_MESH_MODEL_SAR_CFG_CLI(&sar_cfg_cli),
+#endif
+#if defined(CONFIG_BT_MESH_PRIV_BEACONS)
+	BT_MESH_MODEL_PRIV_BEACON_SRV,
+	BT_MESH_MODEL_PRIV_BEACON_CLI(&priv_beacon_cli),
+#endif
+#if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_SRV)
+	BT_MESH_MODEL_OD_PRIV_PROXY_SRV,
+#endif
+#if defined(CONFIG_BT_MESH_OD_PRIV_PROXY_CLI)
+	BT_MESH_MODEL_OD_PRIV_PROXY_CLI(&priv_proxy_cli),
 #endif
 };
 
@@ -337,7 +355,7 @@ int bt_mesh_test_recv(uint16_t len, uint16_t dst, const uint8_t *uuid, k_timeout
 		return -EINVAL;
 	}
 
-	k_mem_slab_free(&msg_pool, (void **)&msg);
+	k_mem_slab_free(&msg_pool, (void *)msg);
 
 	return 0;
 }
@@ -352,7 +370,7 @@ int bt_mesh_test_recv_msg(struct bt_mesh_test_msg *msg, k_timeout_t timeout)
 
 	*msg = *queued;
 
-	k_mem_slab_free(&msg_pool, (void **)&queued);
+	k_mem_slab_free(&msg_pool, (void *)queued);
 
 	return 0;
 }
@@ -363,7 +381,7 @@ int bt_mesh_test_recv_clear(void)
 	int count = 0;
 
 	while ((queued = k_queue_get(&recv, K_NO_WAIT))) {
-		k_mem_slab_free(&msg_pool, (void **)&queued);
+		k_mem_slab_free(&msg_pool, (void *)queued);
 		count++;
 	}
 
