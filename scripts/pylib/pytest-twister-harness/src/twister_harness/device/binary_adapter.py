@@ -7,10 +7,9 @@ from __future__ import annotations
 import abc
 import logging
 import subprocess
-from pathlib import Path
 
 from twister_harness.device.device_adapter import DeviceAdapter
-from twister_harness.helper import log_command, terminate_process
+from twister_harness.device.utils import log_command, terminate_process
 from twister_harness.exceptions import TwisterHarnessException
 from twister_harness.twister_harness_config import DeviceConfig
 
@@ -119,7 +118,7 @@ class NativeSimulatorAdapter(BinaryAdapterBase):
 
     def generate_command(self) -> None:
         """Set command to run."""
-        self.command = [str(Path(self.device_config.build_dir) / 'zephyr' / 'zephyr.exe')]
+        self.command = [str(self.device_config.build_dir / 'zephyr' / 'zephyr.exe')]
 
 
 class UnitSimulatorAdapter(BinaryAdapterBase):
@@ -127,7 +126,7 @@ class UnitSimulatorAdapter(BinaryAdapterBase):
 
     def generate_command(self) -> None:
         """Set command to run."""
-        self.command = [str(Path(self.device_config.build_dir) / 'testbinary')]
+        self.command = [str(self.device_config.build_dir / 'testbinary')]
 
 
 class CustomSimulatorAdapter(BinaryAdapterBase):

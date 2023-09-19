@@ -398,21 +398,21 @@ enum bt_audio_dir {
  *  @param _latency Maximum Transport Latency (msec)
  *  @param _pd Presentation Delay (usec)
  */
-#define BT_AUDIO_CODEC_QOS(_interval, _framing, _phy, _sdu, _rtn, _latency, _pd) \
-	{ \
-		.interval = _interval, \
-		.framing = _framing, \
-		.phy = _phy, \
-		.sdu = _sdu, \
-		.rtn = _rtn, \
-		.latency = _latency, \
-		.pd = _pd, \
-	}
+#define BT_AUDIO_CODEC_QOS(_interval, _framing, _phy, _sdu, _rtn, _latency, _pd)                   \
+	((struct bt_audio_codec_qos){                                                              \
+		.interval = _interval,                                                             \
+		.framing = _framing,                                                               \
+		.phy = _phy,                                                                       \
+		.sdu = _sdu,                                                                       \
+		.rtn = _rtn,                                                                       \
+		.latency = _latency,                                                               \
+		.pd = _pd,                                                                         \
+	})
 
 /** @brief Codec QoS Framing */
-enum {
-	BT_AUDIO_CODEC_QOS_UNFRAMED = 0x00,
-	BT_AUDIO_CODEC_QOS_FRAMED = 0x01,
+enum bt_audio_codec_qos_framing {
+	BT_AUDIO_CODEC_QOS_FRAMING_UNFRAMED = 0x00,
+	BT_AUDIO_CODEC_QOS_FRAMING_FRAMED = 0x01,
 };
 
 /** @brief Codec QoS Preferred PHY */
@@ -432,8 +432,8 @@ enum {
  *  @param _pd Presentation Delay (usec)
  */
 #define BT_AUDIO_CODEC_QOS_UNFRAMED(_interval, _sdu, _rtn, _latency, _pd)                          \
-	BT_AUDIO_CODEC_QOS(_interval, BT_AUDIO_CODEC_QOS_UNFRAMED, BT_AUDIO_CODEC_QOS_2M, _sdu,    \
-			   _rtn, _latency, _pd)
+	BT_AUDIO_CODEC_QOS(_interval, BT_AUDIO_CODEC_QOS_FRAMING_UNFRAMED, BT_AUDIO_CODEC_QOS_2M,  \
+			   _sdu, _rtn, _latency, _pd)
 
 /**
  *  @brief Helper to declare Input Framed bt_audio_codec_qos
@@ -445,8 +445,8 @@ enum {
  *  @param _pd Presentation Delay (usec)
  */
 #define BT_AUDIO_CODEC_QOS_FRAMED(_interval, _sdu, _rtn, _latency, _pd)                            \
-	BT_AUDIO_CODEC_QOS(_interval, BT_AUDIO_CODEC_QOS_FRAMED, BT_AUDIO_CODEC_QOS_2M, _sdu,      \
-			   _rtn, _latency, _pd)
+	BT_AUDIO_CODEC_QOS(_interval, BT_AUDIO_CODEC_QOS_FRAMING_FRAMED, BT_AUDIO_CODEC_QOS_2M,    \
+			   _sdu, _rtn, _latency, _pd)
 
 /** @brief Codec QoS structure. */
 struct bt_audio_codec_qos {
@@ -454,7 +454,7 @@ struct bt_audio_codec_qos {
 	uint8_t  phy;
 
 	/** QoS Framing */
-	uint8_t  framing;
+	enum bt_audio_codec_qos_framing framing;
 
 	/** QoS Retransmission Number */
 	uint8_t rtn;
@@ -662,20 +662,20 @@ int bt_audio_codec_cfg_get_frame_blocks_per_sdu(const struct bt_audio_codec_cfg 
 /** @brief Lookup a specific value based on type
  *
  *  Depending on context bt_audio_codec_cfg will be either codec capabilities, codec configuration
- * or meta data.
+ *  or meta data.
  *
  *  Typically types used are:
  *  @ref bt_audio_codec_capability_type
  *  @ref bt_audio_codec_config_type
  *  @ref bt_audio_metadata_type
  *
- *  @param codec_cfg The codec data to search in.
- *  @param type The type id to look for
- *  @param data Pointer to the data-pointer to update when item is found
- *  @return True if the type is found, false otherwise.
+ *  @param[in] codec_cfg The codec data to search in.
+ *  @param[in] type The type id to look for
+ *  @param[out] data Pointer to the data-pointer to update when item is found
+ *  @return Length of found @p data or 0 if not found
  */
-bool bt_audio_codec_cfg_get_val(const struct bt_audio_codec_cfg *codec_cfg, uint8_t type,
-				const uint8_t **data);
+uint8_t bt_audio_codec_cfg_get_val(const struct bt_audio_codec_cfg *codec_cfg, uint8_t type,
+				   const uint8_t **data);
 
 /** @} */ /* End of bt_audio_codec_cfg */
 

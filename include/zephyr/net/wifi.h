@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018 Texas Instruments, Incorporated
+ * Copyright (c) 2023 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -147,6 +148,7 @@ static inline const char *wifi_band_txt(enum wifi_frequency_bands band)
 #define WIFI_SAE_PSWD_MAX_LEN 128
 #define WIFI_MAC_ADDR_LEN 6
 
+#define WIFI_CHANNEL_MIN 1
 #define WIFI_CHANNEL_MAX 233
 #define WIFI_CHANNEL_ANY 255
 
@@ -354,6 +356,38 @@ static const char * const wifi_ps_mode2str[] = {
 };
 /** @endcond */
 
+/* Interface index Min and Max values */
+#define WIFI_INTERFACE_INDEX_MIN 1
+#define WIFI_INTERFACE_INDEX_MAX 255
+
+/** Wifi operational mode */
+enum wifi_operational_modes {
+	/** STA mode setting enable */
+	WIFI_STA_MODE = BIT(0),
+	/** Monitor mode setting enable */
+	WIFI_MONITOR_MODE = BIT(1),
+	/** TX injection mode setting enable */
+	WIFI_TX_INJECTION_MODE = BIT(2),
+	/** Promiscuous mode setting enable */
+	WIFI_PROMISCUOUS_MODE = BIT(3),
+	/** AP mode setting enable */
+	WIFI_AP_MODE = BIT(4),
+	/** Softap mode setting enable */
+	WIFI_SOFTAP_MODE = BIT(5),
+};
+
+/** Mode filter settings */
+enum wifi_filter {
+	/** Support management, data and control packet sniffing */
+	WIFI_PACKET_FILTER_ALL = BIT(0),
+	/** Support only sniffing of management packets */
+	WIFI_PACKET_FILTER_MGMT = BIT(1),
+	/** Support only sniffing of data packets */
+	WIFI_PACKET_FILTER_DATA = BIT(2),
+	/** Support only sniffing of control packets */
+	WIFI_PACKET_FILTER_CTRL = BIT(3),
+};
+
 /** Wi-Fi Target Wake Time (TWT) operations. */
 enum wifi_twt_operation {
 	/** TWT setup operation */
@@ -455,7 +489,7 @@ enum wifi_twt_fail_reason {
 };
 
 /** @cond INTERNAL_HIDDEN */
-static const char * const twt_err_code_tbl[] = {
+static const char * const wifi_twt_err_code_tbl[] = {
 	[WIFI_TWT_FAIL_UNSPECIFIED] = "Unspecified",
 	[WIFI_TWT_FAIL_CMD_EXEC_FAIL] = "Command Execution failed",
 	[WIFI_TWT_FAIL_OPERATION_NOT_SUPPORTED] =
@@ -478,17 +512,17 @@ static const char * const twt_err_code_tbl[] = {
 /** @endcond */
 
 /** Helper function to get user-friendly TWT error code name. */
-static inline const char *get_twt_err_code_str(int16_t err_no)
+static inline const char *wifi_twt_get_err_code_str(int16_t err_no)
 {
-	if ((err_no) < (int16_t)ARRAY_SIZE(twt_err_code_tbl)) {
-		return twt_err_code_tbl[err_no];
+	if ((err_no) < (int16_t)ARRAY_SIZE(wifi_twt_err_code_tbl)) {
+		return wifi_twt_err_code_tbl[err_no];
 	}
 
 	return "<unknown>";
 }
 
 /** Wi-Fi power save parameters. */
-enum ps_param_type {
+enum wifi_ps_param_type {
 	/** Power save state. */
 	WIFI_PS_PARAM_STATE,
 	/** Power save listen interval. */
@@ -535,7 +569,7 @@ enum wifi_config_ps_param_fail_reason {
 };
 
 /** @cond INTERNAL_HIDDEN */
-static const char * const ps_param_config_err_code_tbl[] = {
+static const char * const wifi_ps_param_config_err_code_tbl[] = {
 	[WIFI_PS_PARAM_FAIL_UNSPECIFIED] = "Unspecified",
 	[WIFI_PS_PARAM_FAIL_CMD_EXEC_FAIL] = "Command Execution failed",
 	[WIFI_PS_PARAM_FAIL_OPERATION_NOT_SUPPORTED] =
@@ -552,10 +586,10 @@ static const char * const ps_param_config_err_code_tbl[] = {
 /** @endcond */
 
 /** Helper function to get user-friendly power save error code name. */
-static inline const char *get_ps_config_err_code_str(int16_t err_no)
+static inline const char *wifi_ps_get_config_err_code_str(int16_t err_no)
 {
-	if ((err_no) < (int16_t)ARRAY_SIZE(ps_param_config_err_code_tbl)) {
-		return ps_param_config_err_code_tbl[err_no];
+	if ((err_no) < (int16_t)ARRAY_SIZE(wifi_ps_param_config_err_code_tbl)) {
+		return wifi_ps_param_config_err_code_tbl[err_no];
 	}
 
 	return "<unknown>";

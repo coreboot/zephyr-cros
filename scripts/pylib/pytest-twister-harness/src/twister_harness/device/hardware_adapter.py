@@ -18,7 +18,7 @@ from twister_harness.exceptions import (
     TwisterHarnessException,
     TwisterHarnessTimeoutException,
 )
-from twister_harness.helper import log_command, terminate_process
+from twister_harness.device.utils import log_command, terminate_process
 from twister_harness.twister_harness_config import DeviceConfig
 
 logger = logging.getLogger(__name__)
@@ -34,8 +34,8 @@ class HardwareAdapter(DeviceAdapter):
         self._serial_pty_proc: subprocess.Popen | None = None
         self._serial_buffer: bytearray = bytearray()
 
-        self.device_log_path: Path = Path(device_config.build_dir) / 'device.log'
-        self._initialize_log_file(self.device_log_path)
+        self.device_log_path: Path = device_config.build_dir / 'device.log'
+        self._log_files.append(self.device_log_path)
 
     def generate_command(self) -> None:
         """Return command to flash."""

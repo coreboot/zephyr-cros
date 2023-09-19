@@ -155,7 +155,7 @@ enum bt_bap_ascs_reason bt_audio_verify_qos(const struct bt_audio_codec_qos *qos
 		return BT_BAP_ASCS_REASON_INTERVAL;
 	}
 
-	if (qos->framing > BT_AUDIO_CODEC_QOS_FRAMED) {
+	if (qos->framing > BT_AUDIO_CODEC_QOS_FRAMING_FRAMED) {
 		LOG_DBG("Invalid Framing 0x%02x", qos->framing);
 		return BT_BAP_ASCS_REASON_FRAMING;
 	}
@@ -193,6 +193,18 @@ bool bt_audio_valid_codec_cfg(const struct bt_audio_codec_cfg *codec_cfg)
 	if (codec_cfg == NULL) {
 		LOG_DBG("codec is NULL");
 		return false;
+	}
+
+	if (codec_cfg->id == BT_AUDIO_CODEC_LC3_ID) {
+		if (codec_cfg->cid != 0U) {
+			LOG_DBG("codec_cfg->cid (%u) is invalid", codec_cfg->cid);
+			return false;
+		}
+
+		if (codec_cfg->vid != 0U) {
+			LOG_DBG("codec_cfg->vid (%u) is invalid", codec_cfg->vid);
+			return false;
+		}
 	}
 
 #if CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE > 0

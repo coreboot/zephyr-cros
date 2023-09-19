@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import time
 from pathlib import Path
 from unittest import mock
 
@@ -18,10 +19,12 @@ def fixture_adapter(tmp_path) -> HardwareAdapter:
     build_dir = tmp_path / 'build_dir'
     os.mkdir(build_dir)
     device_config = DeviceConfig(
-        runner='runner',
+        type='hardware',
         build_dir=build_dir,
+        runner='runner',
         platform='platform',
         id='p_id',
+        base_timeout=5.0,
     )
     return HardwareAdapter(device_config)
 
@@ -34,7 +37,7 @@ def test_if_hardware_adapter_raise_exception_when_west_not_found(patched_which, 
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_1(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.generate_command()
     assert isinstance(device.command, list)
     assert device.command == ['west', 'flash', '--skip-rebuild', '--build-dir', 'build', '--runner', 'runner']
@@ -42,7 +45,7 @@ def test_if_get_command_returns_proper_string_1(patched_which, device: HardwareA
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_2(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.runner = 'pyocd'
     device.generate_command()
     assert isinstance(device.command, list)
@@ -53,7 +56,7 @@ def test_if_get_command_returns_proper_string_2(patched_which, device: HardwareA
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_3(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.runner = 'nrfjprog'
     device.generate_command()
     assert isinstance(device.command, list)
@@ -64,7 +67,7 @@ def test_if_get_command_returns_proper_string_3(patched_which, device: HardwareA
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_4(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.runner = 'openocd'
     device.device_config.product = 'STM32 STLink'
     device.generate_command()
@@ -77,7 +80,7 @@ def test_if_get_command_returns_proper_string_4(patched_which, device: HardwareA
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_5(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.runner = 'openocd'
     device.device_config.product = 'EDBG CMSIS-DAP'
     device.generate_command()
@@ -90,7 +93,7 @@ def test_if_get_command_returns_proper_string_5(patched_which, device: HardwareA
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_6(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.runner = 'jlink'
     device.generate_command()
     assert isinstance(device.command, list)
@@ -102,7 +105,7 @@ def test_if_get_command_returns_proper_string_6(patched_which, device: HardwareA
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_7(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.runner = 'stm32cubeprogrammer'
     device.generate_command()
     assert isinstance(device.command, list)
@@ -114,7 +117,7 @@ def test_if_get_command_returns_proper_string_7(patched_which, device: HardwareA
 
 @mock.patch('shutil.which', return_value='west')
 def test_if_get_command_returns_proper_string_8(patched_which, device: HardwareAdapter) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.runner = 'openocd'
     device.device_config.product = 'STLINK-V3'
     device.generate_command()
@@ -129,7 +132,7 @@ def test_if_get_command_returns_proper_string_8(patched_which, device: HardwareA
 def test_if_get_command_returns_proper_string_with_west_flash_extra_args(
     patched_which, device: HardwareAdapter
 ) -> None:
-    device.device_config.build_dir = 'build'
+    device.device_config.build_dir = Path('build')
     device.device_config.west_flash_extra_args = ['--board-id=foobar', '--erase']
     device.device_config.runner = 'pyocd'
     device.device_config.id = ''
@@ -196,3 +199,21 @@ def test_if_hardware_adapter_uses_serial_pty(
 
     device.disconnect()
     assert not device._serial_pty_proc
+
+
+def test_if_hardware_adapter_properly_send_data_to_subprocess(
+    device: HardwareAdapter, shell_simulator_path: str
+) -> None:
+    """
+    Run shell_simulator.py under serial_pty, send "zen" command and verify
+    output. Flashing command is mocked by "dummy" echo command.
+    """
+    device.command = ['echo', 'TEST']  # only to mock flashing command
+    device.device_config.serial_pty = f'python3 {shell_simulator_path}'
+    device.launch()
+    time.sleep(0.1)
+    device.write(b'zen\n')
+    time.sleep(1)
+    lines = device.readlines_until(regex='Namespaces are one honking great idea')
+    assert 'The Zen of Python, by Tim Peters' in lines
+    device.write(b'quit\n')

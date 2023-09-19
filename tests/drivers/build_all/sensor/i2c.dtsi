@@ -88,6 +88,7 @@ test_i2c_bmg160: bmg160@c {
 test_i2c_bmm150: bmm150@d {
 	compatible = "bosch,bmm150";
 	reg = <0xd>;
+	drdy-gpios = <&test_gpio 0 0>;
 };
 
 test_i2c_hmc5883l: hmc5883l@e {
@@ -527,6 +528,7 @@ test_i2c_bmi160: bmi160@52 {
 test_i2c_bmi270: bmi270@53 {
 	compatible = "bosch,bmi270";
 	reg = <0x53>;
+	irq-gpios = <&test_gpio 0 0>;
 };
 
 test_i2c_fdc2x1x: fdc2x1x@54 {
@@ -739,4 +741,15 @@ test_i2c_ist8310@6f {
 	compatible = "isentek,ist8310";
 	reg = <0x6f>;
 	status = "okay";
+};
+
+test_i2c_f75303: f75303@70 {
+	compatible = "fintek,f75303";
+	reg = <0x70>;
+};
+
+test_i2c_tsl2540: tsl2540@71 {
+	compatible = "ams,tsl2540";
+	reg = <0x71>;
+	int-gpios = <&test_gpio 0 0>;
 };

@@ -141,7 +141,6 @@ ARM arch:
   files:
     - arch/arm/
     - arch/arm/core/offsets/
-    - include/zephyr/arch/arm/aarch32/
     - include/zephyr/arch/arm/
     - tests/arch/arm/
     - doc/hardware/arch/arm_cortex_m.rst
@@ -228,6 +227,7 @@ Bluetooth:
     - tests/bluetooth/host*/
     - tests/bluetooth/mesh_*/
     - tests/bluetooth/mesh/
+    - tests/bluetooth/audio/
     - tests/bsim/bluetooth/mesh/
     - tests/bluetooth/shell/audio*
   labels:
@@ -315,6 +315,7 @@ Bluetooth Audio:
   files:
     - subsys/bluetooth/audio/
     - include/zephyr/bluetooth/audio/
+    - tests/bluetooth/audio/
     - tests/bsim/bluetooth/audio/
     - tests/bluetooth/shell/audio*
   labels:
@@ -711,6 +712,7 @@ Release Notes:
     - str4t0m
   files:
     - boards/shields/mcp2515/
+    - boards/shields/tcan4550evm/
     - doc/hardware/peripherals/canbus/
     - drivers/can/
     - drivers/net/canbus.c
@@ -817,10 +819,10 @@ Release Notes:
 "Drivers: DAI":
   status: maintained
   maintainers:
-    - juimonen
+    - kv2019i
   collaborators:
     - lgirdwood
-    - kv2019i
+    - juimonen
   files:
     - drivers/dai/
     - doc/hardware/peripherals/audio/dai.rst
@@ -899,9 +901,7 @@ Release Notes:
     - "area: eSPI"
 
 "Drivers: Ethernet":
-  status: maintained
-  maintainers:
-    - tbursztyka
+  status: odd fixes
   files:
     - drivers/ethernet/
     - include/zephyr/dt-bindings/ethernet/
@@ -1034,12 +1034,11 @@ Release Notes:
 "Drivers: IEEE 802.15.4":
   status: maintained
   maintainers:
-    - tbursztyka
+    - fgrandel
   collaborators:
     - rlubos
     - jciupis
     - cfriedt
-    - fgrandel
     - jukkar
   files:
     - drivers/ieee802154/
@@ -1394,7 +1393,7 @@ Release Notes:
   maintainers:
     - str4t0m
   collaborators:
-    - dp7hgh7
+    - casparfriedrich
   files:
     - doc/hardware/peripherals/w1.rst
     - drivers/w1/
@@ -1424,7 +1423,6 @@ Release Notes:
 "Drivers: Wi-Fi":
   status: maintained
   maintainers:
-    - tbursztyka
     - jukkar
   collaborators:
     - rlubos
@@ -1776,6 +1774,15 @@ Modbus:
   labels:
     - "area: modbus"
 
+Modem Modules:
+  status: maintained
+  maintainers:
+    - bjarki-trackunit
+  files:
+    - subsys/modem/
+    - include/zephyr/modem/
+    - tests/subsys/modem/
+
 OSDP:
   status: maintained
   maintainers:
@@ -1987,10 +1994,9 @@ Networking:
 "Networking: Native IEEE 802.15.4":
   status: maintained
   maintainers:
-    - tbursztyka
+    - fgrandel
   collaborators:
     - rlubos
-    - fgrandel
     - jukkar
   files:
     - doc/connectivity/networking/api/ieee802154.rst
@@ -2897,6 +2903,15 @@ West:
   labels:
     - "area: West"
 
+"West project: acpica":
+  status: maintained
+  maintainers:
+    - najumon1980
+  files:
+    - modules/acpica/
+  labels:
+    - manifest-acpica
+
 "West project: canopennode":
   status: maintained
   maintainers:
@@ -2996,13 +3011,22 @@ West:
   status: maintained
   maintainers:
     - sylvioalves
-    - glaubermaroto
-    - uLipe
   collaborators:
     - LucasTambor
+    - marekmatej
   files: []
   labels:
     - "platform: ESP32"
+
+"West project: hal_ethos_u":
+  status: maintained
+  maintainers:
+    - kristofer-jonsson-arm
+  files:
+    - drivers/misc/ethos_u/
+    - modules/hal_ethos_u/
+  labels:
+    - manifest-hal_ethos_u
 
 "West project: hal_gigadevice":
   status: maintained
@@ -3300,12 +3324,13 @@ West:
     - "area: Tracing"
 
 "West project: nanopb":
-  status: odd fixes
-  collaborators:
+  status: maintained
+  maintainers:
     - pdgendt
   files:
     - modules/nanopb/
     - samples/modules/nanopb/
+    - tests/modules/nanopb/
   labels:
     - "area: Serialization"
 
@@ -3351,6 +3376,16 @@ West:
     - modules/openthread/
   labels:
     - "area: OpenThread"
+
+"West project: percepio":
+  status: maintained
+  maintainers:
+    - eriktamlin
+    - aronlander-pe
+  files:
+    - modules/percepio/
+  labels:
+    - "area: Tracing"
 
 "West project: picolibc":
   status: maintained
@@ -3415,15 +3450,6 @@ West:
     - modules/Kconfig.tinycrypt
   labels:
     - "area: Crypto / RNG"
-
-"West project: TraceRecorderSource":
-  status: maintained
-  maintainers:
-    - eriktamlin
-  files:
-    - modules/TraceRecorder/
-  labels:
-    - "area: Tracing"
 
 "West project: trusted-firmware-m":
   status: maintained
@@ -3506,6 +3532,7 @@ Xtensa arch:
   collaborators:
     - andyross
     - nashif
+    - ceolin
   files:
     - arch/xtensa/
     - include/zephyr/arch/xtensa/

@@ -123,7 +123,12 @@ class Build(Forceable):
                            (try "-t usage")''')
         group.add_argument('-T', '--test-item',
                            help='''Build based on test data in testcase.yaml
-                           or sample.yaml''')
+                           or sample.yaml. If source directory is not used
+                           an argument has to be defined as
+                           SOURCE_PATH/TEST_NAME.
+                           E.g. samples/hello_world/sample.basic.helloworld.
+                           If source directory is passed
+                           then "TEST_NAME" is enough.''')
         group.add_argument('-o', '--build-opt', default=[], action='append',
                            help='''options to pass to the build tool
                            (make or ninja); may be given more than once''')
@@ -165,7 +170,10 @@ class Build(Forceable):
         if self.args.test_item:
             # we get path + testitem
             item = os.path.basename(self.args.test_item)
-            test_path = os.path.dirname(self.args.test_item)
+            if self.args.source_dir:
+                test_path = self.args.source_dir
+            else:
+                test_path = os.path.dirname(self.args.test_item)
             if test_path and os.path.exists(test_path):
                 self.args.source_dir = test_path
                 if not self._parse_test_item(item):
@@ -285,6 +293,7 @@ class Build(Forceable):
             extra_dtc_overlay_files = []
             extra_overlay_confs = []
             extra_conf_files = []
+            required_snippets = []
             for section in [common, item]:
                 if not section:
                     continue
@@ -294,7 +303,8 @@ class Build(Forceable):
                         'extra_configs',
                         'extra_conf_files',
                         'extra_overlay_confs',
-                        'extra_dtc_overlay_files'
+                        'extra_dtc_overlay_files',
+                        'required_snippets'
                         ]:
                     extra = section.get(data)
                     if not extra:
@@ -307,7 +317,11 @@ class Build(Forceable):
                     if data == 'extra_configs':
                         args = ["-D{}".format(arg.replace('"', '\"')) for arg in arg_list]
                     elif data == 'extra_args':
-                        args = ["-D{}".format(arg.replace('"', '')) for arg in arg_list]
+                        # Retain quotes around config options
+                        config_options = [arg for arg in arg_list if arg.startswith("CONFIG_")]
+                        non_config_options = [arg for arg in arg_list if not arg.startswith("CONFIG_")]
+                        args = ["-D{}".format(a.replace('"', '\"')) for a in config_options]
+                        args.extend(["-D{}".format(arg.replace('"', '')) for arg in non_config_options])
                     elif data == 'extra_conf_files':
                         extra_conf_files.extend(arg_list)
                         continue
@@ -316,6 +330,9 @@ class Build(Forceable):
                         continue
                     elif data == 'extra_dtc_overlay_files':
                         extra_dtc_overlay_files.extend(arg_list)
+                        continue
+                    elif data == 'required_snippets':
+                        required_snippets.extend(arg_list)
                         continue
 
                     if self.args.cmake_opts:
@@ -335,6 +352,10 @@ class Build(Forceable):
 
             if extra_overlay_confs:
                 args.append(f"OVERLAY_CONFIG=\"{';'.join(extra_overlay_confs)}\"")
+
+            if required_snippets:
+                args.append(f"SNIPPET=\"{';'.join(required_snippets)}\"")
+
             # Build the final argument list
             args_expanded = ["-D{}".format(a.replace('"', '')) for a in args]
 

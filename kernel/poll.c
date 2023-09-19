@@ -17,7 +17,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/kernel_structs.h>
 #include <kernel_internal.h>
-#include <zephyr/wait_q.h>
+#include <wait_q.h>
 #include <ksched.h>
 #include <zephyr/syscall_handler.h>
 #include <zephyr/sys/dlist.h>
@@ -269,10 +269,6 @@ static int signal_poller(struct k_poll_event *event, uint32_t state)
 
 	if (!z_is_thread_pending(thread)) {
 		return 0;
-	}
-
-	if (z_is_thread_timeout_expired(thread)) {
-		return -EAGAIN;
 	}
 
 	z_unpend_thread(thread);

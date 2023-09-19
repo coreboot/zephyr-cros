@@ -14,8 +14,18 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/check.h>
 #include <zephyr/sys/barrier.h>
+#include <zephyr/cache.h>
+#include <zephyr/mem_mgmt/mem_attr.h>
+#include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
 
 LOG_MODULE_REGISTER(mpu, CONFIG_MPU_LOG_LEVEL);
+
+#define NODE_HAS_PROP_AND_OR(node_id, prop) \
+	DT_NODE_HAS_PROP(node_id, prop) ||
+
+BUILD_ASSERT((DT_FOREACH_STATUS_OKAY_NODE_VARGS(
+	      NODE_HAS_PROP_AND_OR, zephyr_memory_region_mpu) false) == false,
+	      "`zephyr,memory-region-mpu` was deprecated in favor of `zephyr,memory-attr`");
 
 #define MPU_DYNAMIC_REGION_AREAS_NUM	1
 
@@ -62,8 +72,12 @@ static inline uint8_t get_num_regions(void)
 
 /**
  * @brief enable the MPU
+ *
+ * On the SMP system, The function that enables MPU can not insert stack protector
+ * code because the canary values read by the secondary CPUs before enabling MPU
+ * and after enabling it are not equal due to cache coherence issues.
  */
-void arm_core_mpu_enable(void)
+FUNC_NO_STACK_PROTECTOR void arm_core_mpu_enable(void)
 {
 	uint64_t val;
 
@@ -110,7 +124,12 @@ static void mpu_init(void)
 	barrier_isync_fence_full();
 }
 
-static inline void mpu_set_region(uint32_t rnr, uint64_t rbar,
+/*
+ * Changing the MPU region may change the cache related attribute and cause
+ * cache coherence issues, so it's necessary to avoid invoking functions in such
+ * critical scope to avoid memory access before the MPU regions are all configured.
+ */
+static ALWAYS_INLINE void mpu_set_region(uint32_t rnr, uint64_t rbar,
 				  uint64_t rlar)
 {
 	write_prselr_el1(rnr);
@@ -135,8 +154,14 @@ static inline void mpu_clr_region(uint32_t rnr)
 	barrier_isync_fence_full();
 }
 
-/* This internal functions performs MPU region initialization. */
-static void region_init(const uint32_t index,
+/*
+ * This internal functions performs MPU region initialization.
+ *
+ * Changing the MPU region may change the cache related attribute and cause
+ * cache coherence issues, so it's necessary to avoid invoking functions in such
+ * critical scope to avoid memory access before the MPU regions are all configured.
+ */
+static ALWAYS_INLINE void region_init(const uint32_t index,
 			const struct arm_mpu_region *region_conf)
 {
 	uint64_t rbar = region_conf->base & MPU_RBAR_BASE_Msk;
@@ -151,13 +176,75 @@ static void region_init(const uint32_t index,
 	mpu_set_region(index, rbar, rlar);
 }
 
+#define _BUILD_REGION_CONF(reg, _ATTR)						\
+	(struct arm_mpu_region) { .name  = (reg).dt_name,			\
+				  .base  = (reg).dt_addr,			\
+				  .limit = (reg).dt_addr + (reg).dt_size,	\
+				  .attr  = _ATTR,				\
+				}
+
+/* This internal function programs the MPU regions defined in the DT when using
+ * the `zephyr,memory-attr = <( DT_MEM_ARM(...) )>` property.
+ */
+static int mpu_configure_regions_from_dt(uint8_t *reg_index)
+{
+	const struct mem_attr_region_t *region;
+	size_t num_regions;
+
+	num_regions = mem_attr_get_regions(&region);
+
+	for (size_t idx = 0; idx < num_regions; idx++) {
+		struct arm_mpu_region region_conf;
+
+		switch (DT_MEM_ARM_MASK(region[idx].dt_attr)) {
+		case DT_MEM_ARM_MPU_RAM:
+			region_conf = _BUILD_REGION_CONF(region[idx], REGION_RAM_ATTR);
+			break;
+#ifdef REGION_RAM_NOCACHE_ATTR
+		case DT_MEM_ARM_MPU_RAM_NOCACHE:
+			region_conf = _BUILD_REGION_CONF(region[idx], REGION_RAM_NOCACHE_ATTR);
+			__ASSERT(!(region[idx].dt_attr & DT_MEM_CACHEABLE),
+				 "RAM_NOCACHE with DT_MEM_CACHEABLE attribute\n");
+			break;
+#endif
+#ifdef REGION_FLASH_ATTR
+		case DT_MEM_ARM_MPU_FLASH:
+			region_conf = _BUILD_REGION_CONF(region[idx], REGION_FLASH_ATTR);
+			break;
+#endif
+#ifdef REGION_IO_ATTR
+		case DT_MEM_ARM_MPU_IO:
+			region_conf = _BUILD_REGION_CONF(region[idx], REGION_IO_ATTR);
+			break;
+#endif
+		default:
+			/* Either the specified `ATTR_MPU_*` attribute does not
+			 * exists or the `REGION_*_ATTR` macro is not defined
+			 * for that attribute.
+			 */
+			LOG_ERR("Invalid attribute for the region\n");
+			return -EINVAL;
+		}
+
+		region_init((*reg_index), (const struct arm_mpu_region *) &region_conf);
+
+		(*reg_index)++;
+	}
+
+	return 0;
+}
+
 /*
  * @brief MPU default configuration
  *
  * This function here provides the default configuration mechanism
  * for the Memory Protection Unit (MPU).
+ *
+ * On the SMP system, The function that enables MPU can not insert stack protector
+ * code because the canary values read by the secondary CPUs before enabling MPU
+ * and after enabling it are not equal due to cache coherence issues.
  */
-void z_arm64_mm_init(bool is_primary_core)
+FUNC_NO_STACK_PROTECTOR void z_arm64_mm_init(bool is_primary_core)
 {
 	uint64_t val;
 	uint32_t r_index;
@@ -201,6 +288,12 @@ void z_arm64_mm_init(bool is_primary_core)
 
 	/* Update the number of programmed MPU regions. */
 	static_regions_num = mpu_config.num_regions;
+
+	/* DT-defined MPU regions. */
+	if (mpu_configure_regions_from_dt(&static_regions_num) == -EINVAL) {
+		__ASSERT(0, "Failed to allocate MPU regions from DT\n");
+		return;
+	}
 
 	arm_core_mpu_enable();
 
@@ -396,9 +489,13 @@ static int flush_dynamic_regions_to_mpu(struct dynamic_region_info *dyn_regions,
 	int ret = 0;
 
 	arm_core_mpu_background_region_enable();
+
 	/*
 	 * Clean the dynamic regions
+	 * Before cleaning them, we need to flush dyn_regions to memory, because we need to read it
+	 * in updating mpu region.
 	 */
+	sys_cache_data_flush_range(dyn_regions, sizeof(struct dynamic_region_info) * region_num);
 	for (size_t i = reg_avail_idx; i < get_num_regions(); i++) {
 		mpu_clr_region(i);
 	}

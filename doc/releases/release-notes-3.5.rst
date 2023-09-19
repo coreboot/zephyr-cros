@@ -14,55 +14,6 @@ The following sections provide detailed lists of changes by component.
 Security Vulnerability Related
 ******************************
 
-API Changes
-***********
-
-Changes in this release
-=======================
-
-* Set :kconfig:option:`CONFIG_BOOTLOADER_SRAM_SIZE` default value to ``0`` (was
-  ``16``). Bootloaders that use a part of the SRAM should set this value to an
-  appropriate size. :github:`60371`
-
-* Time and timestamps in the network subsystem, PTP and IEEE 802.15.4
-  were more precisely specified and all in-tree call sites updated accordingly.
-  Fields for timed TX and TX/RX timestamps have been consolidated. See
-  :c:type:`net_time_t`, :c:struct:`net_ptp_time`, :c:struct:`ieee802154_config`,
-  :c:struct:`ieee802154_radio_api` and :c:struct:`net_pkt` for extensive
-  documentation. As this is largely an internal API, existing applications will
-  most probably continue to work unchanged.
-
-* The Kconfig option CONFIG_GPIO_NCT38XX_INTERRUPT has been renamed to
-  :kconfig:option:`CONFIG_GPIO_NCT38XX_ALERT`.
-
-Removed APIs in this release
-============================
-
-Deprecated in this release
-==========================
-
-* Setting the GIC architecture version by selecting
-  :kconfig:option:`CONFIG_GIC_V1`, :kconfig:option:`CONFIG_GIC_V2` and
-  :kconfig:option:`CONFIG_GIC_V3` directly in Kconfig has been deprecated.
-  The GIC version should now be specified by adding the appropriate compatible, for
-  example :dtcompatible:`arm,gic-v2`, to the GIC node in the device tree.
-
-Stable API changes in this release
-==================================
-
-* MCUmgr SMP version 2 error codes entry has changed due to a collision with an
-  existing response in shell_mgmt. Previously, these errors had the entry ``ret``
-  but now have the entry ``err``. ``smp_add_cmd_ret()`` is now deprecated and
-  :c:func:`smp_add_cmd_err` should be used instead, ``MGMT_CB_ERROR_RET`` is
-  now deprecated and :c:enumerator:`MGMT_CB_ERROR_ERR` should be used instead.
-  SMP version 2 error code defines for in-tree modules have been updated to
-  replace the ``*_RET_RC_*`` parts with ``*_ERR_*``.
-
-New APIs in this release
-========================
-
-* Introduced MCUmgr client support with handlers for img_mgmt and os_mgmt.
-
 Kernel
 ******
 
@@ -70,6 +21,11 @@ Architectures
 *************
 
 * ARM
+
+  * Architectural support for Arm Cortex-M has been separated from Arm
+    Cortex-A and Cortex-R. This includes separate source modules to handle
+    tasks like IRQ management, exception handling, thread handling and swap.
+    For implementation details see :github:`60031`.
 
 * ARM
 
@@ -160,6 +116,14 @@ Build system and infrastructure
 
   * Added support for CodeChecker
 
+* Twister now supports ``required_snippets`` in testsuite .yml files, this can
+  be used to include a snippet when a test is ran (and exclude any boards from
+  running that the snippet cannot be applied to).
+
+* Interrupts
+
+  * Added support for shared interrupts
+
 Drivers and Sensors
 *******************
 
@@ -184,6 +148,8 @@ Drivers and Sensors
 * Disk
 
 * Display
+
+  * Added support for ST7735S (in ST7735R driver)
 
 * DMA
 
@@ -285,6 +251,14 @@ Drivers and Sensors
 Networking
 **********
 
+* Time and timestamps in the network subsystem, PTP and IEEE 802.15.4
+  were more precisely specified and all in-tree call sites updated accordingly.
+  Fields for timed TX and TX/RX timestamps have been consolidated. See
+  :c:type:`net_time_t`, :c:struct:`net_ptp_time`, :c:struct:`ieee802154_config`,
+  :c:struct:`ieee802154_radio_api` and :c:struct:`net_pkt` for extensive
+  documentation. As this is largely an internal API, existing applications will
+  most probably continue to work unchanged.
+
 * CoAP:
 
   * Use 64 bit timer values for calculating transmission timeouts. This fixes potential problems for
@@ -304,23 +278,18 @@ Networking
 USB
 ***
 
+* USB device HID
+  * Kconfig option USB_HID_PROTOCOL_CODE, deprecated in v2.6, is finally removed.
+
 Devicetree
 **********
-
-* ``zephyr,memory-region-mpu`` was renamed ``zephyr,memory-attr``
-
-* The following macros were added:
-  :c:macro:`DT_FOREACH_NODE_VARGS`,
-  :c:macro:`DT_FOREACH_STATUS_OKAY_NODE_VARGS`
-  :c:macro:`DT_MEMORY_ATTR_FOREACH_NODE`
-  :c:macro:`DT_MEMORY_ATTR_APPLY`
-  :c:macro:`DT_MEM_FROM_FIXED_PARTITION`
-  :c:macro:`DT_FIXED_PARTITION_ADDR`
 
 Libraries / Subsystems
 **********************
 
 * Management
+
+  * Introduced MCUmgr client support with handlers for img_mgmt and os_mgmt.
 
   * Added response checking to MCUmgr's :c:enumerator:`MGMT_EVT_OP_CMD_RECV`
     notification callback to allow applications to reject MCUmgr commands.
@@ -351,9 +320,21 @@ Libraries / Subsystems
     zephyr settings from a remote device, see :ref:`mcumgr_smp_group_3` for
     details.
 
+  * Added :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_ALLOW_CONFIRM_NON_ACTIVE_IMAGE_SECONDARY`
+    and :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_ALLOW_CONFIRM_NON_ACTIVE_IMAGE_ANY`
+    that allow to control whether MCUmgr client will be allowed to confirm
+    non-active images.
+
+  * Added :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_ALLOW_ERASE_PENDING` that allows
+    to erase slots pending for next boot, that are not revert slots.
+
 * File systems
 
   * Added support for ext2 file system.
+  * Added support of mounting littlefs on the block device from the shell/fs.
+  * Added alignment parameter to FS_LITTLEFS_DECLARE_CUSTOM_CONFIG macro, it can speed up read/write
+    operation for SDMMC devices in case when we align buffers on CONFIG_SDHC_BUFFER_ALIGNMENT,
+    because we can avoid extra copy of data from card bffer to read/prog buffer.
 
 HALs
 ****

@@ -11,8 +11,8 @@
  * ISO-TP is a transport protocol for CAN (Controller Area Network)
  */
 
-#ifndef ZEPHYR_INCLUDE_ISOTP_H_
-#define ZEPHYR_INCLUDE_ISOTP_H_
+#ifndef ZEPHYR_INCLUDE_CANBUS_ISOTP_H_
+#define ZEPHYR_INCLUDE_CANBUS_ISOTP_H_
 
 /**
  * @brief CAN ISO-TP Protocol
@@ -34,10 +34,16 @@
  * DLC     Data length code
  * FC      Flow Control
  * FF      First Frame
+ * SF      Single Frame
  * FS      Flow Status
  * AE      Address Extension
+ * SN      Sequence Number
+ * ST      Separation time
  * SA      Source Address
  * TA      Target Address
+ * RX_DL   CAN RX LL data size
+ * TX_DL   CAN TX LL data size
+ * PCI     Process Control Information
  */
 
 /*
@@ -129,6 +135,33 @@ extern "C" {
 #endif
 
 /**
+ * @name ISO-TP message ID flags
+ * @anchor ISOTP_MSG_FLAGS
+ *
+ * @{
+ */
+
+/** Message uses ISO-TP extended addressing (first payload byte of CAN frame) */
+#define ISOTP_MSG_EXT_ADDR BIT(0)
+
+/**
+ * Message uses ISO-TP fixed addressing (according to SAE J1939). Only valid in combination with
+ * ``ISOTP_MSG_IDE``.
+ */
+#define ISOTP_MSG_FIXED_ADDR BIT(1)
+
+/** Message uses extended (29-bit) CAN ID */
+#define ISOTP_MSG_IDE BIT(2)
+
+/** Message uses CAN-FD format (FDF) */
+#define ISOTP_MSG_FDF BIT(3)
+
+/** Message uses CAN-FD Baud Rate Switch (BRS). Only valid in combination with ``ISOTP_MSG_FDF``. */
+#define ISOTP_MSG_BRS BIT(4)
+
+/** @} */
+
+/**
  * @brief ISO-TP message id struct
  *
  * Used to pass addresses to the bind and send functions.
@@ -146,12 +179,19 @@ struct isotp_msg_id {
 	};
 	/** ISO-TP extended address (if used) */
 	uint8_t ext_addr;
-	/** Indicates the CAN identifier type (0 for standard or 1 for extended) */
-	uint8_t ide : 1;
-	/** Indicates if ISO-TP extended addressing is used */
-	uint8_t use_ext_addr : 1;
-	/** Indicates if ISO-TP fixed addressing (acc. to SAE J1939) is used */
-	uint8_t use_fixed_addr : 1;
+	/**
+	 * ISO-TP frame data length (TX_DL for TX address or RX_DL for RX address).
+	 *
+	 * Valid values are 8 for classical CAN or 8, 12, 16, 20, 24, 32, 48 and 64 for CAN-FD.
+	 *
+	 * 0 will be interpreted as 8 or 64 (if ISOTP_MSG_FDF is set).
+	 *
+	 * The value for incoming transmissions (RX_DL) is determined automatically based on the
+	 * received first frame and does not need to be set during initialization.
+	 */
+	uint8_t dl;
+	/** Flags. @see @ref ISOTP_MSG_FLAGS. */
+	uint8_t flags;
 };
 
 /*
@@ -442,4 +482,4 @@ struct isotp_recv_ctx {
 }
 #endif
 
-#endif /* ZEPHYR_INCLUDE_ISOTP_H_ */
+#endif /* ZEPHYR_INCLUDE_CANBUS_ISOTP_H_ */
