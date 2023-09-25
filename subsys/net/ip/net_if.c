@@ -249,11 +249,6 @@ static bool net_if_tx(struct net_if *iface, struct net_pkt *pkt)
 	context = net_pkt_context(pkt);
 
 	if (net_if_flag_is_set(iface, NET_IF_LOWER_UP)) {
-		if (IS_ENABLED(CONFIG_NET_TCP) &&
-		    net_pkt_family(pkt) != AF_UNSPEC) {
-			net_pkt_set_queued(pkt, false);
-		}
-
 		if (IS_ENABLED(CONFIG_NET_PKT_TXTIME_STATS)) {
 			pkt_priority = net_pkt_priority(pkt);
 
@@ -2890,9 +2885,15 @@ const struct in6_addr *net_if_ipv6_select_src_addr(struct net_if *dst_iface,
 		if (dst_iface) {
 			src = net_if_ipv6_get_ll(dst_iface, NET_ADDR_PREFERRED);
 		} else {
-			STRUCT_SECTION_FOREACH(net_if, iface) {
-				struct in6_addr *addr;
+			struct in6_addr *addr;
 
+			addr = net_if_ipv6_get_ll(net_if_get_default(), NET_ADDR_PREFERRED);
+			if (addr) {
+				src = addr;
+				goto out;
+			}
+
+			STRUCT_SECTION_FOREACH(net_if, iface) {
 				addr = net_if_ipv6_get_ll(iface,
 							  NET_ADDR_PREFERRED);
 				if (addr) {
@@ -2905,7 +2906,6 @@ const struct in6_addr *net_if_ipv6_select_src_addr(struct net_if *dst_iface,
 
 	if (!src) {
 		src = net_ipv6_unspecified_address();
-		goto out;
 	}
 
 out:
@@ -3427,9 +3427,15 @@ const struct in_addr *net_if_ipv4_select_src_addr(struct net_if *dst_iface,
 		if (dst_iface) {
 			src = net_if_ipv4_get_ll(dst_iface, NET_ADDR_PREFERRED);
 		} else {
-			STRUCT_SECTION_FOREACH(net_if, iface) {
-				struct in_addr *addr;
+			struct in_addr *addr;
 
+			addr = net_if_ipv4_get_ll(net_if_get_default(), NET_ADDR_PREFERRED);
+			if (addr) {
+				src = addr;
+				goto out;
+			}
+
+			STRUCT_SECTION_FOREACH(net_if, iface) {
 				addr = net_if_ipv4_get_ll(iface,
 							  NET_ADDR_PREFERRED);
 				if (addr) {
@@ -3454,8 +3460,6 @@ const struct in_addr *net_if_ipv4_select_src_addr(struct net_if *dst_iface,
 		if (!src) {
 			src = net_ipv4_unspecified_address();
 		}
-
-		goto out;
 	}
 
 out:
@@ -4145,12 +4149,15 @@ enum net_verdict net_if_recv_data(struct net_if *iface, struct net_pkt *pkt)
 		/* L2 has modified the buffer starting point, it is easier
 		 * to re-initialize the cursor rather than updating it.
 		 */
-		net_pkt_cursor_init(new_pkt);
+		if (new_pkt) {
+			net_pkt_cursor_init(new_pkt);
 
-		if (net_promisc_mode_input(new_pkt) == NET_DROP) {
-			net_pkt_unref(new_pkt);
+			if (net_promisc_mode_input(new_pkt) == NET_DROP) {
+				net_pkt_unref(new_pkt);
+			}
+		} else {
+			NET_WARN("promiscuous packet dropped, unable to clone packet");
 		}
-
 		net_pkt_unref(pkt);
 
 		return verdict;
@@ -4747,7 +4754,8 @@ int net_if_get_name(struct net_if *iface, char *buf, int len)
 		return -ERANGE;
 	}
 
-	strncpy(buf, net_if_get_config(iface)->name, name_len);
+	/* Copy string and null terminator */
+	memcpy(buf, net_if_get_config(iface)->name, name_len + 1);
 
 	return name_len;
 #else
@@ -4769,7 +4777,8 @@ int net_if_set_name(struct net_if *iface, const char *buf)
 		return -ENAMETOOLONG;
 	}
 
-	strncpy(net_if_get_config(iface)->name, buf, name_len);
+	/* Copy string and null terminator */
+	memcpy(net_if_get_config(iface)->name, buf, name_len + 1);
 
 	return 0;
 #else

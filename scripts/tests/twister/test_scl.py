@@ -162,7 +162,7 @@ def test_yaml_load(caplog, fail_parsing):
         with pytest.raises(ScannerError) if fail_parsing else nullcontext():
             result = scl.yaml_load(filename)
 
-    mock_file.assert_called_with('dummy/file.yaml', 'r')
+    mock_file.assert_called_with('dummy/file.yaml', 'r', encoding='utf-8')
 
     if not fail_parsing:
         assert result == result_mock
@@ -247,3 +247,10 @@ def test_yaml_validate(schema_exists, validate, expected_error):
         core_mock.assert_called_once()
     else:
         core_mock.assert_not_called()
+
+
+def test_yaml_load_empty_file(tmp_path):
+    quarantine_file = tmp_path / 'empty_quarantine.yml'
+    quarantine_file.write_text("# yaml file without data")
+    with pytest.raises(scl.EmptyYamlFileException):
+        scl.yaml_load_verify(quarantine_file, None)

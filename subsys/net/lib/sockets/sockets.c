@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2017 Linaro Limited
  * Copyright (c) 2021 Nordic Semiconductor
+ * Copyright (c) 2023 Arm Limited (or its affiliates). All rights reserved.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -423,12 +424,12 @@ static void zsock_received_cb(struct net_context *ctx,
 	k_fifo_put(&ctx->recv_q, pkt);
 
 unlock:
+	/* Wake reader if it was sleeping */
+	(void)k_condvar_signal(&ctx->cond.recv);
+
 	if (ctx->cond.lock) {
 		(void)k_mutex_unlock(ctx->cond.lock);
 	}
-
-	/* Wake reader if it was sleeping */
-	(void)k_condvar_signal(&ctx->cond.recv);
 }
 
 int zsock_shutdown_ctx(struct net_context *ctx, int how)
@@ -2012,6 +2013,34 @@ int zsock_getsockopt_ctx(struct net_context *ctx, int level, int optname,
 				return 0;
 			}
 			break;
+
+		case SO_REUSEADDR:
+			if (IS_ENABLED(CONFIG_NET_CONTEXT_REUSEADDR)) {
+				ret = net_context_get_option(ctx,
+							     NET_OPT_REUSEADDR,
+							     optval, optlen);
+				if (ret < 0) {
+					errno = -ret;
+					return -1;
+				}
+
+				return 0;
+			}
+			break;
+
+		case SO_REUSEPORT:
+			if (IS_ENABLED(CONFIG_NET_CONTEXT_REUSEPORT)) {
+				ret = net_context_get_option(ctx,
+							     NET_OPT_REUSEPORT,
+							     optval, optlen);
+				if (ret < 0) {
+					errno = -ret;
+					return -1;
+				}
+
+				return 0;
+			}
+			break;
 		}
 
 		break;
@@ -2148,10 +2177,34 @@ int zsock_setsockopt_ctx(struct net_context *ctx, int level, int optname,
 			break;
 
 		case SO_REUSEADDR:
-			/* Ignore for now. Provided to let port
-			 * existing apps.
-			 */
-			return 0;
+			if (IS_ENABLED(CONFIG_NET_CONTEXT_REUSEADDR)) {
+				ret = net_context_set_option(ctx,
+							     NET_OPT_REUSEADDR,
+							     optval, optlen);
+				if (ret < 0) {
+					errno = -ret;
+					return -1;
+				}
+
+				return 0;
+			}
+
+			break;
+
+		case SO_REUSEPORT:
+			if (IS_ENABLED(CONFIG_NET_CONTEXT_REUSEPORT)) {
+				ret = net_context_set_option(ctx,
+							     NET_OPT_REUSEPORT,
+							     optval, optlen);
+				if (ret < 0) {
+					errno = -ret;
+					return -1;
+				}
+
+				return 0;
+			}
+
+			break;
 
 		case SO_PRIORITY:
 			if (IS_ENABLED(CONFIG_NET_CONTEXT_PRIORITY)) {

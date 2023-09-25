@@ -57,7 +57,7 @@ class Shell:
         timeout = timeout or self.base_timeout
         command_ext = f'{command}\n\n'
         regex_prompt = re.escape(self.prompt)
-        regex_command = f'{regex_prompt}.*{command}'
+        regex_command = f'.*{command}'
         self._device.clear_buffer()
         self._device.write(command_ext.encode())
         lines: list[str] = []
@@ -66,3 +66,15 @@ class Shell:
         # wait for device command execution
         lines.extend(self._device.readlines_until(regex=regex_prompt, timeout=timeout, print_output=print_output))
         return lines
+
+    def get_filtered_output(self, command_lines: list[str]) -> list[str]:
+        regex_filter = re.compile(
+            '|'.join([
+                re.escape(self.prompt),
+                '<dbg>',
+                '<inf>',
+                '<wrn>',
+                '<err>'
+            ])
+        )
+        return list(filter(lambda l: not regex_filter.search(l), command_lines))

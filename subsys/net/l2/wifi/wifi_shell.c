@@ -75,18 +75,244 @@ static bool parse_number(const struct shell *sh, long *param, char *str, long mi
 {
 	char *endptr;
 	char *str_tmp = str;
-	long num = strtol(str_tmp, &endptr, 10);
+	long num = 0;
+
+	if ((str_tmp[0] == '0') && (str_tmp[1] == 'x')) {
+		/* Hexadecimal numbers take base 0 in strtol */
+		num = strtol(str_tmp, &endptr, 0);
+	} else {
+		num = strtol(str_tmp, &endptr, 10);
+	}
 
 	if (*endptr != '\0') {
 		print(sh, SHELL_ERROR, "Invalid number: %s", str_tmp);
 		return false;
 	}
+
 	if ((num) < (min) || (num) > (max)) {
 		print(sh, SHELL_WARNING, "Value out of range: %s, (%ld-%ld)", str_tmp, min, max);
 		return false;
 	}
 	*param = num;
 	return true;
+}
+
+const char * const wifi_security_txt(enum wifi_security_type security)
+{
+	switch (security) {
+	case WIFI_SECURITY_TYPE_NONE:
+		return "OPEN";
+	case WIFI_SECURITY_TYPE_WEP:
+		return "WEP";
+	case WIFI_SECURITY_TYPE_WPA_PSK:
+		return "WPA-PSK";
+	case WIFI_SECURITY_TYPE_PSK:
+		return "WPA2-PSK";
+	case WIFI_SECURITY_TYPE_PSK_SHA256:
+		return "WPA2-PSK-SHA256";
+	case WIFI_SECURITY_TYPE_SAE:
+		return "WPA3-SAE";
+	case WIFI_SECURITY_TYPE_WAPI:
+		return "WAPI";
+	case WIFI_SECURITY_TYPE_EAP:
+		return "EAP";
+	case WIFI_SECURITY_TYPE_UNKNOWN:
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_mfp_txt(enum wifi_mfp_options mfp)
+{
+	switch (mfp) {
+	case WIFI_MFP_DISABLE:
+		return "Disable";
+	case WIFI_MFP_OPTIONAL:
+		return "Optional";
+	case WIFI_MFP_REQUIRED:
+		return "Required";
+	case WIFI_MFP_UNKNOWN:
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_band_txt(enum wifi_frequency_bands band)
+{
+	switch (band) {
+	case WIFI_FREQ_BAND_2_4_GHZ:
+		return "2.4GHz";
+	case WIFI_FREQ_BAND_5_GHZ:
+		return "5GHz";
+	case WIFI_FREQ_BAND_6_GHZ:
+		return "6GHz";
+	case WIFI_FREQ_BAND_UNKNOWN:
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_state_txt(enum wifi_iface_state state)
+{
+	switch (state) {
+	case WIFI_STATE_DISCONNECTED:
+		return "DISCONNECTED";
+	case WIFI_STATE_INACTIVE:
+		return "INACTIVE";
+	case WIFI_STATE_INTERFACE_DISABLED:
+		return "INTERFACE_DISABLED";
+	case WIFI_STATE_SCANNING:
+		return "SCANNING";
+	case WIFI_STATE_AUTHENTICATING:
+		return "AUTHENTICATING";
+	case WIFI_STATE_ASSOCIATING:
+		return "ASSOCIATING";
+	case WIFI_STATE_ASSOCIATED:
+		return "ASSOCIATED";
+	case WIFI_STATE_4WAY_HANDSHAKE:
+		return "4WAY_HANDSHAKE";
+	case WIFI_STATE_GROUP_HANDSHAKE:
+		return "GROUP_HANDSHAKE";
+	case WIFI_STATE_COMPLETED:
+		return "COMPLETED";
+	case WIFI_STATE_UNKNOWN:
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_mode_txt(enum wifi_iface_mode mode)
+{
+	switch (mode) {
+	case WIFI_MODE_INFRA:
+		return "STATION";
+	case WIFI_MODE_IBSS:
+		return "ADHOC";
+	case WIFI_MODE_AP:
+		return "ACCESS POINT";
+	case WIFI_MODE_P2P_GO:
+		return "P2P GROUP OWNER";
+	case WIFI_MODE_P2P_GROUP_FORMATION:
+		return "P2P GROUP FORMATION";
+	case WIFI_MODE_MESH:
+		return "MESH";
+	case WIFI_MODE_UNKNOWN:
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_link_mode_txt(enum wifi_link_mode link_mode)
+{
+	switch (link_mode) {
+	case WIFI_0:
+		return "WIFI 0 (802.11)";
+	case WIFI_1:
+		return "WIFI 1 (802.11b)";
+	case WIFI_2:
+		return "WIFI 2 (802.11a)";
+	case WIFI_3:
+		return "WIFI 3 (802.11g)";
+	case WIFI_4:
+		return "WIFI 4 (802.11n/HT)";
+	case WIFI_5:
+		return "WIFI 5 (802.11ac/VHT)";
+	case WIFI_6:
+		return "WIFI 6 (802.11ax/HE)";
+	case WIFI_6E:
+		return "WIFI 6E (802.11ax 6GHz/HE)";
+	case WIFI_7:
+		return "WIFI 7 (802.11be/EHT)";
+	case WIFI_LINK_MODE_UNKNOWN:
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_ps_txt(enum wifi_ps ps_name)
+{
+	switch (ps_name) {
+	case WIFI_PS_DISABLED:
+		return "Power save disabled";
+	case WIFI_PS_ENABLED:
+		return "Power save enabled";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_ps_mode_txt(enum wifi_ps_mode ps_mode)
+{
+	switch (ps_mode) {
+	case WIFI_PS_MODE_LEGACY:
+		return "Legacy power save";
+	case WIFI_PS_MODE_WMM:
+		return "WMM power save";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_twt_operation_txt(enum wifi_twt_operation twt_operation)
+{
+	switch (twt_operation) {
+	case WIFI_TWT_SETUP:
+		return "TWT setup";
+	case WIFI_TWT_TEARDOWN:
+		return "TWT teardown";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_twt_negotiation_type_txt(enum wifi_twt_negotiation_type twt_negotiation)
+{
+	switch (twt_negotiation) {
+	case WIFI_TWT_INDIVIDUAL:
+		return "TWT individual negotiation";
+	case WIFI_TWT_BROADCAST:
+		return "TWT broadcast negotiation";
+	case WIFI_TWT_WAKE_TBTT:
+		return "TWT wake TBTT negotiation";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_twt_setup_cmd_txt(enum wifi_twt_setup_cmd twt_setup)
+{
+	switch (twt_setup) {
+	case WIFI_TWT_SETUP_CMD_REQUEST:
+		return "TWT request";
+	case WIFI_TWT_SETUP_CMD_SUGGEST:
+		return "TWT suggest";
+	case WIFI_TWT_SETUP_CMD_DEMAND:
+		return "TWT demand";
+	case WIFI_TWT_SETUP_CMD_GROUPING:
+		return "TWT grouping";
+	case WIFI_TWT_SETUP_CMD_ACCEPT:
+		return "TWT accept";
+	case WIFI_TWT_SETUP_CMD_ALTERNATE:
+		return "TWT alternate";
+	case WIFI_TWT_SETUP_CMD_DICTATE:
+		return "TWT dictate";
+	case WIFI_TWT_SETUP_CMD_REJECT:
+		return "TWT reject";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+const char * const wifi_ps_wakeup_mode_txt(enum wifi_ps_wakeup_mode ps_wakeup_mode)
+{
+	switch (ps_wakeup_mode) {
+	case WIFI_PS_WAKEUP_MODE_DTIM:
+		return "PS wakeup mode DTIM";
+	case WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL:
+		return "PS wakeup mode listen interval";
+	default:
+		return "UNKNOWN";
+	}
 }
 
 static void handle_wifi_scan_result(struct net_mgmt_event_callback *cb)
@@ -249,7 +475,7 @@ static void print_twt_params(uint8_t dialog_token, uint8_t flow_id,
 	print(context.sh, SHELL_NORMAL, "TWT flow ID: %d\n",
 	      flow_id);
 	print(context.sh, SHELL_NORMAL, "TWT negotiation type: %s\n",
-	      wifi_twt_negotiation_type2str[negotiation_type]);
+	      wifi_twt_negotiation_type_txt(negotiation_type));
 	print(context.sh, SHELL_NORMAL, "TWT responder: %s\n",
 	       responder ? "true" : "false");
 	print(context.sh, SHELL_NORMAL, "TWT implicit: %s\n",
@@ -278,7 +504,7 @@ static void handle_wifi_twt_event(struct net_mgmt_event_callback *cb)
 
 	if (resp->resp_status == WIFI_TWT_RESP_RECEIVED) {
 		print(context.sh, SHELL_NORMAL, "TWT response: %s\n",
-		      wifi_twt_setup_cmd2str[resp->setup_cmd]);
+		      wifi_twt_setup_cmd_txt(resp->setup_cmd));
 		print(context.sh, SHELL_NORMAL, "== TWT negotiated parameters ==\n");
 		print_twt_params(resp->dialog_token,
 				 resp->flow_id,
@@ -728,10 +954,10 @@ static int cmd_wifi_ps(const struct shell *sh, size_t argc, char *argv[])
 		}
 
 		shell_fprintf(sh, SHELL_NORMAL, "PS status: %s\n",
-				wifi_ps2str[config.ps_params.enabled]);
+				wifi_ps_txt(config.ps_params.enabled));
 		if (config.ps_params.enabled) {
 			shell_fprintf(sh, SHELL_NORMAL, "PS mode: %s\n",
-					wifi_ps_mode2str[config.ps_params.mode]);
+					wifi_ps_mode_txt(config.ps_params.mode));
 		}
 
 		shell_fprintf(sh, SHELL_NORMAL, "PS listen_interval: %d\n",
@@ -786,7 +1012,7 @@ static int cmd_wifi_ps(const struct shell *sh, size_t argc, char *argv[])
 		return -ENOEXEC;
 	}
 
-	shell_fprintf(sh, SHELL_NORMAL, "%s\n", wifi_ps2str[params.enabled]);
+	shell_fprintf(sh, SHELL_NORMAL, "%s\n", wifi_ps_txt(params.enabled));
 
 	return 0;
 }
@@ -811,12 +1037,12 @@ static int cmd_wifi_ps_mode(const struct shell *sh, size_t argc, char *argv[])
 
 	if (net_mgmt(NET_REQUEST_WIFI_PS, iface, &params, sizeof(params))) {
 		shell_fprintf(sh, SHELL_WARNING, "%s failed Reason : %s\n",
-			      wifi_ps_mode2str[params.mode],
+			      wifi_ps_mode_txt(params.mode),
 			      wifi_ps_get_config_err_code_str(params.fail_reason));
 		return -ENOEXEC;
 	}
 
-	shell_fprintf(sh, SHELL_NORMAL, "%s\n", wifi_ps_mode2str[params.mode]);
+	shell_fprintf(sh, SHELL_NORMAL, "%s\n", wifi_ps_mode_txt(params.mode));
 
 	return 0;
 }
@@ -895,15 +1121,15 @@ static int cmd_wifi_twt_setup_quick(const struct shell *sh, size_t argc,
 
 	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &params, sizeof(params))) {
 		shell_fprintf(sh, SHELL_WARNING, "%s with %s failed, reason : %s\n",
-			wifi_twt_operation2str[params.operation],
-			wifi_twt_negotiation_type2str[params.negotiation_type],
+			wifi_twt_operation_txt(params.operation),
+			wifi_twt_negotiation_type_txt(params.negotiation_type),
 			wifi_twt_get_err_code_str(params.fail_reason));
 
 		return -ENOEXEC;
 	}
 
 	shell_fprintf(sh, SHELL_NORMAL, "TWT operation %s with dg: %d, flow_id: %d requested\n",
-		wifi_twt_operation2str[params.operation],
+		wifi_twt_operation_txt(params.operation),
 		params.dialog_token, params.flow_id);
 
 	return 0;
@@ -982,15 +1208,15 @@ static int cmd_wifi_twt_setup(const struct shell *sh, size_t argc,
 
 	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &params, sizeof(params))) {
 		shell_fprintf(sh, SHELL_WARNING, "%s with %s failed. reason : %s\n",
-			wifi_twt_operation2str[params.operation],
-			wifi_twt_negotiation_type2str[params.negotiation_type],
+			wifi_twt_operation_txt(params.operation),
+			wifi_twt_negotiation_type_txt(params.negotiation_type),
 			wifi_twt_get_err_code_str(params.fail_reason));
 
 		return -ENOEXEC;
 	}
 
 	shell_fprintf(sh, SHELL_NORMAL, "TWT operation %s with dg: %d, flow_id: %d requested\n",
-		wifi_twt_operation2str[params.operation],
+		wifi_twt_operation_txt(params.operation),
 		params.dialog_token, params.flow_id);
 
 	return 0;
@@ -1038,15 +1264,15 @@ static int cmd_wifi_twt_teardown(const struct shell *sh, size_t argc,
 
 	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &params, sizeof(params))) {
 		shell_fprintf(sh, SHELL_WARNING, "%s with %s failed, reason : %s\n",
-			wifi_twt_operation2str[params.operation],
-			wifi_twt_negotiation_type2str[params.negotiation_type],
+			wifi_twt_operation_txt(params.operation),
+			wifi_twt_negotiation_type_txt(params.negotiation_type),
 			wifi_twt_get_err_code_str(params.fail_reason));
 
 		return -ENOEXEC;
 	}
 
 	shell_fprintf(sh, SHELL_NORMAL, "TWT operation %s with dg: %d, flow_id: %d success\n",
-		wifi_twt_operation2str[params.operation],
+		wifi_twt_operation_txt(params.operation),
 		params.dialog_token, params.flow_id);
 
 	return 0;
@@ -1065,15 +1291,15 @@ static int cmd_wifi_twt_teardown_all(const struct shell *sh, size_t argc,
 
 	if (net_mgmt(NET_REQUEST_WIFI_TWT, iface, &params, sizeof(params))) {
 		shell_fprintf(sh, SHELL_WARNING, "%s with %s failed, reason : %s\n",
-			wifi_twt_operation2str[params.operation],
-			wifi_twt_negotiation_type2str[params.negotiation_type],
+			wifi_twt_operation_txt(params.operation),
+			wifi_twt_negotiation_type_txt(params.negotiation_type),
 			wifi_twt_get_err_code_str(params.fail_reason));
 
 		return -ENOEXEC;
 	}
 
 	shell_fprintf(sh, SHELL_NORMAL, "TWT operation %s all flows success\n",
-		wifi_twt_operation2str[params.operation]);
+		wifi_twt_operation_txt(params.operation));
 
 	return 0;
 }
@@ -1250,8 +1476,337 @@ static int cmd_wifi_ps_wakeup_mode(const struct shell *sh, size_t argc, char *ar
 	}
 
 	shell_fprintf(sh, SHELL_NORMAL, "%s\n",
-		      wifi_ps_wakeup_mode2str[params.wakeup_mode]);
+		      wifi_ps_wakeup_mode_txt(params.wakeup_mode));
 
+	return 0;
+}
+
+void parse_mode_args_to_params(const struct shell *sh, int argc,
+			       char *argv[], struct wifi_mode_info *mode,
+			       bool *do_mode_oper)
+{
+	int opt;
+	int option_index = 0;
+
+	static struct option long_options[] = {{"if_index", optional_argument, 0, 'i'},
+					       {"sta", no_argument, 0, 's'},
+					       {"monitor", no_argument, 0, 'm'},
+					       {"TX-injection", no_argument, 0, 't'},
+					       {"promiscuous", no_argument, 0, 'p'},
+					       {"ap", no_argument, 0, 'a'},
+					       {"softap", no_argument, 0, 'k'},
+					       {"get", no_argument, 0, 'g'},
+					       {"help", no_argument, 0, 'h'},
+					       {0, 0, 0, 0}};
+
+	while ((opt = getopt_long(argc, argv, "i:smtpakgh", long_options, &option_index)) != -1) {
+		switch (opt) {
+		case 's':
+			mode->mode |= WIFI_STA_MODE;
+			break;
+		case 'm':
+			mode->mode |= WIFI_MONITOR_MODE;
+			break;
+		case 't':
+			mode->mode |= WIFI_TX_INJECTION_MODE;
+			break;
+		case 'p':
+			mode->mode |= WIFI_PROMISCUOUS_MODE;
+			break;
+		case 'a':
+			mode->mode |= WIFI_AP_MODE;
+			break;
+		case 'k':
+			mode->mode |= WIFI_SOFTAP_MODE;
+			break;
+		case 'g':
+			mode->oper = true;
+			break;
+		case 'i':
+			mode->if_index = (uint8_t)atoi(optarg);
+			break;
+		case 'h':
+			shell_help(sh);
+			*do_mode_oper = false;
+			break;
+		case '?':
+		default:
+			break;
+		}
+	}
+}
+
+static int cmd_wifi_mode(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct net_if *iface;
+	struct wifi_mode_info mode_info = {0};
+	int ret;
+	bool do_mode_oper = true;
+
+	if (argc > 1) {
+		mode_info.oper = WIFI_MGMT_SET;
+		parse_mode_args_to_params(sh, argc, argv, &mode_info, &do_mode_oper);
+	} else {
+		shell_fprintf(sh, SHELL_ERROR, "Invalid number of arguments\n");
+		return -EINVAL;
+	}
+
+	if (do_mode_oper) {
+		/* Check interface index value. Mode validation must be performed by
+		 * lower layer
+		 */
+		if (mode_info.if_index == 0) {
+			iface = net_if_get_first_wifi();
+			if (iface == NULL) {
+				shell_fprintf(sh, SHELL_ERROR,
+					      "Cannot find the default wifi interface\n");
+				return -ENOEXEC;
+			}
+			mode_info.if_index = net_if_get_by_iface(iface);
+		} else {
+			iface = net_if_get_by_index(mode_info.if_index);
+			if (iface == NULL) {
+				shell_fprintf(sh, SHELL_ERROR,
+					      "Cannot find interface for if_index %d\n",
+					      mode_info.if_index);
+				return -ENOEXEC;
+			}
+		}
+
+		ret = net_mgmt(NET_REQUEST_WIFI_MODE, iface, &mode_info, sizeof(mode_info));
+
+		if (ret) {
+			shell_fprintf(sh, SHELL_ERROR, "mode %s operation failed with reason %d\n",
+					mode_info.oper == WIFI_MGMT_GET ? "get" : "set", ret);
+			return -ENOEXEC;
+		}
+
+		if (mode_info.oper == WIFI_MGMT_GET) {
+			shell_fprintf(sh, SHELL_NORMAL, "Wi-Fi current mode is %x\n",
+					mode_info.mode);
+		} else {
+			shell_fprintf(sh, SHELL_NORMAL, "Wi-Fi mode set to %x\n", mode_info.mode);
+		}
+	}
+	return 0;
+}
+
+void parse_channel_args_to_params(const struct shell *sh, int argc,
+				  char *argv[], struct wifi_channel_info *channel,
+				  bool *do_channel_oper)
+{
+	int opt;
+	int option_index = 0;
+
+	static struct option long_options[] = {{"if_index", optional_argument, 0, 'i'},
+					       {"channel", required_argument, 0, 'c'},
+					       {"get", no_argument, 0, 'g'},
+					       {"help", no_argument, 0, 'h'},
+					       {0, 0, 0, 0}};
+
+	while ((opt = getopt_long(argc, argv, "i:c:gh", long_options, &option_index)) != -1)  {
+		switch (opt) {
+		case 'c':
+			channel->channel = (uint16_t)atoi(optarg);
+			break;
+		case 'i':
+			channel->if_index = (uint8_t)atoi(optarg);
+			break;
+		case 'g':
+			channel->oper = WIFI_MGMT_GET;
+			break;
+		case 'h':
+			shell_help(sh);
+			*do_channel_oper = false;
+			break;
+		case '?':
+		default:
+			break;
+		}
+	}
+}
+
+static int cmd_wifi_channel(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct net_if *iface;
+	struct wifi_channel_info channel_info = {0};
+	int ret;
+	bool do_channel_oper = true;
+
+	if (argc > 1) {
+		channel_info.oper = WIFI_MGMT_SET;
+		parse_channel_args_to_params(sh, argc, argv, &channel_info, &do_channel_oper);
+	} else {
+		shell_fprintf(sh, SHELL_ERROR, "Invalid number of arguments\n");
+		return -EINVAL;
+	}
+
+	if (do_channel_oper) {
+		/*
+		 * Validate parameters before sending to lower layer.
+		 * Do it here instead of parse_channel_args_to_params
+		 * as this is right before sending the parameters to
+		 * the lower layer.
+		 */
+
+		if (channel_info.if_index == 0) {
+			iface = net_if_get_first_wifi();
+			if (iface == NULL) {
+				shell_fprintf(sh, SHELL_ERROR,
+					      "Cannot find the default wifi interface\n");
+				return -ENOEXEC;
+			}
+			channel_info.if_index = net_if_get_by_iface(iface);
+		} else {
+			iface = net_if_get_by_index(channel_info.if_index);
+			if (iface == NULL) {
+				shell_fprintf(sh, SHELL_ERROR,
+					      "Cannot find interface for if_index %d\n",
+					      channel_info.if_index);
+				return -ENOEXEC;
+			}
+		}
+
+		if (channel_info.oper == WIFI_MGMT_SET) {
+			if ((channel_info.channel < WIFI_CHANNEL_MIN) ||
+			    (channel_info.channel > WIFI_CHANNEL_MAX)) {
+				shell_fprintf(sh, SHELL_ERROR,
+						"Invalid channel number. Range is (1-233)\n");
+				return -ENOEXEC;
+			}
+		}
+
+		ret = net_mgmt(NET_REQUEST_WIFI_CHANNEL, iface,
+				&channel_info, sizeof(channel_info));
+
+		if (ret) {
+			shell_fprintf(sh, SHELL_ERROR,
+					"channel %s operation failed with reason %d\n",
+					channel_info.oper == WIFI_MGMT_GET ? "get" : "set", ret);
+			return -ENOEXEC;
+		}
+
+		if (channel_info.oper == WIFI_MGMT_GET) {
+			shell_fprintf(sh, SHELL_NORMAL, "Wi-Fi current channel is: %d\n",
+					channel_info.channel);
+		} else {
+			shell_fprintf(sh, SHELL_NORMAL, "Wi-Fi channel set to %d\n",
+					channel_info.channel);
+		}
+	}
+	return 0;
+}
+
+void parse_filter_args_to_params(const struct shell *sh, int argc,
+				 char *argv[], struct wifi_filter_info *filter,
+				 bool *do_filter_oper)
+{
+	int opt;
+	int option_index = 0;
+
+	static struct option long_options[] = {{"if_index", optional_argument, 0, 'i'},
+					       {"capture_len", optional_argument, 0, 'b'},
+					       {"all", no_argument, 0, 'a'},
+					       {"mgmt", no_argument, 0, 'm'},
+					       {"ctrl", no_argument, 0, 'c'},
+					       {"data", no_argument, 0, 'd'},
+					       {"get", no_argument, 0, 'g'},
+					       {"help", no_argument, 0, 'h'},
+					       {0, 0, 0, 0}};
+
+	while ((opt = getopt_long(argc, argv, "i:b:amcdgh", long_options, &option_index)) != -1)  {
+		switch (opt) {
+		case 'a':
+			filter->filter |= WIFI_PACKET_FILTER_ALL;
+			break;
+		case 'm':
+			filter->filter |= WIFI_PACKET_FILTER_MGMT;
+			break;
+		case 'c':
+			filter->filter |= WIFI_PACKET_FILTER_DATA;
+			break;
+		case 'd':
+			filter->filter |= WIFI_PACKET_FILTER_CTRL;
+			break;
+		case 'i':
+			filter->if_index = (uint8_t)atoi(optarg);
+			break;
+		case 'b':
+			filter->buffer_size = (uint16_t)atoi(optarg);
+			break;
+		case 'h':
+			shell_help(sh);
+			*do_filter_oper = false;
+			break;
+		case 'g':
+			filter->oper = WIFI_MGMT_GET;
+			break;
+		case '?':
+		default:
+			break;
+		}
+	}
+}
+
+static int cmd_wifi_packet_filter(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct net_if *iface;
+	struct wifi_filter_info packet_filter = {0};
+	int ret;
+	bool do_filter_oper = true;
+
+	if (argc > 1) {
+		packet_filter.oper = WIFI_MGMT_SET;
+		parse_filter_args_to_params(sh, argc, argv, &packet_filter, &do_filter_oper);
+	} else {
+		shell_fprintf(sh, SHELL_ERROR, "Invalid number of arguments\n");
+		return -EINVAL;
+	}
+
+	if (do_filter_oper) {
+		/*
+		 * Validate parameters before sending to lower layer.
+		 * Do it here instead of parse_filter_args_to_params
+		 * as this is right before sending the parameters to
+		 * the lower layer. filter and packet capture length
+		 * value to be verified by the lower layer.
+		 */
+		if (packet_filter.if_index == 0) {
+			iface = net_if_get_first_wifi();
+			if (iface == NULL) {
+				shell_fprintf(sh, SHELL_ERROR,
+					      "Cannot find the default wifi interface\n");
+				return -ENOEXEC;
+			}
+			packet_filter.if_index = net_if_get_by_iface(iface);
+		} else {
+			iface = net_if_get_by_index(packet_filter.if_index);
+			if (iface == NULL) {
+				shell_fprintf(sh, SHELL_ERROR,
+					      "Cannot find interface for if_index %d\n",
+					      packet_filter.if_index);
+				return -ENOEXEC;
+			}
+		}
+
+		ret = net_mgmt(NET_REQUEST_WIFI_PACKET_FILTER, iface,
+					&packet_filter, sizeof(packet_filter));
+
+		if (ret) {
+			shell_fprintf(sh, SHELL_ERROR,
+					"Wi-Fi packet filter %s operation failed with reason %d\n",
+					packet_filter.oper == WIFI_MGMT_GET ? "get" : "set", ret);
+			return -ENOEXEC;
+		}
+
+		if (packet_filter.oper == WIFI_MGMT_GET) {
+			shell_fprintf(sh, SHELL_NORMAL, "Wi-Fi current mode packet filter is %d\n",
+					packet_filter.filter);
+		} else {
+			shell_fprintf(sh, SHELL_NORMAL, "Wi-Fi mode packet filter set to %d\n",
+					packet_filter.filter);
+		}
+	}
 	return 0;
 }
 
@@ -1328,6 +1883,55 @@ SHELL_STATIC_SUBCMD_SET_CREATE(wifi_commands,
 		"-f: Force to use this regulatory hint over any other regulatory hints\n"
 		"Note: This may cause regulatory compliance issues, use it at your own risk.",
 		cmd_wifi_reg_domain),
+	SHELL_CMD(mode, NULL, "mode operational setting\n"
+		"This command may be used to set the Wi-Fi device into a specific mode of operation\n"
+		"parameters:"
+		"[-i : Interface index - optional argument\n"
+		"[-s : Station mode.\n"
+		"[-m : Monitor mode.\n"
+		"[-p : Promiscuous mode.\n"
+		"[-t : TX-Injection mode.\n"
+		"[-a : AP mode.\n"
+		"[-k : Softap mode.\n"
+		"[-h : Help.\n"
+		"[-g : Get current mode for a specific interface index.\n"
+		"Usage: Get operation example for interface index 1\n"
+		"wifi mode -g -i1\n"
+		"Set operation example for interface index 1 - set station+promiscuous\n"
+		"wifi mode -i1 -sp\n",
+		cmd_wifi_mode),
+	SHELL_CMD(packet_filter, NULL, "mode filter setting\n"
+		"This command is used to set packet filter setting when\n"
+		"monitor, TX-Injection and promiscuous mode is enabled.\n"
+		"The different packet filter modes are control, management, data and enable all filters\n"
+		"parameters:"
+		"[-i : Interface index - optional argument.\n"
+		"[-a : Enable all packet filter modes\n"
+		"[-m : Enable management packets to allowed up the stack.\n"
+		"[-c : Enable control packets to be allowed up the stack.\n"
+		"[-d : Enable Data packets to be allowed up the stack.\n"
+		"[-g : Get current filter settings for a specific interface index.\n"
+		"<-b : Capture length buffer size for each packet to be captured - optional argument.\n"
+		"<-h : Help.\n"
+		"Usage: Get operation example for interface index 1\n"
+		"wifi packet_filter -g -i1\n"
+		"Set operation example for interface index 1 - set data+management frame filter\n"
+		"wifi packet_filter -i1 -md\n",
+		cmd_wifi_packet_filter),
+	SHELL_CMD(channel, NULL, "wifi channel setting\n"
+		"This command is used to set the channel when\n"
+		"monitor or TX-Injection mode is enabled.\n"
+		"Currently 20 MHz is only supported and no BW parameter is provided\n"
+		"parameters:"
+		"[-i : Interface index - optional argument.\n"
+		"[-c : Set a specific channel number to the lower layer.\n"
+		"[-g : Get current set channel number from the lower layer.\n"
+		"[-h : Help.\n"
+		"Usage: Get operation example for interface index 1\n"
+		"wifi channel -g -i1\n"
+		"Set operation example for interface index 1 (setting channel 5)\n"
+		"wifi -i1 -c5\n",
+		cmd_wifi_channel),
 	SHELL_CMD_ARG(ps_timeout,
 		      NULL,
 		      "<val> - PS inactivity timer(in ms)",

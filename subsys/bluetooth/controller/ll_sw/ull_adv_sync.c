@@ -222,7 +222,7 @@ uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 }
 
 #if defined(CONFIG_BT_CTLR_ADV_ISO) && defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
-void ull_adv_iso_created(struct ll_adv_sync_set *sync)
+void ull_adv_sync_iso_created(struct ll_adv_sync_set *sync)
 {
 	if (sync->lll.iso && sync->is_started) {
 		uint8_t iso_handle = sync->lll.iso->handle;
@@ -1136,7 +1136,7 @@ uint32_t ull_adv_sync_evt_init(struct ll_adv_set *adv,
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_XTAL_US);
 	sync->ull.ticks_preempt_to_start =
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_PREEMPT_MIN_US);
-	sync->ull.ticks_slot = HAL_TICKER_US_TO_TICKS(time_us);
+	sync->ull.ticks_slot = HAL_TICKER_US_TO_TICKS_CEIL(time_us);
 
 	ticks_slot_offset = MAX(sync->ull.ticks_active_to_start,
 				sync->ull.ticks_prepare_to_start);

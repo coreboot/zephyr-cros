@@ -1811,10 +1811,20 @@ if(CONFIG_CHECK_INIT_PRIORITIES)
   list(APPEND
     post_build_commands
     COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/check_init_priorities.py
-      --build-dir ${PROJECT_BINARY_DIR}/..
-      --edt-pickle ${EDT_PICKLE}
+      --elf-file=${ZEPHYR_BINARY_DIR}/${KERNEL_ELF_NAME}
       ${fail_on_warning}
     )
+endif()
+
+if(NOT CMAKE_C_COMPILER_ID STREQUAL "ARMClang")
+  add_custom_target(
+    initlevels
+    COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/check_init_priorities.py
+      --elf-file=${ZEPHYR_BINARY_DIR}/${KERNEL_ELF_NAME}
+      --initlevels
+    DEPENDS ${logical_target_for_zephyr_elf}
+    USES_TERMINAL
+  )
 endif()
 
 # Generate and use MCUboot related artifacts as needed.

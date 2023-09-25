@@ -141,7 +141,6 @@ ARM arch:
   files:
     - arch/arm/
     - arch/arm/core/offsets/
-    - include/zephyr/arch/arm/aarch32/
     - include/zephyr/arch/arm/
     - tests/arch/arm/
     - doc/hardware/arch/arm_cortex_m.rst
@@ -1394,7 +1393,7 @@ Release Notes:
   maintainers:
     - str4t0m
   collaborators:
-    - dp7hgh7
+    - casparfriedrich
   files:
     - doc/hardware/peripherals/w1.rst
     - drivers/w1/
@@ -2086,7 +2085,6 @@ Power management:
     - ceolin
   collaborators:
     - nashif
-    - gmarull
     - teburd
     - tmleman
     - JordanYates
@@ -3012,10 +3010,9 @@ West:
   status: maintained
   maintainers:
     - sylvioalves
-    - glaubermaroto
-    - uLipe
   collaborators:
     - LucasTambor
+    - marekmatej
   files: []
   labels:
     - "platform: ESP32"
@@ -3025,6 +3022,7 @@ West:
   maintainers:
     - kristofer-jonsson-arm
   files:
+    - drivers/misc/ethos_u/
     - modules/hal_ethos_u/
   labels:
     - manifest-hal_ethos_u
@@ -3325,12 +3323,13 @@ West:
     - "area: Tracing"
 
 "West project: nanopb":
-  status: odd fixes
-  collaborators:
+  status: maintained
+  maintainers:
     - pdgendt
   files:
     - modules/nanopb/
     - samples/modules/nanopb/
+    - tests/modules/nanopb/
   labels:
     - "area: Serialization"
 
@@ -3376,6 +3375,16 @@ West:
     - modules/openthread/
   labels:
     - "area: OpenThread"
+
+"West project: percepio":
+  status: maintained
+  maintainers:
+    - eriktamlin
+    - aronlander-pe
+  files:
+    - modules/percepio/
+  labels:
+    - "area: Tracing"
 
 "West project: picolibc":
   status: maintained
@@ -3440,15 +3449,6 @@ West:
     - modules/Kconfig.tinycrypt
   labels:
     - "area: Crypto / RNG"
-
-"West project: TraceRecorderSource":
-  status: maintained
-  maintainers:
-    - eriktamlin
-  files:
-    - modules/TraceRecorder/
-  labels:
-    - "area: Tracing"
 
 "West project: trusted-firmware-m":
   status: maintained
@@ -3531,6 +3531,7 @@ Xtensa arch:
   collaborators:
     - andyross
     - nashif
+    - ceolin
   files:
     - arch/xtensa/
     - include/zephyr/arch/xtensa/

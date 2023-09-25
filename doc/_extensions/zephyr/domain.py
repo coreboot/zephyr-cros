@@ -94,18 +94,6 @@ class ConvertCodeSampleNode(SphinxTransform):
             index = parent.index(node)
             siblings_to_move = parent.children[index + 1 :]
 
-            # TODO remove once all :ref:`sample-xyz` have migrated to :zephyr:code-sample:`xyz`
-            # as this is the recommended way to reference code samples going forward.
-            self.env.app.env.domaindata["std"]["labels"][node["id"]] = (
-                self.env.docname,
-                node["id"],
-                node["name"],
-            )
-            self.env.app.env.domaindata["std"]["anonlabels"][node["id"]] = (
-                self.env.docname,
-                node["id"],
-            )
-
             # Create a new section
             new_section = nodes.section(ids=[node["id"]])
             new_section += nodes.title(text=node["name"])
@@ -226,7 +214,7 @@ class ZephyrDomain(Domain):
     label = "Zephyr Project"
 
     roles = {
-        "code-sample": XRefRole(innernodeclass=nodes.inline),
+        "code-sample": XRefRole(innernodeclass=nodes.inline, warn_dangling=True),
     }
 
     directives = {"code-sample": CodeSampleDirective}
@@ -279,7 +267,7 @@ class ZephyrDomain(Domain):
                     code_sample_info["docname"],
                     code_sample_info["id"],
                     contnode,
-                    code_sample_info["description"],
+                    code_sample_info["description"].astext(),
                 )
 
     def add_code_sample(self, code_sample):

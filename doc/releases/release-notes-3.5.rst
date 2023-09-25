@@ -22,6 +22,11 @@ Architectures
 
 * ARM
 
+  * Architectural support for Arm Cortex-M has been separated from Arm
+    Cortex-A and Cortex-R. This includes separate source modules to handle
+    tasks like IRQ management, exception handling, thread handling and swap.
+    For implementation details see :github:`60031`.
+
 * ARM
 
 * ARM64
@@ -114,6 +119,10 @@ Build system and infrastructure
 * Twister now supports ``required_snippets`` in testsuite .yml files, this can
   be used to include a snippet when a test is ran (and exclude any boards from
   running that the snippet cannot be applied to).
+
+* Interrupts
+
+  * Added support for shared interrupts
 
 Drivers and Sensors
 *******************
@@ -275,16 +284,6 @@ USB
 Devicetree
 **********
 
-* ``zephyr,memory-region-mpu`` was renamed ``zephyr,memory-attr``
-
-* The following macros were added:
-  :c:macro:`DT_FOREACH_NODE_VARGS`,
-  :c:macro:`DT_FOREACH_STATUS_OKAY_NODE_VARGS`
-  :c:macro:`DT_MEMORY_ATTR_FOREACH_NODE`
-  :c:macro:`DT_MEMORY_ATTR_APPLY`
-  :c:macro:`DT_MEM_FROM_FIXED_PARTITION`
-  :c:macro:`DT_FIXED_PARTITION_ADDR`
-
 Libraries / Subsystems
 **********************
 
@@ -328,6 +327,9 @@ Libraries / Subsystems
 
   * Added :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_ALLOW_ERASE_PENDING` that allows
     to erase slots pending for next boot, that are not revert slots.
+
+  * Added ``user_data`` as an optional field to :c:struct:`mgmt_handler` when
+    :kconfig:option:`CONFIG_MCUMGR_MGMT_HANDLER_USER_DATA` is enabled.
 
 * File systems
 

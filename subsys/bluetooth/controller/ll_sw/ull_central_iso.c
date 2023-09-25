@@ -559,7 +559,7 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_XTAL_US);
 	cig->ull.ticks_preempt_to_start =
 		HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_PREEMPT_MIN_US);
-	cig->ull.ticks_slot = HAL_TICKER_US_TO_TICKS(slot_us);
+	cig->ull.ticks_slot = HAL_TICKER_US_TO_TICKS_CEIL(slot_us);
 #endif /* !CONFIG_BT_CTLR_JIT_SCHEDULING */
 
 	/* Reset params cache */
@@ -690,15 +690,6 @@ void ll_cis_create(uint16_t cis_handle, uint16_t acl_handle)
 	/* Initialize stream states */
 	cis->established = 0;
 	cis->teardown = 0;
-	cis->lll.event_count = LLL_CONN_ISO_EVENT_COUNT_MAX;
-	cis->lll.sn = 0;
-	cis->lll.nesn = 0;
-	cis->lll.cie = 0;
-	cis->lll.flush = LLL_CIS_FLUSH_NONE;
-	cis->lll.active = 0;
-	cis->lll.datapath_ready_rx = 0;
-	cis->lll.tx.bn_curr = 1U;
-	cis->lll.rx.bn_curr = 1U;
 
 	(void)memset(&cis->hdr, 0U, sizeof(cis->hdr));
 
@@ -875,6 +866,7 @@ uint8_t ull_central_iso_setup(uint16_t cis_handle,
 #endif /* !CONFIG_BT_CTLR_JIT_SCHEDULING */
 
 	cis->central.instant = instant;
+	cis->lll.event_count = LLL_CONN_ISO_EVENT_COUNT_MAX;
 	cis->lll.next_subevent = 0U;
 	cis->lll.sn = 0U;
 	cis->lll.nesn = 0U;

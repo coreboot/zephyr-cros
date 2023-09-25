@@ -18,9 +18,9 @@
 /MAINTAINERS.yml                          @MaureenHelm
 /arch/arc/                                @abrodkin @ruuddw @evgeniy-paltsev
 /arch/arm/                                @MaureenHelm @galak @ioannisg
-/arch/arm/core/aarch32/cortex_m/cmse/     @ioannisg
-/arch/arm/include/aarch32/cortex_m/cmse.h @ioannisg
-/arch/arm/core/aarch32/cortex_a_r/        @MaureenHelm @galak @ioannisg @bbolen @stephanosio
+/arch/arm/core/cortex_m/cmse/             @ioannisg
+/arch/arm/include/cortex_m/cmse.h         @ioannisg
+/arch/arm/core/cortex_a_r/                @MaureenHelm @galak @ioannisg @bbolen @stephanosio
 /arch/arm64/                              @carlocaione
 /arch/arm64/core/cortex_r/                @povergoing
 /arch/arm64/core/xen/                     @lorc @firscity
@@ -243,6 +243,7 @@
 /drivers/adc/adc_stm32.c                  @cybertale
 /drivers/adc/adc_rpi_pico.c               @soburi
 /drivers/adc/*ads114s0x*                  @benediktibk
+/drivers/adc/*max11102_17*                @benediktibk
 /drivers/audio/*nrfx*                     @anangl
 /drivers/auxdisplay/*pt6314*              @xingrz
 /drivers/auxdisplay/*                      @thedjnK
@@ -576,6 +577,7 @@
 /dts/bindings/i2c/zephyr*i2c-emul*.yaml   @sjg20
 /dts/bindings/adc/st*stm32-adc.yaml       @cybertale
 /dts/bindings/adc/*ads114s08.yaml         @benediktibk
+/dts/bindings/adc/*max111*                @benediktibk
 /dts/bindings/modem/*hl7800.yaml          @rerickson1
 /dts/bindings/serial/ns16550.yaml         @dcpleung @nashif
 /dts/bindings/counter/snps,dw-timers.yaml @pbalsundar
@@ -655,11 +657,11 @@
 /include/zephyr/arch/arc/                        @abrodkin @ruuddw @evgeniy-paltsev
 /include/zephyr/arch/arc/arch.h                  @abrodkin @ruuddw @evgeniy-paltsev
 /include/zephyr/arch/arc/v2/irq.h                @abrodkin @ruuddw @evgeniy-paltsev
-/include/zephyr/arch/arm/aarch32/                @MaureenHelm @galak @ioannisg
-/include/zephyr/arch/arm/aarch32/cortex_a_r/     @stephanosio
+/include/zephyr/arch/arm                         @MaureenHelm @galak @ioannisg
+/include/zephyr/arch/arm/cortex_a_r/             @stephanosio
 /include/zephyr/arch/arm64/                      @carlocaione
 /include/zephyr/arch/arm64/cortex_r/             @povergoing
-/include/zephyr/arch/arm/aarch32/irq.h           @carlocaione
+/include/zephyr/arch/arm/irq.h                   @carlocaione
 /include/zephyr/arch/mips/                       @frantony
 /include/zephyr/arch/nios2/                      @nashif
 /include/zephyr/arch/nios2/arch.h                @nashif

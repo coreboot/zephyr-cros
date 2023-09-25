@@ -12,8 +12,8 @@
 #include <zephyr/bluetooth/testing.h>
 #include <zephyr/bluetooth/audio/vcp.h>
 #include <zephyr/bluetooth/audio/aics.h>
-#include "zephyr/bluetooth/audio/vocs.h"
-#include "zephyr/sys/util.h"
+#include <zephyr/bluetooth/audio/vocs.h>
+#include <zephyr/sys/util.h>
 
 #include <../../subsys/bluetooth/audio/micp_internal.h>
 #include <../../subsys/bluetooth/audio/aics_internal.h>
@@ -371,7 +371,7 @@ uint8_t tester_init_vocs(void)
 	tester_register_command_handlers(BTP_SERVICE_ID_VOCS, vocs_handlers,
 					 ARRAY_SIZE(vocs_handlers));
 
-	return tester_init_vcs();
+	return BTP_STATUS_SUCCESS;
 }
 
 uint8_t tester_unregister_vocs(void)

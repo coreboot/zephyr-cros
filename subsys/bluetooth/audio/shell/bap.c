@@ -1726,7 +1726,7 @@ static void base_recv(struct bt_bap_broadcast_sink *sink, const struct bt_bap_ba
 			shell_print(ctx_shell, "%4sBIS[%d] index 0x%02x", "", i, bis_data->index);
 			bis_indexes[index_count++] = bis_data->index;
 
-			if (subgroup->codec_cfg.id == BT_AUDIO_CODEC_LC3_ID) {
+			if (subgroup->codec_cfg.id == BT_HCI_CODING_FORMAT_LC3) {
 				const int err =
 					bt_audio_data_parse(bis_data->data, bis_data->data_len,
 							    print_data_func_cb, NULL);
@@ -2052,7 +2052,7 @@ static int cmd_create_broadcast(const struct shell *sh, size_t argc,
 	struct bt_bap_broadcast_source_stream_param
 		stream_params[ARRAY_SIZE(broadcast_source_streams)];
 	struct bt_bap_broadcast_source_subgroup_param subgroup_param;
-	struct bt_bap_broadcast_source_create_param create_param = {0};
+	struct bt_bap_broadcast_source_param create_param = {0};
 	const struct named_lc3_preset *named_preset;
 	int err;
 
