@@ -27,6 +27,17 @@ LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
 #ifdef CONFIG_COMMON_LIBC_MALLOC
 
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+#include <zephyr/linker/devicetree_regions.h>
+#include <zephyr/multi_heap/shared_multi_heap.h>
+
+#define FAST_MEMORY_SECTION_NAME LINKER_DT_NODE_REGION_NAME(DT_NODELABEL(psram1))
+#define SLOW_MEMORY_SECTION_NAME LINKER_DT_NODE_REGION_NAME(DT_NODELABEL(sram1))
+
+static uint8_t fast_ram[CONFIG_GEN5_HEAP_FAST_RAM] Z_GENERIC_SECTION(FAST_MEMORY_SECTION_NAME) __aligned(4);
+static uint8_t slow_ram[CONFIG_GEN5_HEAP_SLOW_RAM] Z_GENERIC_SECTION(SLOW_MEMORY_SECTION_NAME);
+#endif
+
 #if (CONFIG_COMMON_LIBC_MALLOC_ARENA_SIZE != 0)
 
 /* Figure out where the malloc variables live */
@@ -114,12 +125,14 @@ extern char _heap_sentry[];
 
 # endif /* else ALLOCATE_HEAP_AT_STARTUP */
 
+#ifndef CONFIG_GEN5_USE_CUSTOM_HEAP
 Z_LIBC_DATA static struct sys_heap z_malloc_heap;
+#endif
 
 #ifdef CONFIG_MULTITHREADING
 Z_LIBC_DATA SYS_MUTEX_DEFINE(z_malloc_heap_mutex);
 
-static inline void
+void
 malloc_lock(void) {
 	int lock_ret;
 
@@ -127,7 +140,7 @@ malloc_lock(void) {
 	__ASSERT_NO_MSG(lock_ret == 0);
 }
 
-static inline void
+void
 malloc_unlock(void)
 {
 	(void) sys_mutex_unlock(&z_malloc_heap_mutex);
@@ -141,9 +154,18 @@ void *malloc(size_t size)
 {
 	malloc_lock();
 
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+	void *ret = shared_multi_heap_aligned_alloc(0, __alignof__(z_max_align_t), size);
+
+	if (ret == NULL && size != 0) {
+		ret = shared_multi_heap_aligned_alloc(1, __alignof__(z_max_align_t), size);
+	}
+#else
 	void *ret = sys_heap_aligned_alloc(&z_malloc_heap,
 					   __alignof__(z_max_align_t),
 					   size);
+#endif
+
 	if (ret == NULL && size != 0) {
 		errno = ENOMEM;
 	}
@@ -157,9 +179,13 @@ void *aligned_alloc(size_t alignment, size_t size)
 {
 	malloc_lock();
 
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+	void *ret = shared_multi_heap_aligned_alloc(0, alignment, size);
+#else
 	void *ret = sys_heap_aligned_alloc(&z_malloc_heap,
 					   alignment,
 					   size);
+#endif
 	if (ret == NULL && size != 0) {
 		errno = ENOMEM;
 	}
@@ -231,7 +257,30 @@ static int malloc_prepare(void)
 	z_malloc_partition.attr = K_MEM_PARTITION_P_RW_U_RW;
 #endif
 
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+	struct shared_multi_heap_region heap_region_fast = {
+		.attr = 0,
+		.addr = (uintptr_t)&fast_ram[0],
+		.size = sizeof(fast_ram)
+	};
+	struct shared_multi_heap_region heap_region_malloc = {
+		.attr = 0,
+		.addr = (uintptr_t)heap_base,
+		.size = heap_size
+	};
+	struct shared_multi_heap_region heap_region_slow = {
+		.attr = 1,
+		.addr = (uintptr_t)&slow_ram[0],
+		.size = sizeof(slow_ram)
+	};
+
+	shared_multi_heap_pool_init();
+	shared_multi_heap_add(&heap_region_fast, NULL);
+	shared_multi_heap_add(&heap_region_malloc, NULL);
+	shared_multi_heap_add(&heap_region_slow, NULL);
+#else
 	sys_heap_init(&z_malloc_heap, heap_base, heap_size);
+#endif
 
 	return 0;
 }
@@ -240,9 +289,13 @@ void *realloc(void *ptr, size_t requested_size)
 {
 	malloc_lock();
 
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+	void *ret = NULL;
+#else
 	void *ret = sys_heap_aligned_realloc(&z_malloc_heap, ptr,
 					     __alignof__(z_max_align_t),
 					     requested_size);
+#endif
 
 	if (ret == NULL && requested_size != 0) {
 		errno = ENOMEM;
@@ -256,7 +309,11 @@ void *realloc(void *ptr, size_t requested_size)
 void free(void *ptr)
 {
 	malloc_lock();
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+	shared_multi_heap_free(ptr);
+#else
 	sys_heap_free(&z_malloc_heap, ptr);
+#endif
 	malloc_unlock();
 }
 

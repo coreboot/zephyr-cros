@@ -13,6 +13,7 @@
 #include <zephyr/sys/bitarray.h>
 #include <zephyr/sys/kobject.h>
 #include <zephyr/internal/syscall_handler.h>
+#include <zephyr/linker/devicetree_regions.h>
 
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
@@ -27,8 +28,18 @@ struct dyn_cb_data {
 	k_thread_stack_t *stack;
 };
 
+
+#if DT_NODE_EXISTS(DT_NODELABEL(sram1))
+#define SLOW_MEMORY_SECTION_NAME LINKER_DT_NODE_REGION_NAME(DT_NODELABEL(sram1))
+#define SLOW_MEMORY_SECTION Z_GENERIC_SECTION(SLOW_MEMORY_SECTION_NAME)
+
+static Z_KERNEL_STACK_ARRAY_DEFINE_IN(dynamic_stack, CONFIG_DYNAMIC_THREAD_POOL_SIZE,
+				      CONFIG_DYNAMIC_THREAD_STACK_SIZE, SLOW_MEMORY_SECTION);
+#else
 static K_THREAD_STACK_ARRAY_DEFINE(dynamic_stack, CONFIG_DYNAMIC_THREAD_POOL_SIZE,
 				   CONFIG_DYNAMIC_THREAD_STACK_SIZE);
+#endif
+
 SYS_BITARRAY_DEFINE_STATIC(dynamic_ba, BA_SIZE);
 
 static k_thread_stack_t *z_thread_stack_alloc_dyn(size_t align, size_t size)
