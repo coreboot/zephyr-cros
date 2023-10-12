@@ -152,19 +152,13 @@ struct net_if *z_impl_net_if_get_by_index(int index)
 struct net_if *z_vrfy_net_if_get_by_index(int index)
 {
 	struct net_if *iface;
-	struct z_object *zo;
-	int ret;
 
 	iface = net_if_get_by_index(index);
 	if (!iface) {
 		return NULL;
 	}
 
-	zo = z_object_find(iface);
-
-	ret = z_object_validate(zo, K_OBJ_NET_IF, _OBJ_INIT_TRUE);
-	if (ret != 0) {
-		z_dump_object_error(ret, iface, zo, K_OBJ_NET_IF);
+	if (!k_object_is_valid(iface, K_OBJ_NET_IF)) {
 		return NULL;
 	}
 
@@ -2864,6 +2858,8 @@ const struct in6_addr *net_if_ipv6_select_src_addr(struct net_if *dst_iface,
 	const struct in6_addr *src = NULL;
 	uint8_t best_match = 0U;
 
+	NET_ASSERT(dst);
+
 	if (!net_ipv6_is_ll_addr(dst) && !net_ipv6_is_addr_mcast_link(dst)) {
 		/* If caller has supplied interface, then use that */
 		if (dst_iface) {
@@ -3404,6 +3400,8 @@ const struct in_addr *net_if_ipv4_select_src_addr(struct net_if *dst_iface,
 {
 	const struct in_addr *src = NULL;
 	uint8_t best_match = 0U;
+
+	NET_ASSERT(dst);
 
 	if (!net_ipv4_is_ll_addr(dst)) {
 
@@ -4122,45 +4120,13 @@ enum net_verdict net_if_recv_data(struct net_if *iface, struct net_pkt *pkt)
 {
 	if (IS_ENABLED(CONFIG_NET_PROMISCUOUS_MODE) &&
 	    net_if_is_promisc(iface)) {
-		/* If the packet is not for us and the promiscuous
-		 * mode is enabled, then increase the ref count so
-		 * that net_core.c:processing_data() will not free it.
-		 * The promiscuous mode handler must free the packet
-		 * after it has finished working with it.
-		 *
-		 * If packet is for us, then NET_CONTINUE is returned.
-		 * In this case we must clone the packet, as the packet
-		 * could be manipulated by other part of the stack.
-		 */
-		enum net_verdict verdict;
 		struct net_pkt *new_pkt;
 
-		/* This protects pkt so that it will not be freed by L2 recv()
-		 */
-		net_pkt_ref(pkt);
+		new_pkt = net_pkt_clone(pkt, K_NO_WAIT);
 
-		verdict = net_if_l2(iface)->recv(iface, pkt);
-		if (verdict == NET_CONTINUE) {
-			new_pkt = net_pkt_clone(pkt, K_NO_WAIT);
-		} else {
-			new_pkt = net_pkt_ref(pkt);
+		if (net_promisc_mode_input(new_pkt) == NET_DROP) {
+			net_pkt_unref(new_pkt);
 		}
-
-		/* L2 has modified the buffer starting point, it is easier
-		 * to re-initialize the cursor rather than updating it.
-		 */
-		if (new_pkt) {
-			net_pkt_cursor_init(new_pkt);
-
-			if (net_promisc_mode_input(new_pkt) == NET_DROP) {
-				net_pkt_unref(new_pkt);
-			}
-		} else {
-			NET_WARN("promiscuous packet dropped, unable to clone packet");
-		}
-		net_pkt_unref(pkt);
-
-		return verdict;
 	}
 
 	return net_if_l2(iface)->recv(iface, pkt);
@@ -4244,7 +4210,7 @@ void net_if_foreach(net_if_cb_t cb, void *user_data)
 	}
 }
 
-static inline bool is_iface_offloaded(struct net_if *iface)
+bool net_if_is_offloaded(struct net_if *iface)
 {
 	return (IS_ENABLED(CONFIG_NET_OFFLOAD) &&
 		net_if_is_ip_offloaded(iface)) ||
@@ -4264,7 +4230,7 @@ static void notify_iface_up(struct net_if *iface)
 	} else
 #endif	/* CONFIG_NET_L2_CANBUS_RAW */
 	{
-		if (!is_iface_offloaded(iface)) {
+		if (!net_if_is_offloaded(iface)) {
 			NET_ASSERT(net_if_get_link_addr(iface)->addr != NULL);
 		}
 	}
@@ -4276,7 +4242,7 @@ static void notify_iface_up(struct net_if *iface)
 	/* If the interface is only having point-to-point traffic then we do
 	 * not need to run DAD etc for it.
 	 */
-	if (!is_iface_offloaded(iface) &&
+	if (!net_if_is_offloaded(iface) &&
 	    !(l2_flags_get(iface) & NET_L2_POINT_TO_POINT)) {
 		iface_ipv6_start(iface);
 		net_ipv4_autoconf_start(iface);
@@ -4289,7 +4255,7 @@ static void notify_iface_down(struct net_if *iface)
 	net_mgmt_event_notify(NET_EVENT_IF_DOWN, iface);
 	net_virtual_disable(iface);
 
-	if (!is_iface_offloaded(iface) &&
+	if (!net_if_is_offloaded(iface) &&
 	    !(l2_flags_get(iface) & NET_L2_POINT_TO_POINT)) {
 		net_ipv4_autoconf_reset(iface);
 	}
@@ -4720,7 +4686,7 @@ void net_if_add_tx_timestamp(struct net_pkt *pkt)
 
 bool net_if_is_wifi(struct net_if *iface)
 {
-	if (is_iface_offloaded(iface)) {
+	if (net_if_is_offloaded(iface)) {
 		return net_off_is_wifi_offloaded(iface);
 	}
 #if defined(CONFIG_NET_L2_ETHERNET)

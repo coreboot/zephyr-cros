@@ -420,6 +420,7 @@ def test_binaryhandler_output_handler(
 
     handler = BinaryHandler(mocked_instance, 'build')
     handler.terminate = mock.Mock()
+    handler.options = mock.Mock(timeout_multiplier=1)
 
     proc = MockProc(1, proc_stdout)
 
@@ -1208,6 +1209,7 @@ def test_devicehandler_create_serial_connection(
     handler.instance.add_missing_case_status = missing_mock
     available_mock = mock.Mock()
     handler.make_device_available = available_mock
+    handler.options = mock.Mock(timeout_multiplier=1)
 
     hardware_baud = 14400
     flash_timeout = 60
@@ -1375,6 +1377,7 @@ def test_devicehandler_handle(
     handler = DeviceHandler(mocked_instance, 'build')
     handler.get_hardware = mock.Mock(return_value=hardware)
     handler.options = mock.Mock(
+        timeout_multiplier=1,
         west_flash=None,
         west_runner=None
     )
@@ -1858,7 +1861,7 @@ TESTDATA_25 = [
     ),
     (
         '1\n2\n3\n4\n5\n'.encode('utf-8'),
-        6,
+        60,
         1,
         [None] * 3 + ['success'] * 7,
         (n for n in [100, 100, 10000]),
@@ -1900,14 +1903,13 @@ def test_qemuhandler_thread(
         else:
             raise ProcessLookupError()
 
+    type(mocked_instance.testsuite).timeout = mock.PropertyMock(return_value=timeout)
     handler = QEMUHandler(mocked_instance, 'build')
     handler.results = {}
     handler.ignore_unexpected_eof = False
     handler.pid_fn = 'pid_fn'
     handler.fifo_fn = 'fifo_fn'
-    type(mocked_instance.testsuite).timeout = mock.PropertyMock(
-        return_value=timeout
-    )
+    handler.options = mock.Mock(timeout_multiplier=1)
 
     def mocked_open(filename, *args, **kwargs):
         if filename == handler.pid_fn:
@@ -1958,7 +1960,7 @@ def test_qemuhandler_thread(
                     mock_thread_update_instance_info):
         QEMUHandler._thread(
             handler,
-            handler.timeout,
+            handler.get_test_timeout(),
             handler.build_dir,
             handler.log,
             handler.fifo_fn,
@@ -2037,6 +2039,7 @@ def test_qemuhandler_handle(
     command = ['generator_cmd', '-C', os.path.join('cmd', 'path'), 'run']
 
     handler.options = mock.Mock(
+        timeout_multiplier=1,
         west_flash=handler_options_west_flash,
         west_runner=None
     )

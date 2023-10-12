@@ -220,6 +220,7 @@
 /doc/CMakeLists.txt                       @carlescufi
 /doc/_scripts/                            @carlescufi
 /doc/connectivity/bluetooth/                    @alwa-nordic @jhedberg @Vudentz
+/doc/connectivity/networking/conn_mgr     @carlescufi @glarsennordic
 /doc/build/dts/                          @galak @mbolivar-ampere
 /doc/build/sysbuild/                      @tejlmand @nordicjm
 /doc/hardware/peripherals/canbus/                    @alexanderwachter @henrikbrixandersen
@@ -327,6 +328,7 @@
 /drivers/gpio/*ads114s0x*                 @benediktibk
 /drivers/gpio/*bd8lb600fs*                @benediktibk
 /drivers/gpio/*pcal64xxa*                 @benediktibk
+/drivers/gpio/gpio_altera_pio.c           @shilinte
 /drivers/hwinfo/                          @alexanderwachter
 /drivers/i2c/i2c_common.c                 @sjg20
 /drivers/i2c/i2c_emul.c                   @sjg20

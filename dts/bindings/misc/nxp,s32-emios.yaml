@@ -15,11 +15,26 @@ properties:
   reg:
     required: true
 
+  interrupts:
+    required: true
+
+  interrupt-names:
+    required: true
+
+  clocks:
+    required: true
+
   clock-divider:
     type: int
     required: true
     description: |
       Clock divider value for the global prescaler. Could be in range [1 ... 256]
+
+  internal-cnt:
+    type: int
+    required: true
+    description: |
+      A mask for channels that have internal counter, lsb is channel 0.
 
 child-binding:
   child-binding:

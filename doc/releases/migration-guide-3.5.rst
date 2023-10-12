@@ -34,6 +34,13 @@ Required changes
   SMP version 2 error code defines for in-tree modules have been updated to
   replace the ``*_RET_RC_*`` parts with ``*_ERR_*``.
 
+* MCUmgr SMP version 2 error translation (to legacy MCUmgr error code) is now
+  handled in function handlers by setting the ``mg_translate_error`` function
+  pointer of :c:struct:`mgmt_group` when registering a group. See
+  :c:type:`smp_translate_error_fn` for function details. Any SMP version 2
+  handlers made for Zephyr 3.4 need to be updated to include these translation
+  functions when the groups are registered.
+
 * ``zephyr,memory-region-mpu`` was renamed ``zephyr,memory-attr`` and its type
   moved from 'enum' to 'int'. To have a seamless conversion this is the
   required change in the DT:
@@ -62,6 +69,171 @@ Required changes
   be used instead. This change is due to a limitation on STM32F4 where the
   channels for temperature and Vbat are identical, and the impossibility of
   determining what we want to measure using solely the ADC API.
+
+* The default C library used on most targets has changed from the built-in
+  minimal C library to Picolibc. While both provide standard C library
+  interfaces and shouldn't cause any behavioral regressions for applications,
+  there are a few side effects to be aware of when migrating to Picolibc.
+
+  * Picolibc enables thread local storage
+    (:kconfig:option:`CONFIG_THREAD_LOCAL_STORAGE`) where supported. This
+    changes some internal operations within the kernel that improve
+    performance using some TLS variables. Zephyr places TLS variables in the
+    memory reserved for the stack, so stack usage for every thread will
+    increase by 8-16 bytes.
+
+  * Picolibc uses the same malloc implementation as the minimal C library, but
+    the default heap size depends on which C library is in use. When using the
+    minimal C library, the default heap is zero bytes, which means that malloc
+    will always fail. When using Picolibc, the default is 16kB with
+    :kconfig:option:`CONFIG_MMU` or :kconfig:option:`ARCH_POSIX`, 2kB with
+    :kconfig:option:`CONFIG_USERSPACE` and
+    :kconfig:option:`CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT`. For all
+    other targets, the default heap uses all remaining memory on the system.
+    You can change this by adjusting
+    :kconfig:option:`CONFIG_COMMON_LIBC_MALLOC_ARENA_SIZE`.
+
+  * Picolibc can either be built as part of the OS build or pulled from the
+    toolchain. When building as part of the OS, the build will increase by
+    approximately 1000 files.
+
+  * When using the standard C++ library with Picolibc, both of those must come
+    from the toolchain as the standard C++ library depends upon the C library
+    ABI.
+
+  * Picolibc removes the ``-ffreestanding`` compiler option. This allows
+    significant compiler optimization improvements, but also means that the
+    compiler will now warn about declarations of `main` which don't conform to
+    the Zephyr required type -- ``int main(void)``.
+
+  * Picolibc's default floating point input/output code is larger than the
+    minimal C library version (this is necessary to conform with the C
+    language "round trip" requirements for these operations). If you use
+    :kconfig:option:`CONFIG_CBPRINTF_FP_SUPPORT`, you will see increased
+    memory usage unless you also disable
+    :kconfig:option:`CONFIG_PICOLIBC_IO_FLOAT_EXACT`, which switches Picolibc
+    to a smaller, but inexact conversion algorithm. This requires building
+    Picolibc as a module.
+
+* The CAN controller timing API functions :c:func:`can_set_timing` and :c:func:`can_set_timing_data`
+  no longer fallback to the (Re-)Synchronization Jump Width (SJW) value set in the devicetree
+  properties for the given CAN controller upon encountering an SJW value corresponding to
+  ``CAN_SJW_NO_CHANGE`` (which is no longer available). The caller will therefore need to fill in
+  the ``sjw`` field in :c:struct:`can_timing`. To aid in this, the :c:func:`can_calc_timing` and
+  :c:func:`can_calc_timing_data` functions now automatically calculate a suitable SJW. The
+  calculated SJW can be overwritten by the caller if needed. The CAN controller API functions
+  :c:func:`can_set_bitrate` and :c:func:`can_set_bitrate_data` now also automatically calculate a
+  suitable SJW, but their SJW cannot be overwritten by the caller.
+
+* Ethernet PHY devicetree bindings were updated to use the standard ``reg``
+  property for the PHY address instead of a custom ``address`` property. As a
+  result, MDIO controller nodes now require ``#address-cells`` and
+  ``#size-cells`` properties. Similarly, Ethernet PHY devicetree nodes and
+  corresponding driver were updated to consistently use the node name
+  ``ethernet-phy`` instead of ``phy``. Devicetrees and overlays must be updated
+  accordingly:
+
+  .. code-block:: devicetree
+
+     mdio {
+         compatible = "mdio-controller";
+         #address-cells = <1>;
+         #size-cells = <0>;
+
+         ethernet-phy@0 {
+             compatible = "ethernet-phy";
+             reg = <0>;
+         };
+     };
+
+* The ``accept()`` callback's signature in :c:struct:`bt_l2cap_server` has
+  changed to ``int (*accept)(struct bt_conn *conn, struct bt_l2cap_server
+  *server, struct bt_l2cap_chan **chan)``,
+  adding a new ``server`` parameter pointing to the :c:struct:`bt_l2cap_server`
+  structure instance the callback relates to. :github:`60536`
+
+* The RAM disk driver has been changed to support multiple instances and instantiation
+  using devicetree. As a result, Kconfig option :kconfig:option:`CONFIG_DISK_RAM_VOLUME_SIZE`
+  and Kconfig option :kconfig:option:`CONFIG_DISK_RAM_VOLUME_NAME` are removed,
+  and the application using the RAM disk must instantiate it using devicetree,
+  as in the following example:
+
+  .. code-block:: devicetree
+
+    / {
+        ramdisk0 {
+            compatible = "zephyr,ram-disk";
+            disk-name = "RAM";
+            sector-size = <512>;
+            sector-count = <192>;
+        };
+    };
+
+* The :dtcompatible:`goodix,gt911`, :dtcompatible:`xptek,xpt2046` and
+  :dtcompatible:`hynitron,cst816s` drivers have been converted from Kscan to
+  Input, they can still be used with Kscan applications by adding a
+  :dtcompatible:`zephyr,kscan-input` node.
+
+* The ``zephyr,gpio-keys`` binding has been merged into
+  :dtcompatible:`gpio-keys` and the callback definition has been renamed from
+  ``INPUT_LISTENER_CB_DEFINE`` to :c:macro:`INPUT_CALLBACK_DEFINE`.
+
+* :c:macro:`CONTAINER_OF` now performs type checking, this was very commonly
+  misused to obtain user structure from :c:struct:`k_work` pointers without
+  passing from :c:struct:`k_work_delayable`. This would now result in a build
+  error and have to be done correctly using
+  :c:func:`k_work_delayable_from_work`.
+
+* The :dtcompatible:`ti,bq274xx` driver was using incorrect units for capacity
+  and power channels, these have been fixed and scaled by x1000 factor from the
+  previous implementation, any application using them has to be changed
+  accordingly.
+
+* The configuration options for the SSD1306 display driver can now be provided
+  via the Devicetree binding :dtcompatible:`solomon,ssd1306fb`. The following
+  Kconfig options: ``CONFIG_SSD1306_DEFAULT``,
+  ``CONFIG_SSD1306_SH1106_COMPATIBLE``, and ``CONFIG_SSD1306_REVERSE_MODE`` have
+  been removed.
+
+  * You can remove ``CONFIG_SSD1306_DEFAULT`` without any other modification.
+
+  * ``CONFIG_SSD1306_SH1106_COMPATIBLE`` was used to assert that the device is
+    (compatible with) SH1106. This has been replaced by a dedicated dts
+    compatible declaration. You may update an existing sh1106 node to change the
+    ``compatible`` designation from :dtcompatible:`solomon,ssd1306fb` to
+    :dtcompatible:`sinowealth,sh1106`.
+
+  * ``CONFIG_SSD1306_REVERSE_MODE`` is now set using the ``inversion-on``
+    property of the devicetree node.
+
+
+* GPIO drivers not implementing IRQ related operations must now provide
+  ``NULL`` to the relevant operations: ``pin_interrupt_configure``,
+  ``manage_callback``, ``get_pending_int``. The public API will return
+  ``-ENOSYS`` when these are not available, instead of ``-ENOTSUP``.
+
+* Platforms that implement power management hooks must explicitly select
+  :kconfig:option:`CONFIG_HAS_PM` in Kconfig. This is now a dependency of
+  :kconfig:option:`CONFIG_PM`. Before this change all platforms could enable
+  :kconfig:option:`CONFIG_PM` because empty weak stubs were provided, however,
+  this is no longer supported. As a result of this change, power management
+  hooks are no longer defined as weaks.
+
+* Multiple platforms no longer support powering the system off using
+  :c:func:`pm_state_force`. The new :c:func:`sys_poweroff` API must be used.
+  Migrated platforms include Nordic nRF, STM32, ESP32 and TI CC13XX/26XX. The
+  new API is independent from :kconfig:option:`CONFIG_PM`. It requires
+  :kconfig:option:`CONFIG_POWEROFF` to be enabled, which depends on
+  :kconfig:option:`CONFIG_HAS_POWEROFF`, an option selected by platforms
+  implementing the required new hooks.
+
+* ARM SoC initialization routines no longer need to call `NMI_INIT()`. The
+  macro call has been removed as it was not doing anything useful.
+
+* Device dependencies (incorrectly referred as "device handles" in some areas)
+  are now an optional feature enabled by :kconfig:option:`CONFIG_DEVICE_DEPS`.
+  This means that an extra linker stage is no longer necessary if this option is
+  not enabled.
 
 Recommended Changes
 *******************
@@ -107,50 +279,20 @@ Recommended Changes
   initialization levels used in the context of the ``init.h`` API,
   e.g. :c:macro:`SYS_INIT`.
 
-Picolibc-related Changes
-************************
+* The following CAN controller devicetree properties are now deprecated in favor specifying the
+  initial CAN bitrate using the ``bus-speed``, ``sample-point``, ``bus-speed-data``, and
+  ``sample-point-data`` properties:
 
-The default C library used on most targets has changed from the built-in
-minimal C library to Picolibc. While both provide standard C library
-interfaces and shouldn't cause any behavioral regressions for applications,
-there are a few side effects to be aware of when migrating to Picolibc.
+  * ``sjw``
+  * ``prop-seg``
+  * ``phase-seg1``
+  * ``phase-seg1``
+  * ``sjw-data``
+  * ``prop-seg-data``
+  * ``phase-seg1-data``
+  * ``phase-seg1-data``
 
-* Picolibc enables thread local storage
-  (:kconfig:option:`CONFIG_THREAD_LOCAL_STORAGE`) where supported. This
-  changes some internal operations within the kernel that improve
-  performance using some TLS variables. Zephyr places TLS variables in the
-  memory reserved for the stack, so stack usage for every thread will
-  increase by 8-16 bytes.
-
-* Picolibc uses the same malloc implementation as the minimal C library, but
-  the default heap size depends on which C library is in use. When using the
-  minimal C library, the default heap is zero bytes, which means that malloc
-  will always fail. When using Picolibc, the default is 16kB with
-  :kconfig:option:`CONFIG_MMU` or :kconfig:option:`ARCH_POSIX`, 2kB with
-  :kconfig:option:`CONFIG_USERSPACE` and
-  :kconfig:option:`CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT`. For all
-  other targets, the default heap uses all remaining memory on the system.
-  You can change this by adjusting
-  :kconfig:option:`CONFIG_COMMON_LIBC_MALLOC_ARENA_SIZE`.
-
-* Picolibc can either be built as part of the OS build or pulled from the
-  toolchain. When building as part of the OS, the build will increase by
-  approximately 1000 files.
-
-* When using the standard C++ library with Picolibc, both of those must come
-  from the toolchain as the standard C++ library depends upon the C library
-  ABI.
-
-* Picolibc removes the ``-ffreestanding`` compiler option. This allows
-  significant compiler optimization improvements, but also means that the
-  compiler will now warn about declarations of `main` which don't conform to
-  the Zephyr required type -- ``int main(void)``.
-
-* Picolibc's default floating point input/output code is larger than the
-  minimal C library version (this is necessary to conform with the C
-  language "round trip" requirements for these operations). If you use
-  :kconfig:option:`CONFIG_CBPRINTF_FP_SUPPORT`, you will see increased
-  memory usage unless you also disable
-  :kconfig:option:`CONFIG_PICOLIBC_IO_FLOAT_EXACT`, which switches Picolibc
-  to a smaller, but inexact conversion algorithm. This requires building
-  Picolibc as a module.
+* ``<zephyr/arch/arm/aarch32/cortex_a_r/cmsis.h>`` and
+  ``<zephyr/arch/arm/aarch32/cortex_m/cmsis.h>`` are now deprecated in favor of
+  including ``<cmsis_core.h>`` instead. The new header is part of the CMSIS glue
+  code in the ``modules`` directory.

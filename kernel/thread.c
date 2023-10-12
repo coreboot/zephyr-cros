@@ -33,6 +33,41 @@
 
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
+#ifdef CONFIG_OBJ_CORE_THREAD
+static struct k_obj_type  obj_type_thread;
+
+#ifdef CONFIG_OBJ_CORE_STATS_THREAD
+static struct k_obj_core_stats_desc  thread_stats_desc = {
+	.raw_size = sizeof(struct k_cycle_stats),
+	.query_size = sizeof(struct k_thread_runtime_stats),
+	.raw   = z_thread_stats_raw,
+	.query = z_thread_stats_query,
+	.reset = z_thread_stats_reset,
+	.disable = z_thread_stats_disable,
+	.enable  = z_thread_stats_enable,
+};
+#endif
+
+static int init_thread_obj_core_list(void)
+{
+	/* Initialize mem_slab object type */
+
+#ifdef CONFIG_OBJ_CORE_THREAD
+	z_obj_type_init(&obj_type_thread, K_OBJ_TYPE_THREAD_ID,
+			offsetof(struct k_thread, obj_core));
+#endif
+
+#ifdef CONFIG_OBJ_CORE_STATS_THREAD
+	k_obj_type_stats_init(&obj_type_thread, &thread_stats_desc);
+#endif
+
+	return 0;
+}
+
+SYS_INIT(init_thread_obj_core_list, PRE_KERNEL_1,
+	 CONFIG_KERNEL_INIT_PRIORITY_OBJECTS);
+#endif
+
 #ifdef CONFIG_THREAD_MONITOR
 /* This lock protects the linked list of active threads; i.e. the
  * initial _kernel.threads pointer and the linked list made up of
@@ -69,6 +104,9 @@ void k_thread_foreach(k_thread_user_cb_t user_cb, void *user_data)
 	SYS_PORT_TRACING_FUNC_EXIT(k_thread, foreach);
 
 	k_spin_unlock(&z_thread_monitor_lock, key);
+#else
+	ARG_UNUSED(user_cb);
+	ARG_UNUSED(user_data);
 #endif
 }
 
@@ -93,6 +131,9 @@ void k_thread_foreach_unlocked(k_thread_user_cb_t user_cb, void *user_data)
 	SYS_PORT_TRACING_FUNC_EXIT(k_thread, foreach_unlocked);
 
 	k_spin_unlock(&z_thread_monitor_lock, key);
+#else
+	ARG_UNUSED(user_cb);
+	ARG_UNUSED(user_data);
 #endif
 }
 
@@ -537,6 +578,15 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 
 	Z_ASSERT_VALID_PRIO(prio, entry);
 
+#ifdef CONFIG_OBJ_CORE_THREAD
+	k_obj_core_init_and_link(K_OBJ_CORE(new_thread), &obj_type_thread);
+#ifdef CONFIG_OBJ_CORE_STATS_THREAD
+	k_obj_core_stats_register(K_OBJ_CORE(new_thread),
+				  &new_thread->base.usage,
+				  sizeof(new_thread->base.usage));
+#endif
+#endif
+
 #ifdef CONFIG_USERSPACE
 	__ASSERT((options & K_USER) == 0U || z_stack_is_user_capable(stack),
 		 "user thread %p with kernel-only stack %p",
@@ -784,9 +834,9 @@ void z_init_static_threads(void)
 	 */
 	k_sched_lock();
 	_FOREACH_STATIC_THREAD(thread_data) {
-		if (thread_data->init_delay != K_TICKS_FOREVER) {
+		if (!K_TIMEOUT_EQ(thread_data->init_delay, K_FOREVER)) {
 			schedule_new_thread(thread_data->init_thread,
-					    K_MSEC(thread_data->init_delay));
+					    thread_data->init_delay);
 		}
 	}
 	k_sched_unlock();
@@ -895,6 +945,7 @@ int z_impl_k_float_disable(struct k_thread *thread)
 #if defined(CONFIG_FPU) && defined(CONFIG_FPU_SHARING)
 	return arch_float_disable(thread);
 #else
+	ARG_UNUSED(thread);
 	return -ENOTSUP;
 #endif /* CONFIG_FPU && CONFIG_FPU_SHARING */
 }
@@ -904,6 +955,8 @@ int z_impl_k_float_enable(struct k_thread *thread, unsigned int options)
 #if defined(CONFIG_FPU) && defined(CONFIG_FPU_SHARING)
 	return arch_float_enable(thread, options);
 #else
+	ARG_UNUSED(thread);
+	ARG_UNUSED(options);
 	return -ENOTSUP;
 #endif /* CONFIG_FPU && CONFIG_FPU_SHARING */
 }

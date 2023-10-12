@@ -132,7 +132,8 @@ static int check_used_port(enum net_ip_protocol proto,
 
 		if (IS_ENABLED(CONFIG_NET_IPV6) &&
 		    local_addr->sa_family == AF_INET6) {
-			if (net_sin6_ptr(&contexts[i].local)->sin6_addr == NULL) {
+			if (net_sin6_ptr(&contexts[i].local)->sin6_addr == NULL ||
+			    net_sin6_ptr(&contexts[i].local)->sin6_family != AF_INET6) {
 				continue;
 			}
 
@@ -187,7 +188,8 @@ static int check_used_port(enum net_ip_protocol proto,
 			}
 		} else if (IS_ENABLED(CONFIG_NET_IPV4) &&
 			   local_addr->sa_family == AF_INET) {
-			if (net_sin_ptr(&contexts[i].local)->sin_addr == NULL) {
+			if (net_sin_ptr(&contexts[i].local)->sin_addr == NULL ||
+			    net_sin_ptr(&contexts[i].local)->sin_family != AF_INET) {
 				continue;
 			}
 
@@ -707,24 +709,19 @@ int net_context_bind(struct net_context *context, const struct sockaddr *addr,
 			return -EADDRNOTAVAIL;
 		}
 
-		if (IS_ENABLED(CONFIG_NET_OFFLOAD) &&
-		    net_if_is_ip_offloaded(iface)) {
-			net_context_set_iface(context, iface);
-
-			return net_offload_bind(iface,
-						context,
-						addr,
-						addrlen);
-		}
-
 		k_mutex_lock(&context->lock, K_FOREVER);
-
-		ret = 0;
 
 		net_context_set_iface(context, iface);
 
 		net_sin6_ptr(&context->local)->sin6_family = AF_INET6;
 		net_sin6_ptr(&context->local)->sin6_addr = ptr;
+
+		if (IS_ENABLED(CONFIG_NET_OFFLOAD) && net_if_is_ip_offloaded(iface)) {
+			k_mutex_unlock(&context->lock);
+			return net_offload_bind(iface, context, addr, addrlen);
+		}
+
+		ret = 0;
 		if (addr6->sin6_port) {
 			ret = check_used_port(context->proto,
 					      addr6->sin6_port,
@@ -809,24 +806,19 @@ int net_context_bind(struct net_context *context, const struct sockaddr *addr,
 			return -EADDRNOTAVAIL;
 		}
 
-		if (IS_ENABLED(CONFIG_NET_OFFLOAD) &&
-		    net_if_is_ip_offloaded(iface)) {
-			net_context_set_iface(context, iface);
-
-			return net_offload_bind(iface,
-						context,
-						addr,
-						addrlen);
-		}
-
 		k_mutex_lock(&context->lock, K_FOREVER);
-
-		ret = 0;
 
 		net_context_set_iface(context, iface);
 
 		net_sin_ptr(&context->local)->sin_family = AF_INET;
 		net_sin_ptr(&context->local)->sin_addr = ptr;
+
+		if (IS_ENABLED(CONFIG_NET_OFFLOAD) && net_if_is_ip_offloaded(iface)) {
+			k_mutex_unlock(&context->lock);
+			return net_offload_bind(iface, context, addr, addrlen);
+		}
+
+		ret = 0;
 		if (addr4->sin_port) {
 			ret = check_used_port(context->proto,
 					      addr4->sin_port,
@@ -1654,10 +1646,7 @@ static void set_pkt_txtime(struct net_pkt *pkt, const struct msghdr *msghdr)
 		if (cmsg->cmsg_len == CMSG_LEN(sizeof(uint64_t)) &&
 		    cmsg->cmsg_level == SOL_SOCKET &&
 		    cmsg->cmsg_type == SCM_TXTIME) {
-			struct net_ptp_time txtime =
-				ns_to_net_ptp_time(*(net_time_t *)CMSG_DATA(cmsg));
-
-			net_pkt_set_timestamp(pkt, &txtime);
+			net_pkt_set_timestamp_ns(pkt, *(net_time_t *)CMSG_DATA(cmsg));
 			break;
 		}
 	}

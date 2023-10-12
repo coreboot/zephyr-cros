@@ -11,11 +11,10 @@ Zephyr Project content is written using the `reStructuredText`_ markup
 language (.rst file extension) with Sphinx extensions, and processed
 using Sphinx to create a formatted standalone website.  Developers can
 view this content either in its raw form as .rst markup files, or (with
-Sphinx installed) they can build the documentation using the Makefile
-on Linux systems, or make.bat on Windows, to
-generate the HTML content. The HTML content can then be viewed using a
-web browser. This same .rst content is also fed into the
-`Zephyr documentation`_ website (with a different theme applied).
+Sphinx installed) they can :ref:`build the documentation <zephyr_doc>` locally
+to generate the documentation in HTML or PDF format. The HTML content can
+then be viewed using a web browser. This same .rst content is served by the
+`Zephyr documentation`_ website.
 
 You can read details about `reStructuredText`_
 and about `Sphinx extensions`_ from their respective websites.
@@ -580,29 +579,3 @@ in the Zephyr setup.  Within a tab, you can have most any content *other
 than a heading* (code-blocks, ordered and unordered lists, pictures,
 paragraphs, and such).  You can read more about sphinx-tabs from the
 link above.
-
-Instruction Steps
-*****************
-
-Also introduced in the :ref:`getting_started` is a style that makes it
-easy to create tutorial guides with clearly identified steps. Add
-the ``.. rst-class:: numbered-step`` directive immediately before a
-second-level heading (by project convention, a heading underlined with
-asterisks ``******``, and it will be displayed as a numbered step,
-sequentially numbered within the document.  For example::
-
-   .. rst-class:: numbered-step
-
-   Put your right hand in
-   **********************
-
-.. rst-class:: numbered-step
-
-Put your right hand in
-**********************
-
-See the :zephyr_raw:`doc/develop/getting_started/index.rst` source file and
-compare with the :ref:`getting_started` to see a full example.  As implemented,
-only one set of numbered steps is intended per document.
-
-For instructions on building the documentation, see :ref:`zephyr_doc`.

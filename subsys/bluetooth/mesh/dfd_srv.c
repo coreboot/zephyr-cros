@@ -477,7 +477,9 @@ static int handle_upload_start(struct bt_mesh_model *mod, struct bt_mesh_msg_ctx
 	/* This will be a no-op if the slot state isn't RESERVED, which is
 	 * what we want.
 	 */
-	bt_mesh_dfu_slot_release(srv->upload.slot);
+	if (srv->upload.slot) {
+		bt_mesh_dfu_slot_release(srv->upload.slot);
+	}
 
 #ifdef CONFIG_BT_MESH_DFD_SRV_OOB_UPLOAD
 	srv->upload.is_oob = false;
@@ -1013,6 +1015,13 @@ enum bt_mesh_dfd_status bt_mesh_dfd_srv_start(struct bt_mesh_dfd_srv *srv,
 
 	sys_slist_init(&srv->inputs.targets);
 	for (i = 0; i < srv->target_cnt; i++) {
+		uint16_t addr = srv->targets[i].blob.addr;
+
+		memset(&srv->targets[i].blob, 0, sizeof(struct bt_mesh_blob_target));
+		memset(&srv->pull_ctxs[i], 0, sizeof(struct bt_mesh_blob_target_pull));
+		srv->targets[i].blob.addr = addr;
+		srv->targets[i].blob.pull = &srv->pull_ctxs[i];
+
 		sys_slist_append(&srv->inputs.targets, &srv->targets[i].blob.n);
 	}
 

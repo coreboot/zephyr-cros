@@ -64,6 +64,8 @@ class Filters:
     SKIP = 'Skip filter'
     # in case of incompatibility between selected and allowed toolchains.
     TOOLCHAIN = 'Toolchain filter'
+    # in case an optional module is not available
+    MODULE = 'Module filter'
 
 
 class TestLevel:
@@ -530,7 +532,7 @@ class TestPlan:
 
                     for name in parsed_data.scenarios.keys():
                         suite_dict = parsed_data.get_scenario(name)
-                        suite = TestSuite(root, suite_path, name, data=suite_dict)
+                        suite = TestSuite(root, suite_path, name, data=suite_dict, detailed_test_id=self.options.detailed_test_id)
                         suite.add_subcases(suite_dict, subcases, ztest_suite_names)
                         if testsuite_filter:
                             if suite.name and suite.name in testsuite_filter:
@@ -576,7 +578,8 @@ class TestPlan:
                 instance.run = instance.check_runnable(
                     self.options.enable_slow,
                     tfilter,
-                    self.options.fixture
+                    self.options.fixture,
+                    self.hwm
                 )
 
                 instance.metrics['handler_time'] = ts.get('execution_time', 0)
@@ -726,13 +729,9 @@ class TestPlan:
                 instance.run = instance.check_runnable(
                     self.options.enable_slow,
                     tfilter,
-                    self.options.fixture
+                    self.options.fixture,
+                    self.hwm
                 )
-                if runnable and self.hwm.duts:
-                    for h in self.hwm.duts:
-                        if h.platform == plat.name:
-                            if ts.harness_config.get('fixture') in h.fixtures:
-                                instance.run = True
 
                 if not force_platform and plat.name in exclude_platform:
                     instance.add_filter("Platform is excluded on command line.", Filters.CMD_LINE)
@@ -743,7 +742,7 @@ class TestPlan:
 
                 if ts.modules and self.modules:
                     if not set(ts.modules).issubset(set(self.modules)):
-                        instance.add_filter(f"one or more required modules not available: {','.join(ts.modules)}", Filters.TESTSUITE)
+                        instance.add_filter(f"one or more required modules not available: {','.join(ts.modules)}", Filters.MODULE)
 
                 if self.options.level:
                     tl = self.get_level(self.options.level)
@@ -1038,7 +1037,7 @@ def change_skip_to_error_if_integration(options, instance):
         # Do not treat this as error if filter type is command line
         filters = {t['type'] for t in instance.filters}
         ignore_filters ={Filters.CMD_LINE, Filters.SKIP, Filters.PLATFORM_KEY,
-                         Filters.TOOLCHAIN}
+                         Filters.TOOLCHAIN, Filters.MODULE}
         if filters.intersection(ignore_filters):
             return
         instance.status = "error"

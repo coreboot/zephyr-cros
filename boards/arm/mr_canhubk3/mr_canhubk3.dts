@@ -29,6 +29,7 @@
 	};
 
 	aliases {
+		dma0 = &edma0;
 		led0 = &user_led1_red;
 		led1 = &user_led1_green;
 		led2 = &user_led1_blue;
@@ -64,15 +65,15 @@
 		compatible = "pwm-leds";
 
 		user_led1_blue_pwm: user_led1_blue {
-			pwms = <&emios1_pwm 5 PWM_MSEC(20)>;
+			pwms = <&emios1_pwm 5 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
 		};
 
 		user_led1_green_pwm: user_led1_green {
-			pwms = <&emios1_pwm 10 PWM_MSEC(20)>;
+			pwms = <&emios1_pwm 10 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
 		};
 
 		user_led1_red_pwm: user_led1_red {
-			pwms = <&emios0_pwm 19 PWM_MSEC(20)>;
+			pwms = <&emios0_pwm 19 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
 		};
 	};
 
@@ -196,38 +197,62 @@
 &lpuart0 {
 	pinctrl-0 = <&lpuart0_default>;
 	pinctrl-names = "default";
+	dmas = <&edma0 0 37>, <&edma0 1 38>;
+	dma-names = "tx", "rx";
 };
 
 &lpuart1 {
 	pinctrl-0 = <&lpuart1_default>;
 	pinctrl-names = "default";
+	dmas = <&edma0 2 39>, <&edma0 3 40>;
+	dma-names = "tx", "rx";
 };
 
 &lpuart2 {
 	pinctrl-0 = <&lpuart2_default>;
 	pinctrl-names = "default";
 	current-speed = <115200>;
+	dmas = <&edma0 16 38>, <&edma0 17 39>;
+	dma-names = "tx", "rx";
 	status = "okay";
 };
 
 &lpuart9 {
 	pinctrl-0 = <&lpuart9_default>;
 	pinctrl-names = "default";
+	/*
+	 * LPUART 1 and 9 share the same DMA source for TX
+	 * and RX, using UART async API for both instances
+	 * should be careful.
+	 */
+	dmas = <&edma0 4 39>, <&edma0 5 40>;
+	dma-names = "tx", "rx";
 };
 
 &lpuart10 {
 	pinctrl-0 = <&lpuart10_default>;
 	pinctrl-names = "default";
+	/*
+	 * LPUART 2 and 10 share the same DMA source for TX
+	 * and RX, using UART async API for both instances
+	 * should be careful.
+	 */
+	dmas = <&edma0 18 38>, <&edma0 19 39>;
+	dma-names = "tx", "rx";
 };
 
 &lpuart13 {
 	pinctrl-0 = <&lpuart13_default>;
 	pinctrl-names = "default";
+	dmas = <&edma0 20 44>, <&edma0 21 45>;
+	dma-names = "tx", "rx";
 };
 
 &lpuart14 {
 	pinctrl-0 = <&lpuart14_default>;
 	pinctrl-names = "default";
+	dmas = <&edma0 22 46>, <&edma0 23 47>;
+	dma-names = "tx", "rx";
 };
 
 &qspi0 {
@@ -271,10 +296,8 @@
 	phys = <&can_phy0>;
 	bus-speed = <125000>;
 	sample-point = <875>;
-	sjw = <1>;
 	bus-speed-data = <1000000>;
 	sample-point-data = <875>;
-	sjw-data = <1>;
 	status = "okay";
 };
 
@@ -284,10 +307,8 @@
 	phys = <&can_phy1>;
 	bus-speed = <125000>;
 	sample-point = <875>;
-	sjw = <1>;
 	bus-speed-data = <1000000>;
 	sample-point-data = <875>;
-	sjw-data = <1>;
 };
 
 &flexcan2 {
@@ -296,10 +317,8 @@
 	phys = <&can_phy2>;
 	bus-speed = <125000>;
 	sample-point = <875>;
-	sjw = <1>;
 	bus-speed-data = <1000000>;
 	sample-point-data = <875>;
-	sjw-data = <1>;
 };
 
 &flexcan3 {
@@ -308,10 +327,8 @@
 	phys = <&can_phy3>;
 	bus-speed = <125000>;
 	sample-point = <875>;
-	sjw = <1>;
 	bus-speed-data = <1000000>;
 	sample-point-data = <875>;
-	sjw-data = <1>;
 };
 
 &flexcan4 {
@@ -320,10 +337,8 @@
 	phys = <&can_phy4>;
 	bus-speed = <125000>;
 	sample-point = <875>;
-	sjw = <1>;
 	bus-speed-data = <1000000>;
 	sample-point-data = <875>;
-	sjw-data = <1>;
 };
 
 &flexcan5 {
@@ -332,10 +347,8 @@
 	phys = <&can_phy5>;
 	bus-speed = <125000>;
 	sample-point = <875>;
-	sjw = <1>;
 	bus-speed-data = <1000000>;
 	sample-point-data = <875>;
-	sjw-data = <1>;
 };
 
 &lpi2c0 {
@@ -428,7 +441,7 @@
 		/* Default clock for internal counter for PWM channel 0-7 is 100Khz */
 		pwm_0 {
 			channel = <0>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -437,7 +450,7 @@
 
 		pwm_1 {
 			channel = <1>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -446,7 +459,7 @@
 
 		pwm_2 {
 			channel = <2>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -455,7 +468,7 @@
 
 		pwm_3 {
 			channel = <3>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -464,7 +477,7 @@
 
 		pwm_4 {
 			channel = <4>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -473,7 +486,7 @@
 
 		pwm_5 {
 			channel = <5>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -482,7 +495,7 @@
 
 		pwm_6 {
 			channel = <6>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -491,7 +504,7 @@
 
 		pwm_7 {
 			channel = <7>;
-			pwm-mode = "MODE_OPWFMB";
+			pwm-mode = "OPWFMB";
 			period = <65535>;
 			duty-cycle = <0>;
 			prescaler = <8>;
@@ -502,7 +515,7 @@
 			channel = <19>;
 			master-bus = <&emios0_bus_a>;
 			duty-cycle = <0>;
-			pwm-mode = "MODE_OPWMB";
+			pwm-mode = "OPWMB";
 			polarity = "ACTIVE_LOW";
 		};
 	};
@@ -541,7 +554,7 @@
 			channel = <10>;
 			master-bus = <&emios1_bus_a>;
 			duty-cycle = <0>;
-			pwm-mode = "MODE_OPWMB";
+			pwm-mode = "OPWMB";
 			polarity = "ACTIVE_LOW";
 		};
 
@@ -549,8 +562,12 @@
 			channel = <5>;
 			master-bus = <&emios1_bus_f>;
 			duty-cycle = <0>;
-			pwm-mode = "MODE_OPWMB";
+			pwm-mode = "OPWMB";
 			polarity = "ACTIVE_LOW";
 		};
 	};
+};
+
+&edma0 {
+	status = "okay";
 };

@@ -592,7 +592,7 @@ static void check_notifications(struct lwm2m_ctx *ctx, const int64_t timestamp)
 			continue;
 		}
 		/* Check That There is not pending process*/
-		if (obs->active_tx_operation) {
+		if (obs->active_notify != NULL) {
 			continue;
 		}
 
@@ -642,7 +642,7 @@ static int socket_recv_message(struct lwm2m_ctx *client_ctx)
 	}
 
 	in_buf[len] = 0U;
-	lwm2m_udp_receive(client_ctx, in_buf, len, &from_addr, handle_request);
+	lwm2m_udp_receive(client_ctx, in_buf, len, &from_addr);
 
 	return 0;
 }
@@ -675,7 +675,9 @@ static int socket_send_message(struct lwm2m_ctx *client_ctx)
 	}
 
 	if (msg->type != COAP_TYPE_CON) {
-		lwm2m_reset_message(msg, true);
+		if (!lwm2m_outgoing_is_part_of_blockwise(msg)) {
+			lwm2m_reset_message(msg, true);
+		}
 	}
 
 	return rc;

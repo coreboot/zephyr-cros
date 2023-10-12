@@ -182,7 +182,6 @@ static int mcux_flexcan_set_timing(const struct device *dev,
 				   const struct can_timing *timing)
 {
 	struct mcux_flexcan_data *data = dev->data;
-	uint8_t sjw_backup = data->timing.sjw;
 
 	if (!timing) {
 		return -EINVAL;
@@ -193,9 +192,6 @@ static int mcux_flexcan_set_timing(const struct device *dev,
 	}
 
 	data->timing = *timing;
-	if (timing->sjw == CAN_SJW_NO_CHANGE) {
-		data->timing.sjw = sjw_backup;
-	}
 
 	return 0;
 }
@@ -205,7 +201,6 @@ static int mcux_flexcan_set_timing_data(const struct device *dev,
 					const struct can_timing *timing_data)
 {
 	struct mcux_flexcan_data *data = dev->data;
-	uint8_t sjw_backup = data->timing_data.sjw;
 
 	if (!timing_data) {
 		return -EINVAL;
@@ -216,9 +211,6 @@ static int mcux_flexcan_set_timing_data(const struct device *dev,
 	}
 
 	data->timing_data = *timing_data;
-	if (timing_data->sjw == CAN_SJW_NO_CHANGE) {
-		data->timing_data.sjw = sjw_backup;
-	}
 
 	return 0;
 }
@@ -1203,6 +1195,7 @@ static int mcux_flexcan_init(const struct device *dev)
 			data->timing.phase_seg2);
 		LOG_DBG("Sample-point err : %d", err);
 	} else {
+		data->timing.sjw = config->sjw;
 		data->timing.prop_seg = config->prop_seg;
 		data->timing.phase_seg1 = config->phase_seg1;
 		data->timing.phase_seg2 = config->phase_seg2;
@@ -1210,6 +1203,13 @@ static int mcux_flexcan_init(const struct device *dev)
 		if (err) {
 			LOG_WRN("Bitrate error: %d", err);
 		}
+	}
+
+	/* Validate initial timing parameters */
+	err = can_set_timing(dev, &data->timing);
+	if (err != 0) {
+		LOG_ERR("failed to set timing (err %d)", err);
+		return -ENODEV;
 	}
 
 #ifdef CONFIG_CAN_MCUX_FLEXCAN_FD
@@ -1227,15 +1227,24 @@ static int mcux_flexcan_init(const struct device *dev)
 				data->timing_data.phase_seg2);
 			LOG_DBG("Sample-point err : %d", err);
 		} else {
-			data->timing_data.prop_seg = config->prop_seg;
-			data->timing_data.phase_seg1 = config->phase_seg1;
-			data->timing_data.phase_seg2 = config->phase_seg2;
+			data->timing_data.sjw = config->sjw_data;
+			data->timing_data.prop_seg = config->prop_seg_data;
+			data->timing_data.phase_seg1 = config->phase_seg1_data;
+			data->timing_data.phase_seg2 = config->phase_seg2_data;
 			err = can_calc_prescaler(dev, &data->timing_data, config->bitrate_data);
 			if (err) {
 				LOG_WRN("Bitrate error: %d", err);
 			}
 		}
 	}
+
+	/* Validate initial data phase timing parameters */
+	err = can_set_timing_data(dev, &data->timing_data);
+	if (err != 0) {
+		LOG_ERR("failed to set data phase timing (err %d)", err);
+		return -ENODEV;
+	}
+
 #endif /* CONFIG_CAN_MCUX_FLEXCAN_FD */
 
 	err = pinctrl_apply_state(config->pincfg, PINCTRL_STATE_DEFAULT);

@@ -44,6 +44,7 @@
 #include "lll_sync_iso.h"
 #include "lll_iso_tx.h"
 #include "lll_conn.h"
+#include "lll_conn_iso.h"
 #include "lll_df.h"
 
 #include "ull_adv_types.h"
@@ -60,6 +61,7 @@
 #endif /* CONFIG_BT_CTLR_USER_EXT */
 
 #include "isoal.h"
+#include "ll_feat_internal.h"
 #include "ull_internal.h"
 #include "ull_iso_internal.h"
 #include "ull_adv_internal.h"
@@ -69,7 +71,6 @@
 #include "ull_central_internal.h"
 #include "ull_iso_types.h"
 #include "ull_conn_internal.h"
-#include "lll_conn_iso.h"
 #include "ull_conn_iso_types.h"
 #include "ull_central_iso_internal.h"
 #include "ull_llcp.h"
@@ -277,22 +278,21 @@
 
 #define TICKER_USER_ULL_LOW_OPS  (1 + TICKER_USER_ULL_LOW_VENDOR_OPS + 1)
 
-/* NOTE: When ULL_LOW priority is configured to lower than ULL_HIGH, then extra
- *       ULL_HIGH operations queue elements are required to buffer the
- *       requested ticker operations.
+/* NOTE: Extended Advertising needs one extra ticker operation being enqueued
+ *       for scheduling the auxiliary PDU reception while there can already
+ *       be three other operations being enqueued.
+ *
+ *       This value also covers the case were initiator with 1M and Coded PHY
+ *       scan window is stopping the two scan tickers, stopping one scan stop
+ *       ticker and starting one new ticker for establishing an ACL connection.
  */
-#if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_CTLR_ADV_EXT) && \
-	defined(CONFIG_BT_CTLR_PHY_CODED)
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
 #define TICKER_USER_ULL_HIGH_OPS (4 + TICKER_USER_ULL_HIGH_VENDOR_OPS + \
 				  TICKER_USER_ULL_HIGH_FLASH_OPS + 1)
-#else /* !CONFIG_BT_CENTRAL || !CONFIG_BT_CTLR_ADV_EXT ||
-       * !CONFIG_BT_CTLR_PHY_CODED
-       */
+#else /* !CONFIG_BT_CTLR_ADV_EXT */
 #define TICKER_USER_ULL_HIGH_OPS (3 + TICKER_USER_ULL_HIGH_VENDOR_OPS + \
 				  TICKER_USER_ULL_HIGH_FLASH_OPS + 1)
-#endif /* !CONFIG_BT_CENTRAL || !CONFIG_BT_CTLR_ADV_EXT ||
-	* !CONFIG_BT_CTLR_PHY_CODED
-	*/
+#endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
 #define TICKER_USER_LLL_OPS      (3 + TICKER_USER_LLL_VENDOR_OPS + 1)
 
@@ -899,6 +899,10 @@ void ll_reset(void)
 	LL_ASSERT(!err);
 #endif
 
+#if defined(CONFIG_BT_CTLR_SET_HOST_FEATURE)
+	ll_feat_reset();
+#endif /* CONFIG_BT_CTLR_SET_HOST_FEATURE */
+
 	/* clear static random address */
 	(void)ll_addr_set(1U, NULL);
 }
@@ -1228,10 +1232,8 @@ void ll_rx_dequeue(void)
 			/* FIXME: use the correct adv and scan set to get
 			 * enabled status bitmask
 			 */
-			bm = (IS_ENABLED(CONFIG_BT_OBSERVER) &&
-			      (ull_scan_is_enabled(0) << 1)) |
-			     (IS_ENABLED(CONFIG_BT_BROADCASTER) &&
-			      ull_adv_is_enabled(0));
+			bm = (IS_ENABLED(CONFIG_BT_OBSERVER)?(ull_scan_is_enabled(0) << 1):0) |
+			     (IS_ENABLED(CONFIG_BT_BROADCASTER)?ull_adv_is_enabled(0):0);
 
 			if (!bm) {
 				ull_filter_adv_scan_state_cb(0);
@@ -2570,18 +2572,10 @@ static uint8_t tx_cmplt_get(uint16_t *handle, uint8_t *first, uint8_t last)
 			/* We must count each SDU HCI fragment */
 			tx_node = tx->node;
 			if (IS_NODE_TX_PTR(tx_node)) {
-				if (IS_ADV_ISO_HANDLE(tx->handle)) {
-					/* FIXME: ADV_ISO shall be updated to
-					 * use ISOAL for TX. Until then, assume
-					 * 1 node equals 1 fragment.
-					 */
-					sdu_fragments = 1U;
-				} else {
-					/* We count each SDU fragment completed
-					 * by this PDU.
-					 */
-					sdu_fragments = tx_node->sdu_fragments;
-				}
+				/* We count each SDU fragment completed
+				 * by this PDU.
+				 */
+				sdu_fragments = tx_node->sdu_fragments;
 
 				/* Replace node reference with fragments
 				 * count
