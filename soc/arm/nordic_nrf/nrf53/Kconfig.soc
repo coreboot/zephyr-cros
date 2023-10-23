@@ -53,12 +53,17 @@ config SOC_NRF53_ANOMALY_160_WORKAROUND
 
 config SOC_NRF53_RTC_PRETICK
 	bool "Pre-tick workaround for nRF5340 anomaly 165"
+	depends on (SYS_CLOCK_EXISTS && SOC_NRF5340_CPUNET) || SOC_NRF5340_CPUAPP
 	select NRFX_DPPI
 	select ARM_ON_ENTER_CPU_IDLE_HOOK if SOC_NRF5340_CPUNET
 	select ARM_ON_ENTER_CPU_IDLE_PREPARE_HOOK if SOC_NRF5340_CPUNET
 	help
 	  Indicates that the pre-tick workaround for the anomaly 165 that affects
-	  the nRF5340 SoC should be applied.
+	  the nRF5340 SoC should be applied. The workaround applies to wake ups caused
+	  by EVENTS_COMPARE and EVENTS_OVRFLW on RTC0 and RTC1 for which interrupts are
+	  enabled through INTENSET register. The case when these events are generated
+	  by EVTEN but without interrupts enabled through INTENSET is not handled.
+	  The EVENTS_TICK event is not handled.
 
 if SOC_NRF53_RTC_PRETICK
 

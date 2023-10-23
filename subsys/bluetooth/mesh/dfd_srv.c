@@ -233,11 +233,10 @@ static int handle_capabilities_get(struct bt_mesh_model *mod, struct bt_mesh_msg
 		net_buf_simple_add_mem(&rsp, srv->oob_schemes.schemes,
 				       srv->oob_schemes.count);
 	} else
-#else
+#endif
 	{
 		net_buf_simple_add_u8(&rsp, 0);
 	}
-#endif
 
 	bt_mesh_model_send(mod, ctx, &rsp, NULL, NULL);
 
@@ -342,9 +341,10 @@ static int handle_apply(struct bt_mesh_model *mod, struct bt_mesh_msg_ctx *ctx,
 	return 0;
 }
 
-static void upload_status_rsp(struct bt_mesh_dfd_srv *srv,
-			      struct bt_mesh_msg_ctx *ctx,
-			      enum bt_mesh_dfd_status status)
+static void upload_status_rsp_with_progress(struct bt_mesh_dfd_srv *srv,
+					    struct bt_mesh_msg_ctx *ctx,
+					    enum bt_mesh_dfd_status status,
+					    uint8_t progress)
 {
 	BT_MESH_MODEL_BUF_DEFINE(rsp, BT_MESH_DFD_OP_UPLOAD_STATUS,
 				 DFD_UPLOAD_STATUS_MSG_MAXLEN);
@@ -361,19 +361,36 @@ static void upload_status_rsp(struct bt_mesh_dfd_srv *srv,
 
 #ifdef CONFIG_BT_MESH_DFD_SRV_OOB_UPLOAD
 	if (srv->upload.is_oob) {
-		net_buf_simple_add_u8(&rsp,
-				      srv->cb->oob_progress_get(srv, srv->upload.slot) | BIT(7));
+		net_buf_simple_add_u8(&rsp, progress | BIT(7));
 		net_buf_simple_add_mem(&rsp, srv->upload.oob.current_fwid,
 				       srv->upload.oob.current_fwid_len);
 	} else
 #endif
 	{
-		net_buf_simple_add_u8(&rsp, bt_mesh_blob_srv_progress(&srv->upload.blob));
+		net_buf_simple_add_u8(&rsp, progress);
 		net_buf_simple_add_mem(&rsp, srv->upload.slot->fwid,
 				       srv->upload.slot->fwid_len);
 	}
 
 	bt_mesh_model_send(srv->mod, ctx, &rsp, NULL, NULL);
+}
+
+static void upload_status_rsp(struct bt_mesh_dfd_srv *srv,
+			      struct bt_mesh_msg_ctx *ctx,
+			      enum bt_mesh_dfd_status status)
+{
+	uint8_t progress;
+
+#ifdef CONFIG_BT_MESH_DFD_SRV_OOB_UPLOAD
+	if (srv->upload.is_oob) {
+		progress = srv->cb->oob_progress_get(srv, srv->upload.slot);
+	} else
+#endif
+	{
+		progress = bt_mesh_blob_srv_progress(&srv->upload.blob);
+	}
+
+	upload_status_rsp_with_progress(srv, ctx, status, progress);
 }
 
 static int handle_upload_get(struct bt_mesh_model *mod, struct bt_mesh_msg_ctx *ctx,
@@ -395,12 +412,20 @@ static inline int set_upload_fwid(struct bt_mesh_dfd_srv *srv, struct bt_mesh_ms
 	case -EFBIG: /* Fwid too long */
 	case -EALREADY: /* Other server is in progress with this fwid */
 		bt_mesh_dfu_slot_release(srv->upload.slot);
+		srv->upload.slot = NULL;
 		upload_status_rsp(srv, ctx, BT_MESH_DFD_ERR_INTERNAL);
 		break;
 	case -EEXIST: /* Img with this fwid already is in list */
 		srv->upload.phase = BT_MESH_DFD_UPLOAD_PHASE_TRANSFER_SUCCESS;
 		bt_mesh_dfu_slot_release(srv->upload.slot);
-		upload_status_rsp(srv, ctx, BT_MESH_DFD_SUCCESS);
+
+		err = bt_mesh_dfu_slot_get(fwid, fwid_len, &srv->upload.slot);
+		if (!err) {
+			upload_status_rsp_with_progress(srv, ctx, BT_MESH_DFD_SUCCESS, 100);
+		} else {
+			srv->upload.slot = NULL;
+			upload_status_rsp(srv, ctx, BT_MESH_DFD_ERR_INTERNAL);
+		}
 		break;
 	case 0:
 		srv->upload.phase = BT_MESH_DFD_UPLOAD_PHASE_TRANSFER_ACTIVE;
@@ -554,6 +579,10 @@ static int handle_upload_start_oob(struct bt_mesh_model *mod, struct bt_mesh_msg
 	fwid_len = buf->len;
 	fwid = net_buf_simple_pull_mem(buf, fwid_len);
 
+	LOG_DBG("Upload OOB Start");
+	LOG_HEXDUMP_DBG(uri, uri_len, "URI");
+	LOG_HEXDUMP_DBG(fwid, fwid_len, "FWID");
+
 	if (upload_is_busy(srv)) {
 #ifdef CONFIG_BT_MESH_DFD_SRV_OOB_UPLOAD
 		if (srv->upload.is_oob &&
@@ -568,6 +597,11 @@ static int handle_upload_start_oob(struct bt_mesh_model *mod, struct bt_mesh_msg
 #endif
 		upload_status_rsp(srv, ctx, BT_MESH_DFD_ERR_BUSY_WITH_UPLOAD);
 		return 0;
+#ifdef CONFIG_BT_MESH_DFD_SRV_OOB_UPLOAD
+	} else if (srv->upload.is_oob && srv->upload.is_pending_oob_check) {
+		/* Ignore the request if we didn't confirm the previous one. */
+		return 0;
+#endif
 	}
 
 #ifdef CONFIG_BT_MESH_DFD_SRV_OOB_UPLOAD
@@ -582,6 +616,13 @@ static int handle_upload_start_oob(struct bt_mesh_model *mod, struct bt_mesh_msg
 	if (slot == NULL) {
 		upload_status_rsp(srv, ctx, BT_MESH_DFD_ERR_INSUFFICIENT_RESOURCES);
 		return 0;
+	}
+
+	/* This will be a no-op if the slot state isn't RESERVED, which is
+	 * what we want.
+	 */
+	if (srv->upload.slot) {
+		bt_mesh_dfu_slot_release(srv->upload.slot);
 	}
 
 	srv->upload.is_oob = true;
@@ -600,6 +641,8 @@ static int handle_upload_start_oob(struct bt_mesh_model *mod, struct bt_mesh_msg
 	if (status != BT_MESH_DFD_SUCCESS) {
 		upload_status_rsp(srv, ctx, status);
 		bt_mesh_dfu_slot_release(srv->upload.slot);
+	} else {
+		srv->upload.is_pending_oob_check = true;
 	}
 #else
 	upload_status_rsp(srv, ctx, BT_MESH_DFD_ERR_URI_NOT_SUPPORTED);
@@ -743,7 +786,7 @@ const struct bt_mesh_model_op _bt_mesh_dfd_srv_op[] = {
 	{ BT_MESH_DFD_OP_APPLY, BT_MESH_LEN_EXACT(0), handle_apply },
 	{ BT_MESH_DFD_OP_UPLOAD_GET, BT_MESH_LEN_EXACT(0), handle_upload_get },
 	{ BT_MESH_DFD_OP_UPLOAD_START, BT_MESH_LEN_MIN(16), handle_upload_start },
-	{ BT_MESH_DFD_OP_UPLOAD_START_OOB, BT_MESH_LEN_EXACT(2), handle_upload_start_oob },
+	{ BT_MESH_DFD_OP_UPLOAD_START_OOB, BT_MESH_LEN_MIN(2), handle_upload_start_oob },
 	{ BT_MESH_DFD_OP_UPLOAD_CANCEL, BT_MESH_LEN_EXACT(0), handle_upload_cancel },
 	{ BT_MESH_DFD_OP_FW_GET, BT_MESH_LEN_MIN(0), handle_fw_get },
 	{ BT_MESH_DFD_OP_FW_GET_BY_INDEX, BT_MESH_LEN_EXACT(2), handle_fw_get_by_index },
@@ -1193,12 +1236,15 @@ int bt_mesh_dfd_srv_oob_check_complete(struct bt_mesh_dfd_srv *srv,
 	int err;
 
 	if (slot != srv->upload.slot || !srv->upload.is_oob ||
-	    srv->upload.phase == BT_MESH_DFD_UPLOAD_PHASE_TRANSFER_ACTIVE) {
+	    srv->upload.phase == BT_MESH_DFD_UPLOAD_PHASE_TRANSFER_ACTIVE ||
+	    !srv->upload.is_pending_oob_check) {
 		/* This should not happen, unless the application calls the function with a
 		 * "wrong" pointer or at a wrong time.
 		 */
 		return -EINVAL;
 	}
+
+	srv->upload.is_pending_oob_check = false;
 
 	if (status != BT_MESH_DFD_SUCCESS) {
 		bt_mesh_dfu_slot_release(srv->upload.slot);

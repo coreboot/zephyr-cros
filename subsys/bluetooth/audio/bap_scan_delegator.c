@@ -1298,7 +1298,7 @@ int bt_bap_scan_delegator_mod_src(const struct bt_bap_scan_delegator_mod_src_par
 {
 	struct bass_recv_state_internal *internal_state = NULL;
 	struct bt_bap_scan_delegator_recv_state *state;
-	static bool state_changed;
+	bool state_changed = false;
 
 	CHECKIF(!valid_bt_bap_scan_delegator_mod_src_param(param)) {
 		return -EINVAL;
@@ -1340,7 +1340,10 @@ int bt_bap_scan_delegator_mod_src(const struct bt_bap_scan_delegator_mod_src_par
 		const struct bt_bap_scan_delegator_subgroup *param_subgroup = &param->subgroups[i];
 		struct bt_bap_scan_delegator_subgroup *subgroup = &state->subgroups[i];
 
-		subgroup->bis_sync = param_subgroup->bis_sync;
+		if (subgroup->bis_sync != param_subgroup->bis_sync) {
+			subgroup->bis_sync = param_subgroup->bis_sync;
+			state_changed = true;
+		}
 
 		/* If the metadata len is 0, we shall not overwrite the existing metadata */
 		if (param_subgroup->metadata_len == 0U) {

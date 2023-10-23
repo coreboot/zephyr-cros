@@ -133,6 +133,7 @@ static bool nrf53_anomaly_160_check(void)
 
 	return true;
 }
+#endif /* CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND */
 
 #if defined(CONFIG_SOC_NRF53_RTC_PRETICK) && defined(CONFIG_SOC_NRF5340_CPUNET)
 
@@ -224,6 +225,15 @@ static bool cpu_idle_prepare_monitor_end(void)
 	return __STREXB(0U, &cpu_idle_prepare_monitor_dummy);
 }
 
+static void rtc_pretick_finish_previous(void)
+{
+	NRF_IPC->PUBLISH_RECEIVE[CONFIG_SOC_NRF53_RTC_PRETICK_IPC_CH_TO_NET] &=
+			~IPC_PUBLISH_RECEIVE_EN_Msk;
+
+	nrf_rtc_event_clear(NRF_RTC1, NRF_RTC_CHANNEL_EVENT_ADDR(RTC1_PRETICK_CC_CHAN));
+}
+
+
 void z_arm_on_enter_cpu_idle_prepare(void)
 {
 	bool ok_to_sleep = true;
@@ -263,6 +273,7 @@ void z_arm_on_enter_cpu_idle_prepare(void)
 
 		if (rtc_pretick_cc_val != nrf_rtc_cc_get(NRF_RTC1, RTC1_PRETICK_CC_CHAN)) {
 			/* The CC for pretick needs to be updated. */
+			rtc_pretick_finish_previous();
 			nrf_rtc_cc_set(NRF_RTC1, RTC1_PRETICK_CC_CHAN, rtc_pretick_cc_val);
 
 			if (rtc_ticks_to_next_event >= NRF_RTC_COUNTER_MAX/2) {
@@ -327,6 +338,8 @@ void z_arm_on_enter_cpu_idle_prepare(void)
 }
 #endif /* CONFIG_SOC_NRF53_RTC_PRETICK && CONFIG_SOC_NRF5340_CPUNET */
 
+#if defined(CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND) || \
+	(defined(CONFIG_SOC_NRF53_RTC_PRETICK) && defined(CONFIG_SOC_NRF5340_CPUNET))
 bool z_arm_on_enter_cpu_idle(void)
 {
 	bool ok_to_sleep = true;
@@ -347,6 +360,7 @@ bool z_arm_on_enter_cpu_idle(void)
 	}
 #endif
 
+#if defined(CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND)
 	if (ok_to_sleep) {
 		ok_to_sleep = nrf53_anomaly_160_check();
 
@@ -361,6 +375,7 @@ bool z_arm_on_enter_cpu_idle(void)
 		}
 #endif
 	}
+#endif /* CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND */
 
 #if defined(CONFIG_SOC_NRF53_RTC_PRETICK) && defined(CONFIG_SOC_NRF5340_CPUNET)
 	if (!ok_to_sleep) {
@@ -372,7 +387,9 @@ bool z_arm_on_enter_cpu_idle(void)
 
 	return ok_to_sleep;
 }
-#endif /* CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND */
+#endif /* CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND ||
+	* (CONFIG_SOC_NRF53_RTC_PRETICK && CONFIG_SOC_NRF5340_CPUNET)
+	*/
 
 #if CONFIG_SOC_NRF53_RTC_PRETICK
 #ifdef CONFIG_SOC_NRF5340_CPUAPP
@@ -406,24 +423,14 @@ static int rtc_pretick_cpuapp_init(void)
 }
 #else /* CONFIG_SOC_NRF5340_CPUNET */
 
-static void rtc_pretick_rtc_isr_hook(void)
-{
-	NRF_IPC->PUBLISH_RECEIVE[CONFIG_SOC_NRF53_RTC_PRETICK_IPC_CH_TO_NET] &=
-			~IPC_PUBLISH_RECEIVE_EN_Msk;
-}
-
 void rtc_pretick_rtc0_isr_hook(void)
 {
-	rtc_pretick_rtc_isr_hook();
+	rtc_pretick_finish_previous();
 }
 
 void rtc_pretick_rtc1_isr_hook(void)
 {
-	rtc_pretick_rtc_isr_hook();
-
-	if (IS_ENABLED(CONFIG_SOC_NRF53_RTC_PRETICK)) {
-		nrf_rtc_event_clear(NRF_RTC1, NRF_RTC_CHANNEL_EVENT_ADDR(RTC1_PRETICK_CC_CHAN));
-	}
+	rtc_pretick_finish_previous();
 }
 
 static int rtc_pretick_cpunet_init(void)

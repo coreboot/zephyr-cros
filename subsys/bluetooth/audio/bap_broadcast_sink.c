@@ -109,12 +109,17 @@ static void update_recv_state_big_synced(const struct bt_bap_broadcast_sink *sin
 		struct bt_bap_scan_delegator_subgroup *subgroup_param = &mod_src_param.subgroups[i];
 		const struct bt_bap_base_subgroup *subgroup = &base->subgroups[i];
 
-		/* Update the BIS sync indexes for the subgroup */
+		/* Update the BIS sync indexes for the subgroup based on the BASE*/
 		for (size_t j = 0U; j < subgroup->bis_count; j++) {
 			const struct bt_bap_base_bis_data *bis_data = &subgroup->bis_data[j];
 
 			subgroup_param->bis_sync |= BIT(bis_data->index);
 		}
+
+		/* Update the bis_sync so that the bis_sync value only contains the indexes that we
+		 * are actually synced to
+		 */
+		subgroup_param->bis_sync &= sink->indexes_bitfield;
 	}
 
 	if (recv_state->encrypt_state == BT_BAP_BIG_ENC_STATE_BCODE_REQ) {
@@ -565,6 +570,16 @@ static void pa_recv(struct bt_le_per_adv_sync *sync,
 	bt_data_parse(buf, pa_decode_base, (void *)sink);
 }
 
+static void pa_term_cb(struct bt_le_per_adv_sync *sync,
+		       const struct bt_le_per_adv_sync_term_info *info)
+{
+	struct bt_bap_broadcast_sink *sink = broadcast_sink_get_by_pa(sync);
+
+	if (sink != NULL) {
+		sink->pa_sync = NULL;
+	}
+}
+
 static void update_recv_state_encryption(const struct bt_bap_broadcast_sink *sink)
 {
 	struct bt_bap_scan_delegator_mod_src_param mod_src_param = { 0 };
@@ -776,6 +791,7 @@ static void broadcast_sink_cleanup_streams(struct bt_bap_broadcast_sink *sink)
 	}
 
 	sink->stream_count = 0;
+	sink->indexes_bitfield = 0U;
 }
 
 static void broadcast_sink_cleanup(struct bt_bap_broadcast_sink *sink)
@@ -1017,6 +1033,7 @@ int bt_bap_broadcast_sink_sync(struct bt_bap_broadcast_sink *sink, uint32_t inde
 		return err;
 	}
 
+	sink->indexes_bitfield = indexes_bitfield;
 	for (size_t i = 0; i < stream_count; i++) {
 		struct bt_bap_ep *ep = streams[i]->ep;
 
@@ -1075,8 +1092,6 @@ int bt_bap_broadcast_sink_stop(struct bt_bap_broadcast_sink *sink)
 
 int bt_bap_broadcast_sink_delete(struct bt_bap_broadcast_sink *sink)
 {
-	int err;
-
 	CHECKIF(sink == NULL) {
 		LOG_DBG("sink is NULL");
 		return -EINVAL;
@@ -1098,17 +1113,6 @@ int bt_bap_broadcast_sink_delete(struct bt_bap_broadcast_sink *sink)
 		}
 	}
 
-	if (sink->pa_sync == NULL) {
-		LOG_DBG("Broadcast sink is already deleted");
-		return -EALREADY;
-	}
-
-	err = bt_le_per_adv_sync_delete(sink->pa_sync);
-	if (err != 0) {
-		LOG_DBG("Failed to delete periodic advertising sync (err %d)", err);
-		return err;
-	}
-
 	/* Reset the broadcast sink */
 	broadcast_sink_cleanup(sink);
 
@@ -1120,6 +1124,7 @@ static int broadcast_sink_init(void)
 	static struct bt_le_per_adv_sync_cb cb = {
 		.recv = pa_recv,
 		.biginfo = biginfo_recv,
+		.term = pa_term_cb,
 	};
 
 	bt_le_per_adv_sync_cb_register(&cb);

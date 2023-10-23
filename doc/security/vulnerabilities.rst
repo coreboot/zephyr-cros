@@ -1370,7 +1370,19 @@ This has been fixed in main for v3.5.0
 CVE-2023-4257
 -------------
 
-Under embargo until 2023/10/12
+Unchecked user input length in the Zephyr WiFi shell module can cause
+buffer overflows.
+
+- `Zephyr project bug tracker GHSA-853q-q69w-gf5j
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-853q-q69w-gf5j>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 605377 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/605377>`_
+
+- `PR 61383 fix for 3.4
+  <https://github.com/zephyrproject-rtos/zephyr/pull/61383>`_
 
 CVE-2023-4258
 -------------
@@ -1390,6 +1402,22 @@ This has been fixed in main for v3.5.0
 
 - `PR 60079 fix for 3.3
   <https://github.com/zephyrproject-rtos/zephyr/pull/60079>`_
+
+CVE-2023-4259
+-------------
+
+Buffer overflow vulnerabilities in the Zephyr eS-WiFi driver
+
+- `Zephyr project bug tracker GHSA-gghm-c696-f4j4
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-gghm-c696-f4j4>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 63074 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/63074>`_
+
+- `PR 63750 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/63750>`_
 
 CVE-2023-4260
 -------------
@@ -1413,6 +1441,25 @@ Potential buffer overflow vulnerabilities in the Zephyr Mgmt subsystem
   <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-56p9-5p3v-hhrc>`_
 
 - This issue has not been fixed.
+
+CVE-2023-4263
+-------------
+
+Potential buffer overflow vulnerability in the Zephyr IEEE 802.15.4 nRF 15.4 driver.
+
+- `Zephyr project bug tracker GHSA-rf6q-rhhp-pqhf
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-rf6q-rhhp-pqhf>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 60528 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/60528>`_
+
+- `PR 61384 fix for 3.4
+  <https://github.com/zephyrproject-rtos/zephyr/pull/61384>`_
+
+- `PR 61216 fix for 2.7
+  <https://github.com/zephyrproject-rtos/zephyr/pull/61216>`_
 
 CVE-2023-4264
 -------------
@@ -1479,3 +1526,24 @@ This has been fixed in main for v3.5.0
 
 - `PR 63069 fix for main
   <https://github.com/zephyrproject-rtos/zephyr/pull/63069>`_
+
+CVE-2023-5563
+-------------
+
+The SJA1000 CAN controller driver backend automatically attempts to recover
+from a bus-off event when built with CONFIG_CAN_AUTO_BUS_OFF_RECOVERY=y. This
+results in calling k_sleep() in IRQ context, causing a fatal exception.
+
+- `Zephyr project bug tracker GHSA-98mc-rj7w-7rpv
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-98mc-rj7w-7rpv>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 63713 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/63713>`_
+
+- `PR 63718 fix for 3.4
+  <https://github.com/zephyrproject-rtos/zephyr/pull/63718>`_
+
+- `PR 63717 fix for 3.3
+  <https://github.com/zephyrproject-rtos/zephyr/pull/63717>`_
