@@ -13,7 +13,9 @@
 
 #include "mec172xnsz.dtsi"
 #include "mec172x/mec172x-vw-routing.dtsi"
-#include "mec172x/mec172xnsz-pinctrl.dtsi"
+
+#include <mem.h>
+#include <freq.h>
 
 / {
 	flash1: flash@60000000 {
@@ -43,6 +45,16 @@
 		jedec-id = [62 06 13];
 	};
 };
+
+&nvic {
+	arm,num-irq-priority-bits = <3>;
+};
+
+&systick {
+	status = "disabled";
+};
+
+#include "mec172x/mec172xnsz-pinctrl.dtsi"
 
 &gpspi_wp_n_gpio076 {
 	output-high;
