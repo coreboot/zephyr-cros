@@ -555,10 +555,11 @@ add_custom_command(
     -DOUT_FILE=${PROJECT_BINARY_DIR}/include/generated/version.h
     -DVERSION_TYPE=KERNEL
     -DVERSION_FILE=${ZEPHYR_BASE}/VERSION
-    -DKERNEL_VERSION_CUSTOMIZATION="${KERNEL_VERSION_CUSTOMIZATION}"
+    -DKERNEL_VERSION_CUSTOMIZATION="$<TARGET_PROPERTY:version_h,KERNEL_VERSION_CUSTOMIZATION>"
     ${build_version_argument}
     -P ${ZEPHYR_BASE}/cmake/gen_version_h.cmake
   DEPENDS ${ZEPHYR_BASE}/VERSION ${git_dependency}
+  COMMAND_EXPAND_LISTS
 )
 add_custom_target(version_h DEPENDS ${PROJECT_BINARY_DIR}/include/generated/version.h)
 
@@ -569,10 +570,11 @@ if(EXISTS ${APPLICATION_SOURCE_DIR}/VERSION)
       -DOUT_FILE=${PROJECT_BINARY_DIR}/include/generated/app_version.h
       -DVERSION_TYPE=APP
       -DVERSION_FILE=${APPLICATION_SOURCE_DIR}/VERSION
-      -DAPP_VERSION_CUSTOMIZATION="${APP_VERSION_CUSTOMIZATION}"
+      -DAPP_VERSION_CUSTOMIZATION="$<TARGET_PROPERTY:app_version_h,APP_VERSION_CUSTOMIZATION>"
       ${build_version_argument}
       -P ${ZEPHYR_BASE}/cmake/gen_version_h.cmake
     DEPENDS ${APPLICATION_SOURCE_DIR}/VERSION ${git_dependency}
+    COMMAND_EXPAND_LISTS
   )
   add_custom_target(app_version_h DEPENDS ${PROJECT_BINARY_DIR}/include/generated/app_version.h)
   add_dependencies(zephyr_interface app_version_h)
@@ -1237,20 +1239,13 @@ if(CONFIG_GEN_ISR_TABLES)
   # isr_tables.c is generated from ${ZEPHYR_LINK_STAGE_EXECUTABLE} by
   # gen_isr_tables.py
   add_custom_command(
-    OUTPUT isr_tables.c isrList.bin
-    COMMAND $<TARGET_PROPERTY:bintools,elfconvert_command>
-            $<TARGET_PROPERTY:bintools,elfconvert_flag>
-            $<TARGET_PROPERTY:bintools,elfconvert_flag_intarget>${OUTPUT_FORMAT}
-            $<TARGET_PROPERTY:bintools,elfconvert_flag_outtarget>binary
-            $<TARGET_PROPERTY:bintools,elfconvert_flag_section_only>.intList
-            $<TARGET_PROPERTY:bintools,elfconvert_flag_infile>$<TARGET_FILE:${ZEPHYR_LINK_STAGE_EXECUTABLE}>
-            $<TARGET_PROPERTY:bintools,elfconvert_flag_outfile>isrList.bin
-            $<TARGET_PROPERTY:bintools,elfconvert_flag_final>
+    OUTPUT isr_tables.c
     COMMAND ${PYTHON_EXECUTABLE}
     ${ZEPHYR_BASE}/scripts/build/gen_isr_tables.py
     --output-source isr_tables.c
     --kernel $<TARGET_FILE:${ZEPHYR_LINK_STAGE_EXECUTABLE}>
-    --intlist isrList.bin
+    --intlist-section .intList
+    --intlist-section intList
     $<$<BOOL:${CONFIG_BIG_ENDIAN}>:--big-endian>
     $<$<BOOL:${CMAKE_VERBOSE_MAKEFILE}>:--debug>
     ${GEN_ISR_TABLE_EXTRA_ARG}

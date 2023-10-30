@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <ctype.h>
+#include <strings.h>
+
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap.h>
@@ -25,6 +28,7 @@ BUILD_ASSERT(IS_ENABLED(CONFIG_SCAN_SELF) || IS_ENABLED(CONFIG_SCAN_OFFLOAD),
 #define INVALID_BROADCAST_ID      (BT_AUDIO_BROADCAST_ID_MAX + 1)
 #define SYNC_RETRY_COUNT          6 /* similar to retries for connections */
 #define PA_SYNC_SKIP              5
+#define NAME_LEN                  sizeof(CONFIG_TARGET_BROADCAST_NAME) + 1
 
 static K_SEM_DEFINE(sem_connected, 0U, 1U);
 static K_SEM_DEFINE(sem_disconnected, 0U, 1U);
@@ -46,10 +50,17 @@ static struct bt_le_scan_recv_info broadcaster_info;
 static bt_addr_le_t broadcaster_addr;
 static struct bt_le_per_adv_sync *pa_sync;
 static uint32_t broadcaster_broadcast_id;
-static struct bt_bap_stream streams[CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT];
+static struct broadcast_sink_stream {
+	struct bt_bap_stream stream;
+	size_t recv_cnt;
+	size_t loss_cnt;
+	size_t error_cnt;
+	size_t valid_cnt;
+} streams[CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT];
 static struct bt_bap_stream *streams_p[ARRAY_SIZE(streams)];
 static struct bt_conn *broadcast_assistant_conn;
 static struct bt_le_ext_adv *ext_adv;
+
 
 static const struct bt_audio_codec_cap codec_cap = BT_AUDIO_CODEC_CAP_LC3(
 	BT_AUDIO_CODEC_LC3_FREQ_16KHZ | BT_AUDIO_CODEC_LC3_FREQ_24KHZ,
@@ -67,7 +78,15 @@ static uint8_t sink_broadcast_code[BT_AUDIO_BROADCAST_CODE_SIZE];
 
 static void stream_started_cb(struct bt_bap_stream *stream)
 {
+	struct broadcast_sink_stream *sink_stream =
+		CONTAINER_OF(stream, struct broadcast_sink_stream, stream);
+
 	printk("Stream %p started\n", stream);
+
+	sink_stream->recv_cnt = 0U;
+	sink_stream->loss_cnt = 0U;
+	sink_stream->valid_cnt = 0U;
+	sink_stream->error_cnt = 0U;
 
 	k_sem_give(&sem_bis_synced);
 }
@@ -88,21 +107,26 @@ static void stream_recv_cb(struct bt_bap_stream *stream,
 			   const struct bt_iso_recv_info *info,
 			   struct net_buf *buf)
 {
-	static uint32_t recv_cnt;
+	struct broadcast_sink_stream *sink_stream =
+		CONTAINER_OF(stream, struct broadcast_sink_stream, stream);
 
 	if (info->flags & BT_ISO_FLAGS_ERROR) {
-		printk("ISO receive error\n");
-		return;
+		sink_stream->error_cnt++;
 	}
 
 	if (info->flags & BT_ISO_FLAGS_LOST) {
-		printk("ISO receive lost\n");
-		return;
+		sink_stream->loss_cnt++;
 	}
 
-	recv_cnt++;
-	if ((recv_cnt % 1000U) == 0U) {
-		printk("Received %u total ISO packets\n", recv_cnt);
+	if (info->flags & BT_ISO_FLAGS_VALID) {
+		sink_stream->valid_cnt++;
+	}
+
+	sink_stream->recv_cnt++;
+	if ((sink_stream->recv_cnt % 1000U) == 0U) {
+		printk("Stream %p: received %u total ISO packets: Valid %u | Error %u | Loss %u\n",
+		       &sink_stream->stream, sink_stream->recv_cnt, sink_stream->valid_cnt,
+		       sink_stream->error_cnt, sink_stream->loss_cnt);
 	}
 }
 
@@ -124,8 +148,13 @@ static void base_recv_cb(struct bt_bap_broadcast_sink *sink, const struct bt_bap
 	       base->subgroup_count, sink);
 
 	for (size_t i = 0U; i < base->subgroup_count; i++) {
-		for (size_t j = 0U; j < base->subgroups[i].bis_count; j++) {
+		const size_t bis_count = base->subgroups[i].bis_count;
+
+		printk("Subgroup[%zu] has %zu streams\n", i, bis_count);
+		for (size_t j = 0U; j < bis_count; j++) {
 			const uint8_t index = base->subgroups[i].bis_data[j].index;
+
+			printk("\tIndex 0x%02x\n", index);
 
 			base_bis_index_bitfield |= BIT(index);
 		}
@@ -420,9 +449,59 @@ static bool scan_check_and_sync_broadcast(struct bt_data *data, void *user_data)
 	return false;
 }
 
+static bool is_substring(const char *substr, const char *str)
+{
+	const size_t str_len = strlen(str);
+	const size_t sub_str_len = strlen(substr);
+
+	if (sub_str_len > str_len) {
+		return false;
+	}
+
+	for (size_t pos = 0; pos < str_len; pos++) {
+		if (tolower(substr[pos]) == tolower(str[pos])) {
+			if (pos + sub_str_len > str_len) {
+				return false;
+			}
+
+			if (strncasecmp(substr, &str[pos], sub_str_len) == 0) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+static bool data_cb(struct bt_data *data, void *user_data)
+{
+	char *name = user_data;
+
+	switch (data->type) {
+	case BT_DATA_NAME_SHORTENED:
+	case BT_DATA_NAME_COMPLETE:
+	case BT_DATA_BROADCAST_NAME:
+		memcpy(name, data->data, MIN(data->data_len, NAME_LEN - 1));
+		return false;
+	default:
+		return true;
+	}
+}
+
 static void broadcast_scan_recv(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
 {
 	if (info->interval != 0U) {
+		/* call to bt_data_parse consumes netbufs so shallow clone for verbose output */
+		if (strlen(CONFIG_TARGET_BROADCAST_NAME) > 0U) {
+			struct net_buf_simple buf_copy;
+			char name[NAME_LEN] = {0};
+
+			net_buf_simple_clone(ad, &buf_copy);
+			bt_data_parse(&buf_copy, data_cb, name);
+			if (!(is_substring(CONFIG_TARGET_BROADCAST_NAME, name))) {
+				return;
+			}
+		}
 		bt_data_parse(ad, scan_check_and_sync_broadcast, (void *)info);
 	}
 }
@@ -482,7 +561,7 @@ static int init(void)
 	bt_le_scan_cb_register(&bap_scan_cb);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
-		streams[i].ops = &stream_ops;
+		streams[i].stream.ops = &stream_ops;
 	}
 
 	return 0;
@@ -659,10 +738,12 @@ int main(void)
 	}
 
 	for (size_t i = 0U; i < ARRAY_SIZE(streams_p); i++) {
-		streams_p[i] = &streams[i];
+		streams_p[i] = &streams[i].stream;
 	}
 
 	while (true) {
+		uint32_t sync_bitfield;
+
 		err = reset();
 		if (err != 0) {
 			printk("Resetting failed: %d - Aborting\n", err);
@@ -709,7 +790,13 @@ int main(void)
 			}
 		}
 
-		printk("Scanning for broadcast sources\n");
+		if (strlen(CONFIG_TARGET_BROADCAST_NAME) > 0U) {
+			printk("Scanning for broadcast sources containing`"
+			CONFIG_TARGET_BROADCAST_NAME "`\n");
+		} else {
+			printk("Scanning for broadcast sources\n");
+		}
+
 		err = bt_le_scan_start(BT_LE_SCAN_ACTIVE, NULL);
 		if (err != 0 && err != -EALREADY) {
 			printk("Unable to start scan for broadcast sources: %d\n",
@@ -785,10 +872,10 @@ wait_for_pa_sync:
 			continue;
 		}
 
-		printk("Syncing to broadcast\n");
-		err = bt_bap_broadcast_sink_sync(broadcast_sink,
-						 bis_index_bitfield & requested_bis_sync,
-						 streams_p, sink_broadcast_code);
+		sync_bitfield = bis_index_bitfield & requested_bis_sync;
+		printk("Syncing to broadcast with bitfield: 0x%08x\n", sync_bitfield);
+		err = bt_bap_broadcast_sink_sync(broadcast_sink, sync_bitfield, streams_p,
+						 sink_broadcast_code);
 		if (err != 0) {
 			printk("Unable to sync to broadcast source: %d\n", err);
 			return 0;

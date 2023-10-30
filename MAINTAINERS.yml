@@ -657,13 +657,13 @@ Documentation Infrastructure:
 Release Notes:
   status: maintained
   maintainers:
-    - jhedberg
-    - fabiobaltieri
+    - MaureenHelm
+    - henrikbrixandersen
+  collaborators:
+    - kartben
   files:
     - doc/releases/migration-guide-*
     - doc/releases/release-notes-*
-  collaborators:
-    - kartben
   labels:
     - "Release Notes"
 
@@ -1138,6 +1138,19 @@ Release Notes:
     - tests/drivers/build_all/led_strip/
   labels:
     - "area: LED"
+
+"Drivers: MFD":
+  status: odd fixes
+  collaborators:
+    - gmarull
+    - aasinclair
+  files:
+    - drivers/mfd/
+    - include/zephyr/drivers/mfd/
+    - dts/bindings/mfd/
+    - tests/drivers/build_all/mfd/
+  labels:
+    - "area: MFD"
 
 "Drivers: Modem":
   status: maintained
@@ -2029,6 +2042,7 @@ Networking:
     - pdgendt
     - canisLupus1313
     - mariuszpos
+    - edmont
   files:
     - subsys/net/l2/openthread/
     - samples/net/openthread/
@@ -2127,6 +2141,7 @@ RISCV arch:
     - arch/riscv/
     - boards/riscv/
     - dts/bindings/riscv/
+    - dts/riscv/
     - include/zephyr/arch/riscv/
     - soc/riscv/
     - tests/arch/riscv/
@@ -2144,6 +2159,17 @@ Retention:
     - subsys/retention/
   labels:
     - "area: Retention"
+
+Samples:
+  status: maintained
+  maintainers:
+    - kartben
+  collaborators:
+    - nashif
+  files:
+    - samples/
+  labels:
+    - "area: Samples"
 
 Sensor Subsystem:
   status: maintained
@@ -2335,18 +2361,24 @@ Nuvoton NPCX Platforms:
   labels:
     - "platform: Nuvoton NPCX"
 
-Nuvoton Numicro Platforms:
-  status: odd fixes
+Nuvoton Numicro Numaker Platforms:
+  status: maintained
+  maintainers:
+    - cyliangtw
   collaborators:
     - ssekar15
   files:
     - soc/arm/nuvoton_numicro/
+    - soc/arm/nuvoton_numaker/
     - boards/arm/nuvoton_pfm*/
+    - boards/arm/numaker_*/
     - dts/arm/nuvoton/
     - dts/bindings/*/*numicro*
+    - dts/bindings/*/*numaker*
     - drivers/*/*_numicro*
+    - drivers/*/*_numaker*
   labels:
-    - "platform: Nuvoton Numicro"
+    - "platform: Nuvoton Numicro Numaker"
 
 Raspberry Pi Pico Platforms:
   status: maintained
@@ -2485,6 +2517,8 @@ NXP Platforms:
     - drivers/*/*imx*
     - drivers/*/*lpc*.c
     - drivers/*/*mcux*.c
+    - drivers/*/*.mcux
+    - drivers/*/*.nxp
     - drivers/*/*nxp*
     - dts/arm/nxp/
     - dts/bindings/*/nxp*
@@ -2607,6 +2641,7 @@ STM32 Platforms:
     - drivers/*/*stm32*.c
     - drivers/*/*stm32*.h
     - drivers/*/*/*stm32*
+    - drivers/*/*stm32
     - dts/arm/st/
     - dts/bindings/*/*stm32*
     - soc/arm/st_stm32/
@@ -3441,6 +3476,7 @@ West:
     - pdgendt
     - canisLupus1313
     - mariuszpos
+    - edmont
   files:
     - modules/openthread/
   labels:
@@ -3594,6 +3630,16 @@ West:
   labels:
     - "area: Sensors"
 
+"West project: hostap":
+  status: maintained
+  maintainers:
+    - krish2718
+    - jukkar
+  files:
+    - modules/hostap/
+  labels:
+    - "area: Wi-Fi"
+
 Xtensa arch:
   status: maintained
   maintainers:
@@ -3644,6 +3690,7 @@ Continuous Integration:
     - scripts/ci/
     - .checkpatch.conf
     - scripts/gitlint/
+    - scripts/set_assignees.py
   labels:
     - "area: Continuous Integration"
 

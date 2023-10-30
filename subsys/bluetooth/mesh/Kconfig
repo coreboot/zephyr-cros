@@ -192,6 +192,38 @@ config BT_MESH_UNPROV_BEACON_INT
 
 if BT_MESH_PB_ADV
 
+config BT_MESH_PB_ADV_USE_RELAY_SETS
+	bool "Use relay advertising sets to send provisioning PDUs"
+	depends on BT_MESH_RELAY_ADV_SETS > 0
+	help
+	  Use relay advertising sets to send provisioning PDUs
+
+config BT_MESH_PB_ADV_TRANS_PDU_RETRANSMIT_COUNT
+	int "Link Open and Transaction PDU retransmit count"
+	default 7 if BT_MESH_PB_ADV_USE_RELAY_SETS
+	default 0
+	range 0 7
+	help
+	  Controls the number of retransmissions of original Link Open and Transaction PDU,
+	  in addition to the first transmission.
+
+config BT_MESH_PB_ADV_TRANS_ACK_RETRANSMIT_COUNT
+	int "Link Ack and Transaction Ack retransmit count"
+	default 2
+	range 0 7
+	help
+	  Controls the number of retransmissions of original Link Ack and Transaction Acknowledgment PDU,
+	  in addition to the first transmission.
+
+config BT_MESH_PB_ADV_LINK_CLOSE_RETRANSMIT_COUNT
+	int "Link Close retransmit count"
+	default 7 if BT_MESH_PB_ADV_USE_RELAY_SETS
+	default 2
+	range 0 7
+	help
+	  Controls the number of retransmissions of original Link Close,
+	  in addition to the first transmission.
+
 config BT_MESH_PB_ADV_RETRANS_TIMEOUT
 	int "Timeout value of retransmit provisioning PDUs"
 	default 500
@@ -1399,7 +1431,7 @@ config BT_MESH_COMP_PAGE_2
 config BT_MESH_MODEL_EXTENSION_LIST_SIZE
 	int "Model extensions list size"
 	depends on BT_MESH_COMP_PAGE_1
-	range 1 255
+	range 0 255
 	default 10
 	help
 	  This option specifies how many models relations can be saved.

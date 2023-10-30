@@ -57,9 +57,8 @@ static void prov_send_fail_msg(uint8_t err)
 
 static void prov_fail(uint8_t reason)
 {
-	/* According to Bluetooth Mesh Specification v1.0.1, Section 5.4.4, the
-	 * provisioner just closes the link when something fails, while the
-	 * provisionee sends the fail message, and waits for the provisioner to
+	/* According to MshPRTv1.1: 5.4.4, the provisioner just closes the link when something
+	 * fails, while the provisionee sends the fail message, and waits for the provisioner to
 	 * close the link.
 	 */
 	prov_send_fail_msg(reason);
@@ -358,6 +357,13 @@ static void prov_dh_key_gen(void)
 	}
 }
 
+static void prov_dh_key_gen_handler(struct k_work *work)
+{
+	prov_dh_key_gen();
+}
+
+static K_WORK_DEFINE(dh_gen_work, prov_dh_key_gen_handler);
+
 static void prov_pub_key(const uint8_t *data)
 {
 	LOG_DBG("Remote Public Key: %s", bt_hex(data, PUB_KEY_SIZE));
@@ -385,7 +391,7 @@ static void prov_pub_key(const uint8_t *data)
 		       PDU_LEN_PUB_KEY);
 	}
 
-	prov_dh_key_gen();
+	k_work_submit(&dh_gen_work);
 }
 
 static void notify_input_complete(void)

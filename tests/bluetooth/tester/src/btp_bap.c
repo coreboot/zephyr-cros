@@ -148,8 +148,12 @@ static void print_codec_cfg(const struct bt_audio_codec_cfg *codec_cfg)
 			LOG_DBG("  Frequency: %d Hz", bt_audio_codec_cfg_freq_to_freq_hz(ret));
 		}
 
-		LOG_DBG("  Frame Duration: %d us",
-			bt_audio_codec_cfg_get_frame_duration_us(codec_cfg));
+		ret = bt_audio_codec_cfg_get_frame_dur(codec_cfg);
+		if (ret > 0) {
+			LOG_DBG("  Frame Duration: %d us",
+				bt_audio_codec_cfg_frame_dur_to_frame_dur_us(ret));
+		}
+
 		if (bt_audio_codec_cfg_get_chan_allocation(codec_cfg, &chan_allocation) == 0) {
 			LOG_DBG("  Channel allocation: 0x%x", chan_allocation);
 		}
@@ -260,14 +264,12 @@ static void btp_send_ascs_ase_state_changed_ev(struct bt_conn *conn, uint8_t ase
 
 static int validate_codec_parameters(const struct bt_audio_codec_cfg *codec_cfg)
 {
-	int frame_duration_us;
 	int frames_per_sdu;
 	int octets_per_frame;
 	int chan_allocation_err;
 	enum bt_audio_location chan_allocation;
 	int ret;
 
-	frame_duration_us = bt_audio_codec_cfg_get_frame_duration_us(codec_cfg);
 	chan_allocation_err =
 		bt_audio_codec_cfg_get_chan_allocation(codec_cfg, &chan_allocation);
 	octets_per_frame = bt_audio_codec_cfg_get_octets_per_frame(codec_cfg);
@@ -279,8 +281,9 @@ static int validate_codec_parameters(const struct bt_audio_codec_cfg *codec_cfg)
 		return -EINVAL;
 	}
 
-	if (frame_duration_us < 0) {
-		LOG_DBG("Error: Invalid frame duration.");
+	ret = bt_audio_codec_cfg_get_frame_dur(codec_cfg);
+	if (ret < 0) {
+		LOG_DBG("Error: Invalid frame duration: %d", ret);
 		return -EINVAL;
 	}
 
@@ -1082,41 +1085,32 @@ static void audio_send_timeout(struct k_work *work)
 		/* TODO: Synchronize the Host clock with the Controller clock */
 	}
 
-	buf = net_buf_alloc(&tx_pool, K_NO_WAIT);
-	if (!buf) {
-		LOG_ERR("Cannot allocate net_buf. Dropping data.");
-		k_work_schedule_for_queue(&iso_data_work_q, dwork,
-					  K_USEC(stream->stream.qos->interval));
-		return;
-	}
-
-	net_buf_reserve(buf, BT_ISO_CHAN_SEND_RESERVE);
-
 	/* Get buffer within a ring buffer memory */
 	size = ring_buf_get_claim(&audio_ring_buf, &data, stream->stream.qos->sdu);
-	if (size != 0) {
-		net_buf_add_mem(buf, data, size);
-	} else {
-		k_work_schedule_for_queue(&iso_data_work_q, dwork,
-					  K_USEC(stream->stream.qos->interval));
-		return;
-	}
+	if (size > 0) {
+		buf = net_buf_alloc(&tx_pool, K_NO_WAIT);
+		if (!buf) {
+			LOG_ERR("Cannot allocate net_buf. Dropping data.");
+		} else {
+			net_buf_reserve(buf, BT_ISO_CHAN_SEND_RESERVE);
+			net_buf_add_mem(buf, data, size);
 
-	/* Because the seq_num field of the audio_stream struct is atomic_val_t (4 bytes),
-	 * let's allow an overflow and just cast it to uint16_t.
-	 */
-	stream->last_req_seq_num = (uint16_t)atomic_get(&stream->seq_num);
+			/* Because the seq_num field of the audio_stream struct is atomic_val_t
+			 * (4 bytes), let's allow an overflow and just cast it to uint16_t.
+			 */
+			stream->last_req_seq_num = (uint16_t)atomic_get(&stream->seq_num);
 
-	LOG_DBG("Sending data to stream %p len %d seq %d", &stream->stream, size,
-		stream->last_req_seq_num);
+			LOG_DBG("Sending data to stream %p len %d seq %d", &stream->stream, size,
+				stream->last_req_seq_num);
 
-	err = bt_bap_stream_send(&stream->stream, buf, 0, BT_ISO_TIMESTAMP_NONE);
-	if (err != 0) {
-		LOG_ERR("Failed to send audio data to stream %p, err %d", &stream->stream, err);
-		net_buf_unref(buf);
-	}
+			err = bt_bap_stream_send(&stream->stream, buf, 0, BT_ISO_TIMESTAMP_NONE);
+			if (err != 0) {
+				LOG_ERR("Failed to send audio data to stream %p, err %d",
+					&stream->stream, err);
+				net_buf_unref(buf);
+			}
+		}
 
-	if (size != 0) {
 		/* Free ring buffer memory */
 		err = ring_buf_get_finish(&audio_ring_buf, size);
 		if (err != 0) {

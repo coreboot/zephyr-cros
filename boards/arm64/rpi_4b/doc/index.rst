@@ -16,31 +16,56 @@ Supported Features
 The Raspberry Pi 4 Model B board configuration supports the following
 hardware features:
 
-+-----------+------------+--------------------------------------+
-| Interface | Controller | Driver/Component                     |
-+===========+============+======================================+
-| GIC-400   | on-chip    | GICv2 interrupt controller           |
-+-----------+------------+--------------------------------------+
-| UART      | on-chip    | Mini uart serial port                |
-+-----------+------------+--------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Peripheral
+     - Kconfig option
+     - Devicetree compatible
+   * - GIC-400
+     - N/A
+     - :dtcompatible:`arm,gic-v2`
+   * - GPIO
+     - :kconfig:option:`CONFIG_GPIO`
+     - :dtcompatible:`brcm,bcm2711-gpio`
+   * - UART (Mini UART)
+     - :kconfig:option:`CONFIG_SERIAL`
+     - :dtcompatible:`brcm,bcm2711-aux-uart`
 
 Other hardware features have not been enabled yet for this board.
 
 The default configuration can be found in the defconfig file:
 
-        ``boards/arm/rpi_4b/rpi_4b_defconfig``
+        ``boards/arm64/rpi_4b/rpi_4b_defconfig``
 
 Programming and Debugging
 *************************
 
-Flashing
-========
+TF Card
+=======
 
-1. Install Raspberry Pi OS using Raspberry Pi Imager. see <https://www.raspberrypi.com/software/>.
+Prepare a TF card with MBR and FAT32. In the root directory of the TF card:
 
-2. add `kernel=zephyr.bin` in `config.txt`. see <https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel>
+1. Download and place these firmware files:
 
-.. code-block:: console
+   * `bcm2711-rpi-4-b.dtb <https://raw.githubusercontent.com/raspberrypi/firmware/master/boot/bcm2711-rpi-4-b.dtb>`_
+   * `bootcode.bin <https://raw.githubusercontent.com/raspberrypi/firmware/master/boot/bootcode.bin>`_
+   * `start4.elf <https://raw.githubusercontent.com/raspberrypi/firmware/master/boot/start4.elf>`_
 
-	*** Booting Zephyr OS build XXXXXXXXXXXX  ***
-	Hello World! Raspberry Pi 4 Model B!
+2. Copy ``build/zephyr/zephyr.bin``
+3. Create a ``config.txt``:
+
+   .. code-block:: text
+
+      kernel=zephyr.bin
+      arm_64bit=1
+      enable_uart=1
+      uart_2ndstage=1
+
+Insert the card and power on the board. You should see the following output on
+the serial console (GPIO 14/15):
+
+.. code-block:: text
+
+   *** Booting Zephyr OS build XXXXXXXXXXXX  ***
+   Hello World! Raspberry Pi 4 Model B!

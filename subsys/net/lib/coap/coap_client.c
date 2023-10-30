@@ -215,12 +215,25 @@ static int coap_client_init_request(struct coap_client *client,
 				coap_block_transfer_init(&internal_req->send_blk_ctx,
 							 coap_client_default_block_size(),
 							 req->len);
+				/* Generate request tag */
+				uint8_t *tag = coap_next_token();
+
+				memcpy(internal_req->request_tag, tag, COAP_TOKEN_MAX_LEN);
 			}
 			ret = coap_append_block1_option(&internal_req->request,
 							&internal_req->send_blk_ctx);
 
 			if (ret < 0) {
 				LOG_ERR("Failed to append block1 option");
+				goto out;
+			}
+
+			ret = coap_packet_append_option(&internal_req->request,
+				COAP_OPTION_REQUEST_TAG, internal_req->request_tag,
+				COAP_TOKEN_MAX_LEN);
+
+			if (ret < 0) {
+				LOG_ERR("Failed to append request tag option");
 				goto out;
 			}
 		}
@@ -317,6 +330,17 @@ int coap_client_req(struct coap_client *client, int sock, const struct sockaddr 
 		LOG_ERR("Failed to initialize coap request");
 		k_mutex_unlock(&client->send_mutex);
 		goto out;
+	}
+
+	if (client->send_echo) {
+		ret = coap_packet_append_option(&internal_req->request, COAP_OPTION_ECHO,
+						client->echo_option.value, client->echo_option.len);
+		if (ret < 0) {
+			LOG_ERR("Failed to append echo option");
+			k_mutex_unlock(&client->send_mutex);
+			goto out;
+		}
+		client->send_echo = false;
 	}
 
 	ret = coap_client_schedule_poll(client, sock, req, internal_req);
@@ -591,6 +615,11 @@ struct coap_client_internal_request *get_request_with_token(struct coap_client *
 	return NULL;
 }
 
+static bool find_echo_option(const struct coap_packet *response, struct coap_option *option)
+{
+	return coap_find_options(response, COAP_OPTION_ECHO, option, 1);
+}
+
 static int handle_response(struct coap_client *client, const struct coap_packet *response)
 {
 	int ret = 0;
@@ -636,6 +665,60 @@ static int handle_response(struct coap_client *client, const struct coap_packet 
 	if (internal_req == NULL || !token_compare(internal_req, response)) {
 		LOG_WRN("Not matching tokens");
 		return 1;
+	}
+
+	/* Received echo option */
+	if (find_echo_option(response, &client->echo_option)) {
+		 /* Resend request with echo option */
+		if (response_code == COAP_RESPONSE_CODE_UNAUTHORIZED) {
+			k_mutex_lock(&client->send_mutex, K_FOREVER);
+
+			ret = coap_client_init_request(client, &internal_req->coap_request,
+						       internal_req, false);
+
+			if (ret < 0) {
+				LOG_ERR("Error creating a CoAP request");
+				k_mutex_unlock(&client->send_mutex);
+				goto fail;
+			}
+
+			ret = coap_packet_append_option(&internal_req->request, COAP_OPTION_ECHO,
+							client->echo_option.value,
+							client->echo_option.len);
+			if (ret < 0) {
+				LOG_ERR("Failed to append echo option");
+				k_mutex_unlock(&client->send_mutex);
+				goto fail;
+			}
+
+			if (coap_header_get_type(&internal_req->request) == COAP_TYPE_CON) {
+				ret = coap_pending_init(&internal_req->pending,
+							&internal_req->request, &client->address,
+							internal_req->retry_count);
+				if (ret < 0) {
+					LOG_ERR("Error creating pending");
+					k_mutex_unlock(&client->send_mutex);
+					goto fail;
+				}
+
+				coap_pending_cycle(&internal_req->pending);
+			}
+
+			ret = send_request(client->fd, internal_req->request.data,
+					   internal_req->request.offset, 0, &client->address,
+					   client->socklen);
+			k_mutex_unlock(&client->send_mutex);
+
+			if (ret < 0) {
+				LOG_ERR("Error sending a CoAP request");
+				goto fail;
+			} else {
+				return 1;
+			}
+		} else {
+			/* Send echo in next request */
+			client->send_echo = true;
+		}
 	}
 
 	/* Send ack for CON */

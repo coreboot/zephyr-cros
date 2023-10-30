@@ -37,6 +37,20 @@ enum charger_property {
 	/** Represents the charging status of the charger. */
 	/** Value should be of type enum charger_status */
 	CHARGER_PROP_STATUS,
+	/** Represents the charging algo type of the charger. */
+	/** Value should be of type enum charger_charge_type */
+	CHARGER_PROP_CHARGE_TYPE,
+	/** Represents the health of the charger. */
+	/** Value should be of type enum charger_health */
+	CHARGER_PROP_HEALTH,
+	/** Configuration of current sink used for charging in µA */
+	CHARGER_PROP_CONSTANT_CHARGE_CURRENT_UA,
+	/** Configuration of current sink used for conditioning in µA */
+	CHARGER_PROP_PRECHARGE_CURRENT_UA,
+	/** Configuration of charge termination target in µA */
+	CHARGER_PROP_CHARGE_TERM_CURRENT_UA,
+	/** Configuration of charge voltage regulation target in µV */
+	CHARGER_PROP_CONSTANT_CHARGE_VOLTAGE_UV,
 	/** Reserved to demark end of common charger properties */
 	CHARGER_PROP_COMMON_COUNT,
 	/**
@@ -85,6 +99,76 @@ enum charger_status {
 };
 
 /**
+ * @brief Charge algorithm types
+ */
+enum charger_charge_type {
+	/** Charge type is unknown */
+	CHARGER_CHARGE_TYPE_UNKNOWN = 0,
+	/** Charging is not occurring */
+	CHARGER_CHARGE_TYPE_NONE,
+	/*
+	 * Charging is occurring at the slowest desired charge rate,
+	 * typically for battery detection or preconditioning
+	 */
+	CHARGER_CHARGE_TYPE_TRICKLE,
+	/** Charging is occurring at the fastest desired charge rate */
+	CHARGER_CHARGE_TYPE_FAST,
+	/** Charging is occurring at a moderate charge rate */
+	CHARGER_CHARGE_TYPE_STANDARD,
+	/*
+	 * Charging is being dynamically adjusted by the charger device
+	 */
+	CHARGER_CHARGE_TYPE_ADAPTIVE,
+	/*
+	 * Charging is occurring at a reduced charge rate to preserve
+	 * battery health
+	 */
+	CHARGER_CHARGE_TYPE_LONGLIFE,
+	/*
+	 * The charger device is being bypassed and the power conversion
+	 * is being handled externally, typically by a "smart" wall adaptor
+	 */
+	CHARGER_CHARGE_TYPE_BYPASS,
+};
+
+/**
+ * @brief Charger health conditions
+ *
+ * These conditions determine the ability to, or the rate of, charge
+ */
+enum charger_health {
+	/** Charger health condition is unknown */
+	CHARGER_HEALTH_UNKNOWN = 0,
+	/** Charger health condition is good */
+	CHARGER_HEALTH_GOOD,
+	/** The charger device is overheated */
+	CHARGER_HEALTH_OVERHEAT,
+	/** The battery voltage has exceeded its overvoltage threshold */
+	CHARGER_HEALTH_OVERVOLTAGE,
+	/*
+	 * The battery or charger device is experiencing an unspecified
+	 * failure.
+	 */
+	CHARGER_HEALTH_UNSPEC_FAILURE,
+	/** The battery temperature is below the "cold" threshold */
+	CHARGER_HEALTH_COLD,
+	/** The charger device's watchdog timer has expired */
+	CHARGER_HEALTH_WATCHDOG_TIMER_EXPIRE,
+	/** The charger device's safety timer has expired */
+	CHARGER_HEALTH_SAFETY_TIMER_EXPIRE,
+	/** The charger device requires calibration */
+	CHARGER_HEALTH_CALIBRATION_REQUIRED,
+	/** The battery temperature is in the "warm" range */
+	CHARGER_HEALTH_WARM,
+	/** The battery temperature is in the "cool" range */
+	CHARGER_HEALTH_COOL,
+	/** The battery temperature is below the "hot" threshold */
+	CHARGER_HEALTH_HOT,
+	/** The charger device does not detect a battery */
+	CHARGER_HEALTH_NO_BATTERY,
+};
+
+/**
  * @brief container for a charger_property value
  *
  */
@@ -99,6 +183,18 @@ union charger_propval {
 	bool present;
 	/** CHARGER_PROP_STATUS */
 	enum charger_status status;
+	/** CHARGER_PROP_CHARGE_TYPE */
+	enum charger_charge_type charge_type;
+	/** CHARGER_PROP_HEALTH */
+	enum charger_health health;
+	/** CHARGER_PROP_CONSTANT_CHARGE_CURRENT_UA */
+	uint32_t const_charge_current_ua;
+	/** CHARGER_PROP_PRECHARGE_CURRENT_UA */
+	uint32_t precharge_current_ua;
+	/** CHARGER_PROP_CHARGE_TERM_CURRENT_UA */
+	uint32_t charge_term_current_ua;
+	/** CHARGER_PROP_CONSTANT_CHARGE_VOLTAGE_UV */
+	uint32_t const_charge_voltage_uv;
 };
 
 /**

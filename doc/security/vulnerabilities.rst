@@ -1511,7 +1511,15 @@ Under embargo until 2023/11/01
 CVE-2023-5139
 -------------
 
-Under embargo until 2023/10/25
+Potential buffer overflow vulnerability in the Zephyr STM32 Crypto driver.
+
+- `Zephyr project bug tracker GHSA-rhrc-pcxp-4453
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-rhrc-pcxp-4453>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 61839 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/61839>`_
 
 CVE-2023-5184
 -------------
@@ -1547,3 +1555,17 @@ This has been fixed in main for v3.5.0
 
 - `PR 63717 fix for 3.3
   <https://github.com/zephyrproject-rtos/zephyr/pull/63717>`_
+
+CVE-2023-5753
+-------------
+
+Potential buffer overflow vulnerabilities in the Zephyr Bluetooth
+subsystem source code when asserts are disabled.
+
+- `Zephyr project bug tracker GHSA-hmpr-px56-rvww
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-hmpr-px56-rvww>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 63605 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/63605>`_

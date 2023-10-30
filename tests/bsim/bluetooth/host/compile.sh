@@ -37,6 +37,7 @@ app=tests/bsim/bluetooth/host/att/read_fill_buf/client compile
 app=tests/bsim/bluetooth/host/att/read_fill_buf/server compile
 app=tests/bsim/bluetooth/host/att/sequential/dut compile
 app=tests/bsim/bluetooth/host/att/sequential/tester compile
+app=tests/bsim/bluetooth/host/att/long_read compile
 
 app=tests/bsim/bluetooth/host/gatt/caching compile
 app=tests/bsim/bluetooth/host/gatt/general compile
@@ -63,6 +64,8 @@ app=tests/bsim/bluetooth/host/l2cap/send_on_connect compile
 app=tests/bsim/bluetooth/host/l2cap/send_on_connect conf_file=prj_ecred.conf compile
 
 app=tests/bsim/bluetooth/host/misc/disable compile
+app=tests/bsim/bluetooth/host/misc/disconnect/dut compile
+app=tests/bsim/bluetooth/host/misc/disconnect/tester compile
 
 app=tests/bsim/bluetooth/host/privacy/central compile
 app=tests/bsim/bluetooth/host/privacy/peripheral compile

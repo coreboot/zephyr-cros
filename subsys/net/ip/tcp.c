@@ -1162,6 +1162,82 @@ static bool is_destination_local(struct net_pkt *pkt)
 	return false;
 }
 
+void net_tcp_reply_rst(struct net_pkt *pkt)
+{
+	NET_PKT_DATA_ACCESS_DEFINE(tcp_access_rst, struct tcphdr);
+	struct tcphdr *th_pkt = th_get(pkt);
+	struct tcphdr *th_rst;
+	struct net_pkt *rst;
+	int ret;
+
+	if (th_pkt == NULL || (th_flags(th_pkt) & RST)) {
+		/* Don't reply to a RST segment. */
+		return;
+	}
+
+	rst = tcp_pkt_alloc_no_conn(pkt->iface, pkt->family,
+				    sizeof(struct tcphdr));
+	if (rst == NULL) {
+		return;
+	}
+
+	/* IP header */
+	if (IS_ENABLED(CONFIG_NET_IPV4) && net_pkt_family(pkt) == AF_INET) {
+		ret = net_ipv4_create(rst,
+				      (struct in_addr *)NET_IPV4_HDR(pkt)->dst,
+				      (struct in_addr *)NET_IPV4_HDR(pkt)->src);
+	} else if (IS_ENABLED(CONFIG_NET_IPV6) && net_pkt_family(pkt) == AF_INET6) {
+		ret =  net_ipv6_create(rst,
+				      (struct in6_addr *)NET_IPV6_HDR(pkt)->dst,
+				      (struct in6_addr *)NET_IPV6_HDR(pkt)->src);
+	} else {
+		ret = -EINVAL;
+	}
+
+	if (ret < 0) {
+		goto err;
+	}
+
+	/* TCP header */
+	th_rst = (struct tcphdr *)net_pkt_get_data(rst, &tcp_access_rst);
+	if (th_rst == NULL) {
+		goto err;
+	}
+
+	memset(th_rst, 0, sizeof(struct tcphdr));
+
+	UNALIGNED_PUT(th_pkt->th_dport, &th_rst->th_sport);
+	UNALIGNED_PUT(th_pkt->th_sport, &th_rst->th_dport);
+	th_rst->th_off = 5;
+
+	if (th_flags(th_pkt) & ACK) {
+		UNALIGNED_PUT(RST, &th_rst->th_flags);
+		UNALIGNED_PUT(th_pkt->th_ack, &th_rst->th_seq);
+	} else {
+		uint32_t ack = ntohl(th_pkt->th_seq) + tcp_data_len(pkt);
+
+		UNALIGNED_PUT(RST | ACK, &th_rst->th_flags);
+		UNALIGNED_PUT(htonl(ack), &th_rst->th_ack);
+	}
+
+	ret = net_pkt_set_data(rst, &tcp_access_rst);
+	if (ret < 0) {
+		goto err;
+	}
+
+	ret = tcp_finalize_pkt(rst);
+	if (ret < 0) {
+		goto err;
+	}
+
+	tcp_send(rst);
+
+	return;
+
+err:
+	tcp_pkt_unref(rst);
+}
+
 static int tcp_out_ext(struct tcp *conn, uint8_t flags, struct net_pkt *data,
 		       uint32_t seq)
 {
@@ -1776,13 +1852,13 @@ static enum net_verdict tcp_recv(struct net_conn *net_conn,
 			goto in;
 		}
 
-		net_ipaddr_copy(&conn_old->context->remote, &conn->dst.sa);
-
 		conn->accepted_conn = conn_old;
 	}
  in:
 	if (conn) {
 		verdict = tcp_in(conn, pkt);
+	} else {
+		net_tcp_reply_rst(pkt);
 	}
 
 	return verdict;
@@ -2341,6 +2417,18 @@ static enum net_verdict tcp_in(struct tcp *conn, struct net_pkt *pkt)
 		net_stats_update_tcp_seg_rst(net_pkt_iface(pkt));
 		do_close = true;
 		close_status = -ECONNRESET;
+
+		/* If we receive RST and ACK for the sent SYN, it means
+		 * that there is no socket listening the port we are trying
+		 * to connect to. Set the errno properly in this case.
+		 */
+		if (conn->in_connect) {
+			fl = th_flags(th);
+			if (FL(&fl, ==, RST | ACK)) {
+				close_status = -ECONNREFUSED;
+			}
+		}
+
 		goto out;
 	}
 
@@ -2421,6 +2509,7 @@ next_state:
 			conn->send_options.mss_found = false;
 			conn_seq(conn, + 1);
 			next = TCP_SYN_SENT;
+			tcp_conn_ref(conn);
 		}
 		break;
 	case TCP_SYN_RECEIVED:
@@ -2454,8 +2543,40 @@ next_state:
 				break;
 			}
 
-			accept_cb(conn->context, &context->remote,
-				  sizeof(struct sockaddr), 0, context);
+			net_ipaddr_copy(&conn->context->remote, &conn->dst.sa);
+
+			/* Check if v4-mapping-to-v6 needs to be done for
+			 * the accepted socket.
+			 */
+			if (IS_ENABLED(CONFIG_NET_IPV4_MAPPING_TO_IPV6) &&
+			    net_context_get_family(conn->context) == AF_INET &&
+			    net_context_get_family(context) == AF_INET6 &&
+			    !net_context_is_v6only_set(context)) {
+				struct in6_addr mapped;
+
+				net_ipv6_addr_create_v4_mapped(
+					&net_sin(&conn->context->remote)->sin_addr,
+					&mapped);
+				net_ipaddr_copy(&net_sin6(&conn->context->remote)->sin6_addr,
+						&mapped);
+
+				net_sin6(&conn->context->remote)->sin6_family = AF_INET6;
+
+				NET_DBG("Setting v4 mapped address %s",
+					net_sprint_ipv6_addr(&mapped));
+
+				/* Note that we cannot set the local address to IPv6 one
+				 * as that is used to match the connection, and not just
+				 * for printing. The remote address is only used for
+				 * passing it to accept() and printing it by "net conn"
+				 * command.
+				 */
+			}
+
+			accept_cb(conn->context, &conn->context->remote,
+				  net_context_get_family(context) == AF_INET6 ?
+				  sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in),
+				  0, context);
 
 			next = TCP_ESTABLISHED;
 
@@ -2496,7 +2617,6 @@ next_state:
 			}
 
 			next = TCP_ESTABLISHED;
-			tcp_conn_ref(conn);
 			net_context_set_state(conn->context,
 					      NET_CONTEXT_CONNECTED);
 			tcp_ca_init(conn);
@@ -2509,7 +2629,10 @@ next_state:
 			 * priority.
 			 */
 			connection_ok = true;
+		} else if (pkt) {
+			net_tcp_reply_rst(pkt);
 		}
+
 		break;
 	case TCP_ESTABLISHED:
 		/* full-close */
