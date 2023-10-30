@@ -138,6 +138,7 @@ ARM arch:
     - stephanosio
     - bbolen
     - povergoing
+    - ithinuel
   files:
     - arch/arm/
     - arch/arm/core/offsets/
@@ -192,6 +193,18 @@ Ambiq Platforms:
     - drivers/*/*_ambiq*
   labels:
     - "platform: Ambiq"
+
+Binary Descriptors:
+  status: maintained
+  maintainers:
+    - yonsch
+  files:
+    - subsys/bindesc/
+    - include/zephyr/bindesc.h
+    - samples/subsys/bindesc/
+    - scripts/west_commands/bindesc.py
+  labels:
+    - "area: Binary Descriptors"
 
 Bluetooth:
   status: maintained
@@ -422,8 +435,9 @@ CMSIS-DSP integration:
     - stephanosio
   collaborators:
     - galak
+    - XenuIsWatching
   files:
-    - modules/cmsis/Kconfig.cmsis_dsp
+    - modules/cmsis-dsp/
     - tests/benchmarks/cmsis_dsp/
     - tests/lib/cmsis_dsp/
   labels:
@@ -435,8 +449,9 @@ CMSIS-NN integration:
     - JordanYates
   collaborators:
     - stephanosio
+    - XenuIsWatching
   files:
-    - modules/cmsis/Kconfig.cmsis_nn
+    - modules/cmsis-nn/
     - tests/lib/cmsis_nn/
   labels:
     - "area: CMSIS-NN"
@@ -1120,24 +1135,6 @@ Release Notes:
   labels:
     - "area: LED"
 
-"Drivers: lora":
-  status: maintained
-  maintainers:
-    - Mani-Sadhasivam
-  collaborators:
-    - mniestroj
-    - JordanYates
-  files:
-    - drivers/lora/
-    - include/zephyr/drivers/lora.h
-    - samples/drivers/lora/
-    - include/zephyr/lorawan/
-    - subsys/lorawan/
-    - samples/subsys/lorawan/
-    - doc/connectivity/lora_lorawan/index.rst
-  labels:
-    - "area: LoRa"
-
 "Drivers: Modem":
   status: maintained
   maintainers:
@@ -1718,6 +1715,25 @@ Logging:
   labels:
     - "area: Logging"
 
+LoRa and LoRaWAN:
+  status: maintained
+  maintainers:
+    - JordanYates
+  collaborators:
+    - Mani-Sadhasivam
+    - martinjaeger
+    - mniestroj
+  files:
+    - drivers/lora/
+    - include/zephyr/drivers/lora.h
+    - samples/drivers/lora/
+    - include/zephyr/lorawan/
+    - subsys/lorawan/
+    - samples/subsys/lorawan/
+    - doc/connectivity/lora_lorawan/index.rst
+  labels:
+    - "area: LoRa"
+
 MAINTAINERS file:
   status: maintained
   maintainers:
@@ -1921,6 +1937,7 @@ Networking:
     - subsys/net/conn_mgr/
     - tests/net/conn_mgr_monitor/
     - tests/net/conn_mgr_conn/
+    - doc/connectivity/networking/conn_mgr/
   labels:
     - "area: Networking"
 
@@ -2053,18 +2070,18 @@ NIOS-2 arch:
   labels:
     - "area: NIOS2"
 
-nRF52 BSIM:
+nRF BSIM:
   status: maintained
   maintainers:
     - aescolar
   files:
-    - boards/posix/nrf52_bsim/
+    - boards/posix/nrf_bsim/
     - tests/boards/nrf52_bsim/
     - tests/bsim/
   files-exclude:
     - tests/bsim/*/
   labels:
-    - "platform: nRF52 BSIM"
+    - "platform: nRF BSIM"
 
 POSIX API layer:
   status: maintained
@@ -2085,7 +2102,6 @@ Power management:
     - ceolin
   collaborators:
     - nashif
-    - gmarull
     - teburd
     - tmleman
     - JordanYates
@@ -2459,6 +2475,7 @@ NXP Platforms:
     - bperseghetti
     - dbaluta
     - iuliana-prodan
+    - Dat-NguyenDuy
   files:
     - boards/arm/mimx*/
     - boards/arm/frdm_k*/
@@ -2939,8 +2956,28 @@ West:
     - povergoing
   files:
     - modules/cmsis/Kconfig
-    - modules/cmsis/Kconfig.cmsis_dsp
-    - modules/cmsis/Kconfig.cmsis_nn
+  labels:
+    - "area: ARM"
+
+"West project: cmsis-dsp":
+  status: maintained
+  maintainers:
+    - XenuIsWatching
+  collaborators:
+    - stephanosio
+  files:
+    - modules/cmsis-dsp/
+  labels:
+    - "area: ARM"
+
+"West project: cmsis-nn":
+  status: maintained
+  maintainers:
+    - XenuIsWatching
+  collaborators:
+    - stephanosio
+  files:
+    - modules/cmsis-nn/
   labels:
     - "area: ARM"
 

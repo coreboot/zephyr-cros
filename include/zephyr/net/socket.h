@@ -995,7 +995,11 @@ static inline char *inet_ntop(sa_family_t family, const void *src, char *dst,
 #define EAI_FAMILY DNS_EAI_FAMILY
 #endif /* defined(CONFIG_NET_SOCKETS_POSIX_NAMES) */
 
+#if defined(CONFIG_NET_INTERFACE_NAME)
+#define IFNAMSIZ CONFIG_NET_INTERFACE_NAME_LEN
+#else
 #define IFNAMSIZ Z_DEVICE_MAX_NAME_LEN
+#endif
 
 /** Interface description structure */
 struct ifreq {
@@ -1009,7 +1013,7 @@ struct ifreq {
 
 /** sockopt: Recording debugging information (ignored, for compatibility) */
 #define SO_DEBUG 1
-/** sockopt: address reuse (ignored, for compatibility) */
+/** sockopt: address reuse */
 #define SO_REUSEADDR 2
 /** sockopt: Type of the socket */
 #define SO_TYPE 3
@@ -1020,7 +1024,7 @@ struct ifreq {
 /** sockopt: Transmission of broadcast messages is supported (ignored, for compatibility) */
 #define SO_BROADCAST 6
 
-/** sockopt: Size of socket socket send buffer (ignored, for compatibility) */
+/** sockopt: Size of socket send buffer */
 #define SO_SNDBUF 7
 /** sockopt: Size of socket recv buffer */
 #define SO_RCVBUF 8
@@ -1031,7 +1035,7 @@ struct ifreq {
 #define SO_OOBINLINE 10
 /** sockopt: Socket lingers on close (ignored, for compatibility) */
 #define SO_LINGER 13
-/** sockopt: Allow multiple sockets to reuse a single port (ignored, for compatibility) */
+/** sockopt: Allow multiple sockets to reuse a single port */
 #define SO_REUSEPORT 15
 
 /** sockopt: Receive low watermark (ignored, for compatibility) */

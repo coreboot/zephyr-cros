@@ -47,6 +47,98 @@ Required changes
      - "IO"          -> <( DT_MEM_ARM(ATTR_MPU_IO) )>
      - "EXTMEM"      -> <( DT_MEM_ARM(ATTR_MPU_EXTMEM) )>
 
+* A new networking Kconfig option :kconfig:option:`CONFIG_NET_INTERFACE_NAME`
+  defaults to ``y``. The option allows user to set a name to a network interface.
+  During system startup a default name is assigned to the network interface like
+  ``eth0`` to the first Ethernet network interface. The option affects the behavior
+  of ``SO_BINDTODEVICE`` BSD socket option. If the Kconfig option is set to ``n``,
+  which is how the system worked earlier, then the name of the device assigned
+  to the network interface is used by the ``SO_BINDTODEVICE`` socket option.
+  If the Kconfig option is set to ``y`` (current default), then the network
+  interface name is used by the ``SO_BINDTODEVICE`` socket option.
+
+* On all STM32 ADC, it is no longer possible to read sensor channels (Vref,
+  Vbat or temperature) using the ADC driver. The dedicated sensor driver should
+  be used instead. This change is due to a limitation on STM32F4 where the
+  channels for temperature and Vbat are identical, and the impossibility of
+  determining what we want to measure using solely the ADC API.
+
+* The default C library used on most targets has changed from the built-in
+  minimal C library to Picolibc. While both provide standard C library
+  interfaces and shouldn't cause any behavioral regressions for applications,
+  there are a few side effects to be aware of when migrating to Picolibc.
+
+  * Picolibc enables thread local storage
+    (:kconfig:option:`CONFIG_THREAD_LOCAL_STORAGE`) where supported. This
+    changes some internal operations within the kernel that improve
+    performance using some TLS variables. Zephyr places TLS variables in the
+    memory reserved for the stack, so stack usage for every thread will
+    increase by 8-16 bytes.
+
+  * Picolibc uses the same malloc implementation as the minimal C library, but
+    the default heap size depends on which C library is in use. When using the
+    minimal C library, the default heap is zero bytes, which means that malloc
+    will always fail. When using Picolibc, the default is 16kB with
+    :kconfig:option:`CONFIG_MMU` or :kconfig:option:`ARCH_POSIX`, 2kB with
+    :kconfig:option:`CONFIG_USERSPACE` and
+    :kconfig:option:`CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT`. For all
+    other targets, the default heap uses all remaining memory on the system.
+    You can change this by adjusting
+    :kconfig:option:`CONFIG_COMMON_LIBC_MALLOC_ARENA_SIZE`.
+
+  * Picolibc can either be built as part of the OS build or pulled from the
+    toolchain. When building as part of the OS, the build will increase by
+    approximately 1000 files.
+
+  * When using the standard C++ library with Picolibc, both of those must come
+    from the toolchain as the standard C++ library depends upon the C library
+    ABI.
+
+  * Picolibc removes the ``-ffreestanding`` compiler option. This allows
+    significant compiler optimization improvements, but also means that the
+    compiler will now warn about declarations of `main` which don't conform to
+    the Zephyr required type -- ``int main(void)``.
+
+  * Picolibc's default floating point input/output code is larger than the
+    minimal C library version (this is necessary to conform with the C
+    language "round trip" requirements for these operations). If you use
+    :kconfig:option:`CONFIG_CBPRINTF_FP_SUPPORT`, you will see increased
+    memory usage unless you also disable
+    :kconfig:option:`CONFIG_PICOLIBC_IO_FLOAT_EXACT`, which switches Picolibc
+    to a smaller, but inexact conversion algorithm. This requires building
+    Picolibc as a module.
+
+* The CAN controller timing API functions :c:func:`can_set_timing` and :c:func:`can_set_timing_data`
+  no longer fallback to the (Re-)Synchronization Jump Width (SJW) value set in the devicetree
+  properties for the given CAN controller upon encountering an SJW value corresponding to
+  ``CAN_SJW_NO_CHANGE`` (which is no longer available). The caller will therefore need to fill in
+  the ``sjw`` field in :c:struct:`can_timing`. To aid in this, the :c:func:`can_calc_timing` and
+  :c:func:`can_calc_timing_data` functions now automatically calculate a suitable SJW. The
+  calculated SJW can be overwritten by the caller if needed. The CAN controller API functions
+  :c:func:`can_set_bitrate` and :c:func:`can_set_bitrate_data` now also automatically calculate a
+  suitable SJW, but their SJW cannot be overwritten by the caller.
+
+* Ethernet PHY devicetree bindings were updated to use the standard ``reg``
+  property for the PHY address instead of a custom ``address`` property. As a
+  result, MDIO controller nodes now require ``#address-cells`` and
+  ``#size-cells`` properties. Similarly, Ethernet PHY devicetree nodes and
+  corresponding driver were updated to consistently use the node name
+  ``ethernet-phy`` instead of ``phy``. Devicetrees and overlays must be updated
+  accordingly:
+
+  .. code-block:: devicetree
+
+     mdio {
+         compatible = "mdio-controller";
+         #address-cells = <1>;
+         #size-cells = <0>;
+
+         ethernet-phy@0 {
+             compatible = "ethernet-phy";
+             reg = <0>;
+         };
+     };
+
 Recommended Changes
 *******************
 
@@ -67,50 +159,38 @@ Recommended Changes
          nfct-pins-as-gpios;
      };
 
-Picolibc-related Changes
-************************
+* Nordic nRF based boards using :kconfig:option:`CONFIG_GPIO_AS_PINRESET`
+  to configure reset GPIO as nRESET, should instead set the new UICR
+  ``gpio-as-nreset`` property in devicetree. It can be set like this in the
+  board devicetree files:
 
-The default C library used on most targets has changed from the built-in
-minimal C library to Picolibc. While both provide standard C library
-interfaces and shouldn't cause any behavioral regressions for applications,
-there are a few side effects to be aware of when migrating to Picolibc.
+  .. code-block:: devicetree
 
-* Picolibc enables thread local storage
-  (:kconfig:option:`CONFIG_THREAD_LOCAL_STORAGE`) where supported. This
-  changes some internal operations within the kernel that improve
-  performance using some TLS variables. Zephyr places TLS variables in the
-  memory reserved for the stack, so stack usage for every thread will
-  increase by 8-16 bytes.
+     &uicr {
+         gpio-as-nreset;
+     };
 
-* Picolibc uses the same malloc implementation as the minimal C library, but
-  the default heap size depends on which C library is in use. When using the
-  minimal C library, the default heap is zero bytes, which means that malloc
-  will always fail. When using Picolibc, the default is 16kB with
-  :kconfig:option:`CONFIG_MMU` or :kconfig:option:`ARCH_POSIX`, 2kB with
-  :kconfig:option:`CONFIG_USERSPACE` and
-  :kconfig:option:`CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT`. For all
-  other targets, the default heap uses all remaining memory on the system.
-  You can change this by adjusting
-  :kconfig:option:`CONFIG_COMMON_LIBC_MALLOC_ARENA_SIZE`.
+* The :kconfig:option:`CONFIG_MODEM_GSM_PPP` modem driver is obsolete.
+  Instead the new :kconfig:option:`CONFIG_MODEM_CELLULAR` driver should be used.
+  As part of this :kconfig:option:`CONFIG_GSM_MUX` and :kconfig:option:`CONFIG_UART_MUX` are being
+  marked as deprecated as well. The new modem subsystem :kconfig:option:`CONFIG_MODEM_CMUX`
+  and :kconfig:option:`CONFIG_MODEM_PPP`` should be used instead.
 
-* Picolibc can either be built as part of the OS build or pulled from the
-  toolchain. When building as part of the OS, the build will increase by
-  approximately 1000 files.
+* Device drivers should now be restricted to ``PRE_KERNEL_1``, ``PRE_KERNEL_2``
+  and ``POST_KERNEL`` initialization levels. Other device initialization levels,
+  including ``EARLY``, ``APPLICATION``, and ``SMP``, have been deprecated and
+  will be removed in future releases. Note that these changes do not apply to
+  initialization levels used in the context of the ``init.h`` API,
+  e.g. :c:macro:`SYS_INIT`.
 
-* When using the standard C++ library with Picolibc, both of those must come
-  from the toolchain as the standard C++ library depends upon the C library
-  ABI.
-
-* Picolibc removes the ``-ffreestanding`` compiler option. This allows
-  significant compiler optimization improvements, but also means that the
-  compiler will now warn about declarations of `main` which don't conform to
-  the Zephyr required type -- ``int main(void)``.
-
-* Picolibc's default floating point input/output code is larger than the
-  minimal C library version (this is necessary to conform with the C
-  language "round trip" requirements for these operations). If you use
-  :kconfig:option:`CONFIG_CBPRINTF_FP_SUPPORT`, you will see increased
-  memory usage unless you also disable
-  :kconfig:option:`CONFIG_PICOLIBC_IO_FLOAT_EXACT`, which switches Picolibc
-  to a smaller, but inexact conversion algorithm. This requires building
-  Picolibc as a module.
+* The following CAN controller devicetree properties are now deprecated in favor specifying the
+  initial CAN bitrate using the ``bus-speed``, ``sample-point``, ``bus-speed-data``, and
+  ``sample-point-data`` properties:
+  * ``sjw``
+  * ``prop-seg``
+  * ``phase-seg1``
+  * ``phase-seg1``
+  * ``sjw-data``
+  * ``prop-seg-data``
+  * ``phase-seg1-data``
+  * ``phase-seg1-data``

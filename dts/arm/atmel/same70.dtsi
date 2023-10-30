@@ -334,6 +334,8 @@
 			compatible = "atmel,sam-mdio";
 			reg = <0x40050000 0x4000>;
 			status = "disabled";
+			#address-cells = <1>;
+			#size-cells = <0>;
 		};
 
 		tc0: tc@4000c000 {
@@ -417,9 +419,7 @@
 			clocks = <&pmc PMC_TYPE_PERIPHERAL 35>;
 			divider = <6>;
 			bosch,mram-cfg = <0x0 28 8 3 3 0 1 1>;
-			sjw = <1>;
 			sample-point = <875>;
-			sjw-data = <1>;
 			sample-point-data = <875>;
 			status = "disabled";
 		};
@@ -432,9 +432,7 @@
 			clocks = <&pmc PMC_TYPE_PERIPHERAL 37>;
 			divider = <6>;
 			bosch,mram-cfg = <0x0 28 8 3 3 0 1 1>;
-			sjw = <1>;
 			sample-point = <875>;
-			sjw-data = <1>;
 			sample-point-data = <875>;
 			status = "disabled";
 		};

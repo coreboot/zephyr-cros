@@ -74,14 +74,19 @@ static void print_codec_cfg(const struct bt_audio_codec_cfg *codec_cfg)
 	printk("codec_cfg 0x%02x cid 0x%04x vid 0x%04x count %u\n", codec_cfg->id, codec_cfg->cid,
 	       codec_cfg->vid, codec_cfg->data_len);
 
-	if (codec_cfg->id == BT_AUDIO_CODEC_LC3_ID) {
-		/* LC3 uses the generic LTV format - other codecs might do as well */
-
+	if (codec_cfg->id == BT_HCI_CODING_FORMAT_LC3) {
 		enum bt_audio_location chan_allocation;
+		int ret;
+
+		/* LC3 uses the generic LTV format - other codecs might do as well */
 
 		bt_audio_data_parse(codec_cfg->data, codec_cfg->data_len, print_cb, "data");
 
-		printk("  Frequency: %d Hz\n", bt_audio_codec_cfg_get_freq(codec_cfg));
+		ret = bt_audio_codec_cfg_get_freq(codec_cfg);
+		if (ret > 0) {
+			printk("  Frequency: %d Hz\n", bt_audio_codec_cfg_freq_to_freq_hz(ret));
+		}
+
 		printk("  Frame Duration: %d us\n",
 		       bt_audio_codec_cfg_get_frame_duration_us(codec_cfg));
 		if (bt_audio_codec_cfg_get_chan_allocation_val(codec_cfg, &chan_allocation) == 0) {

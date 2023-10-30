@@ -13,6 +13,14 @@ The following sections provide detailed lists of changes by component.
 
 Security Vulnerability Related
 ******************************
+The following CVEs are addressed by this release:
+
+More detailed information can be found in:
+https://docs.zephyrproject.org/latest/security/vulnerabilities.html
+
+* CVE-2023-4258 `Zephyr project bug tracker GHSA-m34c-cp63-rwh7
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-m34c-cp63-rwh7>`_
+
 
 Kernel
 ******
@@ -124,6 +132,10 @@ Build system and infrastructure
 
   * Added support for shared interrupts
 
+* Added support for setting MCUboot encryption key in sysbuild which is then
+  propagated to the bootloader and target images to automatically create
+  encrypted updates.
+
 Drivers and Sensors
 *******************
 
@@ -188,6 +200,23 @@ Drivers and Sensors
 
 * IEEE 802.15.4
 
+  * A new mandatory method attr_get() was introduced into ieee802154_radio_api.
+    Drivers need to implement at least
+    IEEE802154_ATTR_PHY_SUPPORTED_CHANNEL_PAGES and
+    IEEE802154_ATTR_PHY_SUPPORTED_CHANNEL_RANGES.
+  * The hardware capabilities IEEE802154_HW_2_4_GHZ and IEEE802154_HW_SUB_GHZ
+    were removed as they were not aligned with the standard and some already
+    existing drivers couldn't properly express their channel page and channel
+    range (notably SUN FSK and HRP UWB drivers). The capabilities were replaced
+    by the standard conforming new driver attribute
+    IEEE802154_ATTR_PHY_SUPPORTED_CHANNEL_PAGES that fits all in-tree drivers.
+  * The method get_subg_channel_count() was removed from ieee802154_radio_api.
+    This method could not properly express the channel range of existing drivers
+    (notably SUN FSK drivers that implement channel pages > 0 and may not have
+    zero-based channel ranges or UWB drivers that could not be represented at
+    all). The method was replaced by the new driver attribute
+    IEEE802154_ATTR_PHY_SUPPORTED_CHANNEL_RANGES that fits all in-tree drivers.
+
 * Interrupt Controller
 
   * GIC: Architecture version selection is now based on the device tree
@@ -227,6 +256,12 @@ Drivers and Sensors
 * Serial
 
   * Added support for Nuvoton NuMaker M46x
+
+  * NS16550: Reworked how device initialization macros.
+
+    * CONFIG_UART_NS16550_ACCESS_IOPORT and CONFIG_UART_NS16550_SIMULT_ACCESS
+      are removed. For UART using IO port access, add "io-mapped" property to
+      device tree node.
 
 * SPI
 
@@ -270,6 +305,7 @@ Networking
   * Added support for tickless mode. This removes the 500 ms timeout from the socket loop
     so the engine does not constantly wake up the CPU. This can be enabled by
     :kconfig:option:`CONFIG_LWM2M_TICKLESS`.
+  * Added new :c:macro:`LWM2M_RD_CLIENT_EVENT_DEREGISTER` event.
 
 * Wi-Fi
   * Added Passive scan support.
@@ -328,6 +364,9 @@ Libraries / Subsystems
   * Added :kconfig:option:`CONFIG_MCUMGR_GRP_IMG_ALLOW_ERASE_PENDING` that allows
     to erase slots pending for next boot, that are not revert slots.
 
+  * Added ``user_data`` as an optional field to :c:struct:`mgmt_handler` when
+    :kconfig:option:`CONFIG_MCUMGR_MGMT_HANDLER_USER_DATA` is enabled.
+
 * File systems
 
   * Added support for ext2 file system.
@@ -335,6 +374,14 @@ Libraries / Subsystems
   * Added alignment parameter to FS_LITTLEFS_DECLARE_CUSTOM_CONFIG macro, it can speed up read/write
     operation for SDMMC devices in case when we align buffers on CONFIG_SDHC_BUFFER_ALIGNMENT,
     because we can avoid extra copy of data from card bffer to read/prog buffer.
+
+* Retention
+
+  * Added the :ref:`blinfo_api` subsystem.
+
+* Binary descriptors
+
+  * Added the :ref:`binary_descriptors` (``bindesc``) subsystem.
 
 HALs
 ****
@@ -345,6 +392,16 @@ HALs
 
 MCUboot
 *******
+
+  * Added :kconfig:option:`CONFIG_MCUBOOT_BOOTLOADER_NO_DOWNGRADE`
+    that allows to inform application that the on-board MCUboot has been configured
+    with downgrade  prevention enabled. This option is automatically selected for
+    DirectXIP mode and is available for both swap modes.
+
+  * Added :kconfig:option:`CONFIG_MCUBOOT_BOOTLOADER_MODE_OVERWRITE_ONLY`
+    that allows to inform application that the on-board MCUboot will overwrite
+    the primary slot with secondary slot contents, without saving the original
+    image in primary slot.
 
 Storage
 *******

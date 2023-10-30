@@ -20,6 +20,7 @@
 
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/bluetooth/byteorder.h>
+#include <zephyr/bluetooth/hci_types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,7 +29,7 @@ extern "C" {
 /**
  *  @brief LC3 codec ID
  */
-#define BT_AUDIO_CODEC_LC3_ID 0x06
+#define BT_HCI_CODING_FORMAT_LC3 0x06
 
 /**
  * @brief Codec capability type id's
@@ -154,6 +155,13 @@ struct BT_AUDIO_CODEC_LC3_frame_len {
 	uint16_t max;
 };
 
+struct bt_audio_codec_octets_per_codec_frame {
+	/** Minimum number of octets supported per codec frame */
+	uint16_t min;
+	/** Maximum number of octets supported per codec frame */
+	uint16_t max;
+};
+
 /**
  * @brief Codec configuration type IDs
  *
@@ -165,73 +173,75 @@ struct BT_AUDIO_CODEC_LC3_frame_len {
 enum bt_audio_codec_config_type {
 
 	/** @brief LC3 Sample Frequency configuration type. */
-	BT_AUDIO_CODEC_CONFIG_LC3_FREQ                 = 0x01,
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ = 0x01,
 
 	/** @brief LC3 Frame Duration configuration type. */
-	BT_AUDIO_CODEC_CONFIG_LC3_DURATION             = 0x02,
+	BT_AUDIO_CODEC_CONFIG_LC3_DURATION = 0x02,
 
 	/** @brief LC3 channel Allocation configuration type. */
-	BT_AUDIO_CODEC_CONFIG_LC3_CHAN_ALLOC           = 0x03,
+	BT_AUDIO_CODEC_CONFIG_LC3_CHAN_ALLOC = 0x03,
 
 	/** @brief LC3 Frame Length configuration type. */
-	BT_AUDIO_CODEC_CONFIG_LC3_FRAME_LEN            = 0x04,
+	BT_AUDIO_CODEC_CONFIG_LC3_FRAME_LEN = 0x04,
 
 	/** @brief Codec frame blocks, per SDU configuration type. */
-	BT_AUDIO_CODEC_CONFIG_LC3_FRAME_BLKS_PER_SDU   = 0x05,
+	BT_AUDIO_CODEC_CONFIG_LC3_FRAME_BLKS_PER_SDU = 0x05,
 };
 
-/**
- *  @brief 8 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_8KHZ    0x01
-/**
- *  @brief 11.025 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_11KHZ   0x02
-/**
- *  @brief 16 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_16KHZ   0x03
-/**
- *  @brief 22.05 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_22KHZ   0x04
-/**
- *  @brief 24 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_24KHZ   0x05
-/**
- *  @brief 32 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_32KHZ   0x06
-/**
- *  @brief 44.1 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_44KHZ   0x07
-/**
- *  @brief 48 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_48KHZ   0x08
-/**
- *  @brief 88.2 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_88KHZ   0x09
-/**
- *  @brief 96 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_96KHZ   0x0a
-/**
- *  @brief 176.4 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_176KHZ   0x0b
-/**
- *  @brief 192 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_192KHZ   0x0c
-/**
- *  @brief 384 Khz codec Sample Frequency configuration
- */
-#define BT_AUDIO_CODEC_CONFIG_LC3_FREQ_384KHZ   0x0d
+enum bt_audio_codec_config_freq {
+	/**
+	 *  @brief 8 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_8KHZ = 0x01,
+	/**
+	 *  @brief 11.025 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_11KHZ = 0x02,
+	/**
+	 *  @brief 16 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_16KHZ = 0x03,
+	/**
+	 *  @brief 22.05 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_22KHZ = 0x04,
+	/**
+	 *  @brief 24 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_24KHZ = 0x05,
+	/**
+	 *  @brief 32 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_32KHZ = 0x06,
+	/**
+	 *  @brief 44.1 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_44KHZ = 0x07,
+	/**
+	 *  @brief 48 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_48KHZ = 0x08,
+	/**
+	 *  @brief 88.2 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_88KHZ = 0x09,
+	/**
+	 *  @brief 96 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_96KHZ = 0x0a,
+	/**
+	 *  @brief 176.4 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_176KHZ = 0x0b,
+	/**
+	 *  @brief 192 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_192KHZ = 0x0c,
+	/**
+	 *  @brief 384 Khz codec Sample Frequency configuration
+	 */
+	BT_AUDIO_CODEC_CONFIG_LC3_FREQ_384KHZ = 0x0d,
+};
 
 /**
  *  @brief LC3 7.5 msec Frame Duration configuration
@@ -241,7 +251,6 @@ enum bt_audio_codec_config_type {
  *  @brief LC3 10 msec Frame Duration configuration
  */
 #define BT_AUDIO_CODEC_CONFIG_LC3_DURATION_10  0x01
-
 
 /**
  *  @brief Helper to declare LC3 codec capability
@@ -292,7 +301,7 @@ enum bt_audio_codec_config_type {
  */
 #define BT_AUDIO_CODEC_CAP_LC3(_freq, _duration, _chan_count, _len_min, _len_max,                  \
 			       _max_frames_per_sdu, _prefer_context)                               \
-	BT_AUDIO_CODEC_CAP(BT_AUDIO_CODEC_LC3_ID, 0x0000, 0x0000,                                  \
+	BT_AUDIO_CODEC_CAP(BT_HCI_CODING_FORMAT_LC3, 0x0000, 0x0000,                               \
 			   BT_AUDIO_CODEC_CAP_LC3_DATA(_freq, _duration, _chan_count, _len_min,    \
 						       _len_max, _max_frames_per_sdu),             \
 			   BT_AUDIO_CODEC_CAP_LC3_META(_prefer_context))
@@ -341,7 +350,7 @@ enum bt_audio_codec_config_type {
  */
 #define BT_AUDIO_CODEC_LC3_CONFIG(_freq, _duration, _loc, _len, _frames_per_sdu, _stream_context)  \
 	BT_AUDIO_CODEC_CFG(                                                                        \
-		BT_AUDIO_CODEC_LC3_ID, 0x0000, 0x0000,                                             \
+		BT_HCI_CODING_FORMAT_LC3, 0x0000, 0x0000,                                          \
 		BT_AUDIO_CODEC_CFG_LC3_DATA(_freq, _duration, _loc, _len, _frames_per_sdu),        \
 		BT_AUDIO_CODEC_CFG_LC3_META(_stream_context))
 

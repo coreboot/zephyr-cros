@@ -9,9 +9,11 @@ ram: 2048
 supported:
   - gpio
   - smbus
+  - smp
   - rtc
   - watchdog
 testing:
   ignore_tags:
     - net
     - bluetooth
+vendor: intel

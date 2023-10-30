@@ -178,13 +178,7 @@ static void nrf5_rx_thread(void *arg1, void *arg2, void *arg3)
 		net_pkt_set_ieee802154_ack_fpb(pkt, rx_frame->ack_fpb);
 
 #if defined(CONFIG_NET_PKT_TIMESTAMP)
-		struct net_ptp_time timestamp = {
-			.second = rx_frame->time / USEC_PER_SEC,
-			.nanosecond =
-				(rx_frame->time % USEC_PER_SEC) * NSEC_PER_USEC
-		};
-
-		net_pkt_set_timestamp(pkt, &timestamp);
+		net_pkt_set_timestamp_ns(pkt, rx_frame->time * NSEC_PER_USEC);
 #endif
 
 		LOG_DBG("Caught a packet (%u) (LQI: %u)",
@@ -223,7 +217,6 @@ static void nrf5_get_capabilities_at_boot(void)
 		IEEE802154_HW_PROMISC |
 		IEEE802154_HW_FILTER |
 		((caps & NRF_802154_CAPABILITY_CSMA) ? IEEE802154_HW_CSMA : 0UL) |
-		IEEE802154_HW_2_4_GHZ |
 		IEEE802154_HW_TX_RX_ACK |
 		IEEE802154_HW_RX_TX_ACK |
 		IEEE802154_HW_ENERGY_SCAN |
@@ -270,7 +263,7 @@ static int nrf5_set_channel(const struct device *dev, uint16_t channel)
 	LOG_DBG("%u", channel);
 
 	if (channel < 11 || channel > 26) {
-		return -EINVAL;
+		return channel < 11 ? -ENOTSUP : -EINVAL;
 	}
 
 	nrf_802154_channel_set(channel);
@@ -408,12 +401,7 @@ static int handle_ack(struct nrf5_802154_data *nrf5_radio)
 	net_pkt_set_ieee802154_rssi_dbm(ack_pkt, nrf5_radio->ack_frame.rssi);
 
 #if defined(CONFIG_NET_PKT_TIMESTAMP)
-	struct net_ptp_time timestamp = {
-		.second = nrf5_radio->ack_frame.time / USEC_PER_SEC,
-		.nanosecond = (nrf5_radio->ack_frame.time % USEC_PER_SEC) * NSEC_PER_USEC
-	};
-
-	net_pkt_set_timestamp(ack_pkt, &timestamp);
+	net_pkt_set_timestamp_ns(ack_pkt, nrf5_radio->ack_frame.time * NSEC_PER_USEC);
 #endif
 
 	net_pkt_cursor_init(ack_pkt);
@@ -532,7 +520,7 @@ static bool nrf5_tx_at(struct nrf5_802154_data *nrf5_radio, struct net_pkt *pkt,
 	 * expects a timestamp pointing to start of SHR.
 	 */
 	uint64_t tx_at = nrf_802154_timestamp_phr_to_shr_convert(
-		net_ptp_time_to_ns(net_pkt_timestamp(pkt)) / NSEC_PER_USEC);
+		net_pkt_timestamp_ns(pkt) / NSEC_PER_USEC);
 
 	return nrf_802154_transmit_raw_at(payload, tx_at, &metadata);
 }
@@ -954,12 +942,20 @@ static int nrf5_configure(const struct device *dev,
 	return 0;
 }
 
+/* driver-allocated attribute memory - constant across all driver instances */
+IEEE802154_DEFINE_PHY_SUPPORTED_CHANNELS(drv_attr, 11, 26);
+
 static int nrf5_attr_get(const struct device *dev,
 			 enum ieee802154_attr attr,
 			 struct ieee802154_attr_value *value)
 {
 	ARG_UNUSED(dev);
-	ARG_UNUSED(value);
+
+	if (ieee802154_attr_get_channel_page_and_range(
+		    attr, IEEE802154_ATTR_PHY_CHANNEL_PAGE_ZERO_OQPSK_2450_BPSK_868_915,
+		    &drv_attr.phy_supported_channels, value) == 0) {
+		return 0;
+	}
 
 	switch ((uint32_t)attr) {
 #if defined(CONFIG_IEEE802154_NRF5_MULTIPLE_CCA)

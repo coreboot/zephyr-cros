@@ -214,7 +214,7 @@ class ZephyrDomain(Domain):
     label = "Zephyr Project"
 
     roles = {
-        "code-sample": XRefRole(innernodeclass=nodes.inline),
+        "code-sample": XRefRole(innernodeclass=nodes.inline, warn_dangling=True),
     }
 
     directives = {"code-sample": CodeSampleDirective}
@@ -267,7 +267,7 @@ class ZephyrDomain(Domain):
                     code_sample_info["docname"],
                     code_sample_info["id"],
                     contnode,
-                    code_sample_info["description"],
+                    code_sample_info["description"].astext(),
                 )
 
     def add_code_sample(self, code_sample):

@@ -34,7 +34,7 @@ static void mock_destroy_rule_after(const struct ztest_unit_test *test, void *fi
 ZTEST_RULE(mock_rule, mock_init_rule_before, mock_destroy_rule_after);
 
 struct bap_broadcast_source_test_suite_fixture {
-	struct bt_bap_broadcast_source_create_param *create_param;
+	struct bt_bap_broadcast_source_param *param;
 	size_t stream_cnt;
 	struct bt_bap_broadcast_source *source;
 };
@@ -59,7 +59,7 @@ static void bap_broadcast_source_test_suite_fixture_init(
 	zassert_true(streams_per_subgroup > 0U);
 
 	/* Allocate memory for everything */
-	fixture->create_param = malloc(sizeof(struct bt_bap_broadcast_source_create_param));
+	fixture->param = malloc(sizeof(struct bt_bap_broadcast_source_param));
 	subgroup_param = malloc(sizeof(struct bt_bap_broadcast_source_subgroup_param) *
 				CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT);
 	zassert_not_null(subgroup_param);
@@ -74,7 +74,7 @@ static void bap_broadcast_source_test_suite_fixture_init(
 	zassert_not_null(streams);
 
 	/* Memset everything to 0 */
-	memset(fixture->create_param, 0, sizeof(*fixture->create_param));
+	memset(fixture->param, 0, sizeof(*fixture->param));
 	memset(subgroup_param, 0,
 	       sizeof(struct bt_bap_broadcast_source_subgroup_param) *
 		       CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT);
@@ -102,15 +102,14 @@ static void bap_broadcast_source_test_suite_fixture_init(
 		bt_bap_stream_cb_register(stream_params[i].stream, &mock_bap_stream_ops);
 	}
 
-	fixture->create_param->params_count = CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT;
-	fixture->create_param->params = subgroup_param;
-	fixture->create_param->qos = codec_qos;
-	fixture->create_param->encryption = false;
-	memset(fixture->create_param->broadcast_code, 0,
-	       sizeof(fixture->create_param->broadcast_code));
-	fixture->create_param->packing = BT_ISO_PACKING_SEQUENTIAL;
+	fixture->param->params_count = CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT;
+	fixture->param->params = subgroup_param;
+	fixture->param->qos = codec_qos;
+	fixture->param->encryption = false;
+	memset(fixture->param->broadcast_code, 0, sizeof(fixture->param->broadcast_code));
+	fixture->param->packing = BT_ISO_PACKING_SEQUENTIAL;
 
-	fixture->stream_cnt = fixture->create_param->params_count * streams_per_subgroup;
+	fixture->stream_cnt = fixture->param->params_count * streams_per_subgroup;
 }
 
 static void *bap_broadcast_source_test_suite_setup(void)
@@ -143,12 +142,12 @@ static void bap_broadcast_source_test_suite_after(void *f)
 		fixture->source = NULL;
 	}
 
-	free(fixture->create_param->params[0].params[0].stream);
-	free(fixture->create_param->params[0].params);
-	free(fixture->create_param->params[0].codec_cfg);
-	free(fixture->create_param->params);
-	free(fixture->create_param->qos);
-	free(fixture->create_param);
+	free(fixture->param->params[0].params[0].stream);
+	free(fixture->param->params[0].params);
+	free(fixture->param->params[0].codec_cfg);
+	free(fixture->param->params);
+	free(fixture->param->qos);
+	free(fixture->param);
 }
 
 static void bap_broadcast_source_test_suite_teardown(void *f)
@@ -162,7 +161,8 @@ ZTEST_SUITE(bap_broadcast_source_test_suite, NULL, bap_broadcast_source_test_sui
 
 ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_delete)
 {
-	struct bt_bap_broadcast_source_create_param *create_param = fixture->create_param;
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_stream *stream = create_param->params[0].params[0].stream;
 	int err;
 
 	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
@@ -171,6 +171,10 @@ ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_delete)
 	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
 	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
 
+	zassert_equal(create_param->qos->sdu, stream->qos->sdu, "Unexpected stream SDU");
+	zassert_equal(create_param->qos->rtn, stream->qos->rtn, "Unexpected stream RTN");
+	zassert_equal(create_param->qos->phy, stream->qos->phy, "Unexpected stream PHY");
+
 	err = bt_bap_broadcast_source_delete(fixture->source);
 	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
 	fixture->source = NULL;
@@ -178,7 +182,7 @@ ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_delete)
 
 ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_start_send_stop_delete)
 {
-	struct bt_bap_broadcast_source_create_param *create_param = fixture->create_param;
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
 	struct bt_le_ext_adv ext_adv = {0};
 	int err;
 
@@ -218,4 +222,787 @@ ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_start_send
 	err = bt_bap_broadcast_source_delete(fixture->source);
 	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
 	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_param_null)
+{
+	int err;
+
+	err = bt_bap_broadcast_source_create(NULL, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with null params");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_source_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	int err;
+
+	err = bt_bap_broadcast_source_create(create_param, NULL);
+	zassert_not_equal(0, err, "Did not fail with null source");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_subgroup_params_count_0)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	int err;
+
+	create_param->params_count = 0U;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with params_count %u", create_param->params_count);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_count_above_max)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	int err;
+
+	create_param->params_count = CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT + 1;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with params_count %u", create_param->params_count);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_subgroup_params_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	int err;
+
+	create_param->params = NULL;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	/* Restore the params for the cleanup after function */
+	create_param->params = subgroup_params;
+	zassert_not_equal(0, err, "Did not fail with NULL subgroup params");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_qos_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_audio_codec_qos *qos = create_param->qos;
+	int err;
+
+	create_param->qos = NULL;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	/* Restore the params for the cleanup after function */
+	create_param->qos = qos;
+	zassert_not_equal(0, err, "Did not fail with NULL qos");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_packing)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	int err;
+
+	create_param->packing = 0x02;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with packing %u", create_param->packing);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_params_count_0)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	int err;
+
+	subgroup_params->params_count = 0U;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with %u stream params",
+			  subgroup_params->params_count);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_params_count_above_max)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	int err;
+
+	subgroup_params->params_count = CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT + 1;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with %u stream params",
+			  subgroup_params->params_count);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_stream_params_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	int err;
+
+	subgroup_params->params = NULL;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	/* Restore the params for the cleanup after function */
+	subgroup_params->params = stream_params;
+	zassert_not_equal(0, err, "Did not fail with NULL stream params");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_codec_cfg_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	subgroup_params->codec_cfg = NULL;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	/* Restore the params for the cleanup after function */
+	subgroup_params->codec_cfg = codec_cfg;
+	zassert_not_equal(0, err, "Did not fail with NULL codec_cfg");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_codec_cfg_data_len)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	codec_cfg->data_len = CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE + 1;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->data_len %zu", codec_cfg->data_len);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_codec_cfg_meta_len)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	codec_cfg->meta_len = CONFIG_BT_AUDIO_CODEC_CFG_MAX_METADATA_SIZE + 1;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->meta_len %zu", codec_cfg->meta_len);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_codec_cfg_cid)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	codec_cfg->id = BT_HCI_CODING_FORMAT_LC3;
+	codec_cfg->cid = 0x01; /* Shall be 0 if id == 0x06 (LC3)*/
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->cid %u", codec_cfg->cid);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_subgroup_params_codec_cfg_vid)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	codec_cfg->id = BT_HCI_CODING_FORMAT_LC3;
+	codec_cfg->vid = 0x01; /* Shall be 0 if id == 0x06 (LC3)*/
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->vid %u", codec_cfg->vid);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_create_inval_stream_params_stream_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	struct bt_bap_stream *stream = stream_params->stream;
+	int err;
+
+	stream_params->stream = NULL;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	/* Restore the params for the cleanup after function */
+	stream_params->stream = stream;
+	zassert_not_equal(0, err, "Did not fail with NULL stream_params->stream");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_stream_params_data_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	uint8_t *data = stream_params->data;
+	int err;
+
+	stream_params->data = NULL;
+	stream_params->data_len = 1;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	/* Restore the params for the cleanup after function */
+	stream_params->data = data;
+	zassert_not_equal(
+		0, err,
+		"Did not fail with NULL stream_params->data and stream_params_>data_len %zu",
+		stream_params->data_len);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_create_inval_stream_params_data_len)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &create_param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	int err;
+
+	stream_params->data_len = CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE + 1;
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_not_equal(0, err, "Did not fail with stream_params_>data_len %zu",
+			  stream_params->data_len);
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_start_inval_source_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_le_ext_adv ext_adv = {0};
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       create_param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	err = bt_bap_broadcast_source_start(NULL, &ext_adv);
+	zassert_not_equal(0, err, "Did not fail with null source");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_start_inval_ext_adv_null)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       create_param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	err = bt_bap_broadcast_source_start(fixture->source, NULL);
+	zassert_not_equal(0, err, "Did not fail with null ext_adv");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_start_inval_double_start)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_le_ext_adv ext_adv = {0};
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       create_param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	err = bt_bap_broadcast_source_start(fixture->source, &ext_adv);
+	zassert_equal(0, err, "Unable to start broadcast source: err %d", err);
+
+	err = bt_bap_broadcast_source_start(fixture->source, &ext_adv);
+	zassert_not_equal(0, err, "Did not fail with starting already started source");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_reconfigure)
+{
+	struct bt_bap_broadcast_source_param *reconf_param = fixture->param;
+	struct bt_bap_stream *stream = reconf_param->params[0].params[0].stream;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       reconf_param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(reconf_param, &fixture->source);
+
+	zassert_equal(reconf_param->qos->sdu, stream->qos->sdu, "Unexpected stream SDU");
+	zassert_equal(reconf_param->qos->rtn, stream->qos->rtn, "Unexpected stream RTN");
+	zassert_equal(reconf_param->qos->phy, stream->qos->phy, "Unexpected stream PHY");
+
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+	reconf_param->qos->sdu = 100U;
+	reconf_param->qos->rtn = 3U;
+	reconf_param->qos->phy = 1U;
+
+	err = bt_bap_broadcast_source_reconfig(fixture->source, reconf_param);
+	zassert_equal(0, err, "Unable to reconfigure broadcast source: err %d", err);
+
+	zassert_equal(reconf_param->qos->sdu, stream->qos->sdu, "Unexpected stream SDU");
+	zassert_equal(reconf_param->qos->rtn, stream->qos->rtn, "Unexpected stream RTN");
+	zassert_equal(reconf_param->qos->phy, stream->qos->phy, "Unexpected stream PHY");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_reconfigure_inval_param_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	err = bt_bap_broadcast_source_reconfig(fixture->source, NULL);
+	zassert_not_equal(0, err, "Did not fail with null params");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_reconfigure_inval_source_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	err = bt_bap_broadcast_source_reconfig(NULL, param);
+	zassert_not_equal(0, err, "Did not fail with null source");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_count_0)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	param->params_count = 0U;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with params_count %u", param->params_count);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_count_above_max)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	param->params_count = CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT + 1;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with params_count %u", param->params_count);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	param->params = NULL;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	/* Restore the params for the cleanup after function */
+	param->params = subgroup_params;
+	zassert_not_equal(0, err, "Did not fail with NULL subgroup params");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_reconfigure_inval_qos_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_audio_codec_qos *qos = param->qos;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	param->qos = NULL;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	/* Restore the params for the cleanup after function */
+	param->qos = qos;
+	zassert_not_equal(0, err, "Did not fail with NULL qos");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_reconfigure_inval_packing)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	param->packing = 0x02;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with packing %u", param->packing);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_params_count_0)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	subgroup_params->params_count = 0U;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with %u stream params",
+			  subgroup_params->params_count);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_params_count_above_max)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	subgroup_params->params_count = CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT + 1;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with %u stream params",
+			  subgroup_params->params_count);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_stream_params_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	subgroup_params->params = NULL;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	/* Restore the params for the cleanup after function */
+	subgroup_params->params = stream_params;
+	zassert_not_equal(0, err, "Did not fail with NULL stream params");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_codec_cfg_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	subgroup_params->codec_cfg = NULL;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	/* Restore the params for the cleanup after function */
+	subgroup_params->codec_cfg = codec_cfg;
+	zassert_not_equal(0, err, "Did not fail with NULL codec_cfg");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_codec_cfg_data_len)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	codec_cfg->data_len = CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE + 1;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->data_len %zu", codec_cfg->data_len);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_codec_cfg_meta_len)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	codec_cfg->meta_len = CONFIG_BT_AUDIO_CODEC_CFG_MAX_METADATA_SIZE + 1;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->meta_len %zu", codec_cfg->meta_len);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_codec_cfg_cid)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	codec_cfg->id = 0x06;
+	codec_cfg->cid = 0x01; /* Shall be 0 if id == 0x06 (LC3)*/
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->cid %u", codec_cfg->cid);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_subgroup_params_codec_cfg_vid)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_audio_codec_cfg *codec_cfg = subgroup_params->codec_cfg;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	codec_cfg->id = 0x06;
+	codec_cfg->vid = 0x01; /* Shall be 0 if id == 0x06 (LC3)*/
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with codec_cfg->vid %u", codec_cfg->vid);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_stream_params_stream_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	struct bt_bap_stream *stream = stream_params->stream;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	stream_params->stream = NULL;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	/* Restore the params for the cleanup after function */
+	stream_params->stream = stream;
+	zassert_not_equal(0, err, "Did not fail with NULL stream_params->stream");
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_stream_params_data_null)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	uint8_t *data = stream_params->data;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	stream_params->data = NULL;
+	stream_params->data_len = 1;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	/* Restore the params for the cleanup after function */
+	stream_params->data = data;
+	zassert_not_equal(
+		0, err,
+		"Did not fail with NULL stream_params->data and stream_params_>data_len %zu",
+		stream_params->data_len);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite,
+	test_broadcast_source_reconfigure_inval_stream_params_data_len)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source_subgroup_param *subgroup_params = &param->params[0];
+	struct bt_bap_broadcast_source_stream_param *stream_params = &subgroup_params->params[0];
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	stream_params->data_len = CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE + 1;
+	err = bt_bap_broadcast_source_reconfig(fixture->source, param);
+	zassert_not_equal(0, err, "Did not fail with stream_params_>data_len %zu",
+			  stream_params->data_len);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_reconfigure_inval_state)
+{
+	struct bt_bap_broadcast_source_param *param = fixture->param;
+	struct bt_bap_broadcast_source *source;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+	source = fixture->source;
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to delete broadcast source: err %d", err);
+	fixture->source = NULL;
+
+	err = bt_bap_broadcast_source_reconfig(source, param);
+	zassert_not_equal(0, err, "Did not fail with deleted broadcast source");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_delete_inval_source_null)
+{
+	int err;
+
+	err = bt_bap_broadcast_source_delete(NULL);
+	zassert_not_equal(0, err, "Did not fail with null source");
+}
+
+ZTEST_F(bap_broadcast_source_test_suite, test_broadcast_source_delete_inval_double_start)
+{
+	struct bt_bap_broadcast_source_param *create_param = fixture->param;
+	struct bt_bap_broadcast_source *source;
+	int err;
+
+	printk("Creating broadcast source with %zu subgroups with %zu streams\n",
+	       create_param->params_count, fixture->stream_cnt);
+
+	err = bt_bap_broadcast_source_create(create_param, &fixture->source);
+	zassert_equal(0, err, "Unable to create broadcast source: err %d", err);
+
+	err = bt_bap_broadcast_source_delete(fixture->source);
+	zassert_equal(0, err, "Unable to start broadcast source: err %d", err);
+
+	source = fixture->source;
+	/* Set to NULL to avoid deleting it in bap_broadcast_source_test_suite_after */
+	fixture->source = NULL;
+
+	err = bt_bap_broadcast_source_delete(source);
+	zassert_not_equal(0, err, "Did not fail with deleting already deleting source");
 }

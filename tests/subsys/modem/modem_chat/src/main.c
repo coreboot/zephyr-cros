@@ -194,6 +194,34 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(
 MODEM_CHAT_SCRIPT_DEFINE(script_partial, script_partial_cmds, abort_matches, on_script_result, 4);
 
 /*************************************************************************************************/
+/*                           Small echo script and mock transactions                             */
+/*************************************************************************************************/
+static const uint8_t at_echo_data[] = {'A', 'T', '\r', '\n'};
+static const struct modem_backend_mock_transaction at_echo_transaction = {
+	.get = at_echo_data,
+	.get_size = sizeof(at_echo_data),
+	.put = at_echo_data,
+	.put_size = sizeof(at_echo_data),
+};
+
+static const uint8_t at_echo_error_data[] = {'E', 'R', 'R', 'O', 'R', ' ', '1', '\r', '\n'};
+static const struct modem_backend_mock_transaction at_echo_error_transaction = {
+	.get = at_echo_data,
+	.get_size = sizeof(at_echo_data),
+	.put = at_echo_error_data,
+	.put_size = sizeof(at_echo_error_data),
+};
+
+MODEM_CHAT_MATCH_DEFINE(at_match, "AT", "", NULL);
+
+MODEM_CHAT_SCRIPT_CMDS_DEFINE(
+	script_echo_cmds,
+	MODEM_CHAT_SCRIPT_CMD_RESP("AT", at_match),
+);
+
+MODEM_CHAT_SCRIPT_DEFINE(script_echo, script_echo_cmds, abort_matches, on_script_result, 4);
+
+/*************************************************************************************************/
 /*                                      Script responses                                         */
 /*************************************************************************************************/
 static const char at_response[] = "AT\r\n";
@@ -517,6 +545,70 @@ ZTEST(modem_chat, test_script_with_partial_matches)
 	/* Assert no data was sent except the request */
 	zassert_equal(modem_backend_mock_get(&mock, buffer, ARRAY_SIZE(buffer)), 0,
 		      "Script sent too many requests");
+}
+
+ZTEST(modem_chat, test_script_run_sync_complete)
+{
+	modem_backend_mock_prime(&mock, &at_echo_transaction);
+	zassert_ok(modem_chat_run_script(&cmd, &script_echo), "Failed to run echo script");
+}
+
+ZTEST(modem_chat, test_script_run_sync_timeout)
+{
+	zassert_equal(modem_chat_run_script(&cmd, &script_echo), -EAGAIN,
+		      "Failed to run echo script");
+}
+
+ZTEST(modem_chat, test_script_run_sync_abort)
+{
+	modem_backend_mock_prime(&mock, &at_echo_error_transaction);
+	zassert_equal(modem_chat_run_script(&cmd, &script_echo), -EAGAIN,
+		      "Echo script should time out and return -EAGAIN");
+}
+
+ZTEST(modem_chat, test_script_run_dynamic_script_sync)
+{
+	char match[] = "AT";
+	char separators[] = ",";
+	char request[] = "AT";
+	char name[] = "Dynamic";
+
+	struct modem_chat_match stack_response_match = {
+		.match = NULL,
+		.match_size = 0,
+		.separators = NULL,
+		.separators_size = 0,
+		.wildcards = false,
+		.partial = false,
+		.callback = NULL,
+	};
+
+	struct modem_chat_script_chat stack_script_chat = {
+		.request = NULL,
+		.response_matches = &stack_response_match,
+		.response_matches_size = 1,
+		.timeout = 0,
+	};
+
+	struct modem_chat_script stack_script = {
+		.name = name,
+		.script_chats = &stack_script_chat,
+		.script_chats_size = 1,
+		.abort_matches = NULL,
+		.abort_matches_size = 0,
+		.callback = NULL,
+		.timeout = 1,
+	};
+
+	stack_response_match.match = match;
+	stack_response_match.match_size = strlen(match);
+	stack_response_match.separators = separators;
+	stack_response_match.separators_size = strlen(match);
+	stack_script_chat.request = request;
+	stack_script_chat.request_size = strlen(request);
+
+	modem_backend_mock_prime(&mock, &at_echo_transaction);
+	zassert_ok(modem_chat_run_script(&cmd, &stack_script), "Failed to run script");
 }
 
 /*************************************************************************************************/

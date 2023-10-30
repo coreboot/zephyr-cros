@@ -329,7 +329,7 @@ The following peripherals are currently provided with this board:
   be created if needed. The IP address configuration can be specified for each
   network interface instance.
   See :kconfig:option:`CONFIG_ETH_NATIVE_POSIX_SETUP_SCRIPT` option for more details.
-  The :ref:`eth-native-posix-sample` sample app provides
+  The :zephyr:code-sample:`eth-native-posix` sample app provides
   some use examples and more information about this driver configuration.
 
   Note that this device can only be used with Linux hosts, and that the user
@@ -466,7 +466,7 @@ Interaction with serial ports can be configured in several different ways:
 
 Multiple instances of such uart drivers are supported.
 
-The :ref:`sample-uart-native-tty` sample app provides a working example of the
+The :zephyr:code-sample:`uart-native-tty` sample app provides a working example of the
 driver.
 
 This driver only supports poll mode. Interrupt and async mode are not supported.

@@ -114,8 +114,8 @@ Push buttons
 Logging
 -------
 
-Logging is done using the USB-CDC port. See the :ref:`logger_sample`
-or the :ref:`cdc-acm-console` sample applications to see how this works.
+Logging is done using the USB-CDC port. See the :zephyr:code-sample:`logging` sample
+or the :zephyr:code-sample:`usb-cdc-acm-console` sample applications to see how this works.
 
 Testing LEDs and buttons on the Adafruit ItsyBitsy nRF52840 Express
 *******************************************************************
@@ -123,7 +123,7 @@ The :zephyr:code-sample:`button` sample lets you test the buttons (switches) and
 The :zephyr:code-sample:`blinky` sample lets you test the red LED.
 
 The DotStar LED has been implemented as a SPI device and can be tested
-with the :ref:`led_apa102_sample` sample application.
+with the :zephyr:code-sample:`led-apa102` sample application.
 
 You can build and flash the examples to make sure Zephyr is running correctly on
 your board. The button and LED definitions can be found in

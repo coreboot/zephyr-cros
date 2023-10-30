@@ -6,9 +6,11 @@ toolchain:
   - zephyr
 ram: 2048
 supported:
+  - smp
   - watchdog
 testing:
   timeout_multiplier: 4
   ignore_tags:
     - net
     - bluetooth
+vendor: intel

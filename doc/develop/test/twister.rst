@@ -195,6 +195,14 @@ testing:
   only_tags:
     Only execute tests with this list of tags on a specific platform.
 
+  .. _twister_board_timeout_multiplier:
+
+  timeout_multiplier: <float> (default 1)
+    Multiply each test case timeout by specified ratio. This option allows to tune timeouts only
+    for required platform. It can be useful in case naturally slow platform I.e.: HW board with
+    power-efficient but slow CPU or simulation platform which can perform instruction accurate
+    simulation but does it slowly.
+
 Test Cases
 **********
 
@@ -359,6 +367,8 @@ min_flash: <integer>
     minimum amount of ROM in KB needed for this test to build and run. This is
     compared with information provided by the board metadata.
 
+.. _twister_test_case_timeout:
+
 timeout: <number of seconds>
     Length of time to run test before automatically killing it.
     Default to 60 seconds.
@@ -492,10 +502,11 @@ harness_config: <harness configuration options>
         Only one fixture can be defined per testcase and the fixture name has to
         be unique across all tests in the test suite.
 
-    pytest_root: <pytest directory> (default pytest)
-        Specify a pytest directory which need to execute when test case begin to running,
-        default pytest directory name is pytest, after pytest finished, twister will
-        check if this case pass or fail according the pytest report.
+    pytest_root: <list of pytest testpaths> (default pytest)
+        Specify a list of pytest directories, files or subtests that need to be executed
+        when test case begin to running, default pytest directory is pytest.
+        After pytest finished, twister will check if this case pass or fail according
+        to the pytest report.
 
     pytest_args: <list of arguments> (default empty)
         Specify a list of additional arguments to pass to ``pytest``.
@@ -526,15 +537,24 @@ harness_config: <harness configuration options>
 
     The following is an example yaml file with pytest harness_config options,
     default pytest_root name "pytest" will be used if pytest_root not specified.
-    please refer the example in samples/subsys/testsuite/pytest/.
+    please refer the examples in samples/subsys/testsuite/pytest/.
 
     ::
 
+        common:
+          harness: pytest
         tests:
-          pytest.example:
-            harness: pytest
+          pytest.example.directories:
             harness_config:
-              pytest_root: [pytest directory name]
+              pytest_root:
+                - pytest_dir1
+                - $ENV_VAR/samples/test/pytest_dir2
+          pytest.example.files_and_subtests:
+            harness_config:
+              pytest_root:
+                - pytest/test_file_1.py
+                - test_file_2.py::test_A
+                - test_file_2.py::test_B[param_a]
 
     The following is an example yaml file with robot harness_config options.
 
@@ -649,6 +669,22 @@ To load arguments from a file, write '+' before the file name, e.g.,
 line break instead of white spaces.
 
 Most everyday users will run with no arguments.
+
+Managing tests timeouts
+***********************
+
+There are several parameters which control tests timeouts on various levels:
+
+* ``timeout`` option in each test case. See :ref:`here <twister_test_case_timeout>` for more
+  details.
+* ``timeout_multiplier`` option in board configuration. See
+  :ref:`here <twister_board_timeout_multiplier>` for more details.
+* ``--timeout-multiplier`` twister option which can be used to adjust timeouts in exact twister run.
+  It can be useful in case of simulation platform as simulation time may depend on the host
+  speed & load or we may select different simulation method (i.e. cycle accurate but slower
+  one), etc...
+
+Overall test case timeout is a multiplication of these three parameters.
 
 Running in Integration Mode
 ***************************

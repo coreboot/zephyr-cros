@@ -143,7 +143,7 @@
 #define REGION_RAM_ATTR							\
 	{								\
 		/* AP, XN, SH */					\
-		.rbar = NOT_EXEC | P_RW_U_NA_Msk | INNER_SHAREABLE_Msk, \
+		.rbar = NOT_EXEC | P_RW_U_NA_Msk | OUTER_SHAREABLE_Msk, \
 		/* Cache-ability */					\
 		.mair_idx = MPU_MAIR_INDEX_SRAM,			\
 	}
@@ -256,7 +256,8 @@ struct dynamic_region_info {
 #define ARM64_MPU_MAX_DYNAMIC_REGIONS						\
 	1 + /* data section */							\
 	(CONFIG_MAX_DOMAIN_PARTITIONS + 2) +					\
-	2   /* user stack */
+	(IS_ENABLED(CONFIG_ARM64_STACK_PROTECTION) ? 2 : 0) +			\
+	(IS_ENABLED(CONFIG_USERSPACE) ? 2 : 0)
 
 #endif	/* _ASMLANGUAGE */
 
