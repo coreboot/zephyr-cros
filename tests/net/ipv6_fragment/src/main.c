@@ -16,7 +16,7 @@ LOG_MODULE_REGISTER(net_test, CONFIG_NET_IPV6_LOG_LEVEL);
 #include <errno.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/linker/sections.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 
 #include <zephyr/ztest.h>
 
@@ -2281,8 +2281,6 @@ static int handle_ipv6_echo_reply(struct net_icmp_ctx *ctx,
 		expected_data++;
 		i++;
 	}
-
-	net_pkt_unref(pkt);
 
 	k_sem_give(&wait_data);
 

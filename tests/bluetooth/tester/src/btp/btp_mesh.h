@@ -30,15 +30,12 @@ struct btp_mesh_read_supported_commands_rp {
 
 #define BTP_MESH_CONFIG_PROVISIONING		0x02
 
-#if IS_ENABLED(CONFIG_BT_MESH_ECDH_P256_HMAC_SHA256_AES_CCM)
-#define BTP_MESH_PROV_AUTH_MAX_LEN   32
-#else
-#define BTP_MESH_PROV_AUTH_MAX_LEN   16
-#endif
+#define BTP_MESH_PROV_AUTH_MAX_LEN 32
 
 struct btp_mesh_config_provisioning_cmd {
 	uint8_t uuid[16];
 	uint8_t static_auth[BTP_MESH_PROV_AUTH_MAX_LEN];
+	uint8_t static_auth_size;
 	uint8_t out_size;
 	uint16_t out_actions;
 	uint8_t in_size;
@@ -48,6 +45,7 @@ struct btp_mesh_config_provisioning_cmd {
 struct btp_mesh_config_provisioning_cmd_v2 {
 	uint8_t uuid[16];
 	uint8_t static_auth[BTP_MESH_PROV_AUTH_MAX_LEN];
+	uint8_t static_auth_size;
 	uint8_t out_size;
 	uint16_t out_actions;
 	uint8_t in_size;
@@ -79,6 +77,10 @@ struct btp_mesh_provision_node_cmd_v2 {
 } __packed;
 
 #define BTP_MESH_INIT				0x04
+struct btp_mesh_init_cmd {
+	uint8_t comp;
+} __packed;
+
 #define BTP_MESH_RESET				0x05
 #define BTP_MESH_INPUT_NUMBER			0x06
 struct btp_mesh_input_number_cmd {
@@ -847,8 +849,6 @@ struct btp_mesh_opcodes_aggregator_init_cmd {
 
 #define BTP_MESH_COMP_CHANGE_PREPARE		0x57
 
-#define BTP_MESH_SET_COMP_ALT			0x58
-
 #define BTP_MESH_RPR_SCAN_START			0x59
 struct btp_rpr_scan_start_cmd {
 	uint16_t dst;
@@ -1037,6 +1037,8 @@ struct btp_srpl_clear_cmd {
 struct btp_proxy_solicit_cmd {
 	uint16_t net_idx;
 } __packed;
+
+#define BTP_MESH_START				0x78
 
 /* events */
 #define BTP_MESH_EV_OUT_NUMBER_ACTION		0x80

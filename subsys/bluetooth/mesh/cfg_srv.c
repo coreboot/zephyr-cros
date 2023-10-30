@@ -59,27 +59,7 @@ static int dev_comp_data_get(struct bt_mesh_model *model,
 	LOG_DBG("net_idx 0x%04x app_idx 0x%04x src 0x%04x len %u: %s", ctx->net_idx, ctx->app_idx,
 		ctx->addr, buf->len, bt_hex(buf->data, buf->len));
 
-	page = net_buf_simple_pull_u8(buf);
-
-	if (page >= 130U && IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2) &&
-	    (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
-	     IS_ENABLED(CONFIG_BT_MESH_RPR_SRV))) {
-		page = 130U;
-	} else if (page >= 129U && IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_1) &&
-	    (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
-	     IS_ENABLED(CONFIG_BT_MESH_RPR_SRV))) {
-		page = 129U;
-	} else if (page >= 128U && (atomic_test_bit(bt_mesh.flags, BT_MESH_COMP_DIRTY) ||
-				    IS_ENABLED(CONFIG_BT_MESH_RPR_SRV))) {
-		page = 128U;
-	} else if (page >= 2U && IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_2)) {
-		page = 2U;
-	} else if (page >= 1U && IS_ENABLED(CONFIG_BT_MESH_COMP_PAGE_1)) {
-		page = 1U;
-	} else if (page != 0U) {
-		LOG_DBG("Composition page %u not available", page);
-		page = 0U;
-	}
+	page = bt_mesh_comp_parse_page(buf);
 	LOG_DBG("Preparing Composition data page %d", page);
 
 	bt_mesh_model_msg_init(&sdu, OP_DEV_COMP_DATA_STATUS);
@@ -2287,11 +2267,15 @@ static int hb_pub_send_status(struct bt_mesh_model *model,
 	net_buf_simple_add_u8(&msg, status);
 
 	net_buf_simple_add_le16(&msg, pub->dst);
-	net_buf_simple_add_u8(&msg, hb_pub_count_log(pub->count));
-	net_buf_simple_add_u8(&msg, bt_mesh_hb_log(pub->period));
-	net_buf_simple_add_u8(&msg, pub->ttl);
-	net_buf_simple_add_le16(&msg, pub->feat);
-	net_buf_simple_add_le16(&msg, pub->net_idx);
+	if (pub->dst == BT_MESH_ADDR_UNASSIGNED) {
+		(void)memset(net_buf_simple_add(&msg, 7), 0, 7);
+	} else {
+		net_buf_simple_add_u8(&msg, hb_pub_count_log(pub->count));
+		net_buf_simple_add_u8(&msg, bt_mesh_hb_log(pub->period));
+		net_buf_simple_add_u8(&msg, pub->ttl);
+		net_buf_simple_add_le16(&msg, pub->feat);
+		net_buf_simple_add_le16(&msg, pub->net_idx & 0xfff);
+	}
 
 	if (bt_mesh_model_send(model, ctx, &msg, NULL, NULL)) {
 		LOG_ERR("Unable to send Heartbeat Publication Status");
@@ -2325,7 +2309,7 @@ static int heartbeat_pub_set(struct bt_mesh_model *model,
 
 	pub.dst = sys_le16_to_cpu(param->dst);
 	if (param->count_log == 0x11) {
-		/* Special case defined in Mesh Profile Errata 11737 */
+		/* Special case defined in MshPRFv1.1 Errata 11737 */
 		pub.count = 0xfffe;
 	} else {
 		pub.count = bt_mesh_hb_pwr2(param->count_log);

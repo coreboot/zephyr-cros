@@ -254,6 +254,7 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 	}
 
 	iso_interval_us = cig->iso_interval * ISO_INT_UNIT_US;
+	cig->lll.iso_interval_us = iso_interval_us;
 
 	lll_hdr_init(&cig->lll, cig);
 	max_se_length = 0U;
@@ -882,6 +883,9 @@ uint8_t ull_central_iso_setup(uint16_t cis_handle,
 #endif /* !CONFIG_BT_CTLR_JIT_SCHEDULING */
 
 	cis->central.instant = instant;
+#if defined(CONFIG_BT_CTLR_ISOAL_PSN_IGNORE)
+	cis->pkt_seq_num = 0U;
+#endif /* CONFIG_BT_CTLR_ISOAL_PSN_IGNORE */
 	cis->lll.event_count = LLL_CONN_ISO_EVENT_COUNT_MAX;
 	cis->lll.next_subevent = 0U;
 	cis->lll.sn = 0U;

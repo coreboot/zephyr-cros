@@ -520,11 +520,11 @@ static void mcux_flexcan_from_can_frame(const struct can_frame *src,
 		dest->type = kFLEXCAN_FrameTypeRemote;
 	} else {
 		dest->type = kFLEXCAN_FrameTypeData;
+		dest->dataWord0 = sys_cpu_to_be32(src->data_32[0]);
+		dest->dataWord1 = sys_cpu_to_be32(src->data_32[1]);
 	}
 
 	dest->length = src->dlc;
-	dest->dataWord0 = sys_cpu_to_be32(src->data_32[0]);
-	dest->dataWord1 = sys_cpu_to_be32(src->data_32[1]);
 }
 
 static void mcux_flexcan_to_can_frame(const flexcan_frame_t *src,
@@ -541,11 +541,12 @@ static void mcux_flexcan_to_can_frame(const flexcan_frame_t *src,
 
 	if (src->type == kFLEXCAN_FrameTypeRemote) {
 		dest->flags |= CAN_FRAME_RTR;
+	} else {
+		dest->data_32[0] = sys_be32_to_cpu(src->dataWord0);
+		dest->data_32[1] = sys_be32_to_cpu(src->dataWord1);
 	}
 
 	dest->dlc = src->length;
-	dest->data_32[0] = sys_be32_to_cpu(src->dataWord0);
-	dest->data_32[1] = sys_be32_to_cpu(src->dataWord1);
 #ifdef CONFIG_CAN_RX_TIMESTAMP
 	dest->timestamp = src->timestamp;
 #endif /* CAN_RX_TIMESTAMP */
@@ -571,6 +572,10 @@ static void mcux_flexcan_fd_from_can_frame(const struct can_frame *src,
 		dest->type = kFLEXCAN_FrameTypeRemote;
 	} else {
 		dest->type = kFLEXCAN_FrameTypeData;
+
+		for (i = 0; i < ARRAY_SIZE(dest->dataWord); i++) {
+			dest->dataWord[i] = sys_cpu_to_be32(src->data_32[i]);
+		}
 	}
 
 	if ((src->flags & CAN_FRAME_FDF) != 0) {
@@ -582,9 +587,6 @@ static void mcux_flexcan_fd_from_can_frame(const struct can_frame *src,
 	}
 
 	dest->length = src->dlc;
-	for (i = 0; i < ARRAY_SIZE(dest->dataWord); i++) {
-		dest->dataWord[i] = sys_cpu_to_be32(src->data_32[i]);
-	}
 }
 
 static void mcux_flexcan_fd_to_can_frame(const flexcan_fd_frame_t *src,
@@ -603,6 +605,10 @@ static void mcux_flexcan_fd_to_can_frame(const flexcan_fd_frame_t *src,
 
 	if (src->type == kFLEXCAN_FrameTypeRemote) {
 		dest->flags |= CAN_FRAME_RTR;
+	} else {
+		for (i = 0; i < ARRAY_SIZE(dest->data_32); i++) {
+			dest->data_32[i] = sys_be32_to_cpu(src->dataWord[i]);
+		}
 	}
 
 	if (src->edl != 0) {
@@ -618,9 +624,7 @@ static void mcux_flexcan_fd_to_can_frame(const flexcan_fd_frame_t *src,
 	}
 
 	dest->dlc = src->length;
-	for (i = 0; i < ARRAY_SIZE(dest->data_32); i++) {
-		dest->data_32[i] = sys_be32_to_cpu(src->dataWord[i]);
-	}
+
 #ifdef CONFIG_CAN_RX_TIMESTAMP
 	dest->timestamp = src->timestamp;
 #endif /* CAN_RX_TIMESTAMP */
@@ -918,9 +922,8 @@ static void mcux_flexcan_remove_rx_filter(const struct device *dev, int filter_i
 {
 	struct mcux_flexcan_data *data = dev->data;
 
-	if (filter_id >= MCUX_FLEXCAN_MAX_RX) {
-		LOG_ERR("Detach: Filter id >= MAX_RX (%d >= %d)", filter_id,
-			MCUX_FLEXCAN_MAX_RX);
+	if (filter_id < 0 || filter_id >= MCUX_FLEXCAN_MAX_RX) {
+		LOG_ERR("filter ID %d out of bounds", filter_id);
 		return;
 	}
 
@@ -1205,6 +1208,13 @@ static int mcux_flexcan_init(const struct device *dev)
 		}
 	}
 
+	/* Validate initial timing parameters */
+	err = can_set_timing(dev, &data->timing);
+	if (err != 0) {
+		LOG_ERR("failed to set timing (err %d)", err);
+		return -ENODEV;
+	}
+
 #ifdef CONFIG_CAN_MCUX_FLEXCAN_FD
 	if (config->flexcan_fd) {
 		data->timing_data.sjw = config->sjw_data;
@@ -1230,6 +1240,14 @@ static int mcux_flexcan_init(const struct device *dev)
 			}
 		}
 	}
+
+	/* Validate initial data phase timing parameters */
+	err = can_set_timing_data(dev, &data->timing_data);
+	if (err != 0) {
+		LOG_ERR("failed to set data phase timing (err %d)", err);
+		return -ENODEV;
+	}
+
 #endif /* CONFIG_CAN_MCUX_FLEXCAN_FD */
 
 	err = pinctrl_apply_state(config->pincfg, PINCTRL_STATE_DEFAULT);

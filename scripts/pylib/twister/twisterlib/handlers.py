@@ -358,6 +358,13 @@ class DeviceHandler(Handler):
         """
         super().__init__(instance, type_str)
 
+    def get_test_timeout(self):
+        timeout = super().get_test_timeout()
+        if self.options.coverage:
+            # wait more for gcov data to be dumped on console
+            timeout += 120
+        return timeout
+
     def monitor_serial(self, ser, halt_event, harness):
         log_out_fp = open(self.log, "wb")
 
@@ -887,7 +894,7 @@ class QEMUHandler(Handler):
             # line contains a full line of data output from QEMU
             log_out_fp.write(line)
             log_out_fp.flush()
-            line = line.strip()
+            line = line.rstrip()
             logger.debug(f"QEMU ({pid}): {line}")
 
             harness.handle(line)

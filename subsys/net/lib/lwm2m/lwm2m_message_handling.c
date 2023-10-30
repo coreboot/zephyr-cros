@@ -304,6 +304,9 @@ STATIC int build_msg_block_for_send(struct lwm2m_message *msg, uint16_t block_nu
 		}
 		msg->cpkt.hdr_len = msg->body_encode_buffer.hdr_len;
 	} else {
+		/* Keep user data between blocks */
+		void *user_data = msg->reply ? msg->reply->user_data : NULL;
+
 		/* reuse message for next block. Copy token from the new query to allow
 		 * CoAP clients to use new token for every query of ongoing transaction
 		 */
@@ -322,6 +325,9 @@ STATIC int build_msg_block_for_send(struct lwm2m_message *msg, uint16_t block_nu
 			lwm2m_reset_message(msg, true);
 			LOG_ERR("Unable to init lwm2m message for next block!");
 			return ret;
+		}
+		if (msg->reply) {
+			msg->reply->user_data = user_data;
 		}
 	}
 
@@ -1089,7 +1095,7 @@ int lwm2m_write_handler(struct lwm2m_engine_obj_inst *obj_inst, struct lwm2m_eng
 				break;
 			}
 
-			len = strlen((char *)write_buf);
+			len = strlen((char *)write_buf) + 1;
 			break;
 
 		case LWM2M_RES_TYPE_TIME:
@@ -1251,8 +1257,10 @@ static int lwm2m_read_resource_data(struct lwm2m_message *msg, void *data_ptr, s
 		break;
 
 	case LWM2M_RES_TYPE_STRING:
-		ret = engine_put_string(&msg->out, &msg->path, (uint8_t *)data_ptr,
-					strlen((uint8_t *)data_ptr));
+		if (data_len) {
+			data_len -= 1; /* Remove the '\0' */
+		}
+		ret = engine_put_string(&msg->out, &msg->path, (uint8_t *)data_ptr, data_len);
 		break;
 
 	case LWM2M_RES_TYPE_U32:
@@ -2418,7 +2426,8 @@ static int handle_request(struct coap_packet *request, struct lwm2m_message *msg
 		goto error;
 	}
 #endif
-	if (msg->path.obj_id == LWM2M_OBJECT_SECURITY_ID && !msg->ctx->bootstrap_mode) {
+	if (msg->path.level > LWM2M_PATH_LEVEL_NONE &&
+	    msg->path.obj_id == LWM2M_OBJECT_SECURITY_ID && !msg->ctx->bootstrap_mode) {
 		r = -EACCES;
 		goto error;
 	}
@@ -2823,7 +2832,7 @@ static void notify_message_timeout_cb(struct lwm2m_message *msg)
 						   msg->token, msg->tkl);
 
 		if (obs) {
-			obs->active_tx_operation = false;
+			obs->active_notify = NULL;
 			if (client_ctx->observe_cb) {
 				client_ctx->observe_cb(LWM2M_OBSERVE_EVENT_NOTIFY_TIMEOUT,
 						       &msg->path, msg->reply->user_data);
@@ -2895,7 +2904,7 @@ static int notify_message_reply_cb(const struct coap_packet *response, struct co
 						   reply->token, reply->tkl);
 
 		if (obs) {
-			obs->active_tx_operation = false;
+			obs->active_notify = NULL;
 			if (msg->ctx->observe_cb) {
 				msg->ctx->observe_cb(LWM2M_OBSERVE_EVENT_NOTIFY_ACK,
 						     lwm2m_read_first_path_ptr(&obs->path_list),
@@ -3068,7 +3077,7 @@ msg_init:
 		goto cleanup;
 	}
 
-	obs->active_tx_operation = true;
+	obs->active_notify = msg;
 	obs->resource_update = false;
 	lwm2m_information_interface_send(msg);
 #if defined(CONFIG_LWM2M_RESOURCE_DATA_CACHE_SUPPORT)
@@ -3302,6 +3311,16 @@ cleanup:
 int do_composite_read_op_for_parsed_list(struct lwm2m_message *msg, uint16_t content_format,
 					 sys_slist_t *path_list)
 {
+	struct lwm2m_obj_path_list *entry;
+
+	/* Check access rights */
+	SYS_SLIST_FOR_EACH_CONTAINER(path_list, entry, node) {
+		if (entry->path.level > LWM2M_PATH_LEVEL_NONE &&
+		    entry->path.obj_id == LWM2M_OBJECT_SECURITY_ID && !msg->ctx->bootstrap_mode) {
+			return -EACCES;
+		}
+	}
+
 	switch (content_format) {
 
 #if defined(CONFIG_LWM2M_RW_SENML_JSON_SUPPORT)

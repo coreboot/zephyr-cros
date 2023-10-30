@@ -23,12 +23,13 @@
 #if !defined(_ASMLANGUAGE)
 #include <zephyr/sys/atomic.h>
 #include <zephyr/types.h>
-#include <zephyr/kernel/sched_priq.h>
+#include <zephyr/kernel/internal/sched_priq.h>
 #include <zephyr/sys/dlist.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/sys_heap.h>
 #include <zephyr/arch/structs.h>
 #include <zephyr/kernel/stats.h>
+#include <zephyr/kernel/obj_core.h>
 #endif
 
 #ifdef __cplusplus
@@ -141,8 +142,12 @@ struct _cpu {
 	uint32_t usage0;
 
 #ifdef CONFIG_SCHED_THREAD_USAGE_ALL
-	struct k_cycle_stats usage;
+	struct k_cycle_stats *usage;
 #endif
+#endif
+
+#ifdef CONFIG_OBJ_CORE_SYSTEM
+	struct k_obj_core  obj_core;
 #endif
 
 	/* Per CPU architecture specifics */
@@ -182,6 +187,13 @@ struct z_kernel {
 
 #if defined(CONFIG_THREAD_MONITOR)
 	struct k_thread *threads; /* singly linked list of ALL threads */
+#endif
+#ifdef CONFIG_SCHED_THREAD_USAGE_ALL
+	struct k_cycle_stats usage[CONFIG_MP_MAX_NUM_CPUS];
+#endif
+
+#ifdef CONFIG_OBJ_CORE_SYSTEM
+	struct k_obj_core  obj_core;
 #endif
 
 #if defined(CONFIG_SMP) && defined(CONFIG_SCHED_IPI_SUPPORTED)

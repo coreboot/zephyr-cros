@@ -165,24 +165,17 @@ static void tcp_server_session(void)
 		if (!net_ipv4_is_addr_unspecified(addr)) {
 			memcpy(&in4_addr->sin_addr, addr,
 				sizeof(struct in_addr));
-		} else if (MY_IP4ADDR && strlen(MY_IP4ADDR)) {
+		} else if (strlen(MY_IP4ADDR ? MY_IP4ADDR : "")) {
 			/* Use Setting IP */
 			ret = zperf_get_ipv4_addr(MY_IP4ADDR,
 						  &in4_addr->sin_addr);
 			if (ret < 0) {
 				NET_WARN("Unable to set IPv4");
-				goto use_existing_ipv4;
+				goto use_any_ipv4;
 			}
 		} else {
-use_existing_ipv4:
-			/* Use existing IP */
-			addr = zperf_get_default_if_in4_addr();
-			if (!addr) {
-				NET_ERR("Unable to get IPv4 by default");
-				goto error;
-			}
-			memcpy(&in4_addr->sin_addr, addr,
-				sizeof(struct in_addr));
+use_any_ipv4:
+			in4_addr->sin_addr.s_addr = INADDR_ANY;
 		}
 
 		in4_addr->sin_port = htons(tcp_server_port);
@@ -217,25 +210,19 @@ use_existing_ipv4:
 		if (!net_ipv6_is_addr_unspecified(addr)) {
 			memcpy(&in6_addr->sin6_addr, addr,
 			       sizeof(struct in6_addr));
-		} else if (MY_IP6ADDR && strlen(MY_IP6ADDR)) {
+		} else if (strlen(MY_IP6ADDR ? MY_IP6ADDR : "")) {
 			/* Use Setting IP */
 			ret = zperf_get_ipv6_addr(MY_IP6ADDR,
 						  MY_PREFIX_LEN_STR,
 						  &in6_addr->sin6_addr);
 			if (ret < 0) {
 				NET_WARN("Unable to set IPv6");
-				goto use_existing_ipv6;
+				goto use_any_ipv6;
 			}
 		} else {
-use_existing_ipv6:
-			/* Use existing IP */
-			addr = zperf_get_default_if_in6_addr();
-			if (!addr) {
-				NET_ERR("Unable to get IPv6 by default");
-				goto error;
-			}
-			memcpy(&in6_addr->sin6_addr, addr,
-				sizeof(struct in6_addr));
+use_any_ipv6:
+			memcpy(&in6_addr->sin6_addr, net_ipv6_unspecified_address(),
+			       sizeof(struct in6_addr));
 		}
 
 		in6_addr->sin6_port = htons(tcp_server_port);

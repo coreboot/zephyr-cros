@@ -26,12 +26,47 @@
 #include <stdbool.h>
 #include <zephyr/irq_offload.h>
 #include <zephyr/sys/check.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/iterable_sections.h>
 
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
+
+#ifdef CONFIG_OBJ_CORE_THREAD
+static struct k_obj_type  obj_type_thread;
+
+#ifdef CONFIG_OBJ_CORE_STATS_THREAD
+static struct k_obj_core_stats_desc  thread_stats_desc = {
+	.raw_size = sizeof(struct k_cycle_stats),
+	.query_size = sizeof(struct k_thread_runtime_stats),
+	.raw   = z_thread_stats_raw,
+	.query = z_thread_stats_query,
+	.reset = z_thread_stats_reset,
+	.disable = z_thread_stats_disable,
+	.enable  = z_thread_stats_enable,
+};
+#endif
+
+static int init_thread_obj_core_list(void)
+{
+	/* Initialize mem_slab object type */
+
+#ifdef CONFIG_OBJ_CORE_THREAD
+	z_obj_type_init(&obj_type_thread, K_OBJ_TYPE_THREAD_ID,
+			offsetof(struct k_thread, obj_core));
+#endif
+
+#ifdef CONFIG_OBJ_CORE_STATS_THREAD
+	k_obj_type_stats_init(&obj_type_thread, &thread_stats_desc);
+#endif
+
+	return 0;
+}
+
+SYS_INIT(init_thread_obj_core_list, PRE_KERNEL_1,
+	 CONFIG_KERNEL_INIT_PRIORITY_OBJECTS);
+#endif
 
 #ifdef CONFIG_THREAD_MONITOR
 /* This lock protects the linked list of active threads; i.e. the
@@ -429,7 +464,7 @@ static size_t random_offset(size_t stack_size)
 	size_t random_val;
 
 	if (!z_stack_adjust_initialized) {
-		z_early_boot_rand_get((uint8_t *)&random_val, sizeof(random_val));
+		z_early_rand_get((uint8_t *)&random_val, sizeof(random_val));
 	} else {
 		sys_rand_get((uint8_t *)&random_val, sizeof(random_val));
 	}
@@ -542,6 +577,15 @@ char *z_setup_new_thread(struct k_thread *new_thread,
 	char *stack_ptr;
 
 	Z_ASSERT_VALID_PRIO(prio, entry);
+
+#ifdef CONFIG_OBJ_CORE_THREAD
+	k_obj_core_init_and_link(K_OBJ_CORE(new_thread), &obj_type_thread);
+#ifdef CONFIG_OBJ_CORE_STATS_THREAD
+	k_obj_core_stats_register(K_OBJ_CORE(new_thread),
+				  &new_thread->base.usage,
+				  sizeof(new_thread->base.usage));
+#endif
+#endif
 
 #ifdef CONFIG_USERSPACE
 	__ASSERT((options & K_USER) == 0U || z_stack_is_user_capable(stack),
@@ -790,9 +834,11 @@ void z_init_static_threads(void)
 	 */
 	k_sched_lock();
 	_FOREACH_STATIC_THREAD(thread_data) {
-		if (!K_TIMEOUT_EQ(thread_data->init_delay, K_FOREVER)) {
+		k_timeout_t init_delay = Z_THREAD_INIT_DELAY(thread_data);
+
+		if (!K_TIMEOUT_EQ(init_delay, K_FOREVER)) {
 			schedule_new_thread(thread_data->init_thread,
-					    thread_data->init_delay);
+					    init_delay);
 		}
 	}
 	k_sched_unlock();

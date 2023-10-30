@@ -26,6 +26,11 @@ zephyr_library_sources(
 	common/trace_hook.c
 )
 
+# Include sync_rtc from real SOC code if enabled
+zephyr_library_sources_ifdef(CONFIG_NRF53_SYNC_RTC
+  ${ZEPHYR_BASE}/soc/arm/nordic_nrf/nrf53/sync_rtc.c
+  )
+
 target_sources(native_simulator INTERFACE
 	common/bsim_args_runner.c
 	common/bsim_extra_cpu_if_stubs.c
@@ -34,6 +39,12 @@ target_sources(native_simulator INTERFACE
 	common/posix_arch_if.c
 	common/trace_hook.c
 )
+
+if (CONFIG_IPC_SERVICE AND CONFIG_BOARD_NRF5340BSIM_NRF5340_CPUAPP)
+	zephyr_library_sources(
+		ipc_backend.c
+	)
+endif()
 
 zephyr_include_directories(
   soc

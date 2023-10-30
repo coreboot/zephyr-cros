@@ -21,7 +21,7 @@
 
 LOG_MODULE_REGISTER(can_stm32, CONFIG_CAN_LOG_LEVEL);
 
-#define CAN_INIT_TIMEOUT  (10 * sys_clock_hw_cycles_per_sec() / MSEC_PER_SEC)
+#define CAN_INIT_TIMEOUT  (10 * (sys_clock_hw_cycles_per_sec() / MSEC_PER_SEC))
 
 #define DT_DRV_COMPAT st_stm32_bxcan
 
@@ -126,11 +126,12 @@ static void can_stm32_rx_fifo_pop(CAN_FIFOMailBox_TypeDef *mbox, struct can_fram
 
 	if ((mbox->RIR & CAN_RI0R_RTR) != 0) {
 		frame->flags |= CAN_FRAME_RTR;
+	} else {
+		frame->data_32[0] = mbox->RDLR;
+		frame->data_32[1] = mbox->RDHR;
 	}
 
 	frame->dlc = mbox->RDTR & (CAN_RDT0R_DLC >> CAN_RDT0R_DLC_Pos);
-	frame->data_32[0] = mbox->RDLR;
-	frame->data_32[1] = mbox->RDHR;
 #ifdef CONFIG_CAN_RX_TIMESTAMP
 	frame->timestamp = ((mbox->RDTR & CAN_RDT0R_TIME) >> CAN_RDT0R_TIME_Pos);
 #endif
@@ -857,13 +858,13 @@ static int can_stm32_send(const struct device *dev, const struct can_frame *fram
 
 	if ((frame->flags & CAN_FRAME_RTR) != 0) {
 		mailbox->TIR |= CAN_TI1R_RTR;
+	} else {
+		mailbox->TDLR = frame->data_32[0];
+		mailbox->TDHR = frame->data_32[1];
 	}
 
 	mailbox->TDTR = (mailbox->TDTR & ~CAN_TDT1R_DLC) |
 			((frame->dlc & 0xF) << CAN_TDT1R_DLC_Pos);
-
-	mailbox->TDLR = frame->data_32[0];
-	mailbox->TDHR = frame->data_32[1];
 
 	mailbox->TIR |= CAN_TI0R_TXRQ;
 	k_mutex_unlock(&data->inst_mutex);
@@ -1034,7 +1035,10 @@ static void can_stm32_remove_rx_filter(const struct device *dev, int filter_id)
 	int bank_num;
 	bool bank_unused;
 
-	__ASSERT_NO_MSG(filter_id >= 0 && filter_id < CAN_STM32_MAX_FILTER_ID);
+	if (filter_id < 0 || filter_id >= CAN_STM32_MAX_FILTER_ID) {
+		LOG_ERR("filter ID %d out of bounds", filter_id);
+		return;
+	}
 
 	k_mutex_lock(&filter_mutex, K_FOREVER);
 	k_mutex_lock(&data->inst_mutex, K_FOREVER);

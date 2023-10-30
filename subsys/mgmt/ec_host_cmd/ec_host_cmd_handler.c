@@ -33,9 +33,11 @@ BUILD_ASSERT(NUMBER_OF_CHOSEN_BACKENDS < 2, "Number of chosen backends > 1");
 #define TX_HEADER_SIZE (sizeof(struct ec_host_cmd_response_header))
 
 COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_DEF,
-	    (static uint8_t hc_rx_buffer[CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_SIZE];), ())
+	    (static uint8_t hc_rx_buffer[CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_SIZE] __aligned(4);),
+	    ())
 COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_DEF,
-	    (static uint8_t hc_tx_buffer[CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_SIZE];), ())
+	    (static uint8_t hc_tx_buffer[CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_SIZE] __aligned(4);),
+	    ())
 
 #ifdef CONFIG_EC_HOST_CMD_DEDICATED_THREAD
 static K_KERNEL_STACK_DEFINE(hc_stack, CONFIG_EC_HOST_CMD_HANDLER_STACK_SIZE);
@@ -45,6 +47,8 @@ static struct ec_host_cmd ec_host_cmd = {
 	.rx_ctx = {
 			.buf = COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_DEF, (hc_rx_buffer),
 					   (NULL)),
+			.len_max = COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_DEF,
+					       (CONFIG_EC_HOST_CMD_HANDLER_RX_BUFFER_SIZE), (0)),
 		},
 	.tx = {
 			.buf = COND_CODE_1(CONFIG_EC_HOST_CMD_HANDLER_TX_BUFFER_DEF, (hc_tx_buffer),

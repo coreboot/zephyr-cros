@@ -11,7 +11,7 @@ LOG_MODULE_REGISTER(net_if, CONFIG_NET_IF_LOG_LEVEL);
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/linker/sections.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 #include <zephyr/syscall_handler.h>
 #include <stdlib.h>
 #include <string.h>
@@ -348,7 +348,7 @@ void net_if_queue_tx(struct net_if *iface, struct net_pkt *pkt)
 	 * directly to the driver.
 	 */
 	if ((IS_ENABLED(CONFIG_NET_TC_SKIP_FOR_HIGH_PRIO) &&
-	     prio == NET_PRIORITY_CA) || NET_TC_TX_COUNT == 0) {
+	     prio >= NET_PRIORITY_CA) || NET_TC_TX_COUNT == 0) {
 		net_pkt_set_tx_stats_tick(pkt, k_cycle_get_32());
 
 		net_if_tx(net_pkt_iface(pkt), pkt);
@@ -4120,45 +4120,13 @@ enum net_verdict net_if_recv_data(struct net_if *iface, struct net_pkt *pkt)
 {
 	if (IS_ENABLED(CONFIG_NET_PROMISCUOUS_MODE) &&
 	    net_if_is_promisc(iface)) {
-		/* If the packet is not for us and the promiscuous
-		 * mode is enabled, then increase the ref count so
-		 * that net_core.c:processing_data() will not free it.
-		 * The promiscuous mode handler must free the packet
-		 * after it has finished working with it.
-		 *
-		 * If packet is for us, then NET_CONTINUE is returned.
-		 * In this case we must clone the packet, as the packet
-		 * could be manipulated by other part of the stack.
-		 */
-		enum net_verdict verdict;
 		struct net_pkt *new_pkt;
 
-		/* This protects pkt so that it will not be freed by L2 recv()
-		 */
-		net_pkt_ref(pkt);
+		new_pkt = net_pkt_clone(pkt, K_NO_WAIT);
 
-		verdict = net_if_l2(iface)->recv(iface, pkt);
-		if (verdict == NET_CONTINUE) {
-			new_pkt = net_pkt_clone(pkt, K_NO_WAIT);
-		} else {
-			new_pkt = net_pkt_ref(pkt);
+		if (net_promisc_mode_input(new_pkt) == NET_DROP) {
+			net_pkt_unref(new_pkt);
 		}
-
-		/* L2 has modified the buffer starting point, it is easier
-		 * to re-initialize the cursor rather than updating it.
-		 */
-		if (new_pkt) {
-			net_pkt_cursor_init(new_pkt);
-
-			if (net_promisc_mode_input(new_pkt) == NET_DROP) {
-				net_pkt_unref(new_pkt);
-			}
-		} else {
-			NET_WARN("promiscuous packet dropped, unable to clone packet");
-		}
-		net_pkt_unref(pkt);
-
-		return verdict;
 	}
 
 	return net_if_l2(iface)->recv(iface, pkt);

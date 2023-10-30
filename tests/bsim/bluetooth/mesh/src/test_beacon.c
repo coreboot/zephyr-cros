@@ -13,6 +13,8 @@
 #include "mesh/foundation.h"
 #include "mesh/crypto.h"
 #include "argparse.h"
+#include "mesh/proxy_cli.h"
+#include "mesh/proxy.h"
 
 #define LOG_MODULE_NAME test_beacon
 
@@ -50,6 +52,22 @@ static const struct bt_mesh_test_cfg tx_cfg = {
 static const struct bt_mesh_test_cfg rx_cfg = {
 	.addr = 0x0002,
 	.dev_key = { 0x02 },
+};
+
+typedef void (*snb_cb)(const struct bt_mesh_snb *snb);
+
+static snb_cb snb_cb_ptr;
+static struct k_sem beacon_sem;
+
+static void snb_received(const struct bt_mesh_snb *snb)
+{
+	if (snb_cb_ptr) {
+		snb_cb_ptr(snb);
+	}
+}
+
+BT_MESH_BEACON_CB_DEFINE(snb) = {
+	.snb_received = snb_received,
 };
 
 /* Setting for scanner defining what beacon is expected next, SNB as default */
@@ -990,7 +1008,79 @@ static void test_rx_secure_beacon_interval(void)
 	PASS();
 }
 
+static uint8_t snb_cnt;
+
+static void snb_recv(const struct bt_mesh_snb *snb)
+{
+	/* IV idx of 2 marks end of test */
+	if (snb->iv_idx == 2) {
+		k_sem_give(&beacon_sem);
+		return;
+	}
+
+	ASSERT_EQUAL(snb->flags, 0x02);
+	ASSERT_EQUAL(snb->iv_idx, 1);
+	snb_cnt++;
+}
+
+static void test_rx_beacon_cache(void)
+{
+	k_sem_init(&beacon_sem, 0, 1);
+	snb_cb_ptr = snb_recv;
+
+	bt_mesh_test_cfg_set(&rx_cfg, WAIT_TIME);
+	bt_mesh_test_setup();
+
+	/* Wait for secondary SNB to end test. */
+	ASSERT_OK_MSG(k_sem_take(&beacon_sem, K_SECONDS(40)),
+		      "Didn't receive SNB in time");
+
+	/* Verify that only one SNB for IV_idx=1 was handled. */
+	ASSERT_EQUAL(snb_cnt, 1);
+	PASS();
+}
+
+static void test_tx_beacon_cache(void)
+{
+	bt_mesh_test_cfg_set(NULL, WAIT_TIME);
+	bt_mesh_crypto_init();
+	ASSERT_OK_MSG(bt_enable(NULL), "Bluetooth init failed");
+
+	NET_BUF_SIMPLE_DEFINE(iv1, 22);
+	NET_BUF_SIMPLE_DEFINE(iv2, 22);
+	beacon_create(&iv1, test_net_key, 0x02, 0x0001);
+	beacon_create(&iv2, test_net_key, 0x02, 0x0002);
+
+	/* Send two copies of the same SNB. */
+	for (size_t i = 0; i < 2; i++) {
+		k_sleep(K_SECONDS(5));
+		send_beacon(&iv1);
+	}
+
+	/* Send secondary SNB to mark end of test. */
+	k_sleep(K_SECONDS(5));
+	send_beacon(&iv2);
+
+	PASS();
+}
+
 #if CONFIG_BT_MESH_V1d1
+
+typedef void (*priv_beacon_cb)(const struct bt_mesh_prb *prb);
+
+static priv_beacon_cb priv_beacon_cb_ptr;
+
+static void priv_received(const struct bt_mesh_prb *prb)
+{
+	if (priv_beacon_cb_ptr) {
+		priv_beacon_cb_ptr(prb);
+	}
+}
+
+BT_MESH_BEACON_CB_DEFINE(priv_beacon) = {
+	.priv_received = priv_received,
+};
+
 static bool private_beacon_check(const uint8_t *net_id, void *ctx)
 {
 	bool ret;
@@ -1178,7 +1268,7 @@ static void private_beacon_create(struct net_buf_simple *buf, const uint8_t *net
 	}
 
 	bt_rand(random_val, sizeof(random_val));
-	bt_mesh_beacon_encrypt(&priv_beacon_key, flags, bt_mesh.iv_index + 1,
+	bt_mesh_beacon_encrypt(&priv_beacon_key, flags, iv_index,
 			       random_val, data, auth);
 
 	net_buf_simple_reset(buf);
@@ -1389,6 +1479,63 @@ static void test_rx_priv_interleave(void)
 				    &same_random));
 	ASSERT_EQUAL(0x03, beacon.flags);
 	ASSERT_EQUAL(0x0001, beacon.iv_index);
+
+	PASS();
+}
+
+static uint8_t prb_cnt;
+
+static void priv_beacon_recv(const struct bt_mesh_prb *prb)
+{
+	/* IV idx of 2 marks end of test */
+	if (prb->iv_idx == 2) {
+		k_sem_give(&beacon_sem);
+		return;
+	}
+
+	ASSERT_EQUAL(prb->flags, 0x02);
+	ASSERT_EQUAL(prb->iv_idx, 1);
+	prb_cnt++;
+}
+
+static void test_rx_priv_beacon_cache(void)
+{
+	k_sem_init(&beacon_sem, 0, 1);
+	priv_beacon_cb_ptr = priv_beacon_recv;
+
+	bt_mesh_test_cfg_set(&rx_cfg, WAIT_TIME);
+	bt_mesh_device_setup(&prov, &prb_comp);
+	provision(&rx_cfg);
+
+	/* Wait for secondary private beacon to end test. */
+	ASSERT_OK_MSG(k_sem_take(&beacon_sem, K_SECONDS(40)),
+		      "Didn't receive private beacon in time");
+
+	/* Verify that only one private beacon for IV_idx=1 was handled. */
+	ASSERT_EQUAL(prb_cnt, 1);
+	PASS();
+}
+
+static void test_tx_priv_beacon_cache(void)
+{
+	bt_mesh_test_cfg_set(NULL, WAIT_TIME);
+	bt_mesh_crypto_init();
+	ASSERT_OK_MSG(bt_enable(NULL), "Bluetooth init failed");
+
+	NET_BUF_SIMPLE_DEFINE(iv1, 27);
+	NET_BUF_SIMPLE_DEFINE(iv2, 27);
+	private_beacon_create(&iv1, test_net_key, 0x02, 0x0001);
+	private_beacon_create(&iv2, test_net_key, 0x02, 0x0002);
+
+	/* Send two copies of the same private beacon. */
+	for (size_t i = 0; i < 2; i++) {
+		k_sleep(K_SECONDS(5));
+		send_beacon(&iv1);
+	}
+
+	/* Send secondary private beacon to mark end of test. */
+	k_sleep(K_SECONDS(5));
+	send_beacon(&iv2);
 
 	PASS();
 }
@@ -1695,6 +1842,68 @@ static void test_rx_priv_multi_net_id(void)
 
 	PASS();
 }
+
+static void test_tx_priv_gatt_proxy(void)
+{
+	bt_mesh_test_cfg_set(NULL, WAIT_TIME);
+	bt_mesh_device_setup(&prov, &prb_comp);
+	provision(&tx_cfg);
+	bt_mesh_iv_update_test(true);
+
+	ASSERT_TRUE(bt_mesh.iv_index == 0);
+
+	/* Disable SNB. */
+	bt_mesh_beacon_set(false);
+	ASSERT_OK_MSG(bt_mesh_scan_disable(), "Failed to disable scanner");
+	ASSERT_OK_MSG(bt_mesh_gatt_proxy_set(BT_MESH_GATT_PROXY_DISABLED),
+		      "Failed to disable gatt proxy");
+	ASSERT_OK_MSG(bt_mesh_priv_gatt_proxy_set(BT_MESH_PRIV_GATT_PROXY_ENABLED),
+		      "Failed to set private gatt proxy");
+
+	/* Wait for proxy connection to complete. */
+	WAIT_FOR_COND(bt_mesh_proxy_srv_connected_cnt() == 1, 10);
+
+	/* Wait a bit so RX device can disable scanner, then start IV update */
+	k_sleep(K_SECONDS(2));
+	ASSERT_TRUE(bt_mesh_iv_update());
+
+	/* Check that IV index has updated */
+	ASSERT_TRUE(bt_mesh.iv_index == 1);
+	PASS();
+}
+
+static void test_rx_priv_gatt_proxy(void)
+{
+	bt_mesh_test_cfg_set(NULL, WAIT_TIME);
+	bt_mesh_device_setup(&prov, &prb_comp);
+	provision(&rx_cfg);
+	bt_mesh_iv_update_test(true);
+
+	ASSERT_TRUE(bt_mesh.iv_index == 0);
+
+	/* Disable SNB. */
+	bt_mesh_beacon_set(false);
+	ASSERT_OK_MSG(bt_mesh_gatt_proxy_set(BT_MESH_GATT_PROXY_DISABLED),
+		      "Failed to disable gatt proxy");
+	ASSERT_OK_MSG(bt_mesh_priv_gatt_proxy_set(BT_MESH_PRIV_GATT_PROXY_ENABLED),
+		      "Failed to set private gatt proxy");
+	ASSERT_OK_MSG(bt_mesh_proxy_connect(TEST_NET_IDX1), "Failed to connect over proxy");
+
+	/* Wait for connection to complete, then disable scanner
+	 * to ensure that all RX communication arrives over GATT.
+	 */
+	WAIT_FOR_COND(bt_mesh_proxy_cli_is_connected(TEST_NET_IDX1), 10);
+	ASSERT_OK_MSG(bt_mesh_scan_disable(), "Failed to disable scanner");
+
+	/* Wait for the IV index to update.
+	 * Verifying that IV index has changed proves that a private
+	 * beacon arrived successfully over the GATT connection.
+	 */
+	WAIT_FOR_COND(bt_mesh.iv_index == 1, 10);
+
+	PASS();
+}
+
 #endif
 
 #endif /* CONFIG_BT_MESH_V1d1 */
@@ -1716,16 +1925,19 @@ static const struct bst_test_instance test_beacon[] = {
 	TEST_CASE(tx, kr_old_key, "Beacon: send old Net Key"),
 	TEST_CASE(tx, multiple_netkeys, "Beacon: multiple Net Keys"),
 	TEST_CASE(tx, secure_beacon_interval, "Beacon: send secure beacons"),
+	TEST_CASE(tx, beacon_cache,   "Beacon: advertise duplicate SNBs"),
 #if CONFIG_BT_MESH_V1d1
 	TEST_CASE(tx, priv_on_iv_update,   "Private Beacon: send on IV update"),
 	TEST_CASE(tx, priv_on_key_refresh,   "Private Beacon: send on Key Refresh"),
 	TEST_CASE(tx, priv_adv,   "Private Beacon: advertise Private Beacons"),
 	TEST_CASE(tx, priv_invalid,   "Private Beacon: advertise invalid beacons"),
 	TEST_CASE(tx, priv_interleave,   "Private Beacon: advertise interleaved with SNB"),
+	TEST_CASE(tx, priv_beacon_cache,   "Private Beacon: advertise duplicate Private Beacons"),
 #if CONFIG_BT_MESH_GATT_PROXY
 	TEST_CASE(tx, priv_net_id,   "Private Proxy: advertise Net ID"),
 	TEST_CASE(tx, priv_node_id,   "Private Proxy: advertise Node ID"),
 	TEST_CASE(tx, priv_multi_net_id,   "Private Proxy: advertise multiple Net ID"),
+	TEST_CASE(tx, priv_gatt_proxy,   "Private Proxy: Send Private Beacons over GATT"),
 #endif
 #endif
 
@@ -1735,14 +1947,17 @@ static const struct bst_test_instance test_beacon[] = {
 	TEST_CASE(rx, kr_old_key, "Beacon: receive old Net Key"),
 	TEST_CASE(rx, multiple_netkeys, "Beacon: multiple Net Keys"),
 	TEST_CASE(rx, secure_beacon_interval, "Beacon: receive and send secure beacons"),
+	TEST_CASE(rx, beacon_cache,   "Beacon: receive duplicate SNBs"),
 #if CONFIG_BT_MESH_V1d1
 	TEST_CASE(rx, priv_adv,   "Private Beacon: verify random regeneration"),
 	TEST_CASE(rx, priv_invalid,   "Private Beacon: receive invalid beacons"),
 	TEST_CASE(rx, priv_interleave,   "Private Beacon: interleaved with SNB"),
+	TEST_CASE(rx, priv_beacon_cache,   "Private Beacon: receive duplicate Private Beacons"),
 #if CONFIG_BT_MESH_GATT_PROXY
 	TEST_CASE(rx, priv_net_id,   "Private Proxy: scan for Net ID"),
 	TEST_CASE(rx, priv_node_id,   "Private Proxy: scan for Node ID"),
 	TEST_CASE(rx, priv_multi_net_id,   "Private Proxy: scan for multiple Net ID"),
+	TEST_CASE(rx, priv_gatt_proxy,   "Private Proxy: Receive Private Beacons over GATT"),
 #endif
 #endif
 	BSTEST_END_MARKER

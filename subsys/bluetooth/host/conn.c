@@ -579,7 +579,7 @@ static inline uint16_t conn_mtu(struct bt_conn *conn)
 static int do_send_frag(struct bt_conn *conn, struct net_buf *buf, uint8_t flags)
 {
 	struct bt_conn_tx *tx = tx_data(buf)->tx;
-	uint32_t *pending_no_cb;
+	uint32_t *pending_no_cb = NULL;
 	unsigned int key;
 	int err = 0;
 
@@ -656,21 +656,6 @@ fail:
 	return err;
 }
 
-static size_t iso_hdr_len(struct net_buf *buf, struct bt_conn *conn)
-{
-#if defined(CONFIG_BT_ISO)
-	if (conn->type == BT_CONN_TYPE_ISO) {
-		if (tx_data(buf)->iso_has_ts) {
-			return BT_HCI_ISO_TS_DATA_HDR_SIZE;
-		} else {
-			return BT_HCI_ISO_DATA_HDR_SIZE;
-		}
-	}
-#endif
-
-	return 0;
-}
-
 static int send_frag(struct bt_conn *conn,
 		     struct net_buf *buf, struct net_buf *frag,
 		     uint8_t flags)
@@ -683,9 +668,7 @@ static int send_frag(struct bt_conn *conn,
 
 	/* Add the data to the buffer */
 	if (frag) {
-		size_t iso_hdr = flags == FRAG_START ? iso_hdr_len(buf, conn) : 0;
-		uint16_t frag_len = MIN(conn_mtu(conn) + iso_hdr,
-					net_buf_tailroom(frag));
+		uint16_t frag_len = MIN(conn_mtu(conn), net_buf_tailroom(frag));
 
 		net_buf_add_mem(frag, buf->data, frag_len);
 		net_buf_pull(buf, frag_len);
@@ -729,13 +712,9 @@ static struct net_buf *create_frag(struct bt_conn *conn, struct net_buf *buf)
 	/* Fragments never have a TX completion callback */
 	tx_data(frag)->tx = NULL;
 	tx_data(frag)->is_cont = false;
+	tx_data(frag)->iso_has_ts = tx_data(buf)->iso_has_ts;
 
 	return frag;
-}
-
-static bool fits_single_ctlr_buf(struct net_buf *buf, struct bt_conn *conn)
-{
-	return buf->len - iso_hdr_len(buf, conn) <= conn_mtu(conn);
 }
 
 static int send_buf(struct bt_conn *conn, struct net_buf *buf)
@@ -747,7 +726,7 @@ static int send_buf(struct bt_conn *conn, struct net_buf *buf)
 	LOG_DBG("conn %p buf %p len %u", conn, buf, buf->len);
 
 	/* Send directly if the packet fits the ACL MTU */
-	if (fits_single_ctlr_buf(buf, conn) && !tx_data(buf)->is_cont) {
+	if (buf->len <= conn_mtu(conn) && !tx_data(buf)->is_cont) {
 		LOG_DBG("send single");
 		return send_frag(conn, buf, NULL, FRAG_SINGLE);
 	}
@@ -2306,11 +2285,15 @@ static int start_security(struct bt_conn *conn)
 
 int bt_conn_set_security(struct bt_conn *conn, bt_security_t sec)
 {
+	bool force_pair;
 	int err;
 
 	if (conn->state != BT_CONN_CONNECTED) {
 		return -ENOTCONN;
 	}
+
+	force_pair = sec & BT_SECURITY_FORCE_PAIR;
+	sec &= ~BT_SECURITY_FORCE_PAIR;
 
 	if (IS_ENABLED(CONFIG_BT_SMP_SC_ONLY)) {
 		sec = BT_SECURITY_L4;
@@ -2321,13 +2304,12 @@ int bt_conn_set_security(struct bt_conn *conn, bt_security_t sec)
 	}
 
 	/* nothing to do */
-	if (conn->sec_level >= sec || conn->required_sec_level >= sec) {
+	if (!force_pair && (conn->sec_level >= sec || conn->required_sec_level >= sec)) {
 		return 0;
 	}
 
-	atomic_set_bit_to(conn->flags, BT_CONN_FORCE_PAIR,
-			  sec & BT_SECURITY_FORCE_PAIR);
-	conn->required_sec_level = sec & ~BT_SECURITY_FORCE_PAIR;
+	atomic_set_bit_to(conn->flags, BT_CONN_FORCE_PAIR, force_pair);
+	conn->required_sec_level = sec;
 
 	err = start_security(conn);
 

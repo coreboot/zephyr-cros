@@ -10,7 +10,7 @@ LOG_MODULE_REGISTER(net_gptp, CONFIG_NET_GPTP_LOG_LEVEL);
 #include <zephyr/net/net_pkt.h>
 #include <zephyr/drivers/ptp_clock.h>
 #include <zephyr/net/ethernet_mgmt.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 
 #include <zephyr/net/gptp.h>
 
@@ -19,8 +19,6 @@ LOG_MODULE_REGISTER(net_gptp, CONFIG_NET_GPTP_LOG_LEVEL);
 #include "gptp_data_set.h"
 
 #include "gptp_private.h"
-
-#define NET_GPTP_STACK_SIZE 2048
 
 #if CONFIG_NET_GPTP_NUM_PORTS > 32
 /*
@@ -31,7 +29,7 @@ LOG_MODULE_REGISTER(net_gptp, CONFIG_NET_GPTP_LOG_LEVEL);
 #error Maximum number of ports exceeded. (Max is 32).
 #endif
 
-K_KERNEL_STACK_DEFINE(gptp_stack, NET_GPTP_STACK_SIZE);
+K_KERNEL_STACK_DEFINE(gptp_stack, CONFIG_NET_GPTP_STACK_SIZE);
 K_FIFO_DEFINE(gptp_rx_queue);
 
 static k_tid_t tid;

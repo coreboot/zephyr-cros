@@ -396,7 +396,10 @@ static void can_nxp_s32_remove_rx_filter(const struct device *dev, int filter_id
 	struct can_nxp_s32_data *data = dev->data;
 	int mb_indx = ALLOC_IDX_TO_RXMB_IDX(filter_id);
 
-	__ASSERT_NO_MSG(filter_id >= 0 && filter_id < CONFIG_CAN_NXP_S32_MAX_RX);
+	if (filter_id < 0 || filter_id >= CONFIG_CAN_NXP_S32_MAX_RX) {
+		LOG_ERR("filter ID %d out of bounds", filter_id);
+		return;
+	}
 
 	k_mutex_lock(&data->rx_mutex, K_FOREVER);
 
@@ -728,12 +731,10 @@ static void can_nxp_s32_err_callback(const struct device *dev,
 static void nxp_s32_msg_data_to_zcan_frame(Canexcel_RxFdMsg msg_data,
 							struct can_frame *frame)
 {
+	memset(frame, 0, sizeof(*frame));
+
 	if (!!(msg_data.Header.Id & CANXL_TX_HEADER_IDE_MASK)) {
 		frame->flags |= CAN_FRAME_IDE;
-	}
-
-	if (!!(msg_data.Header.Id & CANXL_TX_HEADER_RTR_MASK)) {
-		frame->flags |= CAN_FRAME_RTR;
 	}
 
 	if (!!(frame->flags & CAN_FRAME_IDE)) {
@@ -754,7 +755,11 @@ static void nxp_s32_msg_data_to_zcan_frame(Canexcel_RxFdMsg msg_data,
 		frame->flags |= CAN_FRAME_BRS;
 	}
 
-	memcpy(frame->data, msg_data.data, can_dlc_to_bytes(frame->dlc));
+	if (!!(msg_data.Header.Id & CANXL_TX_HEADER_RTR_MASK)) {
+		frame->flags |= CAN_FRAME_RTR;
+	} else {
+		memcpy(frame->data, msg_data.data, can_dlc_to_bytes(frame->dlc));
+	}
 
 #ifdef CONFIG_CAN_RX_TIMESTAMP
 	frame->timestamp = msg_data.timeStampL;

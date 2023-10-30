@@ -9,6 +9,7 @@ sensors and LED wearables to sophisticated embedded controllers, smart
 watches, and IoT wireless applications.
 
 The Zephyr kernel supports multiple architectures, including:
+
  - ARCv2 (EM and HS) and ARCv3 (HS6X)
  - ARMv6-M, ARMv7-M, and ARMv8-M (Cortex-M)
  - ARMv7-A and ARMv8-A (Cortex-A, 32- and 64-bit)
@@ -146,10 +147,9 @@ Zephyr offers a large and ever growing number of features including:
    systems. A native POSIX port lets you build and run Zephyr as a native
    application on Linux and other OSes, aiding development and testing.
 
-**Virtual File System Interface with LittleFS and FATFS Support**
-   LittleFS and FATFS Support,
-   FCB (Flash Circular Buffer) for memory constrained applications, and
-   file system enhancements for logging and configuration.
+**Virtual File System Interface with ext2, FatFs, and LittleFS Support**
+   ext2, LittleFS and FatFS support; FCB (Flash Circular Buffer) for memory constrained
+   applications.
 
 **Powerful multi-backend logging Framework**
    Support for log filtering, object dumping, panic mode, multiple backends

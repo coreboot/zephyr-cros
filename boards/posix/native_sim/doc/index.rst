@@ -65,6 +65,8 @@ The 64 bit version, ``native_sim_64``, compiles your code targeting the
 LP64 ABI (x86-64 in x86 systems), where pointers and longs are 64 bits.
 You can use this target if you cannot compile or run 32 bit binaries.
 
+.. _native_sim_Clib_choice:
+
 C library choice
 ****************
 
@@ -111,7 +113,7 @@ host libC (:kconfig:option:`CONFIG_EXTERNAL_LIBC`).
      display, display SDL, :kconfig:option:`CONFIG_SDL_DISPLAY`, all
      entropy, native posix entropy, :kconfig:option:`CONFIG_FAKE_ENTROPY_NATIVE_POSIX`, all
      eprom, eprom emulator, :kconfig:option:`CONFIG_EEPROM_EMULATOR`, host libC
-     ethernet, eth native_posix, :kconfig:option:`CONFIG_ETH_NATIVE_POSIX`, host libC
+     ethernet, eth native_posix, :kconfig:option:`CONFIG_ETH_NATIVE_POSIX`, all
      flash, flash simulator, :kconfig:option:`CONFIG_FLASH_SIMULATOR`, all
      flash, host based flash access, :kconfig:option:`CONFIG_FUSE_FS_ACCESS`, host libC
      gpio, GPIO emulator, :kconfig:option:`CONFIG_GPIO_EMUL`, all

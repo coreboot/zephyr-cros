@@ -143,9 +143,23 @@ source "subsys/net/ip/Kconfig.ipv6"
 
 source "subsys/net/ip/Kconfig.ipv4"
 
+config NET_IPV4_MAPPING_TO_IPV6
+	bool "Support IPv4 mapped on IPv6 addresses"
+	depends on NET_NATIVE_IPV6
+	help
+	  Support v4-mapped-on-v6 address type. This allows IPv4 and IPv6
+	  to share a local port space. When the application gets an IPv4
+	  connection or packet to an IPv6 socket, its source address will
+	  be mapped to IPv6. This is turned off by default which means
+	  that IPV6_V6ONLY socket option is always on. If you enable this
+	  option, then you can still control the behaviour of the socket
+	  via the IPV6_V6ONLY option at runtime.
+
 config NET_SHELL
 	bool "Network shell utilities"
 	select SHELL
+	select NET_IPV4_IGMP if NET_IPV4
+	select NET_IPV6_MLD if NET_IPV6
 	help
 	  Activate shell module that provides network commands like
 	  ping to the console.
@@ -219,8 +233,8 @@ config NET_TC_RX_COUNT
 config NET_TC_SKIP_FOR_HIGH_PRIO
 	bool "Push high priority packets directly to network driver"
 	help
-	  If this is set, then high priority (NET_PRIORITY_CA) net_pkt will be
-	  pushed directly to network driver and will skip the traffic class
+	  If this is set, then high priority (>= NET_PRIORITY_CA) net_pkt will
+	  be pushed directly to network driver and will skip the traffic class
 	  queues. This is currently not enabled by default.
 
 choice NET_TC_THREAD_TYPE
@@ -564,6 +578,13 @@ config NET_TCP_WORKER_PRIO
 	  execution to the lower layer network stack, with a high risk of
 	  running out of net_bufs.
 
+config NET_TCP_REJECT_CONN_WITH_RST
+	bool "Reject connection attempts on unbound TCP ports with RST"
+	default y
+	help
+	  If enabled, TCP stack will reject connection attempts on unbound ports
+	  with TCP RST packet.
+
 config NET_TEST_PROTOCOL
 	bool "JSON based test protocol (UDP)"
 	help
@@ -839,8 +860,12 @@ config NET_HEADERS_ALWAYS_CONTIGUOUS
 	  NET_BUF_FIXED_DATA_SIZE enabled and NET_BUF_DATA_SIZE of 128 for
 	  instance.
 
+# If we are running network tests found in tests/net, then the NET_TEST is
+# set and in that case we default to Dummy L2 layer as typically the tests
+# use that by default.
 choice
 	prompt "Default Network Interface"
+	default NET_DEFAULT_IF_DUMMY if NET_TEST
 	default NET_DEFAULT_IF_FIRST
 	help
 	  If system has multiple interfaces enabled, then user shall be able

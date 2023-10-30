@@ -647,6 +647,7 @@ static void modem_cellular_connect_cmux_event_handler(struct modem_cellular_data
 	case MODEM_CELLULAR_EVENT_TIMEOUT:
 		modem_pipe_attach(data->uart_pipe, modem_cellular_bus_pipe_handler, data);
 		modem_pipe_open_async(data->uart_pipe);
+		break;
 
 	case MODEM_CELLULAR_EVENT_BUS_OPENED:
 		modem_cmux_attach(&data->cmux, data->uart_pipe);
@@ -1323,8 +1324,13 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(zephyr_gsm_ppp_init_chat_script_cmds,
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGSN", imei_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMM", cgmm_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP_NONE("AT+CMUX=0,0,5,127,10,3,30,10,2",
-							      0));
+			      /* The 300ms delay after sending the AT+CMUX command is required
+			       * for some modems to ensure they get enough time to enter CMUX
+			       * mode before sending the first CMUX command. If this delay is
+			       * too short, modems have been observed to simply deadlock,
+			       * refusing to respond to any CMUX command.
+			       */
+			      MODEM_CHAT_SCRIPT_CMD_RESP_NONE("AT+CMUX=0,0,5,127", 300));
 
 MODEM_CHAT_SCRIPT_DEFINE(zephyr_gsm_ppp_init_chat_script, zephyr_gsm_ppp_init_chat_script_cmds,
 			 abort_matches, modem_cellular_chat_callback_handler, 10);
@@ -1359,8 +1365,7 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(simcom_sim7080_init_chat_script_cmds,
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGSN", imei_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMM", cgmm_match),
-			      MODEM_CHAT_SCRIPT_CMD_RESP_NONE("AT+CMUX=0,0,5,127,10,3,30,10,2",
-							      0));
+			      MODEM_CHAT_SCRIPT_CMD_RESP_NONE("AT+CMUX=0,0,5,127", 300));
 
 MODEM_CHAT_SCRIPT_DEFINE(simcom_sim7080_init_chat_script, simcom_sim7080_init_chat_script_cmds,
 			 abort_matches, modem_cellular_chat_callback_handler, 10);

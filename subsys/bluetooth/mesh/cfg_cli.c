@@ -950,8 +950,8 @@ static int hb_pub_status(struct bt_mesh_model *model,
 	pub.count = net_buf_simple_pull_u8(buf);
 	pub.period = net_buf_simple_pull_u8(buf);
 	pub.ttl = net_buf_simple_pull_u8(buf);
-	pub.feat = net_buf_simple_pull_u8(buf);
-	pub.net_idx = net_buf_simple_pull_u8(buf);
+	pub.feat = net_buf_simple_pull_le16(buf);
+	pub.net_idx = net_buf_simple_pull_le16(buf) & 0xfff;
 
 	if (bt_mesh_msg_ack_ctx_match(&cli->ack_ctx, OP_HEARTBEAT_PUB_STATUS,
 				      ctx->addr, (void **)&param)) {
@@ -2320,7 +2320,7 @@ struct bt_mesh_mod_id_vnd bt_mesh_comp_p0_elem_mod_vnd(struct bt_mesh_comp_p0_el
 struct bt_mesh_comp_p1_elem *bt_mesh_comp_p1_elem_pull(struct net_buf_simple *buf,
 						       struct bt_mesh_comp_p1_elem *elem)
 {
-	if (buf->len < 6) {
+	if (buf->len < 4) {
 		LOG_DBG("No more elements to pull or missing data");
 		return NULL;
 	}

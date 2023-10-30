@@ -39,7 +39,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #include <zephyr/sys/byteorder.h>
 #include <string.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 
 #include <zephyr/net/ieee802154_radio.h>
 #include <zephyr/irq.h>
@@ -663,7 +663,7 @@ static int nrf5_stop(const struct device *dev)
 #if defined(CONFIG_IEEE802154_CSL_ENDPOINT)
 	if (nrf_802154_sleep_if_idle() != NRF_802154_SLEEP_ERROR_NONE) {
 		if (nrf5_data.event_handler) {
-			nrf5_data.event_handler(dev, IEEE802154_EVENT_SLEEP, NULL);
+			nrf5_data.event_handler(dev, IEEE802154_EVENT_RX_OFF, NULL);
 		} else {
 			LOG_WRN("Transition to radio sleep cannot be handled.");
 		}
@@ -877,27 +877,46 @@ static int nrf5_configure(const struct device *dev,
 #endif /* CONFIG_NRF_802154_ENCRYPTION */
 
 	case IEEE802154_CONFIG_ENH_ACK_HEADER_IE: {
-		uint8_t short_addr_le[SHORT_ADDRESS_SIZE];
 		uint8_t ext_addr_le[EXTENDED_ADDRESS_SIZE];
+		uint8_t short_addr_le[SHORT_ADDRESS_SIZE];
+		uint8_t element_id;
+
+		if (config->ack_ie.short_addr == IEEE802154_BROADCAST_ADDRESS ||
+		    config->ack_ie.ext_addr == NULL) {
+			return -ENOTSUP;
+		}
+
+		element_id = ieee802154_header_ie_get_element_id(config->ack_ie.header_ie);
+
+		if (element_id != IEEE802154_HEADER_IE_ELEMENT_ID_CSL_IE &&
+		    (!IS_ENABLED(CONFIG_NET_L2_OPENTHREAD) ||
+		     element_id != IEEE802154_HEADER_IE_ELEMENT_ID_VENDOR_SPECIFIC_IE)) {
+			return -ENOTSUP;
+		}
+
+#if defined(CONFIG_NET_L2_OPENTHREAD)
+		uint8_t vendor_oui_le[IEEE802154_OPENTHREAD_VENDOR_OUI_LEN] =
+			IEEE802154_OPENTHREAD_THREAD_IE_VENDOR_OUI;
+
+		if (element_id == IEEE802154_HEADER_IE_ELEMENT_ID_VENDOR_SPECIFIC_IE &&
+		    memcmp(config->ack_ie.header_ie->content.vendor_specific.vendor_oui,
+			   vendor_oui_le, sizeof(vendor_oui_le))) {
+			return -ENOTSUP;
+		}
+#endif
 
 		sys_put_le16(config->ack_ie.short_addr, short_addr_le);
-		/**
-		 * The extended address field passed to this function starts
-		 * with the most significant octet and ends with the least
-		 * significant octet (i.e. big endian byte order).
-		 * The IEEE 802.15.4 transmission order mandates this order to be
-		 * reversed (i.e. little endian byte order) in a transmitted frame.
-		 *
-		 * The nrf_802154_ack_data_set expects extended address in transmission
-		 * order.
-		 */
 		sys_memcpy_swap(ext_addr_le, config->ack_ie.ext_addr, EXTENDED_ADDRESS_SIZE);
 
-		if (config->ack_ie.data_len > 0) {
-			nrf_802154_ack_data_set(short_addr_le, false, config->ack_ie.data,
-						config->ack_ie.data_len, NRF_802154_ACK_DATA_IE);
-			nrf_802154_ack_data_set(ext_addr_le, true, config->ack_ie.data,
-						config->ack_ie.data_len, NRF_802154_ACK_DATA_IE);
+		if (config->ack_ie.header_ie && config->ack_ie.header_ie->length > 0) {
+			nrf_802154_ack_data_set(short_addr_le, false, config->ack_ie.header_ie,
+						config->ack_ie.header_ie->length +
+							IEEE802154_HEADER_IE_HEADER_LENGTH,
+						NRF_802154_ACK_DATA_IE);
+			nrf_802154_ack_data_set(ext_addr_le, true, config->ack_ie.header_ie,
+						config->ack_ie.header_ie->length +
+							IEEE802154_HEADER_IE_HEADER_LENGTH,
+						NRF_802154_ACK_DATA_IE);
 		} else {
 			nrf_802154_ack_data_clear(short_addr_le, false, NRF_802154_ACK_DATA_IE);
 			nrf_802154_ack_data_clear(ext_addr_le, true, NRF_802154_ACK_DATA_IE);
@@ -905,8 +924,9 @@ static int nrf5_configure(const struct device *dev,
 	} break;
 
 #if defined(CONFIG_IEEE802154_CSL_ENDPOINT)
-	case IEEE802154_CONFIG_CSL_RX_TIME: {
-		nrf_802154_csl_writer_anchor_time_set(config->csl_rx_time / NSEC_PER_USEC);
+	case IEEE802154_CONFIG_EXPECTED_RX_TIME: {
+		nrf_802154_csl_writer_anchor_time_set(nrf_802154_timestamp_phr_to_mhr_convert(
+			config->expected_rx_time / NSEC_PER_USEC));
 	} break;
 
 	case IEEE802154_CONFIG_RX_SLOT: {
@@ -1024,7 +1044,7 @@ void nrf_802154_receive_failed(nrf_802154_rx_error_t error, uint32_t id)
 		 * As a side effect, regular failure notifications would be reported with the
 		 * incorrect ID.
 		 */
-		nrf5_data.event_handler(dev, IEEE802154_EVENT_SLEEP, NULL);
+		nrf5_data.event_handler(dev, IEEE802154_EVENT_RX_OFF, NULL);
 #endif
 		if (error == NRF_802154_RX_ERROR_DELAYED_TIMEOUT) {
 			return;

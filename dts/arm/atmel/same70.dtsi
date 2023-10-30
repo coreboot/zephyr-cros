@@ -57,6 +57,13 @@
 			status = "okay";
 		};
 
+		supc: supc@400e1810 {
+			compatible = "atmel,sam-supc";
+			reg = <0x400e1810 0x20>;
+			#wakeup-source-id-cells = <1>;
+			status = "okay";
+		};
+
 		eefc: flash-controller@400e0c00 {
 			compatible = "atmel,sam-flash-controller";
 			reg = <0x400e0c00 0x200>;
@@ -442,6 +449,15 @@
 			reg = <0x400e1800 0x10>;
 			clocks = <&pmc PMC_TYPE_PERIPHERAL 1>;
 			user-nrst;
+		};
+
+		rtc: rtc@400e1860 {
+			compatible = "atmel,sam-rtc";
+			reg = <0x400e1860 0x100>;
+			interrupts = <2 0>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 2>;
+			alarms-count = <1>;
+			status = "disabled";
 		};
 	};
 };

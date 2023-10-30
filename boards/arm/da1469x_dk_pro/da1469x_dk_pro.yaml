@@ -15,4 +15,6 @@ supported:
   - i2c
   - spi
   - usb_device
+  - rtc
+  - crypto
 vendor: renesas

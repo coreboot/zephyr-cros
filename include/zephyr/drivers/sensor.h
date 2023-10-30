@@ -807,10 +807,13 @@ struct __attribute__((__packed__)) sensor_data_generic_header {
 	 * The number of channels present in the frame. This will be the true number of elements in
 	 * channel_info and in the q31 values that follow the header.
 	 */
-	size_t num_channels;
+	uint32_t num_channels;
 
 	/* Shift value for all samples in the frame */
 	int8_t shift;
+
+	/* This padding is needed to make sure that the 'channels' field is aligned */
+	int8_t _padding[sizeof(enum sensor_channel) - 1];
 
 	/* Channels present in the frame */
 	enum sensor_channel channels[0];
@@ -1263,8 +1266,6 @@ static inline int64_t sensor_value_to_micro(const struct sensor_value *val)
  * @}
  */
 
-#if defined(CONFIG_HAS_DTS) || defined(__DOXYGEN__)
-
 /**
  * @brief Get the decoder name for the current driver
  *
@@ -1312,7 +1313,6 @@ static inline int64_t sensor_value_to_micro(const struct sensor_value *val)
 		    ())
 
 DT_FOREACH_STATUS_OKAY_NODE(Z_MAYBE_SENSOR_DECODER_DECLARE_INTERNAL)
-#endif /* defined(CONFIG_HAS_DTS) || defined(__DOXYGEN__) */
 
 #ifdef __cplusplus
 }

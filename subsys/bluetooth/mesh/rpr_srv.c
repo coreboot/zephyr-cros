@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 #include <zephyr/sys/slist.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/mesh/rpr_srv.h>
@@ -423,7 +423,7 @@ static void subnet_evt_handler(struct bt_mesh_subnet *subnet,
 		link_close(BT_MESH_RPR_ERR_LINK_CLOSED_BY_SERVER,
 			   PROV_BEARER_LINK_STATUS_FAIL);
 		/* Skip the link closing stage, as specified in the Bluetooth
-		 * Mesh Profile specification, section 4.4.5.4.
+		 * MshPRTv1.1: 4.4.5.4.
 		 */
 		srv.link.state = BT_MESH_RPR_LINK_IDLE;
 	} else if (atomic_test_bit(srv.flags, SCANNING) &&
@@ -634,7 +634,7 @@ static int handle_extended_scan_start(struct bt_mesh_model *mod, struct bt_mesh_
 	uint8_t timeout;
 	int i;
 
-	/* According to the Bluetooth Mesh specification, section 4.4.5.5.1.7, scan reports shall be
+	/* According to MshPRTv1.1: 4.4.5.5.1.7, scan reports shall be
 	 * sent as segmented messages.
 	 */
 	ctx->send_rel = true;
@@ -1337,7 +1337,6 @@ static void rpr_srv_reset(struct bt_mesh_model *mod)
 	atomic_clear(srv.flags);
 	srv.link.dev = NULL;
 	srv.scan.dev = NULL;
-	srv.mod = NULL;
 }
 
 const struct bt_mesh_model_cb _bt_mesh_rpr_srv_cb = {
