@@ -707,8 +707,8 @@ struct _static_thread_data {
 	.init_p3 = (void *)p3,                                   \
 	.init_prio = (prio),                                     \
 	.init_options = (options),                               \
-	.init_delay = SYS_TIMEOUT_MS(delay),			 \
 	.init_name = STRINGIFY(tname),                           \
+	.init_delay = SYS_TIMEOUT_MS(delay),			 \
 	}
 
 /*
@@ -1463,6 +1463,10 @@ struct k_timer {
 	void *user_data;
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_timer)
+
+#ifdef CONFIG_OBJ_CORE_TIMER
+	struct k_obj_core  obj_core;
+#endif
 };
 
 #define Z_TIMER_INITIALIZER(obj, expiry, stop) \
@@ -2201,6 +2205,11 @@ struct k_event {
 	struct k_spinlock lock;
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_event)
+
+#ifdef CONFIG_OBJ_CORE_EVENT
+	struct k_obj_core obj_core;
+#endif
+
 };
 
 #define Z_EVENT_INITIALIZER(obj) \
@@ -2359,6 +2368,9 @@ static inline uint32_t k_event_test(struct k_event *event, uint32_t events_mask)
 
 struct k_fifo {
 	struct k_queue _queue;
+#ifdef CONFIG_OBJ_CORE_FIFO
+	struct k_obj_core  obj_core;
+#endif
 };
 
 /**
@@ -2386,11 +2398,13 @@ struct k_fifo {
  *
  * @param fifo Address of the FIFO queue.
  */
-#define k_fifo_init(fifo) \
-	({ \
+#define k_fifo_init(fifo)                                    \
+	({                                                   \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_fifo, init, fifo); \
-	k_queue_init(&(fifo)->_queue); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, init, fifo); \
+	k_queue_init(&(fifo)->_queue);                       \
+	K_OBJ_CORE_INIT(K_OBJ_CORE(fifo), _obj_type_fifo);   \
+	K_OBJ_CORE_LINK(K_OBJ_CORE(fifo));                   \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_fifo, init, fifo);  \
 	})
 
 /**
@@ -2586,13 +2600,16 @@ struct k_fifo {
  * @param name Name of the FIFO queue.
  */
 #define K_FIFO_DEFINE(name) \
-	STRUCT_SECTION_ITERABLE_ALTERNATE(k_queue, k_fifo, name) = \
+	STRUCT_SECTION_ITERABLE(k_fifo, name) = \
 		Z_FIFO_INITIALIZER(name)
 
 /** @} */
 
 struct k_lifo {
 	struct k_queue _queue;
+#ifdef CONFIG_OBJ_CORE_LIFO
+	struct k_obj_core  obj_core;
+#endif
 };
 
 /**
@@ -2621,11 +2638,13 @@ struct k_lifo {
  *
  * @param lifo Address of the LIFO queue.
  */
-#define k_lifo_init(lifo) \
-	({ \
+#define k_lifo_init(lifo)                                    \
+	({                                                   \
 	SYS_PORT_TRACING_OBJ_FUNC_ENTER(k_lifo, init, lifo); \
-	k_queue_init(&(lifo)->_queue); \
-	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_lifo, init, lifo); \
+	k_queue_init(&(lifo)->_queue);                       \
+	K_OBJ_CORE_INIT(K_OBJ_CORE(lifo), _obj_type_lifo);   \
+	K_OBJ_CORE_LINK(K_OBJ_CORE(lifo));                   \
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(k_lifo, init, lifo);  \
 	})
 
 /**
@@ -2706,7 +2725,7 @@ struct k_lifo {
  * @param name Name of the fifo.
  */
 #define K_LIFO_DEFINE(name) \
-	STRUCT_SECTION_ITERABLE_ALTERNATE(k_queue, k_lifo, name) = \
+	STRUCT_SECTION_ITERABLE(k_lifo, name) = \
 		Z_LIFO_INITIALIZER(name)
 
 /** @} */
@@ -2726,6 +2745,10 @@ struct k_stack {
 	uint8_t flags;
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_stack)
+
+#ifdef CONFIG_OBJ_CORE_STACK
+	struct k_obj_core  obj_core;
+#endif
 };
 
 #define Z_STACK_INITIALIZER(obj, stack_buffer, stack_num_entries) \
@@ -2882,6 +2905,10 @@ struct k_mutex {
 	int owner_orig_prio;
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_mutex)
+
+#ifdef CONFIG_OBJ_CORE_MUTEX
+	struct k_obj_core obj_core;
+#endif
 };
 
 /**
@@ -2979,6 +3006,10 @@ __syscall int k_mutex_unlock(struct k_mutex *mutex);
 
 struct k_condvar {
 	_wait_q_t wait_q;
+
+#ifdef CONFIG_OBJ_CORE_CONDVAR
+	struct k_obj_core  obj_core;
+#endif
 };
 
 #define Z_CONDVAR_INITIALIZER(obj)                                             \
@@ -3067,6 +3098,9 @@ struct k_sem {
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_sem)
 
+#ifdef CONFIG_OBJ_CORE_SEM
+	struct k_obj_core  obj_core;
+#endif
 };
 
 #define Z_SEM_INITIALIZER(obj, initial_count, count_limit) \
@@ -4379,6 +4413,10 @@ struct k_msgq {
 	uint8_t flags;
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_msgq)
+
+#ifdef CONFIG_OBJ_CORE_MSGQ
+	struct k_obj_core  obj_core;
+#endif
 };
 /**
  * @cond INTERNAL_HIDDEN
@@ -4677,6 +4715,10 @@ struct k_mbox {
 	struct k_spinlock lock;
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_mbox)
+
+#ifdef CONFIG_OBJ_CORE_MAILBOX
+	struct k_obj_core  obj_core;
+#endif
 };
 /**
  * @cond INTERNAL_HIDDEN
@@ -4814,6 +4856,10 @@ struct k_pipe {
 	uint8_t	       flags;		/**< Flags */
 
 	SYS_PORT_TRACING_TRACKING_FIELD(k_pipe)
+
+#ifdef CONFIG_OBJ_CORE_PIPE
+	struct k_obj_core  obj_core;
+#endif
 };
 
 /**
@@ -4999,31 +5045,37 @@ __syscall void k_pipe_buffer_flush(struct k_pipe *pipe);
  * @cond INTERNAL_HIDDEN
  */
 
-struct k_mem_slab {
-	_wait_q_t wait_q;
-	struct k_spinlock lock;
+struct k_mem_slab_info {
 	uint32_t num_blocks;
-	size_t block_size;
-	char *buffer;
-	char *free_list;
+	size_t   block_size;
 	uint32_t num_used;
 #ifdef CONFIG_MEM_SLAB_TRACE_MAX_UTILIZATION
 	uint32_t max_used;
 #endif
-
-	SYS_PORT_TRACING_TRACKING_FIELD(k_mem_slab)
 };
 
-#define Z_MEM_SLAB_INITIALIZER(obj, slab_buffer, slab_block_size, \
-			       slab_num_blocks) \
-	{ \
-	.wait_q = Z_WAIT_Q_INIT(&obj.wait_q), \
-	.lock = {}, \
-	.num_blocks = slab_num_blocks, \
-	.block_size = slab_block_size, \
-	.buffer = slab_buffer, \
-	.free_list = NULL, \
-	.num_used = 0, \
+struct k_mem_slab {
+	_wait_q_t wait_q;
+	struct k_spinlock lock;
+	char *buffer;
+	char *free_list;
+	struct k_mem_slab_info info;
+
+	SYS_PORT_TRACING_TRACKING_FIELD(k_mem_slab)
+
+#ifdef CONFIG_OBJ_CORE_MEM_SLAB
+	struct k_obj_core  obj_core;
+#endif
+};
+
+#define Z_MEM_SLAB_INITIALIZER(_slab, _slab_buffer, _slab_block_size, \
+			       _slab_num_blocks)                      \
+	{                                                             \
+	.wait_q = Z_WAIT_Q_INIT(&(_slab).wait_q),                     \
+	.lock = {},                                                   \
+	.buffer = _slab_buffer,                                       \
+	.free_list = NULL,                                            \
+	.info = {_slab_num_blocks, _slab_block_size, 0}               \
 	}
 
 
@@ -5162,7 +5214,7 @@ extern void k_mem_slab_free(struct k_mem_slab *slab, void *mem);
  */
 static inline uint32_t k_mem_slab_num_used_get(struct k_mem_slab *slab)
 {
-	return slab->num_used;
+	return slab->info.num_used;
 }
 
 /**
@@ -5178,7 +5230,7 @@ static inline uint32_t k_mem_slab_num_used_get(struct k_mem_slab *slab)
 static inline uint32_t k_mem_slab_max_used_get(struct k_mem_slab *slab)
 {
 #ifdef CONFIG_MEM_SLAB_TRACE_MAX_UTILIZATION
-	return slab->max_used;
+	return slab->info.max_used;
 #else
 	ARG_UNUSED(slab);
 	return 0;
@@ -5197,7 +5249,7 @@ static inline uint32_t k_mem_slab_max_used_get(struct k_mem_slab *slab)
  */
 static inline uint32_t k_mem_slab_num_free_get(struct k_mem_slab *slab)
 {
-	return slab->num_blocks - slab->num_used;
+	return slab->info.num_blocks - slab->info.num_used;
 }
 
 /**
@@ -5879,10 +5931,6 @@ static inline void k_cpu_atomic_idle(unsigned int key)
 /**
  * @internal
  */
-extern void z_init_thread_base(struct _thread_base *thread_base,
-			      int priority, uint32_t initial_state,
-			      unsigned int options);
-
 #ifdef CONFIG_MULTITHREADING
 /**
  * @internal
@@ -5893,16 +5941,6 @@ extern void z_init_static_threads(void);
  * @internal
  */
 #define z_init_static_threads() do { } while (false)
-#endif
-
-/**
- * @internal
- */
-extern bool z_is_thread_essential(void);
-
-#ifdef CONFIG_SMP
-void z_smp_thread_init(void *arg, struct k_thread *thread);
-void z_smp_thread_swap(void);
 #endif
 
 /**

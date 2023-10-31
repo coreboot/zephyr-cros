@@ -1147,15 +1147,6 @@ Release Notes:
   labels:
     - "area: Modem"
 
-"Drivers: Neural Networks":
-  status: odd fixes
-  collaborators:
-    - nashif
-  files:
-    - drivers/neural_net/
-  labels:
-    - "area: Neural Networks"
-
 "Drivers: Regulators":
   status: maintained
   maintainers:
@@ -2917,6 +2908,7 @@ West:
     - scripts/west-commands.yml
     - scripts/west_commands/
     - doc/develop/west/
+    - scripts/pylib/build_helpers/domains.py
   labels:
     - "area: West"
 
@@ -3689,3 +3681,18 @@ zbus:
     - doc/services/zbus/
   labels:
     - "area: zbus"
+
+"Linkable Loadable Extensions":
+  status: maintained
+  maintainers:
+    - teburd
+  collaborators:
+    - lyakh
+  files:
+    - samples/subsys/llext/
+    - include/zephyr/llext/
+    - tests/subsys/llext/
+    - subsys/llext/
+    - doc/services/llext/
+  labels:
+    - "area: Linkable Loadable Extensions"

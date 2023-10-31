@@ -6,7 +6,7 @@
 #include <zephyr/kernel.h>
 #include <ksched.h>
 #include <zephyr/spinlock.h>
-#include <zephyr/kernel/sched_priq.h>
+#include <zephyr/kernel/internal/sched_priq.h>
 #include <wait_q.h>
 #include <kswap.h>
 #include <kernel_arch_func.h>
@@ -1740,6 +1740,13 @@ static void end_thread(struct k_thread *thread)
 
 #ifdef CONFIG_CMSIS_RTOS_V1
 		z_thread_cmsis_status_mask_clear(thread);
+#endif
+
+#ifdef CONFIG_OBJ_CORE_THREAD
+#ifdef CONFIG_OBJ_CORE_STATS_THREAD
+		k_obj_core_stats_deregister(K_OBJ_CORE(thread));
+#endif
+		k_obj_core_unlink(K_OBJ_CORE(thread));
 #endif
 
 #ifdef CONFIG_USERSPACE

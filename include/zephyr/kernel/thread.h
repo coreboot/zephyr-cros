@@ -347,15 +347,15 @@ struct k_thread {
 	struct _pipe_desc pipe_desc;
 #endif
 
+#ifdef CONFIG_OBJ_CORE_THREAD
+	struct k_obj_core  obj_core;
+#endif
+
 	/** arch-specifics: must always be at the end */
 	struct _thread_arch arch;
 };
 
 typedef struct k_thread _thread_t;
 typedef struct k_thread *k_tid_t;
-
-void z_init_cpu(int id);
-void z_sched_ipi(void);
-void z_smp_start_cpu(int id);
 
 #endif

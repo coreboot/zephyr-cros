@@ -191,6 +191,7 @@ uint8_t ull_peripheral_iso_acquire(struct ll_conn *acl,
 
 		cig->iso_interval = sys_le16_to_cpu(req->iso_interval);
 		iso_interval_us = cig->iso_interval * CONN_INT_UNIT_US;
+		cig->lll.iso_interval_us = iso_interval_us;
 
 		cig->cig_id = req->cig_id;
 		cig->lll.handle = LLL_HANDLE_INVALID;
@@ -325,6 +326,9 @@ uint8_t ull_peripheral_iso_setup(struct pdu_data_llctrl_cis_ind *ind,
 	cis->sync_delay = sys_get_le24(ind->cis_sync_delay);
 	cis->offset = cis_offset;
 	memcpy(cis->lll.access_addr, ind->aa, sizeof(ind->aa));
+#if defined(CONFIG_BT_CTLR_ISOAL_PSN_IGNORE)
+	cis->pkt_seq_num = 0U;
+#endif /* CONFIG_BT_CTLR_ISOAL_PSN_IGNORE */
 	cis->lll.event_count = LLL_CONN_ISO_EVENT_COUNT_MAX;
 	cis->lll.next_subevent = 0U;
 	cis->lll.sn = 0U;

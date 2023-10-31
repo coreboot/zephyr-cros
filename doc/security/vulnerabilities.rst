@@ -1339,6 +1339,11 @@ This has been fixed in main for v3.4.0
 - `PR 56709 fix for main
   <https://github.com/zephyrproject-rtos/zephyr/pull/56709>`_
 
+CVE-2023-4257
+-------------
+
+Under embargo until 2023/10/12
+
 CVE-2023-4258
 -------------
 
@@ -1358,6 +1363,38 @@ This has been fixed in main for v3.5.0
 - `PR 60079 fix for 3.3
   <https://github.com/zephyrproject-rtos/zephyr/pull/60079>`_
 
+CVE-2023-4262
+-------------
+
+Potential buffer overflow vulnerabilities in the Zephyr Mgmt subsystem
+
+- `Zephyr project bug tracker GHSA-56p9-5p3v-hhrc
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-56p9-5p3v-hhrc>`_
+
+- This issue has not been fixed.
+
+CVE-2023-4264
+-------------
+
+Potential buffer overflow vulnerabilities in the Zephyr Bluetooth subsystem
+
+- `Zephyr project bug tracker GHSA-rgx6-3w4j-gf5j
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-rgx6-3w4j-gf5j>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 58834 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/58834>`_
+
+- `PR 60465 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/60465>`_
+
+- `PR 61845 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/61845>`_
+
+- `PR 61385 fix for 3.4
+  <https://github.com/zephyrproject-rtos/zephyr/pull/61385>`_
+
 CVE-2023-4265
 -------------
 
@@ -1372,3 +1409,32 @@ This has been fixed in main for v3.4.0
   <https://github.com/zephyrproject-rtos/zephyr/pull/59157>`_
 - `PR 59018 fix for main
   <https://github.com/zephyrproject-rtos/zephyr/pull/59018>`_
+
+CVE-2023-4424
+-------------
+
+Under embargo until 2023/11/01
+
+CVE-2023-5055
+-------------
+
+Under embargo until 2023/11/01
+
+CVE-2023-5139
+-------------
+
+Under embargo until 2023/10/25
+
+CVE-2023-5184
+-------------
+
+Potential signed to unsigned conversion errors and buffer overflow
+vulnerabilities in the Zephyr IPM driver
+
+- `Zephyr project bug tracker GHSA-8x3p-q3r5-xh9g
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-8x3p-q3r5-xh9g>`_
+
+This has been fixed in main for v3.5.0
+
+- `PR 63069 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/63069>`_

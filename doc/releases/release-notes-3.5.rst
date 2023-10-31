@@ -9,6 +9,8 @@ We are pleased to announce the release of Zephyr version 3.5.0.
 
 Major enhancements with this release include:
 
+* Added native_sim (successor to native_posix)
+
 The following sections provide detailed lists of changes by component.
 
 Security Vulnerability Related
@@ -18,8 +20,22 @@ The following CVEs are addressed by this release:
 More detailed information can be found in:
 https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
+* CVE-2023-4257: Under embargo until 2023-10-12
+
 * CVE-2023-4258 `Zephyr project bug tracker GHSA-m34c-cp63-rwh7
   <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-m34c-cp63-rwh7>`_
+
+* CVE-2023-4264 `Zephyr project bug tracker GHSA-rgx6-3w4j-gf5j
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-rgx6-3w4j-gf5j>`_
+
+* CVE-2023-4424: Under embargo until 2023-11-01
+
+* CVE-2023-5055: Under embargo until 2023-11-01
+
+* CVE-2023-5139: Under embargo until 2023-10-25
+
+* CVE-2023-5184 `Zephyr project bug tracker GHSA-8x3p-q3r5-xh9g
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-8x3p-q3r5-xh9g>`_
 
 
 Kernel
@@ -42,6 +58,16 @@ Architectures
 * RISC-V
 
 * Xtensa
+
+* POSIX
+
+  * Has been reworked to use the native simulator.
+  * New boards have been added.
+  * For the new boards, embedded C libraries can be used, and conflicts with the host symbols
+    and libraries avoided.
+  * The :ref:`POSIX OS abstraction<posix_support>` is supported in these new boards.
+  * AMP targets are now supported.
+  * Added support for LLVM source profiling/coverage.
 
 Bluetooth
 *********
@@ -89,6 +115,12 @@ Boards & SoC Support
 
 * Added support for these Xtensa boards:
 
+* Added support for these POSIX boards:
+
+  * :ref:`native_sim(_64) <native_sim>`
+  * nrf5340bsim_nrf5340_cpu(net|app). A simulated nrf5340 SOC, which uses Babblesim for its radio
+    traffic.
+
 * Made these changes for ARC boards:
 
 * Made these changes for ARM boards:
@@ -100,6 +132,13 @@ Boards & SoC Support
 * Made these changes for X86 boards:
 
 * Made these changes for Xtensa boards:
+
+* Made these changes for POSIX boards:
+
+  * nrf52_bsim:
+
+    * Has been reworked to use the native simulator as its runner.
+    * Multiple HW models improvements and fixes. GPIO & GPIOTE peripherals added.
 
 * Removed support for these ARC boards:
 
@@ -135,6 +174,14 @@ Build system and infrastructure
 * Added support for setting MCUboot encryption key in sysbuild which is then
   propagated to the bootloader and target images to automatically create
   encrypted updates.
+
+* Build time priority checking: enable build time priority checking by default.
+  This fails the build if the initialization sequence in the final ELF file
+  does not match the devicetree hierarchy. It can be turned off by disabling
+  the :kconfig:option:`COFNIG_CHECK_INIT_PRIORITIES` option.
+
+* Added a new ``initlevels`` target for printing the final device and
+  :c:macro:`SYS_INIT` initialization sequence from the final ELF file.
 
 Drivers and Sensors
 *******************
@@ -221,6 +268,24 @@ Drivers and Sensors
 
   * GIC: Architecture version selection is now based on the device tree
 
+* Input
+
+  * New drivers: :dtcompatible:`gpio-qdec`, :dtcompatible:`st,stmpe811`.
+
+  * Drivers converted from Kscan to Input: :dtcompatible:`goodix,gt911`
+    :dtcompatible:`xptek,xpt2046` :dtcompatible:`hynitron,cst816s`
+    :dtcompatible:`microchip,cap1203`.
+
+  * Added a Kconfig option for dumping all events to the console
+    :kconfig:option:`CONFIG_INPUT_EVENT_DUMP` and new shell commands
+    :kconfig:option:`CONFIG_INPUT_SHELL`.
+
+  * Merged ``zephyr,gpio-keys`` into :dtcompatible:`gpio-keys` and added
+    ``zephyr,code`` codes to all in-tree board ``gpio-keys`` nodes.
+
+  * Renamed the callback definition macro from ``INPUT_LISTENER_CB_DEFINE`` to
+    :c:macro:`INPUT_CALLBACK_DEFINE`.
+
 * IPM
 
 * KSCAN
@@ -249,9 +314,19 @@ Drivers and Sensors
 
   * Added support for Nuvoton NuMaker M46x
 
+* Retained memory
+
+  * Added support for allowing mutex support to be forcibly disabled with
+    :kconfig:option:`CONFIG_RETAINED_MEM_MUTEX_FORCE_DISABLE`.
+
+  * Fixed issue with user mode support not working.
+
 * SDHC
 
 * Sensor
+
+  * Reworked the :dtcompatible:`ti,bq274xx` to add ``BQ27427`` support, fixed
+    units for capacity and power channels.
 
 * Serial
 
@@ -332,7 +407,7 @@ Libraries / Subsystems
 
   * MCUmgr SMP version 2 error translation (to legacy MCUmgr error code) is now
     supported in function handlers by setting ``mg_translate_error`` of
-    :c:struct:`mgmt_group` when registering a transport. See
+    :c:struct:`mgmt_group` when registering a group. See
     :c:type:`smp_translate_error_fn` for function details.
 
   * Fixed an issue with MCUmgr img_mgmt group whereby the size of the upload in
@@ -367,6 +442,15 @@ Libraries / Subsystems
   * Added ``user_data`` as an optional field to :c:struct:`mgmt_handler` when
     :kconfig:option:`CONFIG_MCUMGR_MGMT_HANDLER_USER_DATA` is enabled.
 
+  * Added optional ``force`` parameter to os mgmt reset command, this can be checked in the
+    :c:enum:`MGMT_EVT_OP_OS_MGMT_RESET` notification callback whose data structure is
+    :c:struct:`os_mgmt_reset_data`.
+
+  * Added configurable number of SMP encoding levels via
+    :kconfig:option:`CONFIG_MCUMGR_SMP_CBOR_MIN_ENCODING_LEVELS`, which automatically increments
+    minimum encoding levels for in-tree groups if :kconfig:option:`CONFIG_ZCBOR_CANONICAL` is
+    enabled.
+
 * File systems
 
   * Added support for ext2 file system.
@@ -378,6 +462,9 @@ Libraries / Subsystems
 * Retention
 
   * Added the :ref:`blinfo_api` subsystem.
+
+  * Added support for allowing mutex support to be forcibly disabled with
+    :kconfig:option:`CONFIG_RETENTION_MUTEX_FORCE_DISABLE`.
 
 * Binary descriptors
 
@@ -402,6 +489,63 @@ MCUboot
     that allows to inform application that the on-board MCUboot will overwrite
     the primary slot with secondary slot contents, without saving the original
     image in primary slot.
+
+  * Fixed issue with serial recovery not showing image details for decrypted images.
+
+  * Fixed issue with serial recovery in single slot mode wrongly iterating over 2 image slots.
+
+  * Fixed an issue with boot_serial repeats not being processed when output was sent, this would
+    lead to a divergence of commands whereby later commands being sent would have the previous
+    command output sent instead.
+
+  * Fixed an issue with the boot_serial zcbor setup encoder function wrongly including the buffer
+    address in the size which caused serial recovery to fail on some platforms.
+
+  * Fixed wrongly building in optimize for debug mode by default, this saves a significant amount
+    of flash space.
+
+  * Fixed issue with serial recovery use of MBEDTLS having undefined operations which led to usage
+    faults when the secondary slot image was encrypted.
+
+  * Added error output when flash device fails to open and asserts are disabled, which will now
+    panic the bootloader.
+
+  * Added currently running slot ID and maximum application size to shared data function
+    definition.
+
+  * Added P384 and SHA384 support to imgtool.
+
+  * Added optional serial recovery image state and image set state commands.
+
+  * Added ``dumpinfo`` command for signed image parsing in imgtool.
+
+  * Added ``getpubhash`` command to dump the sha256 hash of the public key in imgtool.
+
+  * Added support for ``getpub`` to print the output to a file in imgtool.
+
+  * Added support for dumping the raw versions of the public keys in imgtool.
+
+  * Added support for sharing boot information with application via retention subsystem.
+
+  * Added support for serial recovery to read and handle encrypted seondary slot partitions.
+
+  * Removed ECDSA P224 support.
+
+  * Removed custom image list boot serial extension support.
+
+  * Reworked boot serial extensions so that they can be used by modules or from user repositories
+    by switching to iterable sections.
+
+  * Reworked image encryption support for Zephyr, static dummy key files are no longer in the code,
+    a pem file must be supplied to extract the private and public keys. The Kconfig menu has
+    changed to only show a single option for enabling encryption and selecting the key file.
+
+  * Reworked the ECDSA256 TLV curve agnostic and renamed it to ``ECDSA_SIG``.
+
+  * CDDL auto-generated function code has been replaced with zcbor function calls, this now allows
+    the parameters to be supplied in any order.
+
+  * The MCUboot version in this release is version ``2.0.0+0-rc1``.
 
 Storage
 *******

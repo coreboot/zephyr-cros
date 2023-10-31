@@ -34,6 +34,13 @@ Required changes
   SMP version 2 error code defines for in-tree modules have been updated to
   replace the ``*_RET_RC_*`` parts with ``*_ERR_*``.
 
+* MCUmgr SMP version 2 error translation (to legacy MCUmgr error code) is now
+  handled in function handlers by setting the ``mg_translate_error`` function
+  pointer of :c:struct:`mgmt_group` when registering a group. See
+  :c:type:`smp_translate_error_fn` for function details. Any SMP version 2
+  handlers made for Zephyr 3.4 need to be updated to include these translation
+  functions when the groups are registered.
+
 * ``zephyr,memory-region-mpu`` was renamed ``zephyr,memory-attr`` and its type
   moved from 'enum' to 'int'. To have a seamless conversion this is the
   required change in the DT:
@@ -138,6 +145,49 @@ Required changes
              reg = <0>;
          };
      };
+
+* The ``accept()`` callback's signature in :c:struct:`bt_l2cap_server` has
+  changed to ``int (*accept)(struct bt_conn *conn, struct bt_l2cap_server
+  *server, struct bt_l2cap_chan **chan)``,
+  adding a new ``server`` parameter pointing to the :c:struct:`bt_l2cap_server`
+  structure instance the callback relates to. :github:`60536`
+
+* The RAM disk driver has been changed to support multiple instances and instantiation
+  using devicetree. As a result, Kconfig option :kconfig:option:`CONFIG_DISK_RAM_VOLUME_SIZE`
+  and Kconfig option :kconfig:option:`CONFIG_DISK_RAM_VOLUME_NAME` are removed,
+  and the application using the RAM disk must instantiate it using devicetree,
+  as in the following example:
+
+  .. code-block:: devicetree
+
+    / {
+        ramdisk0 {
+            compatible = "zephyr,ram-disk";
+            disk-name = "RAM";
+            sector-size = <512>;
+            sector-count = <192>;
+        };
+    };
+
+* The :dtcompatible:`goodix,gt911`, :dtcompatible:`xptek,xpt2046` and
+  :dtcompatible:`hynitron,cst816s` drivers have been converted from Kscan to
+  Input, they can still be used with Kscan applications by adding a
+  :dtcompatible:`zephyr,kscan-input` node.
+
+* The ``zephyr,gpio-keys`` binding has been merged into
+  :dtcompatible:`gpio-keys` and the callback definition has been renamed from
+  ``INPUT_LISTENER_CB_DEFINE`` to :c:macro:`INPUT_CALLBACK_DEFINE`.
+
+* :c:macro:`CONTAINER_OF` now performs type checking, this was very commonly
+  misused to obtain user structure from :c:struct:`k_work` pointers without
+  passing from :c:struct:`k_work_delayable`. This would now result in a build
+  error and have to be done correctly using
+  :c:func:`k_work_delayable_from_work`.
+
+* The :dtcompatible:`ti,bq274xx` driver was using incorrect units for capacity
+  and power channels, these have been fixed and scaled by x1000 factor from the
+  previous implementation, any application using them has to be changed
+  accordingly.
 
 Recommended Changes
 *******************

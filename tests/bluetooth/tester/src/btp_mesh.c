@@ -50,6 +50,7 @@ static uint8_t priv_key[32];
 /* Configured provisioning data */
 static uint8_t dev_uuid[16];
 static uint8_t static_auth[BTP_MESH_PROV_AUTH_MAX_LEN];
+static uint8_t static_auth_size;
 
 /* Vendor Model data */
 #define VND_MODEL_ID_1 0x1234
@@ -316,8 +317,6 @@ static struct {
 	.local = BT_MESH_ADDR_UNASSIGNED,
 	.dst = BT_MESH_ADDR_UNASSIGNED,
 };
-
-static bool default_comp = true;
 
 static uint8_t supported_commands(const void *cmd, uint16_t cmd_len,
 				  void *rsp, uint16_t *rsp_len)
@@ -1127,13 +1126,21 @@ static uint8_t config_prov(const void *cmd, uint16_t cmd_len,
 
 	/* TODO consider fix BTP commands to avoid this */
 	if (cmd_len != sizeof(*cp) && cmd_len != (sizeof(*cp2))) {
+		LOG_DBG("wrong cmd size");
 		return BTP_STATUS_FAILED;
 	}
 
 	LOG_DBG("");
 
+	static_auth_size = cp->static_auth_size;
+
+	if (static_auth_size > BTP_MESH_PROV_AUTH_MAX_LEN || static_auth_size == 0) {
+		LOG_DBG("wrong static auth length");
+		return BTP_STATUS_FAILED;
+	}
+
 	memcpy(dev_uuid, cp->uuid, sizeof(dev_uuid));
-	memcpy(static_auth, cp->static_auth, sizeof(static_auth));
+	memcpy(static_auth, cp->static_auth, cp->static_auth_size);
 
 	prov.output_size = cp->out_size;
 	prov.output_actions = sys_le16_to_cpu(cp->out_actions);
@@ -1152,7 +1159,7 @@ static uint8_t config_prov(const void *cmd, uint16_t cmd_len,
 	} else if (cp->auth_method == AUTH_METHOD_INPUT) {
 		err = bt_mesh_auth_method_set_input(prov.input_actions, prov.input_size);
 	} else if (cp->auth_method == AUTH_METHOD_STATIC) {
-		err = bt_mesh_auth_method_set_static(static_auth, sizeof(static_auth));
+		err = bt_mesh_auth_method_set_static(static_auth, static_auth_size);
 	}
 
 	if (err) {
@@ -1233,7 +1240,23 @@ static uint8_t provision_adv(const void *cmd, uint16_t cmd_len,
 static uint8_t init(const void *cmd, uint16_t cmd_len,
 		    void *rsp, uint16_t *rsp_len)
 {
+	const struct btp_mesh_init_cmd *cp = cmd;
 	int err;
+
+	if (!cp->comp_alt) {
+		LOG_WRN("Loading default comp data");
+		err = bt_mesh_init(&prov, &comp);
+	} else {
+		LOG_WRN("Loading alternative comp data");
+#ifdef CONFIG_BT_MESH_LARGE_COMP_DATA_SRV
+		health_srv.metadata = health_srv_meta_alt;
+#endif
+		err = bt_mesh_init(&prov, &comp_alt);
+	}
+
+	if (err) {
+		return BTP_STATUS_FAILED;
+	}
 
 	LOG_DBG("");
 
@@ -1862,47 +1885,6 @@ static uint8_t change_prepare(const void *cmd, uint16_t cmd_len,
 #endif
 
 	return BTP_STATUS_SUCCESS;
-}
-
-#if IS_ENABLED(CONFIG_BT_SETTINGS)
-static int comp_alt_set(const char *name, size_t len_rd,
-		   settings_read_cb read_cb, void *store)
-{
-	ssize_t len;
-	bool alt_comp_value;
-
-	if (len_rd == 0) {
-		LOG_DBG("Default composition");
-	}
-
-	len = read_cb(store, &alt_comp_value, sizeof(alt_comp_value));
-	if (len < 0 || len != len_rd) {
-		LOG_ERR("Failed to read value (err %zd)", len);
-		return len;
-	}
-
-	if (alt_comp_value) {
-		default_comp = false;
-	}
-
-	return 0;
-}
-
-SETTINGS_STATIC_HANDLER_DEFINE(tester_comp_alt, "tester/comp_alt", NULL, comp_alt_set, NULL, NULL);
-#endif
-
-static uint8_t set_comp_alt(const void *cmd, uint16_t cmd_len,
-			    void *rsp, uint16_t *rsp_len)
-{
-#if !IS_ENABLED(CONFIG_BT_SETTINGS)
-	return BTP_STATUS_FAILED;
-#else
-	bool comp_alt_val = true;
-
-	settings_save_one("tester/comp_alt", &comp_alt_val, sizeof(comp_alt_val));
-
-	return BTP_STATUS_SUCCESS;
-#endif
 }
 
 static uint8_t config_krp_get(const void *cmd, uint16_t cmd_len,
@@ -3801,7 +3783,7 @@ static void dfu_slot_add(size_t size, uint8_t *fwid, size_t fwid_len,
 		return;
 	}
 
-	bt_mesh_dfu_slot_commit(slot);
+	err = bt_mesh_dfu_slot_commit(slot);
 	if (err) {
 		LOG_ERR("Failed to commit slot: %d", err);
 		return;
@@ -4394,7 +4376,7 @@ static const struct btp_handler handlers[] = {
 	},
 	{
 		.opcode = BTP_MESH_INIT,
-		.expect_len = 0,
+		.expect_len = sizeof(struct btp_mesh_init_cmd),
 		.func = init,
 	},
 	{
@@ -4822,11 +4804,6 @@ static const struct btp_handler handlers[] = {
 		.expect_len = 0,
 		.func = change_prepare
 	},
-	{
-		.opcode = BTP_MESH_SET_COMP_ALT,
-		.expect_len = 0,
-		.func = set_comp_alt
-	},
 #if defined(CONFIG_BT_MESH_RPR_CLI)
 	{
 		.opcode = BTP_MESH_RPR_SCAN_START,
@@ -5199,26 +5176,12 @@ BT_MESH_LPN_CB_DEFINE(lpn_cb) = {
 
 uint8_t tester_init_mesh(void)
 {
-	int err;
-
 	if (IS_ENABLED(CONFIG_BT_TESTING)) {
 		bt_test_cb_register(&bt_test_cb);
 	}
 
 	tester_register_command_handlers(BTP_SERVICE_ID_MESH, handlers,
 					 ARRAY_SIZE(handlers));
-	if (default_comp) {
-		err = bt_mesh_init(&prov, &comp);
-	} else {
-#ifdef CONFIG_BT_MESH_LARGE_COMP_DATA_SRV
-		health_srv.metadata = health_srv_meta_alt;
-#endif
-		err = bt_mesh_init(&prov, &comp_alt);
-	}
-
-	if (err) {
-		return BTP_STATUS_FAILED;
-	}
 
 	return BTP_STATUS_SUCCESS;
 }

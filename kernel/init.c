@@ -43,7 +43,6 @@
 
 LOG_MODULE_REGISTER(os, CONFIG_KERNEL_LOG_LEVEL);
 
-
 BUILD_ASSERT(CONFIG_MP_NUM_CPUS == CONFIG_MP_MAX_NUM_CPUS,
 	     "CONFIG_MP_NUM_CPUS and CONFIG_MP_MAX_NUM_CPUS need to be set the same");
 
@@ -104,6 +103,32 @@ K_KERNEL_PINNED_STACK_ARRAY_DEFINE(z_interrupt_stacks,
 
 extern void idle(void *unused1, void *unused2, void *unused3);
 
+#ifdef CONFIG_OBJ_CORE_SYSTEM
+static struct k_obj_type obj_type_cpu;
+static struct k_obj_type obj_type_kernel;
+
+#ifdef CONFIG_OBJ_CORE_STATS_SYSTEM
+static struct k_obj_core_stats_desc  cpu_stats_desc = {
+	.raw_size = sizeof(struct k_cycle_stats),
+	.query_size = sizeof(struct k_thread_runtime_stats),
+	.raw   = z_cpu_stats_raw,
+	.query = z_cpu_stats_query,
+	.reset = NULL,
+	.disable = NULL,
+	.enable  = NULL,
+};
+
+static struct k_obj_core_stats_desc  kernel_stats_desc = {
+	.raw_size = sizeof(struct k_cycle_stats) * CONFIG_MP_MAX_NUM_CPUS,
+	.query_size = sizeof(struct k_thread_runtime_stats),
+	.raw   = z_kernel_stats_raw,
+	.query = z_kernel_stats_query,
+	.reset = NULL,
+	.disable = NULL,
+	.enable  = NULL,
+};
+#endif
+#endif
 
 /* LCOV_EXCL_START
  *
@@ -405,7 +430,8 @@ void z_init_cpu(int id)
 		(Z_KERNEL_STACK_BUFFER(z_interrupt_stacks[id]) +
 		 K_KERNEL_STACK_SIZEOF(z_interrupt_stacks[id]));
 #ifdef CONFIG_SCHED_THREAD_USAGE_ALL
-	_kernel.cpus[id].usage.track_usage =
+	_kernel.cpus[id].usage = &_kernel.usage[id];
+	_kernel.cpus[id].usage->track_usage =
 		CONFIG_SCHED_THREAD_USAGE_AUTO_ENABLE;
 #endif
 
@@ -414,6 +440,15 @@ void z_init_cpu(int id)
 	 * will keep track of this from here.
 	 */
 	atomic_inc(&_cpus_active);
+
+#ifdef CONFIG_OBJ_CORE_SYSTEM
+	k_obj_core_init_and_link(K_OBJ_CORE(&_kernel.cpus[id]), &obj_type_cpu);
+#ifdef CONFIG_OBJ_CORE_STATS_SYSTEM
+	k_obj_core_stats_register(K_OBJ_CORE(&_kernel.cpus[id]),
+				  _kernel.cpus[id].usage,
+				  sizeof(struct k_cycle_stats));
+#endif
+#endif
 }
 
 /**
@@ -603,3 +638,45 @@ FUNC_NORETURN void z_cstart(void)
 
 	CODE_UNREACHABLE; /* LCOV_EXCL_LINE */
 }
+
+#ifdef CONFIG_OBJ_CORE_SYSTEM
+static int init_cpu_obj_core_list(void)
+{
+	/* Initialize CPU object type */
+
+	z_obj_type_init(&obj_type_cpu, K_OBJ_TYPE_CPU_ID,
+			offsetof(struct _cpu, obj_core));
+
+#ifdef CONFIG_OBJ_CORE_STATS_SYSTEM
+	k_obj_type_stats_init(&obj_type_cpu, &cpu_stats_desc);
+#endif
+
+	return 0;
+}
+
+static int init_kernel_obj_core_list(void)
+{
+	/* Initialize kernel object type */
+
+	z_obj_type_init(&obj_type_kernel, K_OBJ_TYPE_KERNEL_ID,
+			offsetof(struct z_kernel, obj_core));
+
+#ifdef CONFIG_OBJ_CORE_STATS_SYSTEM
+	k_obj_type_stats_init(&obj_type_kernel, &kernel_stats_desc);
+#endif
+
+	k_obj_core_init_and_link(K_OBJ_CORE(&_kernel), &obj_type_kernel);
+#ifdef CONFIG_OBJ_CORE_STATS_SYSTEM
+	k_obj_core_stats_register(K_OBJ_CORE(&_kernel), _kernel.usage,
+				  sizeof(_kernel.usage));
+#endif
+
+	return 0;
+}
+
+SYS_INIT(init_cpu_obj_core_list, PRE_KERNEL_1,
+	 CONFIG_KERNEL_INIT_PRIORITY_OBJECTS);
+
+SYS_INIT(init_kernel_obj_core_list, PRE_KERNEL_1,
+	 CONFIG_KERNEL_INIT_PRIORITY_OBJECTS);
+#endif
