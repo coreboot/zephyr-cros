@@ -158,8 +158,10 @@ struct dma_block_config {
 	 * - 0b1 source request postponed until destination request happens
 	 */
 	uint16_t  flow_control_mode : 1;
+	/** Lock the bus during DMA transfers */
+	uint16_t  bus_lock_enable   : 1;
 
-	uint16_t  _reserved :          3;
+	uint16_t  reserved :          2;
 };
 
 /** The DMA callback event has occurred at the completion of a transfer list */
