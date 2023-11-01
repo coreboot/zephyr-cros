@@ -209,6 +209,11 @@ static int dma_xmc4xxx_config(const struct device *dev, uint32_t channel, struct
 	dma->CH[channel].CFGL = (config->channel_priority << GPDMA0_CH_CFGL_CH_PRIOR_Pos) |
 				GPDMA0_CH_CFGL_HS_SEL_SRC_Msk | GPDMA0_CH_CFGL_HS_SEL_DST_Msk;
 
+	if (block->bus_lock_enable) {
+		dma->CH[channel].CFGL |= GPDMA0_CH_CFGL_LOCK_B_Msk;
+		dma->CH[channel].CFGL |= FIELD_PREP(GPDMA0_CH_CFGL_LOCK_B_L_Msk, 1);
+	}
+
 	dma->CH[channel].CFGH = 0;
 
 	dma->CH[channel].CTLL = config->dest_data_size / 2 << GPDMA0_CH_CTLL_DST_TR_WIDTH_Pos |
