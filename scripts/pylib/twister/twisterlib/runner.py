@@ -1037,6 +1037,9 @@ class ProjectBuilder(FilterBuilder):
         instance = self.instance
 
         if instance.handler.ready:
+            logger.debug(f"Reset instance status from '{instance.status}' to None before run.")
+            instance.status = None
+
             if instance.handler.type_str == "device":
                 instance.handler.duts = self.duts
 
@@ -1059,6 +1062,8 @@ class ProjectBuilder(FilterBuilder):
         sys.stdout.flush()
 
     def gather_metrics(self, instance: TestInstance):
+        if self.options.create_rom_ram_report:
+            self.run_build(['--build', self.build_dir, "--target", "footprint"])
         if self.options.enable_size_report and not self.options.cmake_only:
             self.calc_size(instance=instance, from_buildlog=self.options.footprint_from_buildlog)
         else:

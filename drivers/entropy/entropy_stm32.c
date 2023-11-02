@@ -12,7 +12,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/entropy.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 #include <zephyr/init.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/util.h>
@@ -378,13 +378,7 @@ static void pool_filling_work_handler(struct k_work *work)
 	}
 }
 
-#if defined(CONFIG_BT_CTLR_FAST_ENC)
-#define __fast __attribute__((optimize("Ofast")))
-#else
-#define __fast
-#endif
-
-__fast static uint16_t rng_pool_get(struct rng_pool *rngp, uint8_t *buf,
+static uint16_t rng_pool_get(struct rng_pool *rngp, uint8_t *buf,
 	uint16_t len)
 {
 	uint32_t last  = rngp->last;
@@ -449,7 +443,6 @@ __fast static uint16_t rng_pool_get(struct rng_pool *rngp, uint8_t *buf,
 
 	return len;
 }
-#undef __fast
 
 static int rng_pool_put(struct rng_pool *rngp, uint8_t byte)
 {

@@ -830,6 +830,7 @@ static int scan_delegator_rem_src(struct bt_conn *conn,
 {
 	struct bass_recv_state_internal *internal_state;
 	struct bt_bap_scan_delegator_recv_state *state;
+	bool bis_sync_was_requested;
 	uint8_t src_id;
 
 	/* subtract 1 as the opcode has already been pulled */
@@ -862,6 +863,14 @@ static int scan_delegator_rem_src(struct bt_conn *conn,
 		}
 	}
 
+	bis_sync_was_requested = false;
+	for (uint8_t i = 0U; i < state->num_subgroups; i++) {
+		if (internal_state->requested_bis_sync[i] != 0U) {
+			bis_sync_was_requested = true;
+			break;
+		}
+	}
+
 	LOG_DBG("Index %u: Removed source with ID 0x%02x",
 		internal_state->index, src_id);
 
@@ -873,6 +882,9 @@ static int scan_delegator_rem_src(struct bt_conn *conn,
 	(void)memset(internal_state->requested_bis_sync, 0,
 		     sizeof(internal_state->requested_bis_sync));
 
+	if (bis_sync_was_requested) {
+		bis_sync_request_updated(conn, internal_state);
+	}
 	receive_state_updated(conn, internal_state);
 
 	return 0;
@@ -1298,7 +1310,7 @@ int bt_bap_scan_delegator_mod_src(const struct bt_bap_scan_delegator_mod_src_par
 {
 	struct bass_recv_state_internal *internal_state = NULL;
 	struct bt_bap_scan_delegator_recv_state *state;
-	static bool state_changed;
+	bool state_changed = false;
 
 	CHECKIF(!valid_bt_bap_scan_delegator_mod_src_param(param)) {
 		return -EINVAL;
@@ -1340,7 +1352,10 @@ int bt_bap_scan_delegator_mod_src(const struct bt_bap_scan_delegator_mod_src_par
 		const struct bt_bap_scan_delegator_subgroup *param_subgroup = &param->subgroups[i];
 		struct bt_bap_scan_delegator_subgroup *subgroup = &state->subgroups[i];
 
-		subgroup->bis_sync = param_subgroup->bis_sync;
+		if (subgroup->bis_sync != param_subgroup->bis_sync) {
+			subgroup->bis_sync = param_subgroup->bis_sync;
+			state_changed = true;
+		}
 
 		/* If the metadata len is 0, we shall not overwrite the existing metadata */
 		if (param_subgroup->metadata_len == 0U) {

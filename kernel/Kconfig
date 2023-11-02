@@ -201,7 +201,7 @@ config THREAD_CUSTOM_DATA
 config THREAD_USERSPACE_LOCAL_DATA
 	bool
 	depends on USERSPACE
-	default y if ERRNO && !ERRNO_IN_TLS
+	default y if ERRNO && !ERRNO_IN_TLS && !LIBC_ERRNO
 
 config DYNAMIC_THREAD
 	bool "Support for dynamic threads [EXPERIMENTAL]"
@@ -651,6 +651,7 @@ menu "Work Queue Options"
 config SYSTEM_WORKQUEUE_STACK_SIZE
 	int "System workqueue stack size"
 	default 4096 if COVERAGE_GCOV
+	default 2560 if WIFI_NM_WPA_SUPPLICANT
 	default 1024
 
 config SYSTEM_WORKQUEUE_PRIORITY
@@ -975,6 +976,7 @@ menu "Security Options"
 config STACK_CANARIES
 	bool "Compiler stack canaries"
 	depends on ENTROPY_GENERATOR || TEST_RANDOM_GENERATOR
+	select NEED_LIBC_MEM_PARTITION if !STACK_CANARIES_TLS
 	help
 	  This option enables compiler stack canaries.
 

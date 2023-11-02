@@ -11,7 +11,7 @@ LOG_MODULE_REGISTER(net_if, CONFIG_NET_IF_LOG_LEVEL);
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/linker/sections.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 #include <zephyr/syscall_handler.h>
 #include <stdlib.h>
 #include <string.h>
@@ -348,7 +348,7 @@ void net_if_queue_tx(struct net_if *iface, struct net_pkt *pkt)
 	 * directly to the driver.
 	 */
 	if ((IS_ENABLED(CONFIG_NET_TC_SKIP_FOR_HIGH_PRIO) &&
-	     prio == NET_PRIORITY_CA) || NET_TC_TX_COUNT == 0) {
+	     prio >= NET_PRIORITY_CA) || NET_TC_TX_COUNT == 0) {
 		net_pkt_set_tx_stats_tick(pkt, k_cycle_get_32());
 
 		net_if_tx(net_pkt_iface(pkt), pkt);

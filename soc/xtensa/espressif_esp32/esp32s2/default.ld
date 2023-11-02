@@ -135,6 +135,7 @@ SECTIONS
    */
   SECTION_PROLOGUE(_RODATA_SECTION_NAME,,ALIGN(4))
   {
+    _rodata_reserved_start = ABSOLUTE(.);
     __rodata_region_start = ABSOLUTE(.);
 
     . = ALIGN(4);
@@ -182,7 +183,6 @@ SECTIONS
     *(.rodata_wlog)
     *(.rodata_wlog*)
     _thread_local_end = ABSOLUTE(.);
-    _rodata_reserved_end = ABSOLUTE(.);
     . = ALIGN(4);
   } GROUP_DATA_LINK_IN(RODATA_REGION, ROMABLE_REGION)
 
@@ -192,11 +192,13 @@ SECTIONS
   #include <zephyr/linker/common-rom/common-rom-net.ld>
   #include <zephyr/linker/common-rom/common-rom-debug.ld>
   #include <zephyr/linker/common-rom/common-rom-misc.ld>
+  #include <snippets-sections.ld>
 
   /* Create an explicit section at the end of all the data that shall be mapped into drom.
    * This is used to calculate the size of the _image_drom_size variable */
   SECTION_PROLOGUE(_RODATA_SECTION_END,,ALIGN(0x10))
   {
+    _rodata_reserved_end = ABSOLUTE(.);
     . = ALIGN(4);
     _image_rodata_end = ABSOLUTE(.);
   } GROUP_DATA_LINK_IN(RODATA_REGION, ROMABLE_REGION)
@@ -362,8 +364,6 @@ SECTIONS
     *(.noinit.*)
     . = ALIGN(8);
   } GROUP_LINK_IN(RAMABLE_REGION)
-
-#include <snippets-sections.ld>
 
   .dram0.data :
   {

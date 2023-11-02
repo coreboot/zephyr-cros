@@ -3267,13 +3267,13 @@ function(dt_node_has_status var)
     return()
   endif()
 
-  dt_prop(${var} PATH ${canonical} PROPERTY status)
+  dt_prop(status PATH ${canonical} PROPERTY status)
 
-  if(NOT DEFINED ${var} OR "${${var}}" STREQUAL ok)
-    set(${var} okay)
+  if(NOT DEFINED status OR status STREQUAL "ok")
+    set(status "okay")
   endif()
 
-  if(${var} STREQUAL ${DT_NODE_STATUS})
+  if(status STREQUAL "${DT_NODE_STATUS}")
     set(${var} TRUE PARENT_SCOPE)
   else()
     set(${var} FALSE PARENT_SCOPE)
@@ -4049,8 +4049,8 @@ function(zephyr_linker_dts_section)
     )
   endif()
 
-  dt_node_exists(exists PATH ${DTS_SECTION_PATH})
-  if(NOT ${exists})
+  dt_node_has_status(okay PATH ${DTS_SECTION_PATH} STATUS okay)
+  if(NOT ${okay})
     return()
   endif()
 
@@ -4122,14 +4122,19 @@ function(zephyr_linker_dts_memory)
     return()
   endif()
 
-  dt_node_exists(exists PATH ${DTS_MEMORY_PATH})
-  if(NOT ${exists})
+  dt_node_has_status(okay PATH ${DTS_MEMORY_PATH} STATUS okay)
+  if(NOT ${okay})
     return()
   endif()
 
   dt_reg_addr(addr PATH ${DTS_MEMORY_PATH})
   dt_reg_size(size PATH ${DTS_MEMORY_PATH})
   dt_prop(name PATH ${DTS_MEMORY_PATH} PROPERTY "zephyr,memory-region")
+  if(NOT DEFINED name)
+    message(FATAL_ERROR "zephyr_linker_dts_memory(${ARGV0} ...) missing "
+                        "\"zephyr,memory-region\" property"
+    )
+  endif()
   zephyr_string(SANITIZE name ${name})
 
   zephyr_linker_memory(

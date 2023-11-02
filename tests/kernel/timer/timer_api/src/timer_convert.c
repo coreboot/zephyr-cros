@@ -6,7 +6,7 @@
 #include <zephyr/ztest.h>
 #include <zephyr/types.h>
 #include <zephyr/sys/time_units.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 
 #define NUM_RANDOM 100
 
@@ -33,7 +33,16 @@ struct test_rec {
 			(void *)test_##src##_to_##dst##_##round##prec	\
 	}								\
 
+#ifdef CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME
+#define TESTVAR(src, dst, round, prec)
+#else
+#define TESTVAR(src, dst, round, prec)					\
+	uint##prec##_t test_##src##_to_##dst##_##round##prec##_val =	\
+		k_##src##_to_##dst##_##round##prec(42);
+#endif
+
 #define TESTFUNC(src, dst, round, prec)					\
+	TESTVAR(src, dst, round, prec)					\
 	static uint##prec##_t test_##src##_to_##dst##_##round##prec(uint##prec##_t t) { \
 		return k_##src##_to_##dst##_##round##prec(t);		\
 	}

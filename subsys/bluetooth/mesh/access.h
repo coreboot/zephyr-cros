@@ -23,7 +23,7 @@ enum {
 void bt_mesh_elem_register(struct bt_mesh_elem *elem, uint8_t count);
 
 uint8_t bt_mesh_elem_count(void);
-size_t bt_mesh_comp_page_0_size(void);
+size_t bt_mesh_comp_page_size(uint8_t page);
 int bt_mesh_comp_data_get_page_0(struct net_buf_simple *buf, size_t offset);
 size_t bt_mesh_metadata_page_0_size(void);
 int bt_mesh_metadata_get_page_0(struct net_buf_simple *buf, size_t offset);
@@ -64,6 +64,7 @@ int bt_mesh_model_recv(struct bt_mesh_msg_ctx *ctx, struct net_buf_simple *buf);
 int bt_mesh_comp_register(const struct bt_mesh_comp *comp);
 int bt_mesh_comp_store(void);
 int bt_mesh_comp_read(struct net_buf_simple *buf, uint8_t page);
+uint8_t bt_mesh_comp_parse_page(struct net_buf_simple *buf);
 
 int bt_mesh_models_metadata_store(void);
 int bt_mesh_models_metadata_read(struct net_buf_simple *buf, size_t offset);

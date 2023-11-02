@@ -447,12 +447,19 @@ static int chan_req_send(struct bt_att_chan *chan, struct bt_att_req *req)
 	buf = req->buf;
 	req->buf = NULL;
 
+	/* This lock makes sure the value of `bt_att_mtu(chan)` does not
+	 * change.
+	 */
+	k_sched_lock();
 	err = bt_att_chan_send(chan, buf);
 	if (err) {
 		/* We still have the ownership of the buffer */
 		req->buf = buf;
 		chan->req = NULL;
+	} else {
+		bt_gatt_req_set_mtu(req, bt_att_mtu(chan));
 	}
+	k_sched_unlock();
 
 	return err;
 }
@@ -2867,9 +2874,15 @@ static att_type_t att_op_get_type(uint8_t op)
 	return ATT_UNKNOWN;
 }
 
+static struct bt_conn *get_conn(struct bt_att_chan *att_chan)
+{
+	return att_chan->chan.chan.conn;
+}
+
 static int bt_att_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
 	struct bt_att_chan *att_chan = ATT_CHAN(chan);
+	struct bt_conn *conn = get_conn(att_chan);
 	struct bt_att_hdr *hdr;
 	const struct att_handler *handler;
 	uint8_t err;
@@ -2883,6 +2896,11 @@ static int bt_att_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	hdr = net_buf_pull_mem(buf, sizeof(*hdr));
 	LOG_DBG("Received ATT chan %p code 0x%02x len %zu", att_chan, hdr->code,
 		net_buf_frags_len(buf));
+
+	if (conn->state != BT_CONN_CONNECTED) {
+		LOG_DBG("not connected: conn %p state %u", conn, conn->state);
+		return 0;
+	}
 
 	if (!att_chan->att) {
 		LOG_DBG("Ignore recv on detached ATT chan");

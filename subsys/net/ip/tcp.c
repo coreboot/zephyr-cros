@@ -11,7 +11,7 @@ LOG_MODULE_REGISTER(net_tcp, CONFIG_NET_TCP_LOG_LEVEL);
 #include <stdio.h>
 #include <stdlib.h>
 #include <zephyr/kernel.h>
-#include <zephyr/random/rand32.h>
+#include <zephyr/random/random.h>
 
 #if defined(CONFIG_NET_TCP_ISN_RFC6528)
 #include <mbedtls/md5.h>
@@ -569,7 +569,20 @@ static int tcp_conn_unref(struct tcp *conn)
 
 	tcp_send_queue_flush(conn);
 
-	k_work_cancel_delayable(&conn->send_data_timer);
+	/* Cancel all possible delayed work and prevent any execution of newly scheduled work
+	 * in one of the work item handlers
+	 * Essential because the work items are destructed at the bottom of this method.
+	 * A current ongoing execution might access the connection and schedule new work
+	 * Solution:
+	 * While holding the lock, cancel all delayable work.
+	 * Because every delayable work execution takes the same lock and releases the lock,
+	 * we're either here, or currently executing one of the workers.
+	 * Then, after cancelling the workers within the lock, either those workers have finished
+	 * or have been cancelled and will not execute anymore
+	 */
+	k_mutex_lock(&conn->lock, K_FOREVER);
+
+	(void)k_work_cancel_delayable(&conn->send_data_timer);
 	tcp_pkt_unref(conn->send_data);
 
 	if (CONFIG_NET_TCP_RECV_QUEUE_TIMEOUT) {
@@ -580,6 +593,10 @@ static int tcp_conn_unref(struct tcp *conn)
 	(void)k_work_cancel_delayable(&conn->fin_timer);
 	(void)k_work_cancel_delayable(&conn->persist_timer);
 	(void)k_work_cancel_delayable(&conn->ack_timer);
+	(void)k_work_cancel_delayable(&conn->send_timer);
+	(void)k_work_cancel_delayable(&conn->recv_queue_timer);
+
+	k_mutex_unlock(&conn->lock);
 
 	sys_slist_find_and_remove(&tcp_conns, &conn->next);
 
@@ -695,10 +712,12 @@ static void tcp_send_process(struct k_work *work)
 	struct tcp *conn = CONTAINER_OF(dwork, struct tcp, send_timer);
 	bool unref;
 
+	/* take the lock to prevent a race-condition with tcp_conn_unref */
 	k_mutex_lock(&conn->lock, K_FOREVER);
 
 	unref = tcp_send_process_no_lock(conn);
 
+	/* release the lock only after possible scheduling of work */
 	k_mutex_unlock(&conn->lock);
 
 	if (unref) {
@@ -1143,6 +1162,82 @@ static bool is_destination_local(struct net_pkt *pkt)
 	return false;
 }
 
+void net_tcp_reply_rst(struct net_pkt *pkt)
+{
+	NET_PKT_DATA_ACCESS_DEFINE(tcp_access_rst, struct tcphdr);
+	struct tcphdr *th_pkt = th_get(pkt);
+	struct tcphdr *th_rst;
+	struct net_pkt *rst;
+	int ret;
+
+	if (th_pkt == NULL || (th_flags(th_pkt) & RST)) {
+		/* Don't reply to a RST segment. */
+		return;
+	}
+
+	rst = tcp_pkt_alloc_no_conn(pkt->iface, pkt->family,
+				    sizeof(struct tcphdr));
+	if (rst == NULL) {
+		return;
+	}
+
+	/* IP header */
+	if (IS_ENABLED(CONFIG_NET_IPV4) && net_pkt_family(pkt) == AF_INET) {
+		ret = net_ipv4_create(rst,
+				      (struct in_addr *)NET_IPV4_HDR(pkt)->dst,
+				      (struct in_addr *)NET_IPV4_HDR(pkt)->src);
+	} else if (IS_ENABLED(CONFIG_NET_IPV6) && net_pkt_family(pkt) == AF_INET6) {
+		ret =  net_ipv6_create(rst,
+				      (struct in6_addr *)NET_IPV6_HDR(pkt)->dst,
+				      (struct in6_addr *)NET_IPV6_HDR(pkt)->src);
+	} else {
+		ret = -EINVAL;
+	}
+
+	if (ret < 0) {
+		goto err;
+	}
+
+	/* TCP header */
+	th_rst = (struct tcphdr *)net_pkt_get_data(rst, &tcp_access_rst);
+	if (th_rst == NULL) {
+		goto err;
+	}
+
+	memset(th_rst, 0, sizeof(struct tcphdr));
+
+	UNALIGNED_PUT(th_pkt->th_dport, &th_rst->th_sport);
+	UNALIGNED_PUT(th_pkt->th_sport, &th_rst->th_dport);
+	th_rst->th_off = 5;
+
+	if (th_flags(th_pkt) & ACK) {
+		UNALIGNED_PUT(RST, &th_rst->th_flags);
+		UNALIGNED_PUT(th_pkt->th_ack, &th_rst->th_seq);
+	} else {
+		uint32_t ack = ntohl(th_pkt->th_seq) + tcp_data_len(pkt);
+
+		UNALIGNED_PUT(RST | ACK, &th_rst->th_flags);
+		UNALIGNED_PUT(htonl(ack), &th_rst->th_ack);
+	}
+
+	ret = net_pkt_set_data(rst, &tcp_access_rst);
+	if (ret < 0) {
+		goto err;
+	}
+
+	ret = tcp_finalize_pkt(rst);
+	if (ret < 0) {
+		goto err;
+	}
+
+	tcp_send(rst);
+
+	return;
+
+err:
+	tcp_pkt_unref(rst);
+}
+
 static int tcp_out_ext(struct tcp *conn, uint8_t flags, struct net_pkt *data,
 		       uint32_t seq)
 {
@@ -1403,6 +1498,7 @@ static void tcp_cleanup_recv_queue(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct tcp *conn = CONTAINER_OF(dwork, struct tcp, recv_queue_timer);
 
+	/* take the lock to prevent a race-condition with tcp_conn_unref */
 	k_mutex_lock(&conn->lock, K_FOREVER);
 
 	NET_DBG("Cleanup recv queue conn %p len %zd seq %u", conn,
@@ -1412,6 +1508,7 @@ static void tcp_cleanup_recv_queue(struct k_work *work)
 	net_buf_unref(conn->queue_recv_data->buffer);
 	conn->queue_recv_data->buffer = NULL;
 
+	/* release the lock only after possible scheduling of work */
 	k_mutex_unlock(&conn->lock);
 }
 
@@ -1423,6 +1520,7 @@ static void tcp_resend_data(struct k_work *work)
 	int ret;
 	int exp_tcp_rto;
 
+	/* take the lock to prevent a race-condition with tcp_conn_unref */
 	k_mutex_lock(&conn->lock, K_FOREVER);
 
 	NET_DBG("send_data_retries=%hu", conn->send_data_retries);
@@ -1486,6 +1584,7 @@ static void tcp_resend_data(struct k_work *work)
 				    K_MSEC(exp_tcp_rto));
 
  out:
+	/* release the lock only after possible scheduling of work */
 	k_mutex_unlock(&conn->lock);
 
 	if (conn_unref) {
@@ -1498,6 +1597,7 @@ static void tcp_timewait_timeout(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct tcp *conn = CONTAINER_OF(dwork, struct tcp, timewait_timer);
 
+	/* no need to acquire the conn->lock as there is nothing scheduled here */
 	NET_DBG("conn: %p %s", conn, tcp_conn_state(conn, NULL));
 
 	(void)tcp_conn_close(conn, -ETIMEDOUT);
@@ -1516,6 +1616,7 @@ static void tcp_fin_timeout(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct tcp *conn = CONTAINER_OF(dwork, struct tcp, fin_timer);
 
+	/* no need to acquire the conn->lock as there is nothing scheduled here */
 	if (conn->state == TCP_SYN_RECEIVED) {
 		tcp_establish_timeout(conn);
 		return;
@@ -1532,6 +1633,7 @@ static void tcp_send_zwp(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct tcp *conn = CONTAINER_OF(dwork, struct tcp, persist_timer);
 
+	/* take the lock to prevent a race-condition with tcp_conn_unref */
 	k_mutex_lock(&conn->lock, K_FOREVER);
 
 	(void)tcp_out_ext(conn, ACK, NULL, conn->seq - 1);
@@ -1555,6 +1657,7 @@ static void tcp_send_zwp(struct k_work *work)
 			&tcp_work_q, &conn->persist_timer, K_MSEC(timeout));
 	}
 
+	/* release the lock only after possible scheduling of work */
 	k_mutex_unlock(&conn->lock);
 }
 
@@ -1563,10 +1666,12 @@ static void tcp_send_ack(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct tcp *conn = CONTAINER_OF(dwork, struct tcp, ack_timer);
 
+	/* take the lock to prevent a race-condition with tcp_conn_unref */
 	k_mutex_lock(&conn->lock, K_FOREVER);
 
 	tcp_out(conn, ACK);
 
+	/* release the lock only after possible scheduling of work */
 	k_mutex_unlock(&conn->lock);
 }
 
@@ -1747,13 +1852,13 @@ static enum net_verdict tcp_recv(struct net_conn *net_conn,
 			goto in;
 		}
 
-		net_ipaddr_copy(&conn_old->context->remote, &conn->dst.sa);
-
 		conn->accepted_conn = conn_old;
 	}
  in:
 	if (conn) {
 		verdict = tcp_in(conn, pkt);
+	} else {
+		net_tcp_reply_rst(pkt);
 	}
 
 	return verdict;
@@ -2312,6 +2417,18 @@ static enum net_verdict tcp_in(struct tcp *conn, struct net_pkt *pkt)
 		net_stats_update_tcp_seg_rst(net_pkt_iface(pkt));
 		do_close = true;
 		close_status = -ECONNRESET;
+
+		/* If we receive RST and ACK for the sent SYN, it means
+		 * that there is no socket listening the port we are trying
+		 * to connect to. Set the errno properly in this case.
+		 */
+		if (conn->in_connect) {
+			fl = th_flags(th);
+			if (FL(&fl, ==, RST | ACK)) {
+				close_status = -ECONNREFUSED;
+			}
+		}
+
 		goto out;
 	}
 
@@ -2392,6 +2509,7 @@ next_state:
 			conn->send_options.mss_found = false;
 			conn_seq(conn, + 1);
 			next = TCP_SYN_SENT;
+			tcp_conn_ref(conn);
 		}
 		break;
 	case TCP_SYN_RECEIVED:
@@ -2425,8 +2543,40 @@ next_state:
 				break;
 			}
 
-			accept_cb(conn->context, &context->remote,
-				  sizeof(struct sockaddr), 0, context);
+			net_ipaddr_copy(&conn->context->remote, &conn->dst.sa);
+
+			/* Check if v4-mapping-to-v6 needs to be done for
+			 * the accepted socket.
+			 */
+			if (IS_ENABLED(CONFIG_NET_IPV4_MAPPING_TO_IPV6) &&
+			    net_context_get_family(conn->context) == AF_INET &&
+			    net_context_get_family(context) == AF_INET6 &&
+			    !net_context_is_v6only_set(context)) {
+				struct in6_addr mapped;
+
+				net_ipv6_addr_create_v4_mapped(
+					&net_sin(&conn->context->remote)->sin_addr,
+					&mapped);
+				net_ipaddr_copy(&net_sin6(&conn->context->remote)->sin6_addr,
+						&mapped);
+
+				net_sin6(&conn->context->remote)->sin6_family = AF_INET6;
+
+				NET_DBG("Setting v4 mapped address %s",
+					net_sprint_ipv6_addr(&mapped));
+
+				/* Note that we cannot set the local address to IPv6 one
+				 * as that is used to match the connection, and not just
+				 * for printing. The remote address is only used for
+				 * passing it to accept() and printing it by "net conn"
+				 * command.
+				 */
+			}
+
+			accept_cb(conn->context, &conn->context->remote,
+				  net_context_get_family(context) == AF_INET6 ?
+				  sizeof(struct sockaddr_in6) : sizeof(struct sockaddr_in),
+				  0, context);
 
 			next = TCP_ESTABLISHED;
 
@@ -2467,7 +2617,6 @@ next_state:
 			}
 
 			next = TCP_ESTABLISHED;
-			tcp_conn_ref(conn);
 			net_context_set_state(conn->context,
 					      NET_CONTEXT_CONNECTED);
 			tcp_ca_init(conn);
@@ -2480,7 +2629,10 @@ next_state:
 			 * priority.
 			 */
 			connection_ok = true;
+		} else if (pkt) {
+			net_tcp_reply_rst(pkt);
 		}
+
 		break;
 	case TCP_ESTABLISHED:
 		/* full-close */

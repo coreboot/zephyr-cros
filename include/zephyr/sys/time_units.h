@@ -70,14 +70,11 @@ static inline int z_impl_sys_clock_hw_cycles_per_sec_runtime_get(void)
  * @brief Get the system timer frequency.
  * @return system timer frequency in Hz
  */
-static TIME_CONSTEXPR inline int sys_clock_hw_cycles_per_sec(void)
-{
 #if defined(CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME)
-	return sys_clock_hw_cycles_per_sec_runtime_get();
+#define sys_clock_hw_cycles_per_sec() sys_clock_hw_cycles_per_sec_runtime_get()
 #else
-	return CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC;
+#define sys_clock_hw_cycles_per_sec() CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC
 #endif
-}
 
 /** @internal
  * Macro determines if fast conversion algorithm can be used. It checks if
@@ -138,6 +135,16 @@ static TIME_CONSTEXPR inline int sys_clock_hw_cycles_per_sec(void)
 	 (__round_up) ? ((__from_hz) / (__to_hz)) - 1 :			\
 	 0)
 
+/* Clang emits a divide-by-zero warning even though the int_div macro
+ * results are only used when the divisor will not be zero. Work
+ * around this by substituting 1 to make the compiler happy.
+ */
+#ifdef __clang__
+#define z_tmcvt_divisor(a, b) ((a) / (b) ?: 1)
+#else
+#define z_tmcvt_divisor(a, b) ((a) / (b))
+#endif
+
 /*
  * Compute the offset needed to round the result correctly when
  * the conversion requires a full mul/div
@@ -154,12 +161,12 @@ static TIME_CONSTEXPR inline int sys_clock_hw_cycles_per_sec(void)
 	 ((uint32_t)((__t) +						\
 		     z_tmcvt_off_div(__from_hz, __to_hz,		\
 				     __round_up, __round_off)) /	\
-	  ((__from_hz) / (__to_hz)))					\
+	  z_tmcvt_divisor(__from_hz, __to_hz))				\
 	 :								\
 	 (uint32_t) (((uint64_t) (__t) +				\
 		      z_tmcvt_off_div(__from_hz, __to_hz,		\
 				      __round_up, __round_off)) /	\
-		     ((__from_hz) / (__to_hz)))				\
+		     z_tmcvt_divisor(__from_hz, __to_hz))		\
 		)
 
 /* Integer multiplication 32-bit conversion */
@@ -173,9 +180,9 @@ static TIME_CONSTEXPR inline int sys_clock_hw_cycles_per_sec(void)
 
 /* Integer division 64-bit conversion */
 #define z_tmcvt_int_div_64(__t, __from_hz, __to_hz, __round_up, __round_off) \
-	((uint64_t) (__t) + z_tmcvt_off_div(__from_hz, __to_hz,		\
-					    __round_up, __round_off)) / \
-	((__from_hz) / (__to_hz))
+	(((uint64_t) (__t) + z_tmcvt_off_div(__from_hz, __to_hz,	\
+					     __round_up, __round_off)) / \
+	z_tmcvt_divisor(__from_hz, __to_hz))
 
 /* Integer multiplcation 64-bit conversion */
 #define z_tmcvt_int_mul_64(__t, __from_hz, __to_hz)	\

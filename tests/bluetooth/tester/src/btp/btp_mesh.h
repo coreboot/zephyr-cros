@@ -78,7 +78,7 @@ struct btp_mesh_provision_node_cmd_v2 {
 
 #define BTP_MESH_INIT				0x04
 struct btp_mesh_init_cmd {
-	bool comp_alt;
+	uint8_t comp;
 } __packed;
 
 #define BTP_MESH_RESET				0x05
@@ -1037,6 +1037,8 @@ struct btp_srpl_clear_cmd {
 struct btp_proxy_solicit_cmd {
 	uint16_t net_idx;
 } __packed;
+
+#define BTP_MESH_START				0x78
 
 /* events */
 #define BTP_MESH_EV_OUT_NUMBER_ACTION		0x80

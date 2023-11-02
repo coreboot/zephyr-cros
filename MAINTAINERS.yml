@@ -632,6 +632,7 @@ Documentation:
     - doc/templates/sample.tmpl
     - doc/templates/board.tmpl
   files-exclude:
+    - doc/releases/migration-guide-*
     - doc/releases/release-notes-*
   labels:
     - "area: Documentation"
@@ -656,9 +657,12 @@ Documentation Infrastructure:
 Release Notes:
   status: maintained
   maintainers:
-    - jhedberg
-    - fabiobaltieri
+    - MaureenHelm
+    - henrikbrixandersen
+  collaborators:
+    - kartben
   files:
+    - doc/releases/migration-guide-*
     - doc/releases/release-notes-*
   labels:
     - "Release Notes"
@@ -728,7 +732,8 @@ Release Notes:
   files:
     - boards/shields/mcp2515/
     - boards/shields/tcan4550evm/
-    - doc/hardware/peripherals/canbus/
+    - doc/connectivity/canbus/
+    - doc/hardware/peripherals/can/
     - drivers/can/
     - drivers/net/canbus.c
     - dts/bindings/can/
@@ -1135,6 +1140,19 @@ Release Notes:
   labels:
     - "area: LED"
 
+"Drivers: MFD":
+  status: odd fixes
+  collaborators:
+    - gmarull
+    - aasinclair
+  files:
+    - drivers/mfd/
+    - include/zephyr/drivers/mfd/
+    - dts/bindings/mfd/
+    - tests/drivers/build_all/mfd/
+  labels:
+    - "area: MFD"
+
 "Drivers: Modem":
   status: maintained
   maintainers:
@@ -1150,10 +1168,10 @@ Release Notes:
 "Drivers: Regulators":
   status: maintained
   maintainers:
-    - gmarull
+    - aasinclair
   collaborators:
     - danieldegrasse
-    - aasinclair
+    - gmarull
   files:
     - drivers/regulator/
     - include/zephyr/drivers/regulator/
@@ -1593,7 +1611,9 @@ IPC:
     - "area: IPC"
 
 JSON Web Token:
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - d3zd3z
   collaborators:
     - mrfuchs
     - sir-branch
@@ -2023,6 +2043,7 @@ Networking:
     - pdgendt
     - canisLupus1313
     - mariuszpos
+    - edmont
   files:
     - subsys/net/l2/openthread/
     - samples/net/openthread/
@@ -2121,6 +2142,7 @@ RISCV arch:
     - arch/riscv/
     - boards/riscv/
     - dts/bindings/riscv/
+    - dts/riscv/
     - include/zephyr/arch/riscv/
     - soc/riscv/
     - tests/arch/riscv/
@@ -2138,6 +2160,17 @@ Retention:
     - subsys/retention/
   labels:
     - "area: Retention"
+
+Samples:
+  status: maintained
+  maintainers:
+    - kartben
+  collaborators:
+    - nashif
+  files:
+    - samples/
+  labels:
+    - "area: Samples"
 
 Sensor Subsystem:
   status: maintained
@@ -2329,18 +2362,24 @@ Nuvoton NPCX Platforms:
   labels:
     - "platform: Nuvoton NPCX"
 
-Nuvoton Numicro Platforms:
-  status: odd fixes
+Nuvoton Numicro Numaker Platforms:
+  status: maintained
+  maintainers:
+    - cyliangtw
   collaborators:
     - ssekar15
   files:
     - soc/arm/nuvoton_numicro/
+    - soc/arm/nuvoton_numaker/
     - boards/arm/nuvoton_pfm*/
+    - boards/arm/numaker_*/
     - dts/arm/nuvoton/
     - dts/bindings/*/*numicro*
+    - dts/bindings/*/*numaker*
     - drivers/*/*_numicro*
+    - drivers/*/*_numaker*
   labels:
-    - "platform: Nuvoton Numicro"
+    - "platform: Nuvoton Numicro Numaker"
 
 Raspberry Pi Pico Platforms:
   status: maintained
@@ -2479,6 +2518,8 @@ NXP Platforms:
     - drivers/*/*imx*
     - drivers/*/*lpc*.c
     - drivers/*/*mcux*.c
+    - drivers/*/*.mcux
+    - drivers/*/*.nxp
     - drivers/*/*nxp*
     - dts/arm/nxp/
     - dts/bindings/*/nxp*
@@ -2601,6 +2642,7 @@ STM32 Platforms:
     - drivers/*/*stm32*.c
     - drivers/*/*stm32*.h
     - drivers/*/*/*stm32*
+    - drivers/*/*stm32
     - dts/arm/st/
     - dts/bindings/*/*stm32*
     - soc/arm/st_stm32/
@@ -2673,7 +2715,7 @@ TI SimpleLink Platforms:
     - drivers/*/*cc32*
     - dts/arm/ti/
     - dts/bindings/*/ti,*
-    - soc/arm/ti*/
+    - soc/arm/ti_simplelink/
     - dts/bindings/*/ti,*
   labels:
     - "platform: TI SimpleLink"
@@ -2795,7 +2837,7 @@ TF-M Integration:
   labels:
     - "area: TF-M"
 
-Toolchain Integration:
+"Toolchain Integration":
   status: maintained
   maintainers:
     - tejlmand
@@ -2806,6 +2848,40 @@ Toolchain Integration:
     - cmake/compiler/
     - cmake/linker/
     - cmake/toolchain/
+  labels:
+    - "area: Toolchains"
+
+"Toolchain ARC MWDT":
+  status: maintained
+  maintainers:
+    - evgeniy-paltsev
+    - abrodkin
+  files:
+    - cmake/*/arcmwdt/
+    - include/zephyr/toolchain/mwdt.h
+    - lib/libc/arcmwdt/*
+  labels:
+    - "area: Toolchains"
+
+"Toolchain arm compiler 6":
+  status: maintained
+  maintainers:
+    - tejlmand
+  files:
+    - cmake/*/armclang/
+    - cmake/linker/armlink/
+    - include/zephyr/toolchain/armclang.h
+    - lib/libc/armstdc/*
+  labels:
+    - "area: Toolchains"
+
+"Toolchain oneApi":
+  status: maintained
+  maintainers:
+    - nashif
+  files:
+    - cmake/*/oneApi/
+    - cmake/compiler/icx/
   labels:
     - "area: Toolchains"
 
@@ -3401,6 +3477,7 @@ West:
     - pdgendt
     - canisLupus1313
     - mariuszpos
+    - edmont
   files:
     - modules/openthread/
   labels:
@@ -3554,6 +3631,16 @@ West:
   labels:
     - "area: Sensors"
 
+"West project: hostap":
+  status: maintained
+  maintainers:
+    - krish2718
+    - jukkar
+  files:
+    - modules/hostap/
+  labels:
+    - "area: Wi-Fi"
+
 Xtensa arch:
   status: maintained
   maintainers:
@@ -3604,6 +3691,7 @@ Continuous Integration:
     - scripts/ci/
     - .checkpatch.conf
     - scripts/gitlint/
+    - scripts/set_assignees.py
   labels:
     - "area: Continuous Integration"
 
@@ -3647,8 +3735,8 @@ Emulation:
     - "area: HW Emulation"
 
 Random:
-  status: odd fixes
-  collaborators:
+  status: maintained
+  maintainers:
     - ceolin
   files:
     - subsys/random/

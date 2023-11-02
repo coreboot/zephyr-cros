@@ -138,7 +138,7 @@ struct net_buf *bt_mesh_adv_create(enum bt_mesh_adv_type type,
 				   uint8_t xmit, k_timeout_t timeout)
 {
 #if defined(CONFIG_BT_MESH_RELAY)
-	if (tag & BT_MESH_RELAY_ADV) {
+	if (tag == BT_MESH_ADV_TAG_RELAY) {
 		return bt_mesh_adv_create_from_pool(&relay_buf_pool,
 						    adv_relay_pool, type,
 						    tag, xmit, timeout);
@@ -146,7 +146,7 @@ struct net_buf *bt_mesh_adv_create(enum bt_mesh_adv_type type,
 #endif
 
 #if defined(CONFIG_BT_MESH_ADV_EXT_FRIEND_SEPARATE)
-	if (tag & BT_MESH_FRIEND_ADV) {
+	if (tag == BT_MESH_ADV_TAG_FRIEND) {
 		return bt_mesh_adv_create_from_pool(&friend_buf_pool,
 						    adv_friend_pool, type,
 						    tag, xmit, timeout);
@@ -202,14 +202,15 @@ struct net_buf *bt_mesh_adv_buf_get(k_timeout_t timeout)
 	return process_events(events, ARRAY_SIZE(events));
 }
 
-struct net_buf *bt_mesh_adv_buf_get_by_tag(uint8_t tag, k_timeout_t timeout)
+struct net_buf *bt_mesh_adv_buf_get_by_tag(enum bt_mesh_adv_tag_bit tags, k_timeout_t timeout)
 {
-	if (IS_ENABLED(CONFIG_BT_MESH_ADV_EXT_FRIEND_SEPARATE) && tag & BT_MESH_FRIEND_ADV) {
+	if (IS_ENABLED(CONFIG_BT_MESH_ADV_EXT_FRIEND_SEPARATE) &&
+	    tags & BT_MESH_ADV_TAG_BIT_FRIEND) {
 		return net_buf_get(&bt_mesh_friend_queue, timeout);
 	}
 
 #if CONFIG_BT_MESH_RELAY_ADV_SETS
-	if (tag & BT_MESH_RELAY_ADV) {
+	if (!(tags & BT_MESH_ADV_TAG_BIT_LOCAL)) {
 		return net_buf_get(&bt_mesh_relay_queue, timeout);
 	}
 #endif
@@ -222,9 +223,9 @@ struct net_buf *bt_mesh_adv_buf_get(k_timeout_t timeout)
 	return net_buf_get(&bt_mesh_adv_queue, timeout);
 }
 
-struct net_buf *bt_mesh_adv_buf_get_by_tag(uint8_t tag, k_timeout_t timeout)
+struct net_buf *bt_mesh_adv_buf_get_by_tag(enum bt_mesh_adv_tag_bit tags, k_timeout_t timeout)
 {
-	ARG_UNUSED(tag);
+	ARG_UNUSED(tags);
 
 	return bt_mesh_adv_buf_get(timeout);
 }
@@ -260,14 +261,16 @@ void bt_mesh_adv_send(struct net_buf *buf, const struct bt_mesh_send_cb *cb,
 	}
 
 	if (IS_ENABLED(CONFIG_BT_MESH_ADV_EXT_FRIEND_SEPARATE) &&
-	    BT_MESH_ADV(buf)->tag == BT_MESH_FRIEND_ADV) {
+	    BT_MESH_ADV(buf)->tag == BT_MESH_ADV_TAG_FRIEND) {
 		net_buf_put(&bt_mesh_friend_queue, net_buf_ref(buf));
 		bt_mesh_adv_buf_friend_ready();
 		return;
 	}
 
 #if CONFIG_BT_MESH_RELAY_ADV_SETS
-	if (BT_MESH_ADV(buf)->tag == BT_MESH_RELAY_ADV) {
+	if (BT_MESH_ADV(buf)->tag == BT_MESH_ADV_TAG_RELAY ||
+	    (IS_ENABLED(CONFIG_BT_MESH_PB_ADV_USE_RELAY_SETS) &&
+	     BT_MESH_ADV(buf)->tag == BT_MESH_ADV_TAG_PROV)) {
 		net_buf_put(&bt_mesh_relay_queue, net_buf_ref(buf));
 		bt_mesh_adv_buf_relay_ready();
 		return;

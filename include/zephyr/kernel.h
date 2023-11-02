@@ -531,6 +531,10 @@ __syscall int32_t k_usleep(int32_t us);
  * k_sleep().  For example k_busy_wait(1000) may take slightly more or
  * less time than k_sleep(K_MSEC(1)), with the offset dependent on
  * clock tolerances.
+ *
+ * @note In case when @kconfig{CONFIG_SYSTEM_CLOCK_SLOPPY_IDLE} and
+ * @kconfig{CONFIG_PM} options are enabled, this function may not work.
+ * The timer/clock used for delay processing may be disabled/inactive.
  */
 __syscall void k_busy_wait(uint32_t usec_to_wait);
 
@@ -691,8 +695,20 @@ struct _static_thread_data {
 	int init_prio;
 	uint32_t init_options;
 	const char *init_name;
+#ifdef CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME
+	int32_t init_delay_ms;
+#else
 	k_timeout_t init_delay;
+#endif
 };
+
+#ifdef CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME
+#define Z_THREAD_INIT_DELAY_INITIALIZER(ms) .init_delay_ms = (ms)
+#define Z_THREAD_INIT_DELAY(thread) SYS_TIMEOUT_MS((thread)->init_delay_ms)
+#else
+#define Z_THREAD_INIT_DELAY_INITIALIZER(ms) .init_delay = SYS_TIMEOUT_MS(ms)
+#define Z_THREAD_INIT_DELAY(thread) (thread)->init_delay
+#endif
 
 #define Z_THREAD_INITIALIZER(thread, stack, stack_size,           \
 			    entry, p1, p2, p3,                   \
@@ -708,7 +724,7 @@ struct _static_thread_data {
 	.init_prio = (prio),                                     \
 	.init_options = (options),                               \
 	.init_name = STRINGIFY(tname),                           \
-	.init_delay = SYS_TIMEOUT_MS(delay),			 \
+	Z_THREAD_INIT_DELAY_INITIALIZER(delay)			 \
 	}
 
 /*
@@ -4688,10 +4704,6 @@ struct k_mbox_msg {
 	uint32_t info;
 	/** sender's message data buffer */
 	void *tx_data;
-	/** internal use only - needed for legacy API support */
-	void *_rx_data;
-	/** message data block descriptor */
-	struct k_mem_block tx_block;
 	/** source thread id */
 	k_tid_t rx_source_thread;
 	/** target thread id */
@@ -4760,8 +4772,8 @@ extern void k_mbox_init(struct k_mbox *mbox);
  * @brief Send a mailbox message in a synchronous manner.
  *
  * This routine sends a message to @a mbox and waits for a receiver to both
- * receive and process it. The message data may be in a buffer, in a memory
- * pool block, or non-existent (i.e. an empty message).
+ * receive and process it. The message data may be in a buffer or non-existent
+ * (i.e. an empty message).
  *
  * @param mbox Address of the mailbox.
  * @param tx_msg Address of the transmit message descriptor.
@@ -4782,10 +4794,10 @@ extern int k_mbox_put(struct k_mbox *mbox, struct k_mbox_msg *tx_msg,
  * @brief Send a mailbox message in an asynchronous manner.
  *
  * This routine sends a message to @a mbox without waiting for a receiver
- * to process it. The message data may be in a buffer, in a memory pool block,
- * or non-existent (i.e. an empty message). Optionally, the semaphore @a sem
- * will be given when the message has been both received and completely
- * processed by the receiver.
+ * to process it. The message data may be in a buffer or non-existent
+ * (i.e. an empty message). Optionally, the semaphore @a sem will be given
+ * when the message has been both received and completely processed by
+ * the receiver.
  *
  * @param mbox Address of the mailbox.
  * @param tx_msg Address of the transmit message descriptor.

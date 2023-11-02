@@ -694,14 +694,16 @@ static void can_mcan_get_message(const struct device *dev, uint16_t fifo_offset,
 
 		data_length = can_dlc_to_bytes(frame.dlc);
 		if (data_length <= sizeof(frame.data)) {
-			err = can_mcan_read_mram(dev, fifo_offset + get_idx *
-						 sizeof(struct can_mcan_rx_fifo) +
-						 offsetof(struct can_mcan_rx_fifo, data_32),
-						 &frame.data_32,
-						 ROUND_UP(data_length, sizeof(uint32_t)));
-			if (err != 0) {
-				LOG_ERR("failed to read Rx FIFO data (err %d)", err);
-				return;
+			if ((frame.flags & CAN_FRAME_RTR) == 0U) {
+				err = can_mcan_read_mram(dev, fifo_offset + get_idx *
+							 sizeof(struct can_mcan_rx_fifo) +
+							 offsetof(struct can_mcan_rx_fifo, data_32),
+							 &frame.data_32,
+							 ROUND_UP(data_length, sizeof(uint32_t)));
+				if (err != 0) {
+					LOG_ERR("failed to read Rx FIFO data (err %d)", err);
+					return;
+				}
 			}
 
 			if ((frame.flags & CAN_FRAME_IDE) != 0) {
@@ -953,13 +955,15 @@ int can_mcan_send(const struct device *dev, const struct can_frame *frame, k_tim
 		goto err_unlock;
 	}
 
-	err = can_mcan_write_mram(dev, config->mram_offsets[CAN_MCAN_MRAM_CFG_TX_BUFFER] + put_idx *
-				  sizeof(struct can_mcan_tx_buffer) +
-				  offsetof(struct can_mcan_tx_buffer, data_32),
-				  &frame->data_32, ROUND_UP(data_length, sizeof(uint32_t)));
-	if (err != 0) {
-		LOG_ERR("failed to write Tx Buffer data (err %d)", err);
-		goto err_unlock;
+	if ((frame->flags & CAN_FRAME_RTR) == 0U) {
+		err = can_mcan_write_mram(dev, config->mram_offsets[CAN_MCAN_MRAM_CFG_TX_BUFFER] +
+					put_idx * sizeof(struct can_mcan_tx_buffer) +
+					offsetof(struct can_mcan_tx_buffer, data_32),
+					&frame->data_32, ROUND_UP(data_length, sizeof(uint32_t)));
+		if (err != 0) {
+			LOG_ERR("failed to write Tx Buffer data (err %d)", err);
+			goto err_unlock;
+		}
 	}
 
 	__ASSERT_NO_MSG(put_idx < cbs->num_tx);
@@ -1145,12 +1149,17 @@ void can_mcan_remove_rx_filter(const struct device *dev, int filter_id)
 	struct can_mcan_data *data = dev->data;
 	int err;
 
+	if (filter_id < 0) {
+		LOG_ERR("filter ID %d out of bounds", filter_id);
+		return;
+	}
+
 	k_mutex_lock(&data->lock, K_FOREVER);
 
 	if (filter_id >= cbs->num_std) {
 		filter_id -= cbs->num_std;
 		if (filter_id >= cbs->num_ext) {
-			LOG_ERR("Wrong filter id");
+			LOG_ERR("filter ID %d out of bounds", filter_id);
 			k_mutex_unlock(&data->lock);
 			return;
 		}
@@ -1511,7 +1520,7 @@ int can_mcan_init(const struct device *dev)
 		return err;
 	}
 
-	reg = CAN_MCAN_ILS_RF0NL | CAN_MCAN_ILS_RF1NL;
+	reg = CAN_MCAN_ILS_RF0NL | CAN_MCAN_ILS_RF1NL | CAN_MCAN_ILS_RF0LL | CAN_MCAN_ILS_RF1LL;
 	err = can_mcan_write_reg(dev, CAN_MCAN_ILS, reg);
 	if (err != 0) {
 		return err;
