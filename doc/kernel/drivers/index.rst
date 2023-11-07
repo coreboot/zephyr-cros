@@ -235,11 +235,11 @@ implementation of both the subsystem API and the specific APIs:
 
    #ifdef CONFIG_USERSPACE
 
-   #include <zephyr/syscall_handler.h>
+   #include <zephyr/internal/syscall_handler.h>
 
    int z_vrfy_specific_from_user(const struct device *dev, int bar)
    {
-       Z_OOPS(Z_SYSCALL_SPECIFIC_DRIVER(dev, K_OBJ_DRIVER_GENERIC, &api));
+       K_OOPS(K_SYSCALL_SPECIFIC_DRIVER(dev, K_OBJ_DRIVER_GENERIC, &api));
        return z_impl_specific_do_that(dev, bar)
    }
 
@@ -393,6 +393,18 @@ In some cases you may just need to run a function at boot. For such cases, the
 :c:macro:`SYS_INIT` can be used. This macro does not take any config or runtime
 data structures and there isn't a way to later get a device pointer by name. The
 same device policies for initialization level and priority apply.
+
+Inspecting the initialization sequence
+**************************************
+
+Device drivers declared with :c:macro:`DEVICE_DEFINE` (or any variations of it)
+and :c:macro:`SYS_INIT` are processed at boot time and the corresponding
+initialization functions are called sequentially according to their specified
+level and priority.
+
+Sometimes it's useful to inspect the final sequence of initialization function
+call as produced by the linker. To do that, use the ``initlevels`` CMake
+target, for example ``west build -t initlevels``.
 
 Error handling
 **************

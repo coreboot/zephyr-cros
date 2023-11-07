@@ -52,24 +52,6 @@ static void notify_handler(ACPI_HANDLE device, UINT32 value, void *ctx)
 	ACPI_INFO(("Received a notify 0x%X", value));
 }
 
-static ACPI_STATUS region_handler(UINT32 Function, ACPI_PHYSICAL_ADDRESS address, UINT32 bit_width,
-				  UINT64 *value, void *handler_ctx, void *region_ctx)
-{
-	return AE_OK;
-}
-
-static ACPI_STATUS region_init(ACPI_HANDLE RegionHandle, UINT32 Function, void *handler_ctx,
-			       void **region_ctx)
-{
-	if (Function == ACPI_REGION_DEACTIVATE) {
-		*region_ctx = NULL;
-	} else {
-		*region_ctx = RegionHandle;
-	}
-
-	return AE_OK;
-}
-
 static ACPI_STATUS install_handlers(void)
 {
 	ACPI_STATUS status;
@@ -82,13 +64,7 @@ static ACPI_STATUS install_handlers(void)
 		goto exit;
 	}
 
-	status = AcpiInstallAddressSpaceHandler(ACPI_ROOT_OBJECT, ACPI_ADR_SPACE_SYSTEM_MEMORY,
-						region_handler, region_init, NULL);
-	if (ACPI_FAILURE(status)) {
-		ACPI_EXCEPTION((AE_INFO, status, "While installing an OpRegion handler"));
-	}
 exit:
-
 	return status;
 }
 
@@ -115,10 +91,10 @@ static ACPI_STATUS initialize_acpica(void)
 		goto exit;
 	}
 
-	/* Initialize the ACPI hardware */
-	status = AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
+	/* Create the ACPI namespace from ACPI tables */
+	status = AcpiLoadTables();
 	if (ACPI_FAILURE(status)) {
-		ACPI_EXCEPTION((AE_INFO, status, "While enabling ACPI"));
+		ACPI_EXCEPTION((AE_INFO, status, "While loading ACPI tables"));
 		goto exit;
 	}
 
@@ -129,10 +105,10 @@ static ACPI_STATUS initialize_acpica(void)
 		goto exit;
 	}
 
-	/* Create the ACPI namespace from ACPI tables */
-	status = AcpiLoadTables();
+	/* Initialize the ACPI hardware */
+	status = AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
-		ACPI_EXCEPTION((AE_INFO, status, "While loading ACPI tables"));
+		ACPI_EXCEPTION((AE_INFO, status, "While enabling ACPI"));
 		goto exit;
 	}
 
@@ -239,7 +215,7 @@ static int acpi_get_irq_table(struct acpi *bus, char *bus_name,
 	}
 
 	rt_buffer.Pointer = rt_table;
-	rt_buffer.Length = ACPI_DEBUG_BUFFER_SIZE;
+	rt_buffer.Length = rt_size;
 
 	status = AcpiGetIrqRoutingTable(node, &rt_buffer);
 	if (ACPI_FAILURE(status)) {
@@ -263,7 +239,8 @@ static int acpi_get_irq_table(struct acpi *bus, char *bus_name,
 static int acpi_retrieve_legacy_irq(struct acpi *bus)
 {
 	/* TODO: assume platform have only one PCH with single PCI bus (bus 0). */
-	return acpi_get_irq_table(bus, "_SB.PC00", bus->pci_prt_table, sizeof(bus->pci_prt_table));
+	return acpi_get_irq_table(bus, CONFIG_ACPI_PRT_BUS_NAME,
+				  bus->pci_prt_table, sizeof(bus->pci_prt_table));
 }
 
 static ACPI_STATUS dev_resource_enum_callback(ACPI_HANDLE obj_handle, UINT32 level, void *ctx,
@@ -791,10 +768,13 @@ int acpi_drhd_get(enum AcpiDmarScopeType scope, struct acpi_dmar_device_scope *d
 	return 0;
 }
 
-struct acpi_madt_local_apic *acpi_local_apic_get(uint32_t cpu_num)
+#define ACPI_CPU_FLAGS_ENABLED 0x01u
+
+struct acpi_madt_local_apic *acpi_local_apic_get(int cpu_num)
 {
 	struct acpi_madt_local_apic *lapic;
 	int cpu_cnt;
+	int idx;
 
 	if (acpi_madt_entry_get(ACPI_MADT_TYPE_LOCAL_APIC, (ACPI_SUBTABLE_HEADER **)&lapic,
 				&cpu_cnt)) {
@@ -802,10 +782,15 @@ struct acpi_madt_local_apic *acpi_local_apic_get(uint32_t cpu_num)
 		return NULL;
 	}
 
-	if ((cpu_num >= cpu_cnt) || !(lapic[cpu_num].LapicFlags & 1u)) {
-		/* Proccessor not enabled. */
-		return NULL;
+	for (idx = 0; cpu_num >= 0 && idx < cpu_cnt; idx++) {
+		if (lapic[idx].LapicFlags & ACPI_CPU_FLAGS_ENABLED) {
+			if (cpu_num == 0) {
+				return &lapic[idx];
+			}
+
+			cpu_num--;
+		}
 	}
 
-	return &lapic[cpu_num];
+	return NULL;
 }

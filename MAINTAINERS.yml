@@ -111,6 +111,21 @@
 
 # Areas are sorted by name
 
+ACPI:
+  status: maintained
+  maintainers:
+    - jhedberg
+    - najumon1980
+  collaborators:
+    - finikorg
+    - tbursztyka
+  files:
+    - lib/acpi/
+    - include/zephyr/acpi/
+    - tests/lib/acpi/
+  labels:
+    - "area: ACPI"
+
 ARC arch:
   status: maintained
   maintainers:
@@ -124,6 +139,7 @@ ARC arch:
     - include/zephyr/arch/arc/
     - tests/arch/arc/
     - dts/arc/synopsys/
+    - doc/hardware/arch/arc-support-status.rst
   labels:
     - "area: ARC"
 
@@ -193,6 +209,18 @@ Ambiq Platforms:
     - drivers/*/*_ambiq*
   labels:
     - "platform: Ambiq"
+
+Benchmarks:
+  status: maintained
+  maintainers:
+    - peter-mitsis
+  collaborators:
+    - nashif
+    - dcpleung
+  files:
+    - tests/benchmarks/
+  labels:
+    - "area: Benchmarks"
 
 Binary Descriptors:
   status: maintained
@@ -491,8 +519,10 @@ Common Architecture Interface:
     - dcpleung
     - nashif
   files:
+    - include/zephyr/arch/
     - arch/common/
     - include/zephyr/arch/common/
+    - tests/arch/common/
   labels:
     - "area: Architectures"
 
@@ -520,6 +550,18 @@ Debug:
     - doc/services/debugging/
   labels:
     - "area: Debugging"
+
+
+Demand Paging:
+  status: maintained
+  maintainers:
+    - dcpleung
+  collaborators:
+    - ceolin
+    - peter-mitsis
+    - nashif
+  files:
+    - subsys/demand_paging/
 
 Device Driver Model:
   status: maintained
@@ -590,6 +632,7 @@ Disk:
     - subsys/sd/
     - tests/subsys/sd/
     - tests/drivers/disk/
+    - include/zephyr/sd/
   labels:
     - "area: Disk Access"
 
@@ -605,6 +648,7 @@ Display drivers:
     - include/zephyr/drivers/display.h
     - subsys/fb/
     - samples/subsys/display/
+    - doc/hardware/peripherals/display/
   labels:
     - "area: Display"
 
@@ -693,6 +737,7 @@ Release Notes:
   files:
     - drivers/audio/
     - include/zephyr/audio/
+    - doc/hardware/peripherals/audio/
   labels:
     - "area: Audio"
 
@@ -704,6 +749,7 @@ Release Notes:
     - tests/drivers/bbram/
     - drivers/bbram/
     - include/zephyr/drivers/bbram.h
+    - doc/hardware/peripherals/bbram.rst
   labels:
     - "area: Battery Backed RAM (bbram)"
 
@@ -717,6 +763,7 @@ Release Notes:
     - include/zephyr/drivers/auxdisplay.h
     - drivers/auxdisplay/*
     - dts/bindings/auxdisplay/*
+    - doc/hardware/peripherals/auxdisplay.rst
   labels:
     - "area: Aux display"
 
@@ -732,7 +779,8 @@ Release Notes:
   files:
     - boards/shields/mcp2515/
     - boards/shields/tcan4550evm/
-    - doc/hardware/peripherals/canbus/
+    - doc/connectivity/canbus/
+    - doc/hardware/peripherals/can/
     - drivers/can/
     - drivers/net/canbus.c
     - dts/bindings/can/
@@ -887,6 +935,7 @@ Release Notes:
     - include/zephyr/drivers/eeprom.h
     - samples/drivers/eeprom/
     - tests/drivers/eeprom/
+    - doc/hardware/peripherals/eeprom.rst
   labels:
     - "area: EEPROM"
 
@@ -898,6 +947,7 @@ Release Notes:
     - drivers/entropy/
     - include/zephyr/drivers/entropy.h
     - tests/drivers/entropy/
+    - doc/hardware/peripherals/entropy.rst
   labels:
     - "area: Crypto / RNG"
 
@@ -926,6 +976,7 @@ Release Notes:
     - include/zephyr/dt-bindings/ethernet/
     - tests/drivers/build_all/ethernet/
     - dts/bindings/ethernet/
+    - tests/drivers/ethernet/
   labels:
     - "area: Ethernet"
 
@@ -990,6 +1041,18 @@ Release Notes:
     - tests/drivers/build_all/gpio/
   labels:
     - "area: GPIO"
+
+"Drivers: GNSS":
+  status: maintained
+  maintainers:
+    - bjarki-trackunit
+  files:
+    - doc/hardware/peripherals/gnss.rst
+    - drivers/gnss/
+    - include/zephyr/drivers/gnss.h
+    - tests/drivers/gnss/
+  labels:
+    - "area: GNSS"
 
 "Drivers: HW Info":
   status: maintained
@@ -1085,6 +1148,7 @@ Release Notes:
     - dts/bindings/ipm/
     - tests/drivers/ipm/
     - doc/hardware/peripherals/ipm.rst
+    - include/zephyr/drivers/ipm.h
   description: >-
     Inter-processor mailboxes
   labels:
@@ -1200,6 +1264,7 @@ Release Notes:
     - bjarki-trackunit
   files:
     - drivers/rtc/
+    - include/zephyr/drivers/rtc/
     - tests/drivers/rtc/
     - doc/hardware/peripherals/rtc.rst
     - include/zephyr/drivers/rtc.h
@@ -1217,6 +1282,7 @@ Release Notes:
   files:
     - drivers/pcie/
     - include/zephyr/drivers/pcie/
+    - doc/hardware/peripherals/pcie.rst
   labels:
     - "area: PCI"
 
@@ -1332,6 +1398,7 @@ Release Notes:
   files:
     - drivers/sensor/
     - include/zephyr/drivers/sensor.h
+    - include/zephyr/drivers/sensor_data_types.h
     - samples/sensor/
     - tests/drivers/sensor/
     - dts/bindings/sensor/
@@ -1390,6 +1457,7 @@ Release Notes:
     - drivers/video/
     - include/zephyr/drivers/video.h
     - include/zephyr/drivers/video-controls.h
+    - doc/hardware/peripherals/video.rst
   labels:
     - "area: Video"
 
@@ -1589,6 +1657,7 @@ Input:
     - subsys/input/
     - tests/drivers/build_all/input/
     - tests/subsys/input/
+    - tests/drivers/input/
   description: >-
     Input subsystem and drivers
   labels:
@@ -1621,6 +1690,7 @@ JSON Web Token:
     - include/zephyr/data/
     - lib/os/json.c
     - tests/subsys/jwt/
+    - tests/lib/json/
   labels:
     - "area: JSON"
 
@@ -1643,12 +1713,13 @@ Kernel:
   status: maintained
   maintainers:
     - andyross
+    - peter-mitsis
   collaborators:
     - nashif
     - ceolin
     - dcpleung
-    - peter-mitsis
     - cfriedt
+    - npitre
   files:
     - doc/kernel/
     - include/zephyr/kernel*.h
@@ -1667,9 +1738,10 @@ Base OS:
   status: maintained
   maintainers:
     - andyross
+    - nashif
   collaborators:
     - dcpleung
-    - nashif
+    - peter-mitsis
   files:
     - include/zephyr/sys/
     - lib/os/
@@ -1679,6 +1751,7 @@ Base OS:
     - tests/lib/cbprintf_*/
     - lib/os/cbprintf*
     - lib/os/Kconfig.cbprintf
+    - include/zephyr/sys/mem_manage.h
   labels:
     - "area: Base OS"
 
@@ -1808,6 +1881,8 @@ Modem Modules:
     - subsys/modem/
     - include/zephyr/modem/
     - tests/subsys/modem/
+    - doc/services/modem/
+    - samples/net/cellular_modem/
 
 OSDP:
   status: maintained
@@ -2157,6 +2232,7 @@ Retention:
     - dts/bindings/retention/
     - include/zephyr/retention/
     - subsys/retention/
+    - doc/services/retention/
   labels:
     - "area: Retention"
 
@@ -2202,6 +2278,7 @@ Twister:
     - gchwier
   files:
     - scripts/twister
+    - scripts/schemas/twister/
     - scripts/pylib/twister/
     - scripts/tests/twister/
     - scripts/tests/twister_blackbox/
@@ -2633,6 +2710,7 @@ STM32 Platforms:
     - Desvauxm-st
     - GeorgeCGV
   files:
+    - boards/arm/b_*/
     - boards/arm/nucleo_*/
     - boards/arm/stm32*_disco/
     - boards/arm/stm32*_dk*/
@@ -2836,6 +2914,7 @@ TF-M Integration:
   labels:
     - "area: TF-M"
 
+
 "Toolchain Integration":
   status: maintained
   maintainers:
@@ -2847,6 +2926,7 @@ TF-M Integration:
     - cmake/compiler/
     - cmake/linker/
     - cmake/toolchain/
+    - include/zephyr/toolchain/
   labels:
     - "area: Toolchains"
 
@@ -2892,6 +2972,7 @@ Tracing:
     - teburd
   files:
     - subsys/tracing/
+    - scripts/tracing/
     - include/zephyr/tracing/
     - subsys/timing/
     - samples/subsys/tracing/
@@ -2916,6 +2997,7 @@ USB:
     - tests/subsys/usb/
     - tests/drivers/udc/
     - doc/connectivity/usb/
+    - scripts/generate_usb_vif/
   labels:
     - "area: USB"
 
@@ -2933,6 +3015,7 @@ USB-C:
     - samples/subsys/usb_c/
     - subsys/usb/usb_c/
     - doc/connectivity/usb/pd/
+    - doc/hardware/peripherals/usbc_vbus.rst
   labels:
     - "area: USB-C"
 
@@ -2956,6 +3039,7 @@ Userspace:
     - scripts/build/process_gperf.py
     - scripts/build/gen_relocate_app.py
     - include/zephyr/sys/kobject.h
+    - include/zephyr/sys/mem_manage.h
   labels:
     - "area: Userspace"
 
@@ -2991,10 +3075,11 @@ West:
   status: maintained
   maintainers:
     - najumon1980
+    - jhedberg
   files:
     - modules/acpica/
   labels:
-    - manifest-acpica
+    - "area: ACPI"
 
 "West project: canopennode":
   status: maintained
@@ -3118,7 +3203,8 @@ West:
   collaborators:
     - LucasTambor
     - marekmatej
-  files: []
+  files:
+    - modules/Kconfig.esp32
   labels:
     - "platform: ESP32"
 
@@ -3130,7 +3216,7 @@ West:
     - drivers/misc/ethos_u/
     - modules/hal_ethos_u/
   labels:
-    - manifest-hal_ethos_u
+    - "area: ARM"
 
 "West project: hal_gigadevice":
   status: maintained
@@ -3498,7 +3584,8 @@ West:
     - keith-packard
   collaborators:
     - stephanosio
-  files: []
+  files:
+    - modules/Kconfig.picolibc
   labels:
     - "area: C Library"
     - "area: picolibc"
@@ -3609,6 +3696,7 @@ West:
     - StefanHri
   files:
     - modules/uoscore-uedhoc/
+    - tests/modules/uoscore/
   labels:
     - "area: Networking"
     - "area: Crypto / RNG"
@@ -3654,6 +3742,8 @@ Xtensa arch:
     - dts/xtensa/
     - boards/xtensa/qemu_xtensa/
     - boards/xtensa/xt-sim/
+    - soc/xtensa/dc233c/
+    - soc/xtensa/sample_controller/
   labels:
     - "area: Xtensa"
 
@@ -3707,6 +3797,7 @@ ZTest:
     - subsys/testsuite/
     - tests/ztest/
     - tests/unit/util/
+    - tests/subsys/testsuite/
     - samples/subsys/testsuite/
     - doc/develop/test/ztest.rst
   labels:

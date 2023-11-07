@@ -58,12 +58,9 @@ struct nrf5_802154_config {
 
 static struct nrf5_802154_data nrf5_data;
 
-#define ACK_REQUEST_BYTE 1
-#define ACK_REQUEST_BIT (1 << 5)
-#define FRAME_PENDING_BYTE 1
-#define FRAME_PENDING_BIT (1 << 4)
-
 #define DRX_SLOT_RX 0 /* Delayed reception window ID */
+
+#define NSEC_PER_TEN_SYMBOLS (10 * IEEE802154_PHY_OQPSK_780_TO_2450MHZ_SYMBOL_PERIOD_NS)
 
 #if defined(CONFIG_IEEE802154_NRF5_UICR_EUI64_ENABLE)
 #if defined(CONFIG_SOC_NRF5340_CPUAPP)
@@ -179,6 +176,10 @@ static void nrf5_rx_thread(void *arg1, void *arg2, void *arg3)
 
 #if defined(CONFIG_NET_PKT_TIMESTAMP)
 		net_pkt_set_timestamp_ns(pkt, rx_frame->time * NSEC_PER_USEC);
+#endif
+
+#if defined(CONFIG_NET_L2_OPENTHREAD)
+		net_pkt_set_ieee802154_ack_seb(pkt, rx_frame->ack_seb);
 #endif
 
 		LOG_DBG("Caught a packet (%u) (LQI: %u)",
@@ -925,8 +926,20 @@ static int nrf5_configure(const struct device *dev,
 
 #if defined(CONFIG_IEEE802154_CSL_ENDPOINT)
 	case IEEE802154_CONFIG_EXPECTED_RX_TIME: {
-		nrf_802154_csl_writer_anchor_time_set(nrf_802154_timestamp_phr_to_mhr_convert(
-			config->expected_rx_time / NSEC_PER_USEC));
+
+#if defined(CONFIG_NRF_802154_SER_HOST)
+		net_time_t period_ns = nrf5_data.csl_period * NSEC_PER_TEN_SYMBOLS;
+		bool changed = (config->csl_rx_time - nrf5_data.csl_rx_time) % period_ns;
+
+		nrf5_data.csl_rx_time = config->csl_rx_time;
+
+		if (changed)
+#endif /* CONFIG_NRF_802154_SER_HOST */
+		{
+			nrf_802154_csl_writer_anchor_time_set(
+				nrf_802154_timestamp_phr_to_mhr_convert(config->expected_rx_time /
+									NSEC_PER_USEC));
+		}
 	} break;
 
 	case IEEE802154_CONFIG_RX_SLOT: {
@@ -942,9 +955,12 @@ static int nrf5_configure(const struct device *dev,
 				      config->rx_slot.channel, DRX_SLOT_RX);
 	} break;
 
-	case IEEE802154_CONFIG_CSL_PERIOD:
+	case IEEE802154_CONFIG_CSL_PERIOD: {
 		nrf_802154_csl_writer_period_set(config->csl_period);
-		break;
+#if defined(CONFIG_NRF_802154_SER_HOST)
+		nrf5_data.csl_period = config->csl_period;
+#endif
+	} break;
 #endif /* CONFIG_IEEE802154_CSL_ENDPOINT */
 
 #if defined(CONFIG_IEEE802154_NRF5_MULTIPLE_CCA)
@@ -1014,13 +1030,10 @@ void nrf_802154_received_timestamp_raw(uint8_t *data, int8_t power, uint8_t lqi,
 			nrf_802154_timestamp_end_to_phr_convert(time, data[0]);
 #endif
 
-		if (data[ACK_REQUEST_BYTE] & ACK_REQUEST_BIT) {
-			nrf5_data.rx_frames[i].ack_fpb = nrf5_data.last_frame_ack_fpb;
-		} else {
-			nrf5_data.rx_frames[i].ack_fpb = false;
-		}
-
+		nrf5_data.rx_frames[i].ack_fpb = nrf5_data.last_frame_ack_fpb;
+		nrf5_data.rx_frames[i].ack_seb = nrf5_data.last_frame_ack_seb;
 		nrf5_data.last_frame_ack_fpb = false;
+		nrf5_data.last_frame_ack_seb = false;
 
 		k_fifo_put(&nrf5_data.rx_fifo, &nrf5_data.rx_frames[i]);
 
@@ -1080,6 +1093,8 @@ void nrf_802154_receive_failed(nrf_802154_rx_error_t error, uint32_t id)
 	}
 
 	nrf5_data.last_frame_ack_fpb = false;
+	nrf5_data.last_frame_ack_seb = false;
+
 	if (nrf5_data.event_handler) {
 		nrf5_data.event_handler(dev, IEEE802154_EVENT_RX_FAILED, (void *)&reason);
 	}
@@ -1087,8 +1102,8 @@ void nrf_802154_receive_failed(nrf_802154_rx_error_t error, uint32_t id)
 
 void nrf_802154_tx_ack_started(const uint8_t *data)
 {
-	nrf5_data.last_frame_ack_fpb =
-				data[FRAME_PENDING_BYTE] & FRAME_PENDING_BIT;
+	nrf5_data.last_frame_ack_fpb = data[FRAME_PENDING_OFFSET] & FRAME_PENDING_BIT;
+	nrf5_data.last_frame_ack_seb = data[SECURITY_ENABLED_OFFSET] & SECURITY_ENABLED_BIT;
 }
 
 void nrf_802154_transmitted_raw(uint8_t *frame,

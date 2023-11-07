@@ -60,7 +60,7 @@ extern "C" {
  */
 #define CAN_MAX_DLC     8U
 /**
- * @brief Maximum data length code for CAN-FD.
+ * @brief Maximum data length code for CAN FD.
  */
 #define CANFD_MAX_DLC   15U
 
@@ -94,7 +94,7 @@ extern "C" {
 /** Controller is not allowed to send dominant bits. */
 #define CAN_MODE_LISTENONLY BIT(1)
 
-/** Controller allows transmitting/receiving CAN-FD frames. */
+/** Controller allows transmitting/receiving CAN FD frames. */
 #define CAN_MODE_FD         BIT(2)
 
 /** Controller does not retransmit in case of lost arbitration or missing ACK */
@@ -144,13 +144,13 @@ enum can_state {
 /** Frame is a Remote Transmission Request (RTR) */
 #define CAN_FRAME_RTR BIT(1)
 
-/** Frame uses CAN-FD format (FDF) */
+/** Frame uses CAN FD format (FDF) */
 #define CAN_FRAME_FDF BIT(2)
 
-/** Frame uses CAN-FD Baud Rate Switch (BRS). Only valid in combination with ``CAN_FRAME_FDF``. */
+/** Frame uses CAN FD Baud Rate Switch (BRS). Only valid in combination with ``CAN_FRAME_FDF``. */
 #define CAN_FRAME_BRS BIT(3)
 
-/** CAN-FD Error State Indicator (ESI). Indicates that the transmitting node is in error-passive
+/** CAN FD Error State Indicator (ESI). Indicates that the transmitting node is in error-passive
  * state. Only valid in combination with ``CAN_FRAME_FDF``.
  */
 #define CAN_FRAME_ESI BIT(4)
@@ -209,7 +209,7 @@ struct can_frame {
 /** Filter matches data frames */
 #define CAN_FILTER_DATA BIT(2)
 
-/** Filter matches CAN-FD frames (FDF) */
+/** Filter matches CAN FD frames (FDF) */
 #define CAN_FILTER_FDF BIT(3)
 
 /** @} */
@@ -333,7 +333,7 @@ typedef int (*can_set_timing_t)(const struct device *dev,
 				const struct can_timing *timing);
 
 /**
- * @brief Optional callback API upon setting CAN-FD bus timing for the data phase.
+ * @brief Optional callback API upon setting CAN FD bus timing for the data phase.
  * See @a can_set_timing_data() for argument description
  */
 typedef int (*can_set_timing_data_t)(const struct device *dev,
@@ -841,7 +841,7 @@ __syscall int can_calc_timing(const struct device *dev, struct can_timing *res,
  * @param dev Pointer to the device structure for the driver instance.
  *
  * @return Pointer to the minimum supported timing parameter values, or NULL if
- *         CAN-FD support is not implemented by the driver.
+ *         CAN FD support is not implemented by the driver.
  */
 __syscall const struct can_timing *can_get_timing_data_min(const struct device *dev);
 
@@ -865,7 +865,7 @@ static inline const struct can_timing *z_impl_can_get_timing_data_min(const stru
  * @param dev Pointer to the device structure for the driver instance.
  *
  * @return Pointer to the maximum supported timing parameter values, or NULL if
- *         CAN-FD support is not implemented by the driver.
+ *         CAN FD support is not implemented by the driver.
  */
 __syscall const struct can_timing *can_get_timing_data_max(const struct device *dev);
 
@@ -901,7 +901,7 @@ __syscall int can_calc_timing_data(const struct device *dev, struct can_timing *
 				   uint32_t bitrate, uint16_t sample_pnt);
 
 /**
- * @brief Configure the bus timing for the data phase of a CAN-FD controller.
+ * @brief Configure the bus timing for the data phase of a CAN FD controller.
  *
  * @note @kconfig{CONFIG_CAN_FD_MODE} must be selected for this function to be
  * available.
@@ -915,13 +915,13 @@ __syscall int can_calc_timing_data(const struct device *dev, struct can_timing *
  * @retval -EBUSY if the CAN controller is not in stopped state.
  * @retval -EIO General input/output error, failed to configure device.
  * @retval -ENOTSUP if the timing parameters are not supported by the driver.
- * @retval -ENOSYS if CAN-FD support is not implemented by the driver.
+ * @retval -ENOSYS if CAN FD support is not implemented by the driver.
  */
 __syscall int can_set_timing_data(const struct device *dev,
 				  const struct can_timing *timing_data);
 
 /**
- * @brief Set the bitrate for the data phase of the CAN-FD controller
+ * @brief Set the bitrate for the data phase of the CAN FD controller
  *
  * CAN in Automation (CiA) 301 v4.2.0 recommends a sample point location of
  * 87.5% percent for all bitrates. However, some CAN controllers have
@@ -1385,6 +1385,27 @@ static inline void can_set_state_change_callback(const struct device *dev,
  */
 
 /**
+ * @brief Get the bit error counter for a CAN device
+ *
+ * The bit error counter is incremented when the CAN controller is unable to
+ * transmit either a dominant or a recessive bit.
+ *
+ * @note @kconfig{CONFIG_CAN_STATS} must be selected for this function to be
+ * available.
+ *
+ * @param dev Pointer to the device structure for the driver instance.
+ * @return bit error counter
+ */
+__syscall uint32_t can_stats_get_bit_errors(const struct device *dev);
+
+#ifdef CONFIG_CAN_STATS
+static inline uint32_t z_impl_can_stats_get_bit_errors(const struct device *dev)
+{
+	return Z_CAN_GET_STATS(dev).bit_error;
+}
+#endif /* CONFIG_CAN_STATS */
+
+/**
  * @brief Get the bit0 error counter for a CAN device
  *
  * The bit0 error counter is incremented when the CAN controller is unable to
@@ -1392,6 +1413,8 @@ static inline void can_set_state_change_callback(const struct device *dev,
  *
  * @note @kconfig{CONFIG_CAN_STATS} must be selected for this function to be
  * available.
+ *
+ * @see can_stats_get_bit_errors()
  *
  * @param dev Pointer to the device structure for the driver instance.
  * @return bit0 error counter
@@ -1413,6 +1436,8 @@ static inline uint32_t z_impl_can_stats_get_bit0_errors(const struct device *dev
  *
  * @note @kconfig{CONFIG_CAN_STATS} must be selected for this function to be
  * available.
+ *
+ * @see can_stats_get_bit_errors()
  *
  * @param dev Pointer to the device structure for the driver instance.
  * @return bit1 error counter
@@ -1605,12 +1630,12 @@ static inline bool can_frame_matches_filter(const struct can_frame *frame,
 	}
 
 	if ((frame->flags & CAN_FRAME_FDF) != 0 && (filter->flags & CAN_FILTER_FDF) == 0) {
-		/* CAN-FD format frame, classic format filter */
+		/* CAN FD format frame, classic format filter */
 		return false;
 	}
 
 	if ((frame->flags & CAN_FRAME_FDF) == 0 && (filter->flags & CAN_FILTER_FDF) != 0) {
-		/* Classic frame, CAN-FD format filter */
+		/* Classic frame, CAN FD format filter */
 		return false;
 	}
 

@@ -48,6 +48,25 @@ def test_pytest_command(testinstance: TestInstance, device_type):
         assert c in command
 
 
+def test_pytest_command_dut_scope(testinstance: TestInstance):
+    pytest_harness = Pytest()
+    dut_scope = 'session'
+    testinstance.testsuite.harness_config['pytest_dut_scope'] = dut_scope
+    pytest_harness.configure(testinstance)
+    command = pytest_harness.generate_command()
+    assert f'--dut-scope={dut_scope}' in command
+
+
+def test_pytest_command_extra_args(testinstance: TestInstance):
+    pytest_harness = Pytest()
+    pytest_args = ['-k test1', '-m mark1']
+    testinstance.testsuite.harness_config['pytest_args'] = pytest_args
+    pytest_harness.configure(testinstance)
+    command = pytest_harness.generate_command()
+    for c in pytest_args:
+        assert c in command
+
+
 @pytest.mark.parametrize(
     ('pytest_root', 'expected'),
     [
@@ -169,6 +188,8 @@ def test_if_report_with_error(pytester, testinstance: TestInstance):
         assert tc.status == "failed"
         assert tc.output
         assert tc.reason
+    assert testinstance.reason
+    assert '2/2' in testinstance.reason
 
 
 def test_if_report_with_skip(pytester, testinstance: TestInstance):

@@ -11,7 +11,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/bitarray.h>
 #include <zephyr/sys/kobject.h>
-#include <zephyr/syscall_handler.h>
+#include <zephyr/internal/syscall_handler.h>
 
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
@@ -152,7 +152,7 @@ int z_impl_k_thread_stack_free(k_thread_stack_t *stack)
 
 	if (IS_ENABLED(CONFIG_DYNAMIC_THREAD_ALLOC)) {
 #ifdef CONFIG_USERSPACE
-		if (z_object_find(stack)) {
+		if (k_object_find(stack)) {
 			k_object_free(stack);
 		} else {
 			k_free(stack);

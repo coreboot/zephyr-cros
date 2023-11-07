@@ -364,8 +364,9 @@ static int cmd_can_show(const struct shell *sh, size_t argc, char **argv)
 
 #ifdef CONFIG_CAN_STATS
 	shell_print(sh, "statistics:");
-	shell_print(sh, "  bit0 errors:   %u", can_stats_get_bit0_errors(dev));
-	shell_print(sh, "  bit1 errors:   %u", can_stats_get_bit1_errors(dev));
+	shell_print(sh, "  bit errors:    %u", can_stats_get_bit_errors(dev));
+	shell_print(sh, "    bit0 errors: %u", can_stats_get_bit0_errors(dev));
+	shell_print(sh, "    bit1 errors: %u", can_stats_get_bit1_errors(dev));
 	shell_print(sh, "  stuff errors:  %u", can_stats_get_stuff_errors(dev));
 	shell_print(sh, "  crc errors:    %u", can_stats_get_crc_errors(dev));
 	shell_print(sh, "  form errors:   %u", can_stats_get_form_errors(dev));
@@ -669,7 +670,7 @@ static int cmd_can_send(const struct shell *sh, size_t argc, char **argv)
 	frame_no = frame_counter++;
 
 	shell_print(sh, "enqueuing CAN frame #%u with %s (%d-bit) CAN ID 0x%0*x, "
-		    "RTR %d, CAN-FD %d, BRS %d, DLC %d", frame_no,
+		    "RTR %d, CAN FD %d, BRS %d, DLC %d", frame_no,
 		    (frame.flags & CAN_FRAME_IDE) != 0 ? "extended" : "standard",
 		    (frame.flags & CAN_FRAME_IDE) != 0 ? 29 : 11,
 		    (frame.flags & CAN_FRAME_IDE) != 0 ? 8 : 3, frame.id,
@@ -781,7 +782,7 @@ static int cmd_can_filter_add(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	shell_print(sh, "adding filter with %s (%d-bit) CAN ID 0x%0*x, "
-		    "CAN ID mask 0x%0*x, data frames %d, RTR frames %d, CAN-FD frames %d",
+		    "CAN ID mask 0x%0*x, data frames %d, RTR frames %d, CAN FD frames %d",
 		    (filter.flags & CAN_FILTER_IDE) != 0 ? "extended" : "standard",
 		    (filter.flags & CAN_FILTER_IDE) != 0 ? 29 : 11,
 		    (filter.flags & CAN_FILTER_IDE) != 0 ? 8 : 3, filter.id,
@@ -908,7 +909,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_can_filter_cmds,
 		"Add rx filter\n"
 		"Usage: can filter add <device> [-e] [-f] [-r] [-R] <CAN ID> [CAN ID mask]\n"
 		"-e  use extended (29-bit) CAN ID/CAN ID mask\n"
-		"-f  match CAN-FD format frames\n"
+		"-f  match CAN FD format frames\n"
 		"-r  also match Remote Transmission Request (RTR) frames\n"
 		"-R  only match Remote Transmission Request (RTR) frames",
 		cmd_can_filter_add, 3, 5),
@@ -950,8 +951,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_can_cmds,
 		"Usage: can send <device> [-e] [-r] [-f] [-b] <CAN ID> [data] [...]\n"
 		"-e  use extended (29-bit) CAN ID\n"
 		"-r  send Remote Transmission Request (RTR) frame\n"
-		"-f  use CAN-FD frame format\n"
-		"-b  use CAN-FD Bit Rate Switching (BRS)",
+		"-f  use CAN FD frame format\n"
+		"-b  use CAN FD Bit Rate Switching (BRS)",
 		cmd_can_send, 3, SHELL_OPT_ARG_CHECK_SKIP),
 	SHELL_CMD(filter, &sub_can_filter_cmds,
 		"CAN rx filter commands\n"

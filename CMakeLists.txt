@@ -484,30 +484,6 @@ if(CONFIG_USERSPACE)
   set(KOBJECT_LINKER_DEP kobject_linker)
 endif()
 
-get_property(TOPT GLOBAL PROPERTY TOPT)
-get_property(COMPILER_TOPT TARGET compiler PROPERTY linker_script)
-set_ifndef(  TOPT "${COMPILER_TOPT}")
-set_ifndef(  TOPT -Wl,-T) # Use this if the compiler driver doesn't set a value
-
-if(CONFIG_HAVE_CUSTOM_LINKER_SCRIPT)
-  set(LINKER_SCRIPT ${APPLICATION_SOURCE_DIR}/${CONFIG_CUSTOM_LINKER_SCRIPT})
-  if(NOT EXISTS ${LINKER_SCRIPT})
-    set(LINKER_SCRIPT ${CONFIG_CUSTOM_LINKER_SCRIPT})
-    assert_exists(CONFIG_CUSTOM_LINKER_SCRIPT)
-  endif()
-else()
-  # Try a board specific linker file
-  set(LINKER_SCRIPT ${BOARD_DIR}/linker.ld)
-  if(NOT EXISTS ${LINKER_SCRIPT})
-    # If not available, try an SoC specific linker file
-    set(LINKER_SCRIPT ${SOC_DIR}/${ARCH}/${SOC_PATH}/linker.ld)
-  endif()
-endif()
-
-if(NOT EXISTS ${LINKER_SCRIPT})
-  message(FATAL_ERROR "Could not find linker script: '${LINKER_SCRIPT}'. Corrupted configuration?")
-endif()
-
 if(DEFINED BUILD_VERSION)
   set(build_version_argument "-DBUILD_VERSION=${BUILD_VERSION}")
 elseif(NOT ZEPHYR_GIT_INDEX)
@@ -976,6 +952,29 @@ set(CMAKE_C_COMPILE_FEATURES ${compile_features_${CSTD}} PARENT_SCOPE)
 # @Intent: Configure linker scripts, i.e. generate linker scripts with variables substituted
 toolchain_ld_configure_files()
 
+get_property(TOPT GLOBAL PROPERTY TOPT)
+get_property(COMPILER_TOPT TARGET compiler PROPERTY linker_script)
+set_ifndef(  TOPT "${COMPILER_TOPT}")
+set_ifndef(  TOPT -Wl,-T) # Use this if the compiler driver doesn't set a value
+
+if(CONFIG_HAVE_CUSTOM_LINKER_SCRIPT)
+  set(LINKER_SCRIPT ${APPLICATION_SOURCE_DIR}/${CONFIG_CUSTOM_LINKER_SCRIPT})
+  if(NOT EXISTS ${LINKER_SCRIPT})
+    set(LINKER_SCRIPT ${CONFIG_CUSTOM_LINKER_SCRIPT})
+    assert_exists(CONFIG_CUSTOM_LINKER_SCRIPT)
+  endif()
+elseif(DEFINED BOARD_LINKER_SCRIPT)
+  set(LINKER_SCRIPT ${BOARD_LINKER_SCRIPT})
+elseif(DEFINED SOC_LINKER_SCRIPT)
+  set(LINKER_SCRIPT ${SOC_LINKER_SCRIPT})
+else()
+  find_package(Deprecated COMPONENTS SEARCHED_LINKER_SCRIPT)
+endif()
+
+if(NOT EXISTS ${LINKER_SCRIPT})
+  message(FATAL_ERROR "Could not find linker script: '${LINKER_SCRIPT}'. Corrupted configuration?")
+endif()
+
 if(CONFIG_USERSPACE)
   set(APP_SMEM_ALIGNED_LD "${PROJECT_BINARY_DIR}/include/generated/app_smem_aligned.ld")
   set(APP_SMEM_UNALIGNED_LD "${PROJECT_BINARY_DIR}/include/generated/app_smem_unaligned.ld")
@@ -1125,7 +1124,7 @@ if(CONFIG_USERSPACE)
     ${PROCESS_GPERF}
     -i ${KOBJECT_PREBUILT_HASH_OUTPUT_SRC_PRE}
     -o ${KOBJECT_PREBUILT_HASH_OUTPUT_SRC}
-    -p "struct z_object"
+    -p "struct k_object"
     $<$<BOOL:${CMAKE_VERBOSE_MAKEFILE}>:--verbose>
     DEPENDS kobj_prebuilt_hash_output_src_pre ${KOBJECT_PREBUILT_HASH_OUTPUT_SRC_PRE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -1317,7 +1316,7 @@ if(CONFIG_USERSPACE)
     ${PROCESS_GPERF}
     -i ${KOBJECT_HASH_OUTPUT_SRC_PRE}
     -o ${KOBJECT_HASH_OUTPUT_SRC}
-    -p "struct z_object"
+    -p "struct k_object"
     $<$<BOOL:${CMAKE_VERBOSE_MAKEFILE}>:--verbose>
     DEPENDS kobj_hash_output_src_pre ${CMAKE_CURRENT_BINARY_DIR}/${KOBJECT_HASH_OUTPUT_SRC_PRE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -1798,14 +1797,10 @@ if(CONFIG_BUILD_OUTPUT_INFO_HEADER)
 endif()
 
 if(CONFIG_CHECK_INIT_PRIORITIES)
-  if(CONFIG_CHECK_INIT_PRIORITIES_FAIL_ON_WARNING)
-    set(fail_on_warning "--fail-on-warning")
-  endif()
   list(APPEND
     post_build_commands
     COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_BASE}/scripts/build/check_init_priorities.py
       --elf-file=${ZEPHYR_BINARY_DIR}/${KERNEL_ELF_NAME}
-      ${fail_on_warning}
     )
 endif()
 

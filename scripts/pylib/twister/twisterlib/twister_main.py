@@ -131,10 +131,6 @@ def main(options):
         logger.error(f"{e}")
         return 1
 
-    if options.list_tests and options.platform:
-        tplan.report_platform_tests(options.platform)
-        return 0
-
     if VERBOSE > 1:
         # if we are using command line platform filter, no need to list every
         # other platform as excluded, we know that already.
@@ -154,10 +150,6 @@ def main(options):
                         i.reason,
                     )
                 )
-
-    if options.report_excluded:
-        tplan.report_excluded_tests()
-        return 0
 
     report = Reporting(tplan, env)
     plan_file = os.path.join(options.outdir, "testplan.json")

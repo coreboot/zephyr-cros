@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <zephyr/kernel.h>
-#include <zephyr/syscall_handler.h>
+#include <zephyr/internal/syscall_handler.h>
 #include <zephyr/logging/log_internal.h>
 #include <zephyr/logging/log_ctrl.h>
 #include <zephyr/logging/log_frontend.h>
@@ -236,7 +236,8 @@ void z_impl_z_log_msg_static_create(const void *source,
 
 	if (inlen > 0) {
 		uint32_t flags = CBPRINTF_PACKAGE_CONVERT_RW_STR |
-				 CBPRINTF_PACKAGE_CONVERT_PTR_CHECK;
+				 (IS_ENABLED(CONFIG_LOG_FMT_SECTION_STRIP) ?
+				 0 : CBPRINTF_PACKAGE_CONVERT_PTR_CHECK);
 		uint16_t strl[4];
 		int len;
 
