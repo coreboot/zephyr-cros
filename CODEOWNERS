@@ -245,6 +245,7 @@
 /drivers/adc/adc_rpi_pico.c               @soburi
 /drivers/adc/*ads114s0x*                  @benediktibk
 /drivers/adc/*max11102_17*                @benediktibk
+/drivers/adc/adc_ad5592.c                 @bbilas
 /drivers/audio/*nrfx*                     @anangl
 /drivers/auxdisplay/*pt6314*              @xingrz
 /drivers/auxdisplay/*                      @thedjnK
@@ -274,6 +275,7 @@
 /drivers/display/display_ili9342c.*       @extremegtx
 /drivers/dac/                             @martinjaeger
 /drivers/dac/*ad56xx*                     @benediktibk
+/drivers/dac/dac_ad5592.c                 @bbilas
 /drivers/dai/                             @kv2019i @marcinszkudlinski @abonislawski
 /drivers/dai/intel/                       @kv2019i @marcinszkudlinski @abonislawski
 /drivers/dai/intel/ssp/                   @kv2019i @marcinszkudlinski @abonislawski
@@ -303,6 +305,8 @@
 /drivers/ethernet/*xlnx_gem*              @ibirnbaum
 /drivers/ethernet/*smsc91x*               @sgrrzhf
 /drivers/ethernet/*adin2111*              @GeorgeCGV
+/drivers/ethernet/*oa_tc6*                @lmajewski
+/drivers/ethernet/*lan865x*               @lmajewski
 /drivers/ethernet/phy/                    @rlubos @tbursztyka @arvinf @jukkar
 /drivers/ethernet/phy/*adin2111*          @GeorgeCGV
 /drivers/mdio/                            @rlubos @tbursztyka @arvinf
@@ -329,6 +333,7 @@
 /drivers/gpio/*bd8lb600fs*                @benediktibk
 /drivers/gpio/*pcal64xxa*                 @benediktibk
 /drivers/gpio/gpio_altera_pio.c           @shilinte
+/drivers/gpio/gpio_ad5592.c               @bbilas
 /drivers/hwinfo/                          @alexanderwachter
 /drivers/i2c/i2c_common.c                 @sjg20
 /drivers/i2c/i2c_emul.c                   @sjg20
@@ -373,6 +378,7 @@
 /drivers/led_strip/                       @mbolivar-ampere
 /drivers/lora/                            @Mani-Sadhasivam
 /drivers/mbox/                            @carlocaione
+/drivers/mfd/mfd_ad5592.c                 @bbilas
 /drivers/mfd/mfd_max20335.c               @bbilas
 /drivers/misc/                            @tejlmand
 /drivers/misc/ft8xx/                      @hubertmis

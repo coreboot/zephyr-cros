@@ -59,6 +59,10 @@ Power Management
 Bootloader
 ==========
 
+* MCUboot's deprecated ``CONFIG_ZEPHYR_TRY_MASS_ERASE`` Kconfig option has been removed. If an
+  erase is needed when flashing MCUboot, this should now be provided directly to the ``west``
+  command e.g. ``west flash --erase``.
+
 Bluetooth
 =========
 
@@ -68,9 +72,26 @@ Bluetooth
   Devicetree chosen is now ``zephyr,bt-hci-ipc``. The existing sample has also
   been renamed, from ``samples/bluetooth/hci_rpmsg`` to
   ``samples/bluetooth/hci_ipc``.
+* The BT GATT callback list, appended to by :c:func:`bt_gatt_cb_register`, is no longer
+  cleared on :c:func:`bt_enable`. Callbacks can now be registered before the initial
+  call to :c:func:`bt_enable`, and should no longer be re-registered after a :c:func:`bt_disable`
+  :c:func:`bt_enable` cycle.
+
+LoRaWAN
+=======
+
+* The API to register a callback to provide battery level information to the LoRaWAN stack has been
+  renamed from ``lorawan_set_battery_level_callback`` to
+  :c:func:`lorawan_register_battery_level_callback` and the return type is now ``void``. This
+  is more consistent with similar functions for downlink and data rate changed callbacks.
 
 Networking
 ==========
+
+* The CoAP public API has some minor changes to take into account. The
+  :c:func:`coap_remove_observer` now returns a result if the observer was removed. This
+  change is used by the newly introduced :ref:`coap_server_interface` subsystem. Also, the
+  ``request`` argument for :c:func:`coap_well_known_core_get` is made ``const``.
 
 Other Subsystems
 ================
@@ -82,7 +103,7 @@ Other Subsystems
 * Touchscreen drivers :dtcompatible:`focaltech,ft5336` and
   :dtcompatible:`goodix,gt911` were using the incorrect polarity for the
   respective ``reset-gpios``. This has been fixed so those signals now have to
-  be flagged as :c:macro:`GPIO_ACTIVE_LOW` in the devicetree.`
+  be flagged as :c:macro:`GPIO_ACTIVE_LOW` in the devicetree.
 
 Recommended Changes
 *******************

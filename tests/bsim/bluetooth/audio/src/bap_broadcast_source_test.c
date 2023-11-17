@@ -149,26 +149,6 @@ static int setup_broadcast_source(struct bt_bap_broadcast_source **source)
 	return 0;
 }
 
-static void test_broadcast_source_get_id_inval(struct bt_bap_broadcast_source *source,
-					       uint32_t *broadcast_id_out)
-{
-	int err;
-
-	printk("Test bt_bap_broadcast_source_get_id with NULL source\n");
-	err = bt_bap_broadcast_source_get_id(NULL, broadcast_id_out);
-	if (err == 0) {
-		FAIL("bt_bap_broadcast_source_get_id with NULL source did not fail\n");
-		return;
-	}
-
-	printk("Test bt_bap_broadcast_source_get_id with NULL broadcast_id\n");
-	err = bt_bap_broadcast_source_get_id(source, NULL);
-	if (err == 0) {
-		FAIL("bt_bap_broadcast_source_get_id with NULL ID did not fail\n");
-		return;
-	}
-}
-
 static void test_broadcast_source_get_id(struct bt_bap_broadcast_source *source,
 					 uint32_t *broadcast_id_out)
 {
@@ -177,43 +157,6 @@ static void test_broadcast_source_get_id(struct bt_bap_broadcast_source *source,
 	err = bt_bap_broadcast_source_get_id(source, broadcast_id_out);
 	if (err != 0) {
 		FAIL("Unable to get broadcast ID: %d\n", err);
-		return;
-	}
-}
-
-static void test_broadcast_source_get_base_inval(struct bt_bap_broadcast_source *source,
-						 struct net_buf_simple *base_buf)
-{
-	/* Large enough for minimum, but not large enough for any CC or Meta data */
-	NET_BUF_SIMPLE_DEFINE(small_base_buf, BT_BAP_BASE_MIN_SIZE + 2);
-	NET_BUF_SIMPLE_DEFINE(very_small_base_buf, 4);
-	int err;
-
-	printk("Test bt_bap_broadcast_source_get_base with NULL source\n");
-	err = bt_bap_broadcast_source_get_base(NULL, base_buf);
-	if (err == 0) {
-		FAIL("bt_bap_broadcast_source_get_base with NULL source did not fail\n");
-		return;
-	}
-
-	printk("Test bt_bap_broadcast_source_get_base with NULL buf\n");
-	err = bt_bap_broadcast_source_get_base(source, NULL);
-	if (err == 0) {
-		FAIL("bt_bap_broadcast_source_get_base with NULL buf did not fail\n");
-		return;
-	}
-
-	printk("Test bt_bap_broadcast_source_get_base with very small buf\n");
-	err = bt_bap_broadcast_source_get_base(source, &very_small_base_buf);
-	if (err == 0) {
-		FAIL("bt_bap_broadcast_source_get_base with very small buf did not fail\n");
-		return;
-	}
-
-	printk("Test bt_bap_broadcast_source_get_base with small buf\n");
-	err = bt_bap_broadcast_source_get_base(source, &small_base_buf);
-	if (err == 0) {
-		FAIL("bt_bap_broadcast_source_get_base with small buf did not fail\n");
 		return;
 	}
 }
@@ -256,7 +199,6 @@ static int setup_extended_adv(struct bt_bap_broadcast_source *source, struct bt_
 		return err;
 	}
 
-	test_broadcast_source_get_id_inval(source, &broadcast_id);
 	test_broadcast_source_get_id(source, &broadcast_id);
 
 	/* Setup extended advertising data */
@@ -272,7 +214,6 @@ static int setup_extended_adv(struct bt_bap_broadcast_source *source, struct bt_
 	}
 
 	/* Setup periodic advertising data */
-	test_broadcast_source_get_base_inval(source, &base_buf);
 	test_broadcast_source_get_base(source, &base_buf);
 
 	per_ad.type = BT_DATA_SVC_DATA16;
