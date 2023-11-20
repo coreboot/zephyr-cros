@@ -14,7 +14,7 @@ LOG_MODULE_REGISTER(net_utils, CONFIG_NET_UTILS_LOG_LEVEL);
 
 #include <zephyr/kernel.h>
 #include <stdlib.h>
-#include <zephyr/syscall_handler.h>
+#include <zephyr/internal/syscall_handler.h>
 #include <zephyr/types.h>
 #include <stdbool.h>
 #include <string.h>
@@ -304,14 +304,14 @@ char *z_vrfy_net_addr_ntop(sa_family_t family, const void *src,
 	char *out;
 	const void *addr;
 
-	Z_OOPS(Z_SYSCALL_MEMORY_WRITE(dst, size));
+	K_OOPS(K_SYSCALL_MEMORY_WRITE(dst, size));
 
 	if (family == AF_INET) {
-		Z_OOPS(z_user_from_copy(&addr4, (const void *)src,
+		K_OOPS(k_usermode_from_copy(&addr4, (const void *)src,
 					sizeof(addr4)));
 		addr = &addr4;
 	} else if (family == AF_INET6) {
-		Z_OOPS(z_user_from_copy(&addr6, (const void *)src,
+		K_OOPS(k_usermode_from_copy(&addr6, (const void *)src,
 					sizeof(addr6)));
 		addr = &addr6;
 	} else {
@@ -323,7 +323,7 @@ char *z_vrfy_net_addr_ntop(sa_family_t family, const void *src,
 		return 0;
 	}
 
-	Z_OOPS(z_user_to_copy((void *)dst, str, MIN(size, sizeof(str))));
+	K_OOPS(k_usermode_to_copy((void *)dst, str, MIN(size, sizeof(str))));
 
 	return dst;
 }
@@ -484,18 +484,18 @@ int z_vrfy_net_addr_pton(sa_family_t family, const char *src,
 		return -EINVAL;
 	}
 
-	if (z_user_string_copy(str, (char *)src, sizeof(str)) != 0) {
+	if (k_usermode_string_copy(str, (char *)src, sizeof(str)) != 0) {
 		return -EINVAL;
 	}
 
-	Z_OOPS(Z_SYSCALL_MEMORY_WRITE(dst, size));
+	K_OOPS(K_SYSCALL_MEMORY_WRITE(dst, size));
 
 	err = z_impl_net_addr_pton(family, str, addr);
 	if (err) {
 		return err;
 	}
 
-	Z_OOPS(z_user_to_copy((void *)dst, addr, size));
+	K_OOPS(k_usermode_to_copy((void *)dst, addr, size));
 
 	return 0;
 }

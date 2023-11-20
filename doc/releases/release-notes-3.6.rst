@@ -110,6 +110,8 @@ Boards & SoC Support
 Build system and infrastructure
 *******************************
 
+- Dropped the ``COMPAT_INCLUDES`` option, it was unused since 3.0.
+
 Drivers and Sensors
 *******************
 
@@ -236,6 +238,18 @@ Libraries / Subsystems
 
 * Management
 
+  * Fixed an issue in MCUmgr image management whereby erasing an already erased slot would return
+    an unknown error, it now returns success.
+
+  * Fixed MCUmgr UDP transport structs being statically initialised, this results in about a
+    ~5KiB flash saving.
+
+  * Fixed an issue in MCUmgr which would cause a user data buffer overflow if the UDP transport was
+    enabled on IPv4 only but IPv6 support was enabled in the kernel.
+
+  * Implemented datetime functionality in MCUmgr OS management group, this makes use of the RTC
+    driver API.
+
 * File systems
 
 * Modem modules
@@ -278,3 +292,6 @@ Documentation
 
 Tests and Samples
 *****************
+
+* Fixed an issue in :zephyr:code-sample:`smp-svr` sample whereby if USB was already initialised,
+  application would fail to boot properly.

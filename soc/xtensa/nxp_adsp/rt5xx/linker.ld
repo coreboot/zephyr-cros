@@ -307,7 +307,7 @@ SECTIONS
   .text : ALIGN(4)
   {
     _stext = .;
-    _text_start = ABSOLUTE(.);
+    __text_region_start = ABSOLUTE(.);
     KEEP (*(.ResetVector.text))
     *(.ResetVector.literal)
     *(.entry.text)
@@ -317,7 +317,7 @@ SECTIONS
     *(.fini.literal)
     KEEP(*(.fini))
     *(.gnu.version)
-    _text_end = ABSOLUTE(.);
+    __text_region_end = ABSOLUTE(.);
     _etext = .;
   } >iram_text_start :iram_text_start_phdr
 
@@ -327,12 +327,6 @@ SECTIONS
   {
     KEEP(*(".fw_ready"));
     KEEP (*(.fw_ready_metadata))
-  } >sdram0 :sdram0_phdr
-
-  .noinit : ALIGN(4)
-  {
-    *(.noinit)
-    *(.noinit.*)
   } >sdram0 :sdram0_phdr
 
   .data : ALIGN(4)
@@ -389,6 +383,12 @@ SECTIONS
     *(COMMON)
     . = ALIGN (8);
     _bss_end = ABSOLUTE(.);
+  } >sdram0 :sdram0_phdr
+
+  .noinit (NOLOAD) : ALIGN(4)
+  {
+    *(.noinit)
+    *(.noinit.*)
   } >sdram0 :sdram0_phdr
 
   .heap_mem (NOLOAD) : ALIGN(8)

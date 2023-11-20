@@ -264,8 +264,12 @@ static inline void adin2111_port_on_phyint(const struct device *dev)
 	}
 }
 
-static void adin2111_offload_thread(const struct device *dev)
+static void adin2111_offload_thread(void *p1, void *p2, void *p3)
 {
+	ARG_UNUSED(p2);
+	ARG_UNUSED(p3);
+
+	const struct device *dev = p1;
 	struct adin2111_data *ctx = dev->data;
 	const struct adin2111_config *adin_cfg = dev->config;
 	bool is_adin2111 = (adin_cfg->id == ADIN2111_MAC);
@@ -669,7 +673,7 @@ static void adin2111_port_iface_init(struct net_if *iface)
 		/* all ifaces are done, start INT processing */
 		k_thread_create(&ctx->rx_thread, ctx->rx_thread_stack,
 				CONFIG_ETH_ADIN2111_IRQ_THREAD_STACK_SIZE,
-				(k_thread_entry_t)adin2111_offload_thread,
+				adin2111_offload_thread,
 				(void *)adin, NULL, NULL,
 				CONFIG_ETH_ADIN2111_IRQ_THREAD_PRIO,
 				K_ESSENTIAL, K_NO_WAIT);
@@ -696,7 +700,7 @@ static int adin2111_port_set_config(const struct device *dev,
 	const struct device *adin = cfg->adin;
 	int ret = -ENOTSUP;
 
-	(void)eth_adin2111_lock(dev, K_FOREVER);
+	(void)eth_adin2111_lock(adin, K_FOREVER);
 
 	if (type == ETHERNET_CONFIG_TYPE_MAC_ADDRESS) {
 		ret = adin2111_filter_unicast(adin, (uint8_t *)&config->mac_address.addr[0],
@@ -712,7 +716,7 @@ static int adin2111_port_set_config(const struct device *dev,
 	}
 
 end_unlock:
-	(void)eth_adin2111_unlock(dev);
+	(void)eth_adin2111_unlock(adin);
 	return ret;
 }
 

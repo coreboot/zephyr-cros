@@ -79,7 +79,7 @@ struct log_msg_hdr {
 	const void *source;
 	log_timestamp_t timestamp;
 #endif
-#if CONFIG_LOG_THREAD_ID_PREFIX
+#if defined(CONFIG_LOG_THREAD_ID_PREFIX)
 	void *tid;
 #endif
 };
@@ -532,7 +532,7 @@ do { \
 				    UTIL_AND(UTIL_NOT(_domain_id), UTIL_NOT(_cstr_cnt))), \
 			( \
 			bool can_simple = LOG_MSG_SIMPLE_CHECK(__VA_ARGS__); \
-			if (can_simple && ((_dlen) == 0)) { \
+			if (can_simple && ((_dlen) == 0) && !k_is_user_context()) { \
 				LOG_MSG_DBG("create fast message\n");\
 				Z_LOG_MSG_SIMPLE_ARGS_CREATE(_domain_id, _source, _level, \
 						     Z_LOG_FMT_ARGS(_fmt, ##__VA_ARGS__)); \
@@ -679,11 +679,11 @@ __syscall void z_log_msg_static_create(const void *source,
  *
  * @param ap Variable list of string arguments.
  */
-__syscall void z_log_msg_runtime_vcreate(uint8_t domain_id, const void *source,
-					  uint8_t level, const void *data,
-					  size_t dlen, uint32_t package_flags,
-					  const char *fmt,
-					  va_list ap);
+void z_log_msg_runtime_vcreate(uint8_t domain_id, const void *source,
+				uint8_t level, const void *data,
+				size_t dlen, uint32_t package_flags,
+				const char *fmt,
+				va_list ap);
 
 /** @brief Create message at runtime.
  *
@@ -807,7 +807,7 @@ static inline log_timestamp_t log_msg_get_timestamp(struct log_msg *msg)
  */
 static inline void *log_msg_get_tid(struct log_msg *msg)
 {
-#if CONFIG_LOG_THREAD_ID_PREFIX
+#if defined(CONFIG_LOG_THREAD_ID_PREFIX)
 	return msg->hdr.tid;
 #else
 	ARG_UNUSED(msg);

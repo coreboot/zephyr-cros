@@ -60,8 +60,11 @@ extern "C" {
 /* Thread is suspended */
 #define _THREAD_SUSPENDED (BIT(4))
 
-/* Thread is being aborted */
+/* Thread is in the process of aborting */
 #define _THREAD_ABORTING (BIT(5))
+
+/* Thread is in the process of suspending */
+#define _THREAD_SUSPENDING (BIT(6))
 
 /* Thread is present in the ready queue */
 #define _THREAD_QUEUED (BIT(7))
@@ -232,7 +235,7 @@ typedef struct {
 	struct _priq_rb waitq;
 } _wait_q_t;
 
-extern bool z_priq_rb_lessthan(struct rbnode *a, struct rbnode *b);
+bool z_priq_rb_lessthan(struct rbnode *a, struct rbnode *b);
 
 #define Z_WAIT_Q_INIT(wait_q) { { { .lessthan_fn = z_priq_rb_lessthan } } }
 

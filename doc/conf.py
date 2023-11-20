@@ -167,7 +167,6 @@ html_context = {
         ("latest", "/"),
         ("3.5.0", "/3.5.0/"),
         ("3.4.0", "/3.4.0/"),
-        ("3.3.0", "/3.3.0/"),
         ("2.7.5 (LTS)", "/2.7.5/"),
     ),
     "display_gh_links": True,
@@ -185,6 +184,7 @@ latex_elements = {
     "papersize": "a4paper",
     "maketitle": open(ZEPHYR_BASE / "doc" / "_static" / "latex" / "title.tex").read(),
     "preamble": open(ZEPHYR_BASE / "doc" / "_static" / "latex" / "preamble.tex").read(),
+    "makeindex": r"\usepackage[columns=1]{idxlayout}\makeindex",
     "fontpkg": textwrap.dedent(r"""
                                     \usepackage{noto}
                                     \usepackage{inconsolata-nerd-font}

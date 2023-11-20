@@ -141,17 +141,18 @@ struct x86_cpuboot x86_cpuboot[] = {
 void arch_start_cpu(int cpu_num, k_thread_stack_t *stack, int sz,
 		    arch_cpustart_t fn, void *arg)
 {
+#if CONFIG_MP_MAX_NUM_CPUS > 1
 	uint8_t vector = ((unsigned long) x86_ap_start) >> 12;
 	uint8_t apic_id;
 
-#ifdef CONFIG_ACPI
-	struct acpi_madt_local_apic *lapic = acpi_local_apic_get(cpu_num);
+	IF_ENABLED(CONFIG_ACPI, ({
+		ACPI_MADT_LOCAL_APIC *lapic = acpi_local_apic_get(cpu_num);
 
-	if (lapic != NULL) {
-		/* We update the apic_id, __start will need it. */
-		x86_cpu_loapics[cpu_num] = lapic->Id;
-	}
-#endif
+		if (lapic != NULL) {
+			/* We update the apic_id, __start will need it. */
+			x86_cpu_loapics[cpu_num] = lapic->Id;
+		}
+	}));
 
 	apic_id = x86_cpu_loapics[cpu_num];
 
@@ -166,6 +167,13 @@ void arch_start_cpu(int cpu_num, k_thread_stack_t *stack, int sz,
 
 	while (x86_cpuboot[cpu_num].ready == 0) {
 	}
+#else
+	ARG_UNUSED(cpu_num);
+	ARG_UNUSED(stack);
+	ARG_UNUSED(sz);
+	ARG_UNUSED(fn);
+	ARG_UNUSED(arg);
+#endif
 }
 
 /* Per-CPU initialization, C domain. On the first CPU, z_x86_prep_c is the

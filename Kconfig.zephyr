@@ -785,16 +785,7 @@ config CHECK_INIT_PRIORITIES
 	  derived from the devicetree definition.
 
 	  Fails the build on priority errors (dependent devices, inverted
-	  priority), see CHECK_INIT_PRIORITIES_FAIL_ON_WARNING to fail on
-	  warnings (dependent devices, same priority) as well.
-
-config CHECK_INIT_PRIORITIES_FAIL_ON_WARNING
-	bool "Fail the build on priority check warnings"
-	depends on CHECK_INIT_PRIORITIES
-	help
-	  Fail the build if the dependency check script identifies any pair of
-	  devices depending on each other but initialized with the same
-	  priority.
+	  priority).
 
 config EMIT_ALL_SYSCALLS
 	bool "Emit all possible syscalls in the tree"
@@ -928,16 +919,5 @@ config BOOTLOADER_BOSSA_ADAFRUIT_UF2
 	  0xf01669ef as the magic value to enter the bootloader.
 
 endchoice
-
-endmenu
-
-menu "Compatibility"
-
-config COMPAT_INCLUDES
-	bool "Suppress warnings when using header shims"
-	default y
-	help
-	  Suppress any warnings from the pre-processor when including
-	  deprecated header files.
 
 endmenu

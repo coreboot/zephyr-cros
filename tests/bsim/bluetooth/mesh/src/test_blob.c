@@ -233,7 +233,7 @@ static struct bt_mesh_sar_cfg_cli sar_cfg_cli;
 
 static const struct bt_mesh_comp srv_comp = {
 	.elem =
-		(struct bt_mesh_elem[]){
+		(const struct bt_mesh_elem[]){
 			BT_MESH_ELEM(1,
 				     MODEL_LIST(BT_MESH_MODEL_CFG_SRV,
 						BT_MESH_MODEL_CFG_CLI(&cfg_cli),
@@ -247,7 +247,7 @@ static const struct bt_mesh_comp srv_comp = {
 
 static const struct bt_mesh_comp cli_comp = {
 	.elem =
-		(struct bt_mesh_elem[]){
+		(const struct bt_mesh_elem[]){
 			BT_MESH_ELEM(1,
 				     MODEL_LIST(BT_MESH_MODEL_CFG_SRV,
 						BT_MESH_MODEL_CFG_CLI(&cfg_cli),
@@ -261,7 +261,7 @@ static const struct bt_mesh_comp cli_comp = {
 
 static struct k_sem info_get_sem;
 
-static int mock_handle_info_get(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,
+static int mock_handle_info_get(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,
 				struct net_buf_simple *buf)
 {
 	k_sem_give(&info_get_sem);
@@ -275,7 +275,7 @@ static const struct bt_mesh_model_op model_op1[] = {
 
 static const struct bt_mesh_comp none_rsp_srv_comp = {
 	.elem =
-		(struct bt_mesh_elem[]){
+		(const struct bt_mesh_elem[]){
 			BT_MESH_ELEM(1,
 				     MODEL_LIST(BT_MESH_MODEL_CFG_SRV,
 						BT_MESH_MODEL_CFG_CLI(&cfg_cli),
@@ -1310,7 +1310,7 @@ static void test_srv_fail_on_block_get(void)
 	PASS();
 }
 
-static int dummy_xfer_get(struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,
+static int dummy_xfer_get(const struct bt_mesh_model *model, struct bt_mesh_msg_ctx *ctx,
 				struct net_buf_simple *buf)
 {
 	return 0;
@@ -1328,7 +1328,7 @@ static const struct bt_mesh_model_op model_op2[] = {
  */
 static const struct bt_mesh_comp srv_broken_comp = {
 	.elem =
-		(struct bt_mesh_elem[]){
+		(const struct bt_mesh_elem[]){
 			BT_MESH_ELEM(1,
 				     MODEL_LIST(BT_MESH_MODEL_CFG_SRV,
 						BT_MESH_MODEL_CFG_CLI(&cfg_cli),

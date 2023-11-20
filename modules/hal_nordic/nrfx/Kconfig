@@ -82,6 +82,11 @@ config NRFX_I2S0
 	depends on $(dt_nodelabel_has_compat,i2s0,$(DT_COMPAT_NORDIC_NRF_I2S))
 	select NRFX_I2S
 
+config NRFX_I2S20
+	bool "I2S20 driver instance"
+	depends on $(dt_nodelabel_has_compat,i2s20,$(DT_COMPAT_NORDIC_NRF_I2S))
+	select NRFX_I2S
+
 config NRFX_IPC
 	bool "IPC driver"
 	depends on $(dt_has_compat,$(DT_COMPAT_NORDIC_NRF_IPC))
@@ -152,6 +157,26 @@ config NRFX_QDEC0
 config NRFX_QDEC1
 	bool "QDEC1 driver instance"
 	depends on $(dt_nodelabel_has_compat,qdec1,$(DT_COMPAT_NORDIC_NRF_QDEC))
+	select NRFX_QDEC
+
+config NRFX_QDEC20
+	bool "QDEC20 driver instance"
+	depends on $(dt_nodelabel_has_compat,qdec20,$(DT_COMPAT_NORDIC_NRF_QDEC))
+	select NRFX_QDEC
+
+config NRFX_QDEC21
+	bool "QDEC21 driver instance"
+	depends on $(dt_nodelabel_has_compat,qdec21,$(DT_COMPAT_NORDIC_NRF_QDEC))
+	select NRFX_QDEC
+
+config NRFX_QDEC130
+	bool "QDEC130 driver instance"
+	depends on $(dt_nodelabel_has_compat,qdec130,$(DT_COMPAT_NORDIC_NRF_QDEC))
+	select NRFX_QDEC
+
+config NRFX_QDEC131
+	bool "QDEC131 driver instance"
+	depends on $(dt_nodelabel_has_compat,qdec131,$(DT_COMPAT_NORDIC_NRF_QDEC))
 	select NRFX_QDEC
 
 config NRFX_QSPI
@@ -518,19 +543,6 @@ config NRFX_UARTE3
 	bool "UARTE3 driver instance"
 	depends on $(dt_nodelabel_has_compat,uart3,$(DT_COMPAT_NORDIC_NRF_UARTE))
 	select NRFX_UARTE
-
-config NRFX_USBD
-	bool "USBD driver"
-	depends on $(dt_has_compat,$(DT_COMPAT_NORDIC_NRF_USBD))
-
-config NRFX_USBD_ISO_IN_ZLP
-	bool "Send ZLP on ISO IN when not ready"
-	depends on NRFX_USBD
-	default y
-	help
-	  Controls the response of the ISO IN endpoint to an IN token when no
-	  data is ready to be sent. When enabled, ZLP is sent when no data is
-	  ready. When disabled, no response is sent (bus timeout occurs).
 
 config NRFX_USBREG
 	bool "USBREG driver"

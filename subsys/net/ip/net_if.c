@@ -12,7 +12,7 @@ LOG_MODULE_REGISTER(net_if, CONFIG_NET_IF_LOG_LEVEL);
 #include <zephyr/kernel.h>
 #include <zephyr/linker/sections.h>
 #include <zephyr/random/random.h>
-#include <zephyr/syscall_handler.h>
+#include <zephyr/internal/syscall_handler.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zephyr/net/igmp.h>
@@ -254,7 +254,9 @@ static bool net_if_tx(struct net_if *iface, struct net_pkt *pkt)
 			}
 		}
 
+		net_if_tx_lock(iface);
 		status = net_if_l2(iface)->send(iface, pkt);
+		net_if_tx_unlock(iface);
 
 		if (IS_ENABLED(CONFIG_NET_PKT_TXTIME_STATS)) {
 			uint32_t end_tick = k_cycle_get_32();
@@ -422,10 +424,11 @@ static inline void init_iface(struct net_if *iface)
 	NET_DBG("On iface %p", iface);
 
 #ifdef CONFIG_USERSPACE
-	z_object_init(iface);
+	k_object_init(iface);
 #endif
 
 	k_mutex_init(&iface->lock);
+	k_mutex_init(&iface->tx_lock);
 
 	api->init(iface);
 }
@@ -436,8 +439,6 @@ enum net_verdict net_if_send_data(struct net_if *iface, struct net_pkt *pkt)
 	struct net_linkaddr *dst = net_pkt_lladdr_dst(pkt);
 	enum net_verdict verdict = NET_OK;
 	int status = -EIO;
-
-	net_if_lock(iface);
 
 	if (!net_if_flag_is_set(iface, NET_IF_LOWER_UP) ||
 	    net_if_flag_is_set(iface, NET_IF_SUSPENDED)) {
@@ -520,8 +521,6 @@ done:
 		/* Packet is ready to be sent by L2, let's queue */
 		net_if_queue_tx(iface, pkt);
 	}
-
-	net_if_unlock(iface);
 
 	return verdict;
 }
@@ -1589,7 +1588,7 @@ static inline int z_vrfy_net_if_ipv6_addr_lookup_by_index(
 {
 	struct in6_addr addr_v6;
 
-	Z_OOPS(z_user_from_copy(&addr_v6, (void *)addr, sizeof(addr_v6)));
+	K_OOPS(k_usermode_from_copy(&addr_v6, (void *)addr, sizeof(addr_v6)));
 
 	return z_impl_net_if_ipv6_addr_lookup_by_index(&addr_v6);
 }
@@ -1929,7 +1928,7 @@ bool z_vrfy_net_if_ipv6_addr_add_by_index(int index,
 		return false;
 	}
 
-	Z_OOPS(z_user_from_copy(&addr_v6, (void *)addr, sizeof(addr_v6)));
+	K_OOPS(k_usermode_from_copy(&addr_v6, (void *)addr, sizeof(addr_v6)));
 
 	return z_impl_net_if_ipv6_addr_add_by_index(index,
 						    &addr_v6,
@@ -1965,7 +1964,7 @@ bool z_vrfy_net_if_ipv6_addr_rm_by_index(int index,
 		return false;
 	}
 
-	Z_OOPS(z_user_from_copy(&addr_v6, (void *)addr, sizeof(addr_v6)));
+	K_OOPS(k_usermode_from_copy(&addr_v6, (void *)addr, sizeof(addr_v6)));
 
 	return z_impl_net_if_ipv6_addr_rm_by_index(index, &addr_v6);
 }
@@ -3526,7 +3525,7 @@ static inline int z_vrfy_net_if_ipv4_addr_lookup_by_index(
 {
 	struct in_addr addr_v4;
 
-	Z_OOPS(z_user_from_copy(&addr_v4, (void *)addr, sizeof(addr_v4)));
+	K_OOPS(k_usermode_from_copy(&addr_v4, (void *)addr, sizeof(addr_v4)));
 
 	return z_impl_net_if_ipv4_addr_lookup_by_index(&addr_v4);
 }
@@ -3578,7 +3577,7 @@ bool z_vrfy_net_if_ipv4_set_netmask_by_index(int index,
 		return false;
 	}
 
-	Z_OOPS(z_user_from_copy(&netmask_addr, (void *)netmask,
+	K_OOPS(k_usermode_from_copy(&netmask_addr, (void *)netmask,
 				sizeof(netmask_addr)));
 
 	return z_impl_net_if_ipv4_set_netmask_by_index(index, &netmask_addr);
@@ -3631,7 +3630,7 @@ bool z_vrfy_net_if_ipv4_set_gw_by_index(int index,
 		return false;
 	}
 
-	Z_OOPS(z_user_from_copy(&gw_addr, (void *)gw, sizeof(gw_addr)));
+	K_OOPS(k_usermode_from_copy(&gw_addr, (void *)gw, sizeof(gw_addr)));
 
 	return z_impl_net_if_ipv4_set_gw_by_index(index, &gw_addr);
 }
@@ -3805,7 +3804,7 @@ bool z_vrfy_net_if_ipv4_addr_add_by_index(int index,
 		return false;
 	}
 
-	Z_OOPS(z_user_from_copy(&addr_v4, (void *)addr, sizeof(addr_v4)));
+	K_OOPS(k_usermode_from_copy(&addr_v4, (void *)addr, sizeof(addr_v4)));
 
 	return z_impl_net_if_ipv4_addr_add_by_index(index,
 						    &addr_v4,
@@ -3841,7 +3840,7 @@ bool z_vrfy_net_if_ipv4_addr_rm_by_index(int index,
 		return false;
 	}
 
-	Z_OOPS(z_user_from_copy(&addr_v4, (void *)addr, sizeof(addr_v4)));
+	K_OOPS(k_usermode_from_copy(&addr_v4, (void *)addr, sizeof(addr_v4)));
 
 	return (uint32_t)z_impl_net_if_ipv4_addr_rm_by_index(index, &addr_v4);
 }
@@ -4618,8 +4617,12 @@ bool net_if_is_suspended(struct net_if *iface)
 #endif /* CONFIG_NET_POWER_MANAGEMENT */
 
 #if defined(CONFIG_NET_PKT_TIMESTAMP_THREAD)
-static void net_tx_ts_thread(void)
+static void net_tx_ts_thread(void *p1, void *p2, void *p3)
 {
+	ARG_UNUSED(p1);
+	ARG_UNUSED(p2);
+	ARG_UNUSED(p3);
+
 	struct net_pkt *pkt;
 
 	NET_DBG("Starting TX timestamp callback thread");
@@ -4873,6 +4876,16 @@ void net_if_init(void)
 		goto out;
 	}
 
+#if defined(CONFIG_ASSERT)
+	/* Do extra check that verifies that interface count is properly
+	 * done.
+	 */
+	int count_if;
+
+	NET_IFACE_COUNT(&count_if);
+	NET_ASSERT(count_if == if_count);
+#endif
+
 	iface_ipv6_init(if_count);
 	iface_ipv4_init(if_count);
 	iface_router_init();
@@ -4880,7 +4893,7 @@ void net_if_init(void)
 #if defined(CONFIG_NET_PKT_TIMESTAMP_THREAD)
 	k_thread_create(&tx_thread_ts, tx_ts_stack,
 			K_KERNEL_STACK_SIZEOF(tx_ts_stack),
-			(k_thread_entry_t)net_tx_ts_thread,
+			net_tx_ts_thread,
 			NULL, NULL, NULL, K_PRIO_COOP(1), 0, K_NO_WAIT);
 	k_thread_name_set(&tx_thread_ts, "tx_tstamp");
 #endif /* CONFIG_NET_PKT_TIMESTAMP_THREAD */

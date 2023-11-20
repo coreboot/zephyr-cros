@@ -8,6 +8,7 @@ if(CONFIG_SOC_NXP_RT595)
 endif()
 
 add_subdirectory(common)
+zephyr_include_directories(${SOC_SERIES}/include)
 
 #  west sign
 
@@ -22,3 +23,5 @@ add_custom_command(
   COMMAND  west sign --if-tool-available --tool rimage --build-dir ${CMAKE_BINARY_DIR} ${WEST_SIGN_OPTS}
   DEPENDS ${CMAKE_BINARY_DIR}/zephyr/${KERNEL_ELF_NAME}
 )
+
+set(SOC_LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/${SOC_SERIES}/linker.ld CACHE INTERNAL "")
