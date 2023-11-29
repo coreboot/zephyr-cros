@@ -94,6 +94,17 @@ struct net_if_mcast_addr {
 	/** IP address */
 	struct net_addr address;
 
+#if defined(CONFIG_NET_IPV4_IGMPV3)
+	/** Sources to filter on */
+	struct net_addr sources[CONFIG_NET_IF_MCAST_IPV4_SOURCE_COUNT];
+
+	/** Number of sources to be used by the filter */
+	uint16_t sources_len;
+
+	/** Filter mode (used in IGMPV3) */
+	uint8_t record_type;
+#endif
+
 	/** Is this multicast IP address used or not */
 	uint8_t is_used : 1;
 
@@ -3021,6 +3032,20 @@ struct net_if_api {
  */
 #define NET_DEVICE_DT_INST_OFFLOAD_DEFINE(inst, ...) \
 	NET_DEVICE_DT_OFFLOAD_DEFINE(DT_DRV_INST(inst), __VA_ARGS__)
+
+/**
+ * @brief Count the number of network interfaces.
+ *
+ * @param[out] _dst Pointer to location where result is written.
+ */
+#define NET_IFACE_COUNT(_dst) \
+		do {							\
+			extern struct net_if _net_if_list_start[];	\
+			extern struct net_if _net_if_list_end[];	\
+			*(_dst) = ((uintptr_t)_net_if_list_end -	\
+				   (uintptr_t)_net_if_list_start) /	\
+				sizeof(struct net_if);			\
+		} while (0)
 
 #ifdef __cplusplus
 }

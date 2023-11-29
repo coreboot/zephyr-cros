@@ -20,36 +20,32 @@ struct wdt_nrfx_data {
 };
 
 struct wdt_nrfx_config {
-	nrfx_wdt_t	  wdt;
-	nrfx_wdt_config_t config;
+	nrfx_wdt_t wdt;
 };
 
 static int wdt_nrf_setup(const struct device *dev, uint8_t options)
 {
 	const struct wdt_nrfx_config *config = dev->config;
-	struct wdt_nrfx_data *data = dev->data;
+	const struct wdt_nrfx_data *data = dev->data;
 	nrfx_err_t err_code;
 
-	/* Activate all available options. Run in all cases. */
-	config->config.behaviour = NRF_WDT_BEHAVIOUR_RUN_SLEEP_MASK |
+	nrfx_wdt_config_t wdt_config = {
+		.reload_value = data->m_timeout
+	};
+
 #if NRF_WDT_HAS_STOP
-				   NRF_WDT_BEHAVIOUR_STOP_ENABLE_MASK |
+	wdt_config.behaviour |= NRF_WDT_BEHAVIOUR_STOP_ENABLE_MASK;
 #endif
-				   NRF_WDT_BEHAVIOUR_RUN_HALT_MASK;
 
-	/* Deactivate running in sleep mode. */
-	if (options & WDT_OPT_PAUSE_IN_SLEEP) {
-		config->config.behaviour &= ~NRF_WDT_BEHAVIOUR_RUN_SLEEP_MASK;
+	if (!(options & WDT_OPT_PAUSE_IN_SLEEP)) {
+		wdt_config.behaviour |= NRF_WDT_BEHAVIOUR_RUN_SLEEP_MASK;
 	}
 
-	/* Deactivate running when debugger is attached. */
-	if (options & WDT_OPT_PAUSE_HALTED_BY_DBG) {
-		config->config.behaviour &= ~NRF_WDT_BEHAVIOUR_RUN_HALT_MASK;
+	if (!(options & WDT_OPT_PAUSE_HALTED_BY_DBG)) {
+		wdt_config.behaviour |= NRF_WDT_BEHAVIOUR_RUN_HALT_MASK;
 	}
 
-	config->config.reload_value = data->m_timeout;
-
-	err_code = nrfx_wdt_reconfigure(&config->wdt, &config->config);
+	err_code = nrfx_wdt_reconfigure(&config->wdt, &wdt_config);
 
 	if (err_code != NRFX_SUCCESS) {
 		return -EBUSY;
@@ -177,8 +173,8 @@ static void wdt_event_handler(const struct device *dev, uint32_t requests)
 		IRQ_CONNECT(DT_IRQN(WDT(idx)), DT_IRQ(WDT(idx), priority),     \
 			    nrfx_isr, nrfx_wdt_##idx##_irq_handler, 0);	       \
 		err_code = nrfx_wdt_init(&config->wdt,			       \
-				 &config->config,			       \
-				 wdt_##idx##_event_handler);		       \
+					 NULL,				       \
+					 wdt_##idx##_event_handler);	       \
 		if (err_code != NRFX_SUCCESS) {				       \
 			return -EBUSY;					       \
 		}							       \
@@ -190,11 +186,6 @@ static void wdt_event_handler(const struct device *dev, uint32_t requests)
 	};								       \
 	static const struct wdt_nrfx_config wdt_##idx##z_config = {	       \
 		.wdt = NRFX_WDT_INSTANCE(idx),				       \
-		.config = {						       \
-			.behaviour = NRF_WDT_BEHAVIOUR_RUN_SLEEP_MASK |	       \
-				     NRF_WDT_BEHAVIOUR_RUN_HALT_MASK,	       \
-			.reload_value   = 2000,				       \
-		}							       \
 	};								       \
 	DEVICE_DT_DEFINE(WDT(idx),					       \
 			    wdt_##idx##_init,				       \

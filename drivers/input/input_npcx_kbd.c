@@ -18,8 +18,7 @@
 #include <zephyr/toolchain.h>
 
 #include <soc.h>
-#define LOG_LEVEL CONFIG_INPUT_LOG_LEVEL
-LOG_MODULE_REGISTER(input_npcx_kbd);
+LOG_MODULE_REGISTER(input_npcx_kbd, CONFIG_INPUT_LOG_LEVEL);
 
 #define ROW_SIZE DT_INST_PROP(0, row_size)
 
@@ -98,7 +97,7 @@ static void npcx_kbd_drive_column(const struct device *dev, int col)
 	inst->KBSOUT1 = ((mask >> 16) & 0x03);
 }
 
-static int npcx_kbd_read_row(const struct device *dev)
+static kbd_row_t npcx_kbd_read_row(const struct device *dev)
 {
 	const struct npcx_kbd_config *config = dev->config;
 	const struct input_kbd_matrix_common_config *common = &config->common;

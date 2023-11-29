@@ -987,6 +987,18 @@ int lwm2m_set_default_sockopt(struct lwm2m_ctx *ctx)
 				return ret;
 			}
 		}
+		if (IS_ENABLED(CONFIG_LWM2M_DTLS_CID)) {
+			/* Enable CID */
+			int cid = TLS_DTLS_CID_ENABLED;
+
+			ret = zsock_setsockopt(ctx->sock_fd, SOL_TLS, TLS_DTLS_CID, &cid,
+					       sizeof(cid));
+			if (ret) {
+				ret = -errno;
+				LOG_ERR("Failed to enable TLS_DTLS_CID: %d", ret);
+				/* Not fatal, continue. */
+			}
+		}
 
 		if (ctx->hostname_verify && (ctx->desthostname != NULL)) {
 			/** store character at len position */
@@ -1061,13 +1073,15 @@ int lwm2m_socket_start(struct lwm2m_ctx *client_ctx)
 	int ret;
 
 #if defined(CONFIG_LWM2M_DTLS_SUPPORT)
-	if (client_ctx->load_credentials) {
-		ret = client_ctx->load_credentials(client_ctx);
-	} else {
-		ret = lwm2m_load_tls_credentials(client_ctx);
-	}
-	if (ret < 0) {
-		return ret;
+	if (client_ctx->use_dtls) {
+		if (client_ctx->load_credentials) {
+			ret = client_ctx->load_credentials(client_ctx);
+		} else {
+			ret = lwm2m_load_tls_credentials(client_ctx);
+		}
+		if (ret < 0) {
+			return ret;
+		}
 	}
 #endif /* CONFIG_LWM2M_DTLS_SUPPORT */
 

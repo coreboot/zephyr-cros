@@ -216,6 +216,39 @@ static bool init_irq = true;
 #endif
 
 #ifdef CONFIG_ADC_STM32_DMA
+static void adc_stm32_enable_dma_support(ADC_TypeDef *adc)
+{
+	/* Allow ADC to create DMA request and set to one-shot mode as implemented in HAL drivers */
+
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+
+#if defined(ADC_VER_V5_V90)
+	if (adc == ADC3) {
+		LL_ADC_REG_SetDMATransferMode(adc,
+			ADC3_CFGR_DMACONTREQ(LL_ADC_REG_DMA_TRANSFER_LIMITED));
+		LL_ADC_EnableDMAReq(adc);
+	} else {
+		LL_ADC_REG_SetDataTransferMode(adc,
+			ADC_CFGR_DMACONTREQ(LL_ADC_REG_DMA_TRANSFER_LIMITED));
+	}
+#elif defined(ADC_VER_V5_X)
+	LL_ADC_REG_SetDataTransferMode(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED);
+#else
+#error "Unsupported ADC version"
+#endif
+
+#elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32f1_adc) /* defined(CONFIG_SOC_SERIES_STM32H7X) */
+
+#error "The STM32F1 ADC + DMA is not yet supported"
+
+#else /* DT_HAS_COMPAT_STATUS_OKAY(st_stm32f1_adc) */
+
+	/* Default mechanism for other MCUs */
+	LL_ADC_REG_SetDMATransfer(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED);
+
+#endif
+}
+
 static int adc_stm32_dma_start(const struct device *dev,
 			       void *buffer, size_t channel_count)
 {
@@ -257,21 +290,7 @@ static int adc_stm32_dma_start(const struct device *dev,
 		return ret;
 	}
 
-	/* Allow ADC to create DMA request and set to one-shot mode,
-	 * as implemented in HAL drivers, if applicable.
-	 */
-#if defined(ADC_VER_V5_V90)
-	if (adc == ADC3) {
-		LL_ADC_REG_SetDMATransferMode(adc,
-			ADC3_CFGR_DMACONTREQ(LL_ADC_REG_DMA_TRANSFER_LIMITED));
-		LL_ADC_EnableDMAReq(adc);
-	} else {
-		LL_ADC_REG_SetDataTransferMode(adc,
-			ADC_CFGR_DMACONTREQ(LL_ADC_REG_DMA_TRANSFER_LIMITED));
-	}
-#elif defined(ADC_VER_V5_X)
-	LL_ADC_REG_SetDataTransferMode(adc, LL_ADC_REG_DMA_TRANSFER_LIMITED);
-#endif
+	adc_stm32_enable_dma_support(adc);
 
 	data->dma_error = 0;
 	ret = dma_start(data->dma.dma_dev, data->dma.channel);
@@ -1521,39 +1540,39 @@ static void adc_stm32_irq_init(void)
 #define ADC_STM32_IRQ_CONFIG(index)
 #define ADC_STM32_IRQ_FUNC(index)					\
 	.irq_cfg_func = adc_stm32_irq_init,
-#define ADC_DMA_CHANNEL(id, dir, DIR, src, dest)
+#define ADC_DMA_CHANNEL(id, src, dest)
 
 #elif defined(CONFIG_ADC_STM32_DMA) /* !CONFIG_ADC_STM32_SHARED_IRQS */
 
-#define ADC_DMA_CHANNEL_INIT(index, name, dir_cap, src_dev, dest_dev)			\
+#define ADC_DMA_CHANNEL_INIT(index, src_dev, dest_dev)					\
 	.dma = {									\
-		.dma_dev = DEVICE_DT_GET(STM32_DMA_CTLR(index, name)),			\
-		.channel = DT_INST_DMAS_CELL_BY_NAME(index, name, channel),		\
+		.dma_dev = DEVICE_DT_GET(DT_INST_DMAS_CTLR_BY_IDX(index, 0)),		\
+		.channel = STM32_DMA_SLOT_BY_IDX(index, 0, channel),			\
 		.dma_cfg = {								\
-			.dma_slot = STM32_DMA_SLOT(index, name, slot),			\
+			.dma_slot = STM32_DMA_SLOT_BY_IDX(index, 0, slot),		\
 			.channel_direction = STM32_DMA_CONFIG_DIRECTION(		\
-				STM32_DMA_CHANNEL_CONFIG(index, name)),			\
+				STM32_DMA_CHANNEL_CONFIG_BY_IDX(index, 0)),		\
 			.source_data_size = STM32_DMA_CONFIG_##src_dev##_DATA_SIZE(	\
-				STM32_DMA_CHANNEL_CONFIG(index, name)),			\
+				STM32_DMA_CHANNEL_CONFIG_BY_IDX(index, 0)),		\
 			.dest_data_size = STM32_DMA_CONFIG_##dest_dev##_DATA_SIZE(	\
-				STM32_DMA_CHANNEL_CONFIG(index, name)),			\
+				STM32_DMA_CHANNEL_CONFIG_BY_IDX(index, 0)),		\
 			.source_burst_length = 1,       /* SINGLE transfer */		\
 			.dest_burst_length = 1,         /* SINGLE transfer */		\
 			.channel_priority = STM32_DMA_CONFIG_PRIORITY(			\
-				STM32_DMA_CHANNEL_CONFIG(index, name)),			\
+				STM32_DMA_CHANNEL_CONFIG_BY_IDX(index, 0)),		\
 			.dma_callback = dma_callback,					\
 			.block_count = 2,						\
 		},									\
 		.src_addr_increment = STM32_DMA_CONFIG_##src_dev##_ADDR_INC(		\
-			STM32_DMA_CHANNEL_CONFIG(index, name)),				\
+			STM32_DMA_CHANNEL_CONFIG_BY_IDX(index, 0)),			\
 		.dst_addr_increment = STM32_DMA_CONFIG_##dest_dev##_ADDR_INC(		\
-			STM32_DMA_CHANNEL_CONFIG(index, name)),				\
+			STM32_DMA_CHANNEL_CONFIG_BY_IDX(index, 0)),			\
 	}
 
-#define ADC_DMA_CHANNEL(id, dir, DIR, src, dest)					\
-	COND_CODE_1(DT_INST_DMAS_HAS_NAME(id, dir),					\
-		    (ADC_DMA_CHANNEL_INIT(id, dir, DIR, src, dest)),			\
-		    (EMPTY))
+#define ADC_DMA_CHANNEL(id, src, dest)							\
+	COND_CODE_1(DT_INST_DMAS_HAS_IDX(id, 0),					\
+			(ADC_DMA_CHANNEL_INIT(id, src, dest)),				\
+			(/* Required for other adc instances without dma */))
 
 #define ADC_STM32_IRQ_CONFIG(index)					\
 static void adc_stm32_cfg_func_##index(void){ EMPTY }
@@ -1572,7 +1591,7 @@ static void adc_stm32_cfg_func_##index(void)				\
 }
 #define ADC_STM32_IRQ_FUNC(index)					\
 	.irq_cfg_func = adc_stm32_cfg_func_##index,
-#define ADC_DMA_CHANNEL(id, dir, DIR, src, dest)
+#define ADC_DMA_CHANNEL(id, src, dest)
 
 #endif /* CONFIG_ADC_STM32_DMA && CONFIG_ADC_STM32_SHARED_IRQS */
 
@@ -1605,7 +1624,7 @@ static struct adc_stm32_data adc_stm32_data_##index = {			\
 	ADC_CONTEXT_INIT_TIMER(adc_stm32_data_##index, ctx),		\
 	ADC_CONTEXT_INIT_LOCK(adc_stm32_data_##index, ctx),		\
 	ADC_CONTEXT_INIT_SYNC(adc_stm32_data_##index, ctx),		\
-	ADC_DMA_CHANNEL(index, dmamux, NULL, PERIPHERAL, MEMORY)	\
+	ADC_DMA_CHANNEL(index, PERIPHERAL, MEMORY)			\
 };									\
 									\
 PM_DEVICE_DT_INST_DEFINE(index, adc_stm32_pm_action);			\

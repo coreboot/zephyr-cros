@@ -141,6 +141,9 @@
 #ifdef CONFIG_NRFX_I2S0
 #define NRFX_I2S0_ENABLED 1
 #endif
+#ifdef CONFIG_NRFX_I2S20
+#define NRFX_I2S20_ENABLED 1
+#endif
 
 #ifdef CONFIG_NRFX_IPC
 #define NRFX_IPC_ENABLED 1
@@ -243,6 +246,18 @@
 #endif
 #ifdef CONFIG_NRFX_QDEC1
 #define NRFX_QDEC1_ENABLED 1
+#endif
+#ifdef CONFIG_NRFX_QDEC20
+#define NRFX_QDEC20_ENABLED 1
+#endif
+#ifdef CONFIG_NRFX_QDEC21
+#define NRFX_QDEC21_ENABLED 1
+#endif
+#ifdef CONFIG_NRFX_QDEC130
+#define NRFX_QDEC130_ENABLED 1
+#endif
+#ifdef CONFIG_NRFX_QDEC131
+#define NRFX_QDEC131_ENABLED 1
 #endif
 
 #ifdef CONFIG_NRFX_QSPI
