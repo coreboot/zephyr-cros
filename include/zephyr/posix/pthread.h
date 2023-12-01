@@ -477,6 +477,20 @@ int pthread_key_delete(pthread_key_t key);
 int pthread_setspecific(pthread_key_t key, const void *value);
 void *pthread_getspecific(pthread_key_t key);
 int pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void));
+int pthread_getconcurrency(void);
+int pthread_setconcurrency(int new_level);
+
+void __z_pthread_cleanup_push(void *cleanup[3], void (*routine)(void *arg), void *arg);
+void __z_pthread_cleanup_pop(int execute);
+
+#define pthread_cleanup_push(_rtn, _arg)                                                           \
+	do /* enforce '{'-like behaviour */ {                                                      \
+		void *_z_pthread_cleanup[3];                                                       \
+		__z_pthread_cleanup_push(_z_pthread_cleanup, _rtn, _arg)
+
+#define pthread_cleanup_pop(_ex)                                                                   \
+		__z_pthread_cleanup_pop(_ex);                                                      \
+	} /* enforce '}'-like behaviour */ while (0)
 
 /* Glibc / Oracle Extension Functions */
 

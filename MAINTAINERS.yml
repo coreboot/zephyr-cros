@@ -222,6 +222,8 @@ Ambiq Platforms:
   collaborators:
     - tgorochowik
     - msobkowski
+    - aaronyegx
+    - RichardSWheatley
   files:
     - soc/arm/ambiq/
     - boards/arm/apollo*/
@@ -473,7 +475,7 @@ CMSIS API layer:
     - include/zephyr/portability/cmsis*
     - samples/subsys/portability/cmsis_rtos_v*/
     - tests/subsys/portability/cmsis_rtos_v*/
-    - doc/services/portability/
+    - doc/services/portability/cmsis*
   labels:
     - "area: CMSIS API Layer"
     - "area: Portability"
@@ -1101,6 +1103,8 @@ Release Notes:
     - doc/hardware/peripherals/gnss.rst
     - drivers/gnss/
     - include/zephyr/drivers/gnss.h
+    - include/zephyr/drivers/gnss/
+    - tests/drivers/build_all/gnss/
     - tests/drivers/gnss/
   labels:
     - "area: GNSS"
@@ -2004,7 +2008,7 @@ Native POSIX/Sim and POSIX arch:
     - scripts/native_simulator/
     - scripts/valgrind.supp
     - soc/posix/
-    - tests/boards/native_posix/
+    - tests/boards/native_sim/
   labels:
     - "area: native port"
   description: >-
@@ -2185,6 +2189,7 @@ Networking:
     - canisLupus1313
     - mariuszpos
     - edmont
+    - maciejbaczmanski
   files:
     - subsys/net/l2/openthread/
     - samples/net/openthread/
@@ -2248,6 +2253,7 @@ POSIX API layer:
     - tests/posix/
     - samples/posix/
     - tests/lib/fdtable/
+    - doc/services/portability/posix/
   labels:
     - "area: POSIX"
 
@@ -2801,7 +2807,7 @@ STM32 Platforms:
     - drivers/*/*stm32*.c
     - drivers/*/*stm32*.h
     - drivers/*/*/*stm32*
-    - drivers/*/*stm32
+    - drivers/*/*stm32*
     - dts/arm/st/
     - dts/bindings/*/*stm32*
     - soc/arm/st_stm32/
@@ -2862,7 +2868,6 @@ TI SimpleLink Platforms:
     - vaishnavachath
   collaborators:
     - vanti
-    - cfriedt
   files:
     - boards/arm/cc13*/
     - boards/arm/cc26*/
@@ -3271,6 +3276,8 @@ West:
   collaborators:
     - tgorochowik
     - msobkowski
+    - aaronyegx
+    - RichardSWheatley
   files:
     - modules/hal_ambiq/
   labels:
@@ -3484,8 +3491,6 @@ West:
   status: maintained
   maintainers:
     - vaishnavachath
-  collaborators:
-    - cfriedt
   files: []
   labels:
     - "platform: TI"
@@ -3666,6 +3671,7 @@ West:
     - canisLupus1313
     - mariuszpos
     - edmont
+    - maciejbaczmanski
   files:
     - modules/openthread/
   labels:

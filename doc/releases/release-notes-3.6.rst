@@ -63,6 +63,9 @@ Boards & SoC Support
 
 * Made these changes in other SoC series:
 
+  * Nordic SoCs now imply :kconfig:option:`CONFIG_XIP` instead of selecting it, this allows for
+    creating RAM-based applicatins by disabling it.
+
 * Added support for these ARC boards:
 
 * Added support for these ARM boards:
@@ -110,7 +113,9 @@ Boards & SoC Support
 Build system and infrastructure
 *******************************
 
-- Dropped the ``COMPAT_INCLUDES`` option, it was unused since 3.0.
+* Dropped the ``COMPAT_INCLUDES`` option, it was unused since 3.0.
+
+* Fixed an issue whereby board revision ``0`` did not include overlay files for that revision.
 
 Drivers and Sensors
 *******************
@@ -250,6 +255,9 @@ Libraries / Subsystems
   * Implemented datetime functionality in MCUmgr OS management group, this makes use of the RTC
     driver API.
 
+  * Fixes an issue in MCUmgr console UART input whereby the FIFO would be read outside of an ISR,
+    which is not supported in the next USB stack.
+
 * File systems
 
 * Modem modules
@@ -271,6 +279,11 @@ Libraries / Subsystems
 * RTIO
 
 * ZBus
+
+  * Renamed :kconfig:option:`ZBUS_MSG_SUBSCRIBER_NET_BUF_DYNAMIC` and
+    :kconfig:option:`ZBUS_MSG_SUBSCRIBER_NET_BUF_STATIC`
+    with :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_DYNAMIC` and
+    :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_STATIC`
 
 HALs
 ****

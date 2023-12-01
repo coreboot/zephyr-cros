@@ -240,11 +240,6 @@ config BT_CTLR_CONN_ISO_AVOID_SEGMENTATION
 	  interface, the config provides a way to force the Max_PDU to Max_SDU +
 	  5 (header + offset).
 
-config BT_CTLR_ADVANCED_FEATURES
-	bool "Show advanced features"
-	help
-	  Makes advanced features visible to controller developers.
-
 choice
 	prompt "CIS Creation Policy Selection"
 	default BT_CTLR_CONN_ISO_RELIABILITY_POLICY
@@ -271,6 +266,11 @@ config BT_CTLR_TEST
 	bool "Run in-system unit tests"
 	help
 	  Run in-system unit tests
+
+config BT_CTLR_ADVANCED_FEATURES
+	bool "Show advanced features"
+	help
+	  Makes advanced features visible to controller developers.
 
 menu "Advanced features"
 	visible if BT_CTLR_ADVANCED_FEATURES
@@ -960,6 +960,13 @@ config BT_CTLR_SCAN_UNRESERVED
 	help
 	  Scanner will not use time space reservation for scan window when in
 	  continuous scan mode.
+
+config BT_CTLR_EARLY_ABORT_PREVIOUS_PREPARE
+	bool "Early abort previous prepare"
+	default y
+	help
+	  Early abort previous prepare present before a short prepare is
+	  enqueued in the prepare pipeline.
 
 config BT_MAYFLY_YIELD_AFTER_CALL
 	bool "Yield from mayfly thread after first call"
