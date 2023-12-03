@@ -44,6 +44,7 @@ void z_arm_platform_init(void)
 #ifdef CONFIG_MEMC_XMC4XXX_EBU
 				     | XMC_SCU_CLOCK_SLEEP_MODE_CONFIG_ENABLE_EBU
 #endif
+				     | XMC_SCU_CLOCK_SLEEP_MODE_CONFIG_ENABLE_USB
 	);
 
 	/* configure PLL & system clock */

@@ -1,0 +1,14 @@
+# Copyright (c) 2023 SLB
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Infineon XMC4xxx System Control Unit (SCU) is a multi-function peripheral
+  which handles power control, hibernate control, reset control and clock control.
+
+compatible: "infineon,xmc4xxx-scu"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true

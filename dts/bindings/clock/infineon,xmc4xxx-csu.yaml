@@ -1,0 +1,42 @@
+# Copyright (c) 2023 SLB
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Infineon XMC4xxx Clock Select Unit (CSU) is part of the System Control
+  Unit (SCU).
+
+  To specify the clocks in a peripheral, the standard clocks property needs
+  to be used, e.g.:
+
+    usic0ch0: usic@xxx {
+        ...
+        /* cell encodes the clock id */
+        clocks = <&cctl XMC4XXX_CLOCK_USIC>;
+        ...
+    }
+
+compatible: "infineon,xmc4xxx-csu"
+
+include: [base.yaml, clock-controller.yaml, pinctrl-device.yaml]
+
+properties:
+  "#clock-cells":
+    const: 1
+
+  fext-clk-source:
+    type: string
+    description:
+      Input clock source for the external clock.
+    enum:
+      - "f_sys"
+      - "f_pll"
+      - "f_usbpll"
+
+  fext-clk-divider:
+    type: int
+    description:
+      Clock divider if pll or usbpll are used as the input clock source.
+      The value has no effect if f_sys is selected as the clock.
+
+clock-cells:
+  - id

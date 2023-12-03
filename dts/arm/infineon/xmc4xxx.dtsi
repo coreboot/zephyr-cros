@@ -21,6 +21,24 @@
 		};
 	};
 
+	clocks {
+		sysclk: system-clock {
+			compatible = "fixed-clock";
+			clock-frequency = <120000000>;
+			#clock-cells = <0>;
+		};
+
+		usbpll: usbpll-clock {
+			status = "disabled";
+			compatible = "fixed-factor-clock";
+			clocks = <&sysclk>;
+			clock-div = <40>;
+			clock-mult = <1>;
+			#clock-cells = <0>;
+		};
+	};
+
+
 	flash_controller: flash_controller@58001000 {
 		compatible = "infineon,xmc4xxx-flash-controller";
 		reg = <0x58001000 0x1400>;
@@ -32,13 +50,19 @@
 		};
 	};
 
-	sysclk: system-clock {
-		compatible = "fixed-clock";
-		clock-frequency = <120000000>;
-		#clock-cells = <0>;
-	};
-
 	soc {
+		scu: system-control-unit@50004000 {
+			compatible = "infineon,xmc4xxx-scu";
+			reg = <0x50004000 0x4000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			csu: clock-selection-unit@50004600 {
+				reg = <0x50004600>;
+				compatible = "infineon,xmc4xxx-csu";
+				#clock-cells = <1>;
+			};
+		};
+
 		ebu: ebu@58008000 {
 		    compatible = "infineon,xmc4xxx-ebu";
 			reg = <0x58008000 0x4000>;

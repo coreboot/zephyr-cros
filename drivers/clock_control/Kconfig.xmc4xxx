@@ -1,0 +1,9 @@
+# Copyright (C) 2023 SLB
+# SPDX-License-Identifier: Apache-2.0
+
+config CLOCK_CONTROL_XMC4XXX
+	bool "Infineon XMC4xxx clock control driver"
+	default y
+	depends on DT_HAS_INFINEON_XMC4XXX_CSU_ENABLED
+	help
+	  This option enables the clock select unit (CSU) for Infineon XMC4xxx.

@@ -1268,4 +1268,9 @@
 	/omit-if-no-ref/ can_rx_p2_6_node5: can_rx_p2_6_node5 {
 		pinmux = <XMC4XXX_PINMUX_SET(2, 6, 0)>;	/* CAN input src = RXDB */
 	};
+
+	/omit-if-no-ref/ scu_p1_15_ext_clock: scu_p1_15_ext_clock {
+		pinmux = <XMC4XXX_PINMUX_SET(1, 15, 1)>;
+		hwctrl = "disabled";
+	};
 };
