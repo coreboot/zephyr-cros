@@ -1060,12 +1060,10 @@ ZTEST(net_socket_tcp, test_connect_timeout)
 
 	test_close(c_sock);
 
-	/* If we have preemptive option set, then sleep here in order to allow
-	 * other part of the system to run and update itself.
+	/* Sleep here in order to allow other part of the system to run and
+	 * update itself.
 	 */
-	if (IS_ENABLED(CONFIG_NET_TC_THREAD_PREEMPTIVE)) {
-		k_sleep(K_MSEC(10));
-	}
+	k_sleep(K_MSEC(10));
 
 	/* After the client socket closing, the context count should be 0 */
 	net_context_foreach(calc_net_context, &count_after);
@@ -2191,6 +2189,10 @@ static void test_ioctl_fionread_common(int af)
 		zassert_ok(ioctl(fd[i], ZFD_IOCTL_FIONREAD, &avail));
 		zassert_equal(0, avail, "exp: %d: act: %d", 0, avail);
 	}
+
+	close(fd[SERVER]);
+	close(fd[CLIENT]);
+	close(fd[ACCEPT]);
 }
 
 ZTEST(net_socket_tcp, test_ioctl_fionread_v4)

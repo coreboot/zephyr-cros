@@ -220,6 +220,19 @@ static int coap_server_process(int sock_fd)
 					      COAP_SERVICE_RESOURCE_COUNT(service),
 					      options, opt_num, &client_addr, client_addr_len);
 
+		/* Translate errors to response codes */
+		switch (ret) {
+		case -ENOENT:
+			ret = COAP_RESPONSE_CODE_NOT_FOUND;
+			break;
+		case -ENOTSUP:
+			ret = COAP_RESPONSE_CODE_BAD_REQUEST;
+			break;
+		case -EPERM:
+			ret = COAP_RESPONSE_CODE_NOT_ALLOWED;
+			break;
+		}
+
 		/* Shortcut for replying a code without a body */
 		if (ret > 0 && type == COAP_TYPE_CON) {
 			/* Minimal sized ack buffer */
@@ -470,6 +483,24 @@ end:
 	return ret;
 }
 
+int coap_service_is_running(const struct coap_service *service)
+{
+	int ret;
+
+	if (!coap_service_in_section(service)) {
+		__ASSERT_NO_MSG(false);
+		return -EINVAL;
+	}
+
+	k_mutex_lock(&lock, K_FOREVER);
+
+	ret = (service->data->sock_fd < 0) ? 0 : 1;
+
+	k_mutex_unlock(&lock);
+
+	return ret;
+}
+
 int coap_service_send(const struct coap_service *service, const struct coap_packet *cpkt,
 		      const struct sockaddr *addr, socklen_t addr_len)
 {
@@ -694,9 +725,6 @@ static void coap_server_thread(void *p1, void *p2, void *p3)
 	}
 
 	COAP_SERVICE_FOREACH(svc) {
-		/* Init all file descriptors to -1 */
-		svc->data->sock_fd = -1;
-
 		if (svc->flags & COAP_SERVICE_AUTOSTART) {
 			ret = coap_service_start(svc);
 			if (ret < 0) {

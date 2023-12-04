@@ -59,13 +59,20 @@ Boards & SoC Support
 
 * Added support for these SoC series:
 
+  * Added support for Renesas R-Car Gen4 series
+
 * Removed support for these SoC series:
 
 * Made these changes in other SoC series:
 
+  * Nordic SoCs now imply :kconfig:option:`CONFIG_XIP` instead of selecting it, this allows for
+    creating RAM-based applicatins by disabling it.
+
 * Added support for these ARC boards:
 
 * Added support for these ARM boards:
+
+  * Added support for Renesas R-Car Spider board CR52: ``rcar_spider_cr52``
 
 * Added support for these ARM64 boards:
 
@@ -110,7 +117,9 @@ Boards & SoC Support
 Build system and infrastructure
 *******************************
 
-- Dropped the ``COMPAT_INCLUDES`` option, it was unused since 3.0.
+* Dropped the ``COMPAT_INCLUDES`` option, it was unused since 3.0.
+
+* Fixed an issue whereby board revision ``0`` did not include overlay files for that revision.
 
 Drivers and Sensors
 *******************
@@ -120,6 +129,8 @@ Drivers and Sensors
 * CAN
 
 * Clock control
+
+  * Renesas R-Car clock control driver now supports Gen4 SoCs
 
 * Counter
 
@@ -141,11 +152,16 @@ Drivers and Sensors
 
 * GPIO
 
+  * Renesas R-Car GPIO driver now supports Gen4 SoCs
+
 * I2C
 
 * I2S
 
 * I3C
+
+  * The Legacy Virtual Register defines have been renamed from ``I3C_DCR_I2C_*``
+    to ``I3C_LVR_I2C_*``.
 
 * IEEE 802.15.4
 
@@ -158,6 +174,8 @@ Drivers and Sensors
 * ACPI
 
 * Pin control
+
+  * Renesas R-Car pinctrl driver now supports Gen4 SoCs
 
 * PWM
 
@@ -250,6 +268,9 @@ Libraries / Subsystems
   * Implemented datetime functionality in MCUmgr OS management group, this makes use of the RTC
     driver API.
 
+  * Fixes an issue in MCUmgr console UART input whereby the FIFO would be read outside of an ISR,
+    which is not supported in the next USB stack.
+
 * File systems
 
 * Modem modules
@@ -272,6 +293,11 @@ Libraries / Subsystems
 
 * ZBus
 
+  * Renamed :kconfig:option:`ZBUS_MSG_SUBSCRIBER_NET_BUF_DYNAMIC` and
+    :kconfig:option:`ZBUS_MSG_SUBSCRIBER_NET_BUF_STATIC`
+    with :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_DYNAMIC` and
+    :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_STATIC`
+
 HALs
 ****
 
@@ -292,6 +318,11 @@ Documentation
 
 Tests and Samples
 *****************
+
+* :ref:`native_sim<native_sim>` has replaced :ref:`native_posix<native_posix>` as the default
+  test platform.
+  :ref:`native_posix<native_posix>` remains supported and used in testing but will be deprecated
+  in a future release.
 
 * Fixed an issue in :zephyr:code-sample:`smp-svr` sample whereby if USB was already initialised,
   application would fail to boot properly.

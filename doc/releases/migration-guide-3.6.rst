@@ -14,6 +14,12 @@ the :ref:`release notes<zephyr_3.6>`.
 Required changes
 ****************
 
+Boards
+======
+
+  * The deprecated Nordic SoC Kconfig option ``NRF_STORE_REBOOT_TYPE_GPREGRET`` has been removed,
+    applications that use this should switch to using the :ref:`boot_mode_api` instead.
+
 Kernel
 ======
 
@@ -52,8 +58,59 @@ Device Drivers and Device Tree
             drdy-pin = <2>;
         };
     };
+* The optional :c:func:`setup()` function in the Bluetooth HCI driver API (enabled through
+  :kconfig:option:`CONFIG_BT_HCI_SETUP`) has gained a function parameter of type
+  :c:struct:`bt_hci_setup_params`. By default, the struct is empty, but drivers can opt-in to
+  :kconfig:option:`CONFIG_BT_HCI_SET_PUBLIC_ADDR` if they support setting the controller's public
+  identity address, which will then be passed in the ``public_addr`` field.
 
   (:github:`62994`)
+
+* Various deprecated macros related to the deprecated devicetree label property
+  were removed. These are listed in the following table. The table also
+  provides replacements.
+
+  However, if you are still using code like
+  ``device_get_binding(DT_LABEL(node_id))``, consider replacing it with
+  something like ``DEVICE_DT_GET(node_id)`` instead. The ``DEVICE_DT_GET()``
+  macro avoids run-time string comparisons, and is also safer because it will
+  fail the build if the device does not exist.
+
+  .. list-table::
+     :header-rows: 1
+
+     * - Removed macro
+       - Replacement
+
+     * - ``DT_GPIO_LABEL(node_id, gpio_pha)``
+       - ``DT_PROP(DT_GPIO_CTLR(node_id, gpio_pha), label)``
+
+     * - ``DT_GPIO_LABEL_BY_IDX(node_id, gpio_pha, idx)``
+       - ``DT_PROP(DT_GPIO_CTLR_BY_IDX(node_id, gpio_pha, idx), label)``
+
+     * - ``DT_INST_GPIO_LABEL(inst, gpio_pha)``
+       - ``DT_PROP(DT_GPIO_CTLR(DT_DRV_INST(inst), gpio_pha), label)``
+
+     * - ``DT_INST_GPIO_LABEL_BY_IDX(inst, gpio_pha, idx)``
+       - ``DT_PROP(DT_GPIO_CTLR_BY_IDX(DT_DRV_INST(inst), gpio_pha, idx), label)``
+
+     * - ``DT_SPI_DEV_CS_GPIOS_LABEL(spi_dev)``
+       - ``DT_PROP(DT_SPI_DEV_CS_GPIOS_CTLR(spi_dev), label)``
+
+     * - ``DT_INST_SPI_DEV_CS_GPIOS_LABEL(inst)``
+       - ``DT_PROP(DT_SPI_DEV_CS_GPIOS_CTLR(DT_DRV_INST(inst)), label)``
+
+     * - ``DT_LABEL(node_id)``
+       - ``DT_PROP(node_id, label)``
+
+     * - ``DT_BUS_LABEL(node_id)``
+       - ``DT_PROP(DT_BUS(node_id), label)``
+
+     * - ``DT_INST_LABEL(inst)``
+       - ``DT_INST_PROP(inst, label)``
+
+     * - ``DT_INST_BUS_LABEL(inst)``
+       - ``DT_PROP(DT_BUS(DT_DRV_INST(inst)), label)``
 
 Power Management
 ================
@@ -158,9 +215,18 @@ Other Subsystems
   respective ``reset-gpios``. This has been fixed so those signals now have to
   be flagged as :c:macro:`GPIO_ACTIVE_LOW` in the devicetree. (:github:`64800`)
 
+* The :kconfig:option:`ZBUS_MSG_SUBSCRIBER_NET_BUF_DYNAMIC`
+  and :kconfig:option:`ZBUS_MSG_SUBSCRIBER_NET_BUF_STATIC`
+  zbus options are renamed. Instead, the new :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_DYNAMIC`
+  and :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_STATIC` options should be used.
+
 Recommended Changes
 *******************
 
 * New macros available for ST sensor DT properties setting. These macros have a self-explanatory
   name that helps in recognizing what the property setting means (e.g. LSM6DSV16X_DT_ODR_AT_60Hz).
   (:github:`65410`)
+
+* Users of :ref:`native_posix<native_posix>` are recommended to migrate to
+  :ref:`native_sim<native_sim>`. :ref:`native_sim<native_sim>` supports all its use cases,
+  and should be a drop-in replacement for most.

@@ -38,11 +38,17 @@ Please check the
 
 .. _nativesim_important_limitations:
 
-Important limitations
-*********************
+Important limitations and unsupported features
+**********************************************
 
 ``native_sim`` is based on the :ref:`POSIX architecture<Posix arch>`, and therefore
 :ref:`its limitations <posix_arch_limitations>` and considerations apply to it.
+
+Similarly, it inherits the POSIX architecture
+:ref:`unsupported features set <posix_arch_unsupported>`.
+
+Note that some drivers may have limitations, or may not support their whole driver API optional
+functionality.
 
 .. _native_sim_how_to_use:
 
@@ -406,6 +412,8 @@ The following peripherals are currently provided with this board:
 
   .. code-block:: console
 
+     $ sudo dpkg --add-architecture i386
+     $ sudo apt update
      $ sudo apt-get install pkg-config libsdl2-dev:i386
      $ export PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig
 
@@ -589,6 +597,8 @@ these commands:
 
 .. code-block:: console
 
+   $ sudo dpkg --add-architecture i386
+   $ sudo apt update
    $ sudo apt-get install pkg-config libfuse-dev:i386
    $ export PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig
 
