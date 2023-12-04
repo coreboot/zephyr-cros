@@ -155,6 +155,7 @@ ARM arch:
     - bbolen
     - povergoing
     - ithinuel
+    - sgrrzhf
   files:
     - arch/arm/
     - arch/arm/core/offsets/
@@ -472,7 +473,7 @@ CMSIS API layer:
     - include/zephyr/portability/cmsis*
     - samples/subsys/portability/cmsis_rtos_v*/
     - tests/subsys/portability/cmsis_rtos_v*/
-    - doc/services/portability/
+    - doc/services/portability/cmsis*
   labels:
     - "area: CMSIS API Layer"
     - "area: Portability"
@@ -1601,7 +1602,7 @@ Release Notes:
 EC Host Commands:
   status: maintained
   maintainers:
-    - semihalf-niedzwiecki-dawid
+    - niedzwiecki-dawid
   files:
     - subsys/mgmt/ec_host_cmd/
     - include/zephyr/mgmt/ec_host_cmd/
@@ -2003,7 +2004,7 @@ Native POSIX/Sim and POSIX arch:
     - scripts/native_simulator/
     - scripts/valgrind.supp
     - soc/posix/
-    - tests/boards/native_posix/
+    - tests/boards/native_sim/
   labels:
     - "area: native port"
   description: >-
@@ -2184,6 +2185,7 @@ Networking:
     - canisLupus1313
     - mariuszpos
     - edmont
+    - maciejbaczmanski
   files:
     - subsys/net/l2/openthread/
     - samples/net/openthread/
@@ -2247,6 +2249,7 @@ POSIX API layer:
     - tests/posix/
     - samples/posix/
     - tests/lib/fdtable/
+    - doc/services/portability/posix/
   labels:
     - "area: POSIX"
 
@@ -2502,8 +2505,8 @@ Nuvoton NPCX Platforms:
     - MulinChao
     - ChiHuaL
   collaborators:
-    - MulinChao
-    - ChiHuaL
+    - TomChang19
+    - alvsun
     - sjg20
     - keith-zephyr
     - jackrosenthal
@@ -3665,6 +3668,7 @@ West:
     - canisLupus1313
     - mariuszpos
     - edmont
+    - maciejbaczmanski
   files:
     - modules/openthread/
   labels:

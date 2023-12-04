@@ -57,6 +57,9 @@ struct zsock_pollfd {
 
 /** zsock_recv: Read data without removing it from socket input queue */
 #define ZSOCK_MSG_PEEK 0x02
+/** zsock_recvmsg: Control data buffer too small.
+ */
+#define ZSOCK_MSG_CTRUNC 0x08
 /** zsock_recv: return the real length of the datagram, even when it was longer
  *  than the passed buffer
  */
@@ -467,6 +470,20 @@ __syscall ssize_t zsock_recvfrom(int sock, void *buf, size_t max_len,
 				 socklen_t *addrlen);
 
 /**
+ * @brief Receive a message from an arbitrary network address
+ *
+ * @details
+ * @rst
+ * See `POSIX.1-2017 article
+ * <http://pubs.opengroup.org/onlinepubs/9699919799/functions/recvmsg.html>`__
+ * for normative description.
+ * This function is also exposed as ``recvmsg()``
+ * if :kconfig:option:`CONFIG_NET_SOCKETS_POSIX_NAMES` is defined.
+ * @endrst
+ */
+__syscall ssize_t zsock_recvmsg(int sock, struct msghdr *msg, int flags);
+
+/**
  * @brief Receive data from a connected peer
  *
  * @details
@@ -862,6 +879,12 @@ static inline ssize_t recvfrom(int sock, void *buf, size_t max_len, int flags,
 	return zsock_recvfrom(sock, buf, max_len, flags, src_addr, addrlen);
 }
 
+/** POSIX wrapper for @ref zsock_recvmsg */
+static inline ssize_t recvmsg(int sock, struct msghdr *msg, int flags)
+{
+	return zsock_recvmsg(sock, msg, flags);
+}
+
 /** POSIX wrapper for @ref zsock_poll */
 static inline int poll(struct zsock_pollfd *fds, int nfds, int timeout)
 {
@@ -959,6 +982,8 @@ static inline char *inet_ntop(sa_family_t family, const void *src, char *dst,
 
 /** POSIX wrapper for @ref ZSOCK_MSG_PEEK */
 #define MSG_PEEK ZSOCK_MSG_PEEK
+/** POSIX wrapper for @ref ZSOCK_MSG_CTRUNC */
+#define MSG_CTRUNC ZSOCK_MSG_CTRUNC
 /** POSIX wrapper for @ref ZSOCK_MSG_TRUNC */
 #define MSG_TRUNC ZSOCK_MSG_TRUNC
 /** POSIX wrapper for @ref ZSOCK_MSG_DONTWAIT */
@@ -1075,9 +1100,32 @@ struct ifreq {
 /** sockopt: Set or receive the Type-Of-Service value for an outgoing packet. */
 #define IP_TOS 1
 
+/** sockopt: Pass an IP_PKTINFO ancillary message that contains a
+ *  pktinfo structure that supplies some information about the
+ *  incoming packet.
+ */
+#define IP_PKTINFO 8
+
+struct in_pktinfo {
+	unsigned int   ipi_ifindex;  /* Interface index */
+	struct in_addr ipi_spec_dst; /* Local address */
+	struct in_addr ipi_addr;     /* Header Destination address */
+};
+
 /* Socket options for IPPROTO_IPV6 level */
 /** sockopt: Don't support IPv4 access (ignored, for compatibility) */
 #define IPV6_V6ONLY 26
+
+/** sockopt: Pass an IPV6_RECVPKTINFO ancillary message that contains a
+ *  in6_pktinfo structure that supplies some information about the
+ *  incoming packet. See RFC 3542.
+ */
+#define IPV6_RECVPKTINFO 49
+
+struct in6_pktinfo {
+	struct in6_addr ipi6_addr;    /* src/dst IPv6 address */
+	unsigned int    ipi6_ifindex; /* send/recv interface index */
+};
 
 /** sockopt: Set or receive the traffic class value for an outgoing packet. */
 #define IPV6_TCLASS 67

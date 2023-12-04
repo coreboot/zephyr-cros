@@ -160,21 +160,21 @@ Tests are written from test spec;
 |LightweightM2M-1.1-int-232 - Querying basic information in SenML CBOR format|:white_check_mark:| |
 |LightweightM2M-1.1-int-233 - Setting basic information in SenML CBOR format|:white_check_mark:| |
 |LightweightM2M-1.1-int-234 - Setting basic information in SenML JSON format|:white_check_mark:| |
-|LightweightM2M-1.1-int-235 - Read-Composite Operation on root path|:large_orange_diamond:|Root Path is not yet supported by Leshan.|
+|LightweightM2M-1.1-int-235 - Read-Composite Operation on root path|:white_check_mark:| |
 |LightweightM2M-1.1-int-236 - Read-Composite - Partial Presence|:white_check_mark:| |
 |LightweightM2M-1.1-int-237 - Read on Object without specifying Content-Type|:white_check_mark:| |
 |LightweightM2M-1.1-int-241 - Executable Resource: Rebooting the device|:white_check_mark:| |
 |LightweightM2M-1.1-int-256 - Write Operation Failure|:white_check_mark:| |
 |LightweightM2M-1.1-int-257 - Write-Composite Operation|:white_check_mark:| |
 |LightweightM2M-1.1-int-260 - Discover Command|:white_check_mark:| |
-|LightweightM2M-1.1-int-261 - Write-Attribute Operation on a multiple resource|:large_orange_diamond:|Leshan don't allow writing attributes to resource instance|
+|LightweightM2M-1.1-int-261 - Write-Attribute Operation on a multiple resource|:white_check_mark:| |
 |LightweightM2M-1.1-int-280 - Successful Read-Composite Operation|:white_check_mark:| |
 |LightweightM2M-1.1-int-281 - Partially Successful Read-Composite Operation|:white_check_mark:| |
 |LightweightM2M-1.1-int-301 - Observation and Notification of parameter values|:white_check_mark:| |
 |LightweightM2M-1.1-int-302 - Cancel Observations using Reset Operation|:white_check_mark:| |
-|LightweightM2M-1.1-int-303 - Cancel observations using Observe with Cancel parameter|:large_orange_diamond:|Leshan only supports passive cancelling|
+|LightweightM2M-1.1-int-303 - Cancel observations using Observe with Cancel parameter|:white_check_mark:||
 |LightweightM2M-1.1-int-304 - Observe-Composite Operation|:white_check_mark:| |
-|LightweightM2M-1.1-int-305 - Cancel Observation-Composite Operation|:large_orange_diamond:|Leshan only supports passive cancelling|
+|LightweightM2M-1.1-int-305 - Cancel Observation-Composite Operation|:white_check_mark:| |
 |LightweightM2M-1.1-int-306 – Send Operation|:white_check_mark:|[~~#64290~~](https://github.com/zephyrproject-rtos/zephyr/issues/64290)|
 |LightweightM2M-1.1-int-307 – Muting Send|:white_check_mark:| |
 |LightweightM2M-1.1-int-308 - Observe-Composite and Creating Object Instance|:white_check_mark:|[~~#64634~~](https://github.com/zephyrproject-rtos/zephyr/issues/64634)|

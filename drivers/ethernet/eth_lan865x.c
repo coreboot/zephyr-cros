@@ -373,16 +373,16 @@ static void lan865x_read_chunks(const struct device *dev)
 	k_sem_take(&ctx->tx_rx_sem, K_FOREVER);
 	pkt = net_pkt_rx_alloc(K_MSEC(cfg->timeout));
 	if (!pkt) {
-		LOG_ERR("OA RX: Could not allocate packet!");
 		k_sem_give(&ctx->tx_rx_sem);
+		LOG_ERR("OA RX: Could not allocate packet!");
 		return;
 	}
 
 	ret = oa_tc6_read_chunks(tc6, pkt);
-	k_sem_give(&ctx->tx_rx_sem);
 	if (ret < 0) {
 		eth_stats_update_errors_rx(ctx->iface);
 		net_pkt_unref(pkt);
+		k_sem_give(&ctx->tx_rx_sem);
 		return;
 	}
 
@@ -392,6 +392,7 @@ static void lan865x_read_chunks(const struct device *dev)
 		LOG_ERR("OA RX: Could not process packet (%d)!", ret);
 		net_pkt_unref(pkt);
 	}
+	k_sem_give(&ctx->tx_rx_sem);
 }
 
 static void lan865x_int_thread(const struct device *dev)
@@ -408,7 +409,8 @@ static void lan865x_int_thread(const struct device *dev)
 				oa_tc6_reg_write(tc6, OA_STATUS0, sts);
 				lan865x_default_config(dev, ctx->silicon_rev);
 				oa_tc6_reg_read(tc6, OA_CONFIG0, &val);
-				oa_tc6_reg_write(tc6, OA_CONFIG0, OA_CONFIG0_SYNC | val);
+				val |= OA_CONFIG0_SYNC | OA_CONFIG0_RFA_ZARFE;
+				oa_tc6_reg_write(tc6, OA_CONFIG0, val);
 				lan865x_mac_rxtx_control(dev, LAN865x_MAC_TXRX_ON);
 
 				ctx->reset = true;
@@ -425,29 +427,15 @@ static void lan865x_int_thread(const struct device *dev)
 		 * The IRQ_N is asserted when RCA becomes > 0, so update its value
 		 * before reading chunks.
 		 */
-		oa_tc6_update_buf_info(tc6);
+		if (oa_tc6_update_buf_info(tc6) < 0) {
+			continue;
+		}
 
 		while (tc6->rca > 0) {
 			lan865x_read_chunks(dev);
 		}
 
-		if (tc6->exst) {
-			/*
-			 * Just clear any pending interrupts - data RX will be served
-			 * earlier.
-			 * The RESETC is handled separately as it requires LAN865x device
-			 * configuration.
-			 */
-			oa_tc6_reg_read(tc6, OA_STATUS0, &sts);
-			if (sts != 0) {
-				oa_tc6_reg_write(tc6, OA_STATUS0, sts);
-			}
-
-			oa_tc6_reg_read(tc6, OA_STATUS1, &sts);
-			if (sts != 0) {
-				oa_tc6_reg_write(tc6, OA_STATUS1, sts);
-			}
-		}
+		oa_tc6_check_status(tc6);
 	}
 }
 
@@ -573,8 +561,8 @@ static const struct ethernet_api lan865x_api_func = {
 	static struct lan865x_data lan865x_data_##inst = {                                         \
 		.mac_address = DT_INST_PROP(inst, local_mac_address),                              \
 		.tx_rx_sem =                                                                       \
-			Z_SEM_INITIALIZER((lan865x_data_##inst).tx_rx_sem, 1, UINT_MAX),           \
-		.int_sem = Z_SEM_INITIALIZER((lan865x_data_##inst).int_sem, 0, UINT_MAX),          \
+			Z_SEM_INITIALIZER((lan865x_data_##inst).tx_rx_sem, 1, 1),                  \
+		.int_sem = Z_SEM_INITIALIZER((lan865x_data_##inst).int_sem, 0, 1),                 \
 		.tc6 = &oa_tc6_##inst                                                              \
 	};                                                                                         \
 												   \

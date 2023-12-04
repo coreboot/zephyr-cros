@@ -72,6 +72,7 @@ extern const char *net_context_state(struct net_context *context);
 extern bool net_context_is_reuseaddr_set(struct net_context *context);
 extern bool net_context_is_reuseport_set(struct net_context *context);
 extern bool net_context_is_v6only_set(struct net_context *context);
+extern bool net_context_is_recv_pktinfo_set(struct net_context *context);
 extern void net_pkt_init(void);
 extern void net_tc_tx_init(void);
 extern void net_tc_rx_init(void);
@@ -91,6 +92,11 @@ static inline bool net_context_is_reuseaddr_set(struct net_context *context)
 	return false;
 }
 static inline bool net_context_is_reuseport_set(struct net_context *context)
+{
+	ARG_UNUSED(context);
+	return false;
+}
+static inline bool net_context_is_recv_pktinfo_set(struct net_context *context)
 {
 	ARG_UNUSED(context);
 	return false;
@@ -230,12 +236,12 @@ void net_ipv4_igmp_init(struct net_if *iface);
 #endif /* CONFIG_NET_IPV4_IGMP */
 
 #if defined(CONFIG_NET_IPV4_IGMP)
-uint16_t net_calc_chksum_igmp(uint8_t *data, size_t len);
+uint16_t net_calc_chksum_igmp(struct net_pkt *pkt);
 enum net_verdict net_ipv4_igmp_input(struct net_pkt *pkt,
 				     struct net_ipv4_hdr *ip_hdr);
 #else
 #define net_ipv4_igmp_input(...)
-#define net_calc_chksum_igmp(data, len) 0U
+#define net_calc_chksum_igmp(pkt) 0U
 #endif /* CONFIG_NET_IPV4_IGMP */
 
 static inline uint16_t net_calc_chksum_icmpv6(struct net_pkt *pkt)

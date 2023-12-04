@@ -152,7 +152,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: b3cb13f06586543ae1d156dc3e84b2fd3dc2f1fb
+      revision: ca3be152414bb269647806c4d3091e04168d1add
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -183,7 +183,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 2ff8ce6e6ca131d87699dba260f3c0cc4a6cc365
+      revision: 56e0b052dff311c2f8eb08c6804e60fc79feb56f
       path: modules/hal/nordic
       groups:
         - hal
@@ -229,7 +229,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 89ef0a3383edebf661073073bcdf6e2836fe90ee
+      revision: af2d314b6f7f87cfa8365009497132468ca3a686
       path: modules/hal/stm32
       groups:
         - hal
@@ -282,7 +282,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 0c0470e294dcfb52aab92299356a5f3caa0aa52b
+      revision: 47b34362552835621bc289d53d2127691088cb7c
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -301,7 +301,7 @@ manifest:
       revision: 214f9fc1539f8e5937c0474cb6ee29b6dcb2d4b8
       path: modules/lib/open-amp
     - name: openthread
-      revision: 193e77e40ec2387d458eaebd1e03902d86f484a5
+      revision: 75694d2860282d216d7286f3956388e957c7cfb5
       path: modules/lib/openthread
     - name: percepio
       path: modules/debug/percepio
@@ -310,7 +310,7 @@ manifest:
         - debug
     - name: picolibc
       path: modules/lib/picolibc
-      revision: d07c38ff051386f8e09a143ea0a6c1d6d66dd1d8
+      revision: 1a5c603b9f8e228f9459bdafedad15ea28efc700
     - name: segger
       revision: 9d0191285956cef43daf411edc2f1a7788346def
       path: modules/debug/segger
