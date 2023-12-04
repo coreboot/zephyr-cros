@@ -228,7 +228,7 @@ static void shell_stack_dump(const struct k_thread *thread, void *user_data)
 	shell_print(
 		(const struct shell *)user_data, "%p %-" STRINGIFY(THREAD_MAX_NAM_LEN) "s "
 		"(real size %4zu):\tunused %4zu\tusage %4zu / %4zu (%2u %%)",
-		thread, tname ? tname : "NA", size, unused, size - unused, size, pcnt);
+		(void*)thread->stack_info.start, tname ? tname : "NA", size, unused, size - unused, size, pcnt);
 }
 
 K_KERNEL_STACK_ARRAY_DECLARE(z_interrupt_stacks, CONFIG_MP_MAX_NUM_CPUS,
