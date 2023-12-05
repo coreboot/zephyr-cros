@@ -1100,6 +1100,9 @@ struct ifreq {
 /** sockopt: Set or receive the Type-Of-Service value for an outgoing packet. */
 #define IP_TOS 1
 
+/** sockopt: Set or receive the Time-To-Live value for an outgoing packet. */
+#define IP_TTL 2
+
 /** sockopt: Pass an IP_PKTINFO ancillary message that contains a
  *  pktinfo structure that supplies some information about the
  *  incoming packet.
@@ -1112,7 +1115,40 @@ struct in_pktinfo {
 	struct in_addr ipi_addr;     /* Header Destination address */
 };
 
+/** sockopt: Set IPv4 multicast TTL value. */
+#define IP_MULTICAST_TTL 33
+/** sockopt: Join IPv4 multicast group. */
+#define IP_ADD_MEMBERSHIP 35
+/** sockopt: Leave IPv4 multicast group. */
+#define IP_DROP_MEMBERSHIP 36
+
+struct ip_mreqn {
+	struct in_addr imr_multiaddr; /* IP multicast group address */
+	struct in_addr imr_address;   /* IP address of local interface */
+	int            imr_ifindex;   /* interface index */
+};
+
 /* Socket options for IPPROTO_IPV6 level */
+/** sockopt: Set the unicast hop limit for the socket. */
+#define IPV6_UNICAST_HOPS	16
+
+/** sockopt: Set the multicast hop limit for the socket. */
+#define IPV6_MULTICAST_HOPS 18
+
+/** sockopt: Join IPv6 multicast group. */
+#define IPV6_ADD_MEMBERSHIP 20
+
+/** sockopt: Leave IPv6 multicast group. */
+#define IPV6_DROP_MEMBERSHIP 21
+
+struct ipv6_mreq {
+	/* IPv6 multicast address of group */
+	struct in6_addr ipv6mr_multiaddr;
+
+	/* Interface index of the local IPv6 address */
+	int ipv6mr_ifindex;
+};
+
 /** sockopt: Don't support IPv4 access */
 #define IPV6_V6ONLY 26
 

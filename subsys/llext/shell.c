@@ -52,45 +52,57 @@ static int cmd_llext_list_symbols(const struct shell *sh, size_t argc, char *arg
 	return 0;
 }
 
-static void llext_name_get(size_t idx, struct shell_static_entry *entry)
+struct llext_shell_cmd {
+	unsigned int tgt;
+	unsigned int idx;
+	struct llext *ext;
+};
+
+static int llext_shell_name_cb(struct llext *ext, void *arg)
 {
-	sys_slist_t *ext_list = llext_list();
-	sys_snode_t *node = sys_slist_peek_head(ext_list);
+	struct llext_shell_cmd *cmd = arg;
 
-	entry->syntax = NULL;
-
-	for (int i = 0; i < idx; i++) {
-		node = sys_slist_peek_next(node);
-
-		if (node == NULL) {
-			goto out;
-		}
+	if (cmd->tgt == cmd->idx) {
+		cmd->ext = ext;
+		return 1;
 	}
 
-	struct llext *ext = CONTAINER_OF(node, struct llext, _llext_list);
+	cmd->idx++;
 
-	entry->syntax = ext->name;
-out:
-	entry->syntax = NULL;
+	return 0;
+}
+
+static void llext_name_get(size_t idx, struct shell_static_entry *entry)
+{
+	struct llext_shell_cmd cmd = {.tgt = idx};
+
+	llext_iterate(llext_shell_name_cb, &cmd);
+
+	entry->syntax = cmd.ext ? cmd.ext->name : NULL;
 	entry->help = NULL;
 	entry->subcmd = NULL;
-
 }
 
 SHELL_DYNAMIC_CMD_CREATE(msub_llext_name, llext_name_get);
 
+struct llext_shell_list {
+	const struct shell *sh;
+};
+
+static int llext_shell_list_cb(struct llext *ext, void *arg)
+{
+	struct llext_shell_list *sl = arg;
+
+	shell_print(sl->sh, "| %16s | %12d |", ext->name, ext->mem_size);
+	return 0;
+}
+
 static int cmd_llext_list(const struct shell *sh, size_t argc, char *argv[])
 {
-	sys_snode_t *node;
-	struct llext *ext;
+	struct llext_shell_list sl = {.sh = sh};
 
 	shell_print(sh, "| Name             | Size         |");
-	SYS_SLIST_FOR_EACH_NODE(llext_list(), node) {
-		ext = CONTAINER_OF(node, struct llext, _llext_list);
-		shell_print(sh, "| %16s | %12d |", ext->name, ext->mem_size);
-	}
-
-	return 0;
+	return llext_iterate(llext_shell_list_cb, &sl);
 }
 
 static uint8_t llext_buf[CONFIG_LLEXT_SHELL_MAX_SIZE];
@@ -117,8 +129,9 @@ static int cmd_llext_load_hex(const struct shell *sh, size_t argc, char *argv[])
 		hex_len, CONFIG_LLEXT_SHELL_MAX_SIZE, llext_buf_len);
 	LOG_HEXDUMP_DBG(llext_buf, 4, "4 byte MAGIC");
 
+	struct llext_load_param ldr_parm = LLEXT_LOAD_PARAM_DEFAULT;
 	struct llext *ext;
-	int res = llext_load(ldr, name, &ext);
+	int res = llext_load(ldr, name, &ext, &ldr_parm);
 
 	if (res == 0) {
 		shell_print(sh, "Successfully loaded extension %s, addr %p\n", ext->name, ext);
@@ -138,7 +151,7 @@ static int cmd_llext_unload(const struct shell *sh, size_t argc, char *argv[])
 		return -EINVAL;
 	}
 
-	llext_unload(ext);
+	llext_unload(&ext);
 	shell_print(sh, "Unloaded extension %s\n", argv[1]);
 
 	return 0;

@@ -290,6 +290,9 @@ struct net_if_ipv6 {
 
 	/** IPv6 hop limit */
 	uint8_t hop_limit;
+
+	/** IPv6 multicast hop limit */
+	uint8_t mcast_hop_limit;
 };
 
 #if defined(CONFIG_NET_DHCPV6) && defined(CONFIG_NET_NATIVE_IPV6)
@@ -380,6 +383,9 @@ struct net_if_ipv4 {
 
 	/** IPv4 time-to-live */
 	uint8_t ttl;
+
+	/** IPv4 time-to-live for multicast packets */
+	uint8_t mcast_ttl;
 };
 
 #if defined(CONFIG_NET_DHCPV4) && defined(CONFIG_NET_NATIVE_IPV4)
@@ -1672,7 +1678,36 @@ uint8_t net_if_ipv6_get_hop_limit(struct net_if *iface);
  * @param iface Network interface
  * @param hop_limit New hop limit
  */
-void net_ipv6_set_hop_limit(struct net_if *iface, uint8_t hop_limit);
+void net_if_ipv6_set_hop_limit(struct net_if *iface, uint8_t hop_limit);
+
+/* The old hop limit setter function is deprecated because the naming
+ * of it was incorrect. The API name was missing "_if_" so this function
+ * should not be used.
+ */
+__deprecated
+static inline void net_ipv6_set_hop_limit(struct net_if *iface,
+					  uint8_t hop_limit)
+{
+	net_if_ipv6_set_hop_limit(iface, hop_limit);
+}
+
+/**
+ * @brief Get IPv6 multicast hop limit specified for a given interface. This is the
+ * default value but can be overridden by the user.
+ *
+ * @param iface Network interface
+ *
+ * @return Hop limit
+ */
+uint8_t net_if_ipv6_get_mcast_hop_limit(struct net_if *iface);
+
+/**
+ * @brief Set the default IPv6 multicast hop limit of a given interface.
+ *
+ * @param iface Network interface
+ * @param hop_limit New hop limit
+ */
+void net_if_ipv6_set_mcast_hop_limit(struct net_if *iface, uint8_t hop_limit);
 
 /**
  * @brief Set IPv6 reachable time for a given interface
@@ -1915,6 +1950,23 @@ uint8_t net_if_ipv4_get_ttl(struct net_if *iface);
  * @param ttl Time-to-live value
  */
 void net_if_ipv4_set_ttl(struct net_if *iface, uint8_t ttl);
+
+/**
+ * @brief Get IPv4 multicast time-to-live value specified for a given interface
+ *
+ * @param iface Network interface
+ *
+ * @return Time-to-live
+ */
+uint8_t net_if_ipv4_get_mcast_ttl(struct net_if *iface);
+
+/**
+ * @brief Set IPv4 multicast time-to-live value specified to a given interface
+ *
+ * @param iface Network interface
+ * @param ttl Time-to-live value
+ */
+void net_if_ipv4_set_mcast_ttl(struct net_if *iface, uint8_t ttl);
 
 /**
  * @brief Check if this IPv4 address belongs to one of the interfaces.

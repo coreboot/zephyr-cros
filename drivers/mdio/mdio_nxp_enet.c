@@ -62,7 +62,7 @@ static int nxp_enet_mdio_wait_xfer(const struct device *dev)
 		 * ethernet driver has not initiaized, just do a busy wait
 		 */
 		k_busy_wait(USEC_PER_MSEC * config->timeout);
-		if (base->EIR && ENET_EIR_MII_MASK == ENET_EIR_MII_MASK) {
+		if (base->EIR & ENET_EIR_MII_MASK) {
 			ret = 0;
 		} else {
 			ret = -ETIMEDOUT;
@@ -70,7 +70,7 @@ static int nxp_enet_mdio_wait_xfer(const struct device *dev)
 	} else if (k_sem_take(&data->mdio_sem, K_MSEC(config->timeout))) {
 		/* Interrupt was enabled but did not occur in time */
 		ret = -ETIMEDOUT;
-	} else if (base->EIR && ENET_EIR_MII_MASK == ENET_EIR_MII_MASK) {
+	} else if (base->EIR & ENET_EIR_MII_MASK) {
 		/* Interrupt happened meaning mdio transaction completed */
 		ret = 0;
 	} else {
@@ -228,18 +228,20 @@ static void nxp_enet_mdio_post_module_reset_init(const struct device *dev)
 }
 
 void nxp_enet_mdio_callback(const struct device *dev,
-				enum nxp_enet_callback_reason event)
+				enum nxp_enet_callback_reason event, void *cb_data)
 {
 	struct nxp_enet_mdio_data *data = dev->data;
 
+	ARG_UNUSED(cb_data);
+
 	switch (event) {
-	case nxp_enet_module_reset:
+	case NXP_ENET_MODULE_RESET:
 		nxp_enet_mdio_post_module_reset_init(dev);
 		break;
-	case nxp_enet_interrupt:
+	case NXP_ENET_INTERRUPT:
 		nxp_enet_mdio_isr_cb(dev);
 		break;
-	case nxp_enet_interrupt_enabled:
+	case NXP_ENET_INTERRUPT_ENABLED:
 		data->interrupt_up = true;
 		break;
 	default:

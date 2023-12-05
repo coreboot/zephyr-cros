@@ -152,7 +152,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: ffbe58815808af98d1e3241defa552a0fcc6d28a
+      revision: eb7e415dc115e57afe96f552493b19d49dfc8c0e
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -193,7 +193,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 1ed023da7f5541b78099b5a030507a2839ce554f
+      revision: d0c424e1c6ef0acac3099a07280a46a24951a47a
       path: modules/hal/nxp
       groups:
         - hal
@@ -295,7 +295,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: a715dcc179f1a71f51c574165958b72fe932ae3f
+      revision: 9b985ea6bc237b6ae06f48eb228f2ac7f6e3b96b
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: 214f9fc1539f8e5937c0474cb6ee29b6dcb2d4b8

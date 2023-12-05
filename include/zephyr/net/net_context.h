@@ -348,8 +348,14 @@ __net_socket struct net_context {
 
 	/** IPv6 hop limit or IPv4 ttl for packets sent via this context. */
 	union {
-		uint8_t ipv6_hop_limit;
-		uint8_t ipv4_ttl;
+		struct {
+			uint8_t ipv6_hop_limit;
+			uint8_t ipv6_mcast_hop_limit;
+		};
+		struct {
+			uint8_t ipv4_ttl;
+			uint8_t ipv4_mcast_ttl;
+		};
 	};
 
 #if defined(CONFIG_SOCKS)
@@ -703,6 +709,17 @@ static inline void net_context_set_ipv4_ttl(struct net_context *context,
 	context->ipv4_ttl = ttl;
 }
 
+static inline uint8_t net_context_get_ipv4_mcast_ttl(struct net_context *context)
+{
+	return context->ipv4_mcast_ttl;
+}
+
+static inline void net_context_set_ipv4_mcast_ttl(struct net_context *context,
+						  uint8_t ttl)
+{
+	context->ipv4_mcast_ttl = ttl;
+}
+
 static inline uint8_t net_context_get_ipv6_hop_limit(struct net_context *context)
 {
 	return context->ipv6_hop_limit;
@@ -712,6 +729,17 @@ static inline void net_context_set_ipv6_hop_limit(struct net_context *context,
 						  uint8_t hop_limit)
 {
 	context->ipv6_hop_limit = hop_limit;
+}
+
+static inline uint8_t net_context_get_ipv6_mcast_hop_limit(struct net_context *context)
+{
+	return context->ipv6_mcast_hop_limit;
+}
+
+static inline void net_context_set_ipv6_mcast_hop_limit(struct net_context *context,
+							uint8_t hop_limit)
+{
+	context->ipv6_mcast_hop_limit = hop_limit;
 }
 
 #if defined(CONFIG_SOCKS)
@@ -1094,18 +1122,22 @@ int net_context_update_recv_wnd(struct net_context *context,
 				int32_t delta);
 
 enum net_context_option {
-	NET_OPT_PRIORITY	= 1,
-	NET_OPT_TXTIME		= 2,
-	NET_OPT_SOCKS5		= 3,
-	NET_OPT_RCVTIMEO        = 4,
-	NET_OPT_SNDTIMEO        = 5,
-	NET_OPT_RCVBUF		= 6,
-	NET_OPT_SNDBUF		= 7,
-	NET_OPT_DSCP_ECN	= 8,
-	NET_OPT_REUSEADDR	= 9,
-	NET_OPT_REUSEPORT	= 10,
-	NET_OPT_IPV6_V6ONLY	= 11,
-	NET_OPT_RECV_PKTINFO    = 12,
+	NET_OPT_PRIORITY          = 1,
+	NET_OPT_TXTIME            = 2,
+	NET_OPT_SOCKS5            = 3,
+	NET_OPT_RCVTIMEO          = 4,
+	NET_OPT_SNDTIMEO          = 5,
+	NET_OPT_RCVBUF            = 6,
+	NET_OPT_SNDBUF            = 7,
+	NET_OPT_DSCP_ECN          = 8,
+	NET_OPT_REUSEADDR         = 9,
+	NET_OPT_REUSEPORT         = 10,
+	NET_OPT_IPV6_V6ONLY       = 11,
+	NET_OPT_RECV_PKTINFO      = 12,
+	NET_OPT_MCAST_TTL         = 13,
+	NET_OPT_MCAST_HOP_LIMIT   = 14,
+	NET_OPT_UNICAST_HOP_LIMIT = 15,
+	NET_OPT_TTL               = 16,
 };
 
 /**
