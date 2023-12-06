@@ -71,6 +71,13 @@ struct flash_parameters {
 typedef int (*flash_api_read)(const struct device *dev, off_t offset,
 			      void *data,
 			      size_t len);
+
+#if defined(CONFIG_FLASH_64_BIT_API)
+typedef int (*flash_api_read_64)(const struct device *dev, int64_t offset,
+				 void *data,
+				 size_t len);
+#endif
+
 /**
  * @brief Flash write implementation handler type
  *
@@ -82,6 +89,11 @@ typedef int (*flash_api_read)(const struct device *dev, off_t offset,
 typedef int (*flash_api_write)(const struct device *dev, off_t offset,
 			       const void *data, size_t len);
 
+#if defined(CONFIG_FLASH_64_BIT_API)
+typedef int (*flash_api_write_64)(const struct device *dev, int64_t offset,
+				  const void *data, size_t len);
+#endif
+
 /**
  * @brief Flash erase implementation handler type
  *
@@ -92,6 +104,11 @@ typedef int (*flash_api_write)(const struct device *dev, off_t offset,
  */
 typedef int (*flash_api_erase)(const struct device *dev, off_t offset,
 			       size_t size);
+
+#if defined(CONFIG_FLASH_64_BIT_API)
+typedef int (*flash_api_erase_64)(const struct device *dev, int64_t offset,
+				  uint64_t size);
+#endif
 
 typedef const struct flash_parameters* (*flash_api_get_parameters)(const struct device *dev);
 
@@ -132,6 +149,11 @@ __subsystem struct flash_driver_api {
 	flash_api_read read;
 	flash_api_write write;
 	flash_api_erase erase;
+#if defined(CONFIG_FLASH_64_BIT_API)
+	flash_api_read_64 read_64;
+	flash_api_write_64 write_64;
+	flash_api_erase_64 erase_64;
+#endif
 	flash_api_get_parameters get_parameters;
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
 	flash_api_pages_layout page_layout;
@@ -180,6 +202,25 @@ static inline int z_impl_flash_read(const struct device *dev, off_t offset,
 	return api->read(dev, offset, data, len);
 }
 
+#if defined(CONFIG_FLASH_64_BIT_API)
+__syscall int flash_read_64(const struct device *dev, int64_t offset, void *data,
+			    size_t len);
+
+static inline int z_impl_flash_read_64(const struct device *dev, int64_t offset,
+				       void *data, size_t len)
+{
+	const struct flash_driver_api *api =
+		(const struct flash_driver_api *)dev->api;
+	int rc = -ENOTSUP;
+
+	if (api->read_64 != NULL) {
+		rc = api->read_64(dev, offset, data, len);
+	}
+
+	return rc;
+}
+#endif
+
 /**
  *  @brief  Write buffer into flash memory.
  *
@@ -213,6 +254,26 @@ static inline int z_impl_flash_write(const struct device *dev, off_t offset,
 
 	return rc;
 }
+
+#if defined(CONFIG_FLASH_64_BIT_API)
+__syscall int flash_write_64(const struct device *dev, int64_t offset,
+			     const void *data,
+			     size_t len);
+
+static inline int z_impl_flash_write_64(const struct device *dev, int64_t offset,
+				        const void *data, size_t len)
+{
+	const struct flash_driver_api *api =
+		(const struct flash_driver_api *)dev->api;
+	int rc = -ENOTSUP;
+
+	if (api->write_64 != NULL) {
+		rc = api->write_64(dev, offset, data, len);
+	}
+
+	return rc;
+}
+#endif
 
 /**
  *  @brief  Erase part or all of a flash memory
@@ -248,6 +309,24 @@ static inline int z_impl_flash_erase(const struct device *dev, off_t offset,
 
 	return rc;
 }
+
+#if defined(CONFIG_FLASH_64_BIT_API)
+__syscall int flash_erase_64(const struct device *dev, int64_t offset, uint64_t size);
+
+static inline int z_impl_flash_erase_64(const struct device *dev, int64_t offset,
+				        uint64_t size)
+{
+	const struct flash_driver_api *api =
+		(const struct flash_driver_api *)dev->api;
+	int rc = -ENOTSUP;
+
+	if (api->erase_64 != NULL) {
+		rc = api->erase_64(dev, offset, size);
+	}
+
+	return rc;
+}
+#endif
 
 struct flash_pages_info {
 	off_t start_offset; /* offset from the base of flash address */

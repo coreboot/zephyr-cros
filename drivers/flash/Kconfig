@@ -23,6 +23,11 @@ config FLASH_HAS_PAGE_LAYOUT
 	  This option is enabled when the SoC flash driver supports
 	  retrieving the layout of flash memory pages.
 
+config FLASH_64_BIT_API
+	bool
+	help
+	  This option is select by drivers that use 64-bit flash API.
+
 config FLASH_JESD216
 	bool
 	help
