@@ -17,7 +17,7 @@
 #include <soc.h>
 
 /* Target MDC frequency 2.5 MHz */
-#define NXP_ENET_MDIO_MDC_FREQ 25000000U
+#define NXP_ENET_MDIO_MDC_FREQ 2500000U
 
 struct nxp_enet_mdio_config {
 	ENET_Type *base;
@@ -228,18 +228,20 @@ static void nxp_enet_mdio_post_module_reset_init(const struct device *dev)
 }
 
 void nxp_enet_mdio_callback(const struct device *dev,
-				enum nxp_enet_callback_reason event)
+				enum nxp_enet_callback_reason event, void *cb_data)
 {
 	struct nxp_enet_mdio_data *data = dev->data;
 
+	ARG_UNUSED(cb_data);
+
 	switch (event) {
-	case nxp_enet_module_reset:
+	case NXP_ENET_MODULE_RESET:
 		nxp_enet_mdio_post_module_reset_init(dev);
 		break;
-	case nxp_enet_interrupt:
+	case NXP_ENET_INTERRUPT:
 		nxp_enet_mdio_isr_cb(dev);
 		break;
-	case nxp_enet_interrupt_enabled:
+	case NXP_ENET_INTERRUPT_ENABLED:
 		data->interrupt_up = true;
 		break;
 	default:

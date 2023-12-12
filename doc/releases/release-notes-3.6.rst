@@ -52,6 +52,11 @@ Bluetooth
 
 * Mesh
 
+  * Added the delayable messages functionality to apply random delays for
+    the transmitted responses on the Access layer.
+    The functionality is enabled by the :kconfig:option:`CONFIG_BT_MESH_ACCESS_DELAYABLE_MSG`
+    Kconfig option.
+
 * Controller
 
 Boards & SoC Support
@@ -206,6 +211,8 @@ Networking
 
 * CoAP:
 
+  * Emit observer/service network events using the Network Event subsystem.
+
 * Connection Manager:
 
 * DHCP:
@@ -222,6 +229,16 @@ Networking
 
 * Misc:
 
+  * It is now possible to have separate IPv4 TTL value and IPv6 hop limit value for
+    unicast and multicast packets. This can be controlled in each socket via
+    :c:func:`setsockopt` API.
+
+  * Added support for compile time network event handlers using the macro
+    :c:macro:`NET_MGMT_REGISTER_EVENT_HANDLER`.
+
+  * The :kconfig:option:`CONFIG_NET_MGMT_EVENT_WORKER` choice is added to
+    allow emitting network events using the system work queue or synchronously.
+
 * MQTT-SN:
 
 * OpenThread:
@@ -229,6 +246,9 @@ Networking
 * PPP:
 
 * Sockets:
+
+  * Added support for IPv4 multicast ``IP_ADD_MEMBERSHIP`` and ``IP_DROP_MEMBERSHIP`` socket options.
+  * Added support for IPv6 multicast ``IPV6_ADD_MEMBERSHIP`` and ``IPV6_DROP_MEMBERSHIP`` socket options.
 
 * TCP:
 
@@ -268,8 +288,11 @@ Libraries / Subsystems
   * Implemented datetime functionality in MCUmgr OS management group, this makes use of the RTC
     driver API.
 
-  * Fixes an issue in MCUmgr console UART input whereby the FIFO would be read outside of an ISR,
+  * Fixed an issue in MCUmgr console UART input whereby the FIFO would be read outside of an ISR,
     which is not supported in the next USB stack.
+
+  * Fixed an issue whereby the ``mcuboot erase`` DFU shell command could be used to erase the
+    MCUboot or currently running application slot.
 
 * File systems
 

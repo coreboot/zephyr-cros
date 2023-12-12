@@ -660,6 +660,11 @@ module-str = "Bluetooth Audio Stream"
 source "subsys/bluetooth/common/Kconfig.template.log_config_bt"
 
 parent-module = BT
+module = BT_BAP_BASE
+module-str = "Bluetooth Basic Audio Profile Broadcast Audio Source Endpoint"
+source "subsys/logging/Kconfig.template.log_config_inherit"
+
+parent-module = BT
 module = BT_AUDIO_CODEC
 module-str = "Bluetooth Audio Codec"
 source "subsys/logging/Kconfig.template.log_config_inherit"
@@ -719,6 +724,11 @@ source "subsys/bluetooth/common/Kconfig.template.log_config_bt"
 parent-module = BT
 module = BT_CAP_COMMANDER
 module-str = "Common Audio Profile Commander"
+source "subsys/logging/Kconfig.template.log_config_inherit"
+
+parent-module = BT
+module = BT_CAP_COMMON
+module-str = "Common Audio Profile Common"
 source "subsys/logging/Kconfig.template.log_config_inherit"
 
 parent-module = BT

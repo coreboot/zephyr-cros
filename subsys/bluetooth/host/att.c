@@ -72,8 +72,6 @@ K_MEM_SLAB_DEFINE(req_slab, sizeof(struct bt_att_req),
 		  CONFIG_BT_L2CAP_TX_BUF_COUNT, __alignof__(struct bt_att_req));
 
 enum {
-	ATT_PENDING_RSP,
-	ATT_PENDING_CFM,
 	ATT_CONNECTED,
 	ATT_ENHANCED,
 	ATT_PENDING_SENT,
@@ -214,17 +212,25 @@ static void bt_att_disconnected(struct bt_l2cap_chan *chan);
 struct net_buf *bt_att_create_rsp_pdu(struct bt_att_chan *chan,
 				      uint8_t op, size_t len);
 
+static void bt_att_sent(struct bt_l2cap_chan *ch);
+
 void att_sent(struct bt_conn *conn, void *user_data)
 {
 	struct bt_att_tx_meta_data *data = user_data;
 	struct bt_att_chan *att_chan = data->att_chan;
 	struct bt_l2cap_chan *chan = &att_chan->chan.chan;
 
+	__ASSERT_NO_MSG(!bt_att_is_enhanced(att_chan));
+
 	LOG_DBG("conn %p chan %p", conn, chan);
 
-	if (chan->ops->sent) {
-		chan->ops->sent(chan);
-	}
+	/* For EATT, `bt_att_sent` is assigned to the `.sent` L2 callback.
+	 * L2CAP will then call it once the SDU has finished sending.
+	 *
+	 * For UATT, this won't happen, as static LE l2cap channels don't have
+	 * SDUs. Call it manually instead.
+	 */
+	bt_att_sent(chan);
 }
 
 static int att_chan_send_cb(struct bt_att_chan *att_chan,
@@ -540,10 +546,6 @@ static void chan_cfm_sent(struct bt_conn *conn, struct bt_att_tx_meta_data *user
 
 	LOG_DBG("chan %p", chan);
 
-	if (IS_ENABLED(CONFIG_BT_ATT_ENFORCE_FLOW)) {
-		atomic_clear_bit(chan->flags, ATT_PENDING_CFM);
-	}
-
 	tx_meta_data_free(data);
 }
 
@@ -553,10 +555,6 @@ static void chan_rsp_sent(struct bt_conn *conn, struct bt_att_tx_meta_data *user
 	struct bt_att_chan *chan = data->att_chan;
 
 	LOG_DBG("chan %p", chan);
-
-	if (IS_ENABLED(CONFIG_BT_ATT_ENFORCE_FLOW)) {
-		atomic_clear_bit(chan->flags, ATT_PENDING_RSP);
-	}
 
 	tx_meta_data_free(data);
 }
@@ -2906,19 +2904,6 @@ static int bt_att_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 				     BT_ATT_ERR_NOT_SUPPORTED);
 		}
 		return 0;
-	}
-
-	if (IS_ENABLED(CONFIG_BT_ATT_ENFORCE_FLOW)) {
-		if (handler->type == ATT_REQUEST &&
-		    atomic_test_and_set_bit(att_chan->flags, ATT_PENDING_RSP)) {
-			LOG_WRN("Ignoring unexpected request");
-			return 0;
-		} else if (handler->type == ATT_INDICATION &&
-			   atomic_test_and_set_bit(att_chan->flags,
-						   ATT_PENDING_CFM)) {
-			LOG_WRN("Ignoring unexpected indication");
-			return 0;
-		}
 	}
 
 	if (buf->len < handler->expect_len) {
