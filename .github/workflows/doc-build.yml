@@ -120,6 +120,12 @@ jobs:
       with:
         name: html-output
         path: html-output.tar.xz
+        
+    - name: upload-api-coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-coverage
+        path: new.info
 
     - name: upload-api-coverage
       uses: actions/upload-artifact@v3
