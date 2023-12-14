@@ -94,6 +94,11 @@ static bool input_kbd_matrix_scan(const struct device *dev)
 		k_busy_wait(cfg->settle_time_us);
 
 		row = api->read_row(dev);
+
+		if (cfg->actual_key_mask != NULL) {
+			row &= cfg->actual_key_mask[col];
+		}
+
 		cfg->matrix_new_state[col] = row;
 		key_event |= row;
 	}
@@ -207,7 +212,7 @@ static bool input_kbd_matrix_check_key_events(const struct device *dev)
 	key_pressed = input_kbd_matrix_scan(dev);
 
 	for (int c = 0; c < cfg->col_size; c++) {
-		LOG_DBG("c=%2d u=%02x p=%02x n=%02x",
+		LOG_DBG("c=%2d u=" PRIkbdrow " p=" PRIkbdrow " n=" PRIkbdrow,
 			c,
 			cfg->matrix_unstable_state[c],
 			cfg->matrix_previous_state[c],

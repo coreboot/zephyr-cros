@@ -11,6 +11,7 @@
 #include <zephyr/llext/loader.h>
 #include <zephyr/llext/llext.h>
 #include <zephyr/kernel.h>
+#include <zephyr/cache.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(llext, CONFIG_LLEXT_LOG_LEVEL);
@@ -302,6 +303,7 @@ static int llext_copy_section(struct llext_loader *ldr, struct llext *ext,
 	if (!ldr->sects[sect_idx].sh_size) {
 		return 0;
 	}
+	ext->mem_size[mem_idx] = ldr->sects[sect_idx].sh_size;
 
 	if (ldr->sects[sect_idx].sh_type != SHT_NOBITS &&
 	    IS_ENABLED(CONFIG_LLEXT_STORAGE_WRITABLE)) {
@@ -318,7 +320,7 @@ static int llext_copy_section(struct llext_loader *ldr, struct llext *ext,
 	if (!ext->mem[mem_idx]) {
 		return -ENOMEM;
 	}
-	ext->mem_size += ldr->sects[sect_idx].sh_size;
+	ext->alloc_size += ldr->sects[sect_idx].sh_size;
 
 	if (ldr->sects[sect_idx].sh_type == SHT_NOBITS) {
 		memset(ext->mem[mem_idx], 0, ldr->sects[sect_idx].sh_size);
@@ -431,7 +433,7 @@ static int llext_allocate_symtab(struct llext_loader *ldr, struct llext *ext)
 		return -ENOMEM;
 	}
 	memset(sym_tab->syms, 0, syms_size);
-	ext->mem_size += syms_size;
+	ext->alloc_size += syms_size;
 
 	return 0;
 }
@@ -775,6 +777,15 @@ static int llext_link(struct llext_loader *ldr, struct llext *ext, bool do_local
 		}
 	}
 
+#ifdef CONFIG_CACHE_MANAGEMENT
+	/* Make sure changes to ext sections are flushed to RAM */
+	for (i = 0; i < LLEXT_MEM_COUNT; ++i) {
+		if (ext->mem[i]) {
+			arch_dcache_flush_range(ext->mem[i], ext->mem_size[i]);
+		}
+	}
+#endif
+
 	return 0;
 }
 
@@ -801,7 +812,7 @@ static int do_llext_load(struct llext_loader *ldr, struct llext *ext,
 	memset(ldr->sect_map, 0, sect_map_sz);
 
 	ldr->sect_cnt = ldr->hdr.e_shnum;
-	ext->mem_size += sect_map_sz;
+	ext->alloc_size += sect_map_sz;
 
 	LOG_DBG("Finding ELF tables...");
 	ret = llext_find_tables(ldr);
@@ -893,6 +904,8 @@ int llext_load(struct llext_loader *ldr, const char *name, struct llext **ext,
 {
 	int ret;
 	elf_ehdr_t ehdr;
+
+	*ext = llext_by_name(name);
 
 	k_mutex_lock(&llext_lock, K_FOREVER);
 

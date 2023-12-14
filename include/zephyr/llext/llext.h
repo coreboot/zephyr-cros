@@ -58,8 +58,11 @@ struct llext {
 	/** Memory allocated on heap */
 	bool mem_on_heap[LLEXT_MEM_COUNT];
 
-	/** Total size of the llext memory usage */
-	size_t mem_size;
+	/** Size of each stored section */
+	size_t mem_size[LLEXT_MEM_COUNT];
+
+	/** Total llext allocation size */
+	size_t alloc_size;
 
 	/*
 	 * These are all global symbols in the extension, all of them don't
@@ -121,7 +124,7 @@ struct llext_load_param {
  *
  * @param[in] loader An extension loader that provides input data and context
  * @param[in] name A string identifier for the extension
- * @param[out] ext A pointer to a statically allocated llext struct
+ * @param[out] ext This will hold the pointer to the llext struct
  * @param[in] ldr_parm Loader parameters
  *
  * @retval 0 Success

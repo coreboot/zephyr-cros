@@ -17,8 +17,14 @@ Required changes
 Boards
 ======
 
-  * The deprecated Nordic SoC Kconfig option ``NRF_STORE_REBOOT_TYPE_GPREGRET`` has been removed,
-    applications that use this should switch to using the :ref:`boot_mode_api` instead.
+* The deprecated Nordic SoC Kconfig option ``NRF_STORE_REBOOT_TYPE_GPREGRET`` has been removed,
+  applications that use this should switch to using the :ref:`boot_mode_api` instead.
+
+Build System
+============
+
+* The deprecated ``prj_<board>.conf`` Kconfig file support has been removed, projects that use
+  this should switch to using board Kconfig fragments instead (``boards/<board>.conf``).
 
 Kernel
 ======
@@ -177,6 +183,11 @@ Bluetooth
 * The Bluetooth Mesh ``element`` declaration has been changed to add prefix ``const``.
   The ``elem->addr`` field has been changed to the new runtime structure, replaced by
   ``elem->rt->addr``. (:github:`65388`)
+* The Bluetooth UUID has been modified to rodata in ``BT_UUID_DECLARE_16``, ``BT_UUID_DECLARE_32`
+  and ``BT_UUID_DECLARE_128`` as the return value has been changed to `const`.
+  Any pointer to a UUID must be prefixed with `const`, otherwise there will be a compilation warning.
+  For example change ``struct bt_uuid *uuid = BT_UUID_DECLARE_16(xx)`` to
+  ``const struct bt_uuid *uuid = BT_UUID_DECLARE_16(xx)``. (:github:`66136`)
 
 LoRaWAN
 =======
@@ -195,6 +206,10 @@ Networking
   change is used by the newly introduced :ref:`coap_server_interface` subsystem. Also, the
   ``request`` argument for :c:func:`coap_well_known_core_get` is made ``const``.
   (:github:`64265`)
+
+* CoAP observer events have moved from a callback function in a CoAP resource to the Network Events
+  subsystem. The ``CONFIG_COAP_OBSERVER_EVENTS`` configuration option has been removed.
+  (:github:`65936`)
 
 * The IGMP multicast library now supports IGMPv3. This results in a minor change to the existing
   api. The :c:func:`net_ipv4_igmp_join` now takes an additional argument of the type
