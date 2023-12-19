@@ -13,8 +13,8 @@
  * (include/arm/cpu.h)
  */
 
-#ifndef ZEPHYR_INCLUDE_ARCH_ARM_AARCH32_ARCH_H_
-#define ZEPHYR_INCLUDE_ARCH_ARM_AARCH32_ARCH_H_
+#ifndef ZEPHYR_INCLUDE_ARCH_ARM_ARCH_H_
+#define ZEPHYR_INCLUDE_ARCH_ARM_ARCH_H_
 
 /* Add include for DTS generated information */
 #include <zephyr/devicetree.h>
@@ -23,7 +23,7 @@
 #define sys_define_gpr_with_alias(name1, name2) union { uint32_t name1, name2; }
 
 #include <zephyr/arch/arm/thread.h>
-#include <zephyr/arch/arm/exc.h>
+#include <zephyr/arch/arm/exception.h>
 #include <zephyr/arch/arm/irq.h>
 #include <zephyr/arch/arm/error.h>
 #include <zephyr/arch/arm/misc.h>
@@ -279,4 +279,4 @@ enum k_fatal_error_reason_arch {
 }
 #endif
 
-#endif /* ZEPHYR_INCLUDE_ARCH_ARM_AARCH32_ARCH_H_ */
+#endif /* ZEPHYR_INCLUDE_ARCH_ARM_ARCH_H_ */

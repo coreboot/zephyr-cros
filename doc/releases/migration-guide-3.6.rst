@@ -118,6 +118,25 @@ Device Drivers and Device Tree
      * - ``DT_INST_BUS_LABEL(inst)``
        - ``DT_PROP(DT_BUS(DT_DRV_INST(inst)), label)``
 
+* The :dtcompatible:`st,stm32-lptim` lptim which is selected for counting ticks during
+  low power modes is identified by **stm32_lp_tick_source** in the device tree as follows.
+  The stm32_lptim_timer driver has been changed to support this.
+
+  .. code-block:: devicetree
+
+    stm32_lp_tick_source: &lptim1 {
+            status = "okay";
+    };
+
+* The native Linux SocketCAN driver, which can now be used in both :ref:`native_posix<native_posix>`
+  and :ref:`native_sim<native_sim>` with or without an embedded C-library, has been renamed to
+  reflect this:
+
+  * The devicetree compatible was renamed from ``zephyr,native-posix-linux-can`` to
+    :dtcompatible:`zephyr,native-linux-can`.
+  * The main Kconfig option was renamed from ``CONFIG_CAN_NATIVE_POSIX_LINUX`` to
+    :kconfig:option:`CONFIG_CAN_NATIVE_LINUX`.
+
 Power Management
 ================
 
@@ -176,18 +195,24 @@ Bluetooth
   cleared on :c:func:`bt_enable`. Callbacks can now be registered before the initial
   call to :c:func:`bt_enable`, and should no longer be re-registered after a :c:func:`bt_disable`
   :c:func:`bt_enable` cycle. (:github:`63693`)
-* The Bluetooth Mesh ``model`` declaration has been changed to add prefix ``const``.
-  The ``model->user_data``, ``model->elem_idx`` and ``model->mod_idx`` field has been changed to
-  the new runtime structure, replaced by ``model->rt->user_data``, ``model->rt->elem_idx`` and
-  ``model->rt->mod_idx`` separately. (:github:`65152`)
-* The Bluetooth Mesh ``element`` declaration has been changed to add prefix ``const``.
-  The ``elem->addr`` field has been changed to the new runtime structure, replaced by
-  ``elem->rt->addr``. (:github:`65388`)
 * The Bluetooth UUID has been modified to rodata in ``BT_UUID_DECLARE_16``, ``BT_UUID_DECLARE_32`
   and ``BT_UUID_DECLARE_128`` as the return value has been changed to `const`.
   Any pointer to a UUID must be prefixed with `const`, otherwise there will be a compilation warning.
   For example change ``struct bt_uuid *uuid = BT_UUID_DECLARE_16(xx)`` to
   ``const struct bt_uuid *uuid = BT_UUID_DECLARE_16(xx)``. (:github:`66136`)
+
+* Mesh
+
+  * The Bluetooth Mesh ``model`` declaration has been changed to add prefix ``const``.
+    The ``model->user_data``, ``model->elem_idx`` and ``model->mod_idx`` field has been changed to
+    the new runtime structure, replaced by ``model->rt->user_data``, ``model->rt->elem_idx`` and
+    ``model->rt->mod_idx`` separately. (:github:`65152`)
+  * The Bluetooth Mesh ``element`` declaration has been changed to add prefix ``const``.
+    The ``elem->addr`` field has been changed to the new runtime structure, replaced by
+    ``elem->rt->addr``. (:github:`65388`)
+  * Deprecated :kconfig:option:`CONFIG_BT_MESH_PROV_DEVICE`. This option is
+    replaced by new option :kconfig:option:`CONFIG_BT_MESH_PROVISIONEE` to
+    be aligned with Mesh Protocol Specification v1.1, section 5.4. (:github:`64252`)
 
 LoRaWAN
 =======
@@ -239,6 +264,12 @@ Other Subsystems
   and :kconfig:option:`ZBUS_MSG_SUBSCRIBER_NET_BUF_STATIC`
   zbus options are renamed. Instead, the new :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_DYNAMIC`
   and :kconfig:option:`ZBUS_MSG_SUBSCRIBER_BUF_ALLOC_STATIC` options should be used.
+
+Xtensa
+======
+
+* :kconfig:option:`CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC` no longer has a default in
+  the architecture layer. Instead, SoCs or boards will need to define it.
 
 Recommended Changes
 *******************
