@@ -37,6 +37,8 @@ Architectures
 
 * Xtensa
 
+  * Removed the unused Kconfig option ``CONFIG_XTENSA_NO_IPC``.
+
 * x86
 
 * POSIX
@@ -125,6 +127,16 @@ Build system and infrastructure
 * Dropped the ``COMPAT_INCLUDES`` option, it was unused since 3.0.
 
 * Fixed an issue whereby board revision ``0`` did not include overlay files for that revision.
+
+* Added ``PRE_IMAGE_CMAKE`` and ``POST_IMAGE_CMAKE`` hooks to sysbuild modules, which allows for
+  modules to run code after and before each image's cmake invocation.
+
+* Added :kconfig:option:`CONFIG_ROM_END_OFFSET` option which allows reducing the size of an image,
+  this is intended for use with firmware signing scripts which add additional data to the end of
+  images outside of the build itself.
+
+* Added MCUboot image size reduction to sysbuild images which include MCUboot which prevents
+  issues with building firmware images that are too large for MCUboot to swap.
 
 Drivers and Sensors
 *******************

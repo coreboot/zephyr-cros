@@ -56,10 +56,12 @@ class Filters:
     CMD_LINE = 'command line filter'
     # filters in the testsuite yaml definition
     TESTSUITE = 'testsuite filter'
+    # filters in the testplan yaml definition
+    TESTPLAN = 'testplan filter'
     # filters realted to platform definition
     PLATFORM = 'Platform related filter'
     # in case a test suite was quarantined.
-    QUARENTINE = 'Quarantine filter'
+    QUARANTINE = 'Quarantine filter'
     # in case a test suite is skipped intentionally .
     SKIP = 'Skip filter'
     # in case of incompatibility between selected and allowed toolchains.
@@ -717,7 +719,7 @@ class TestPlan:
                     tl = self.get_level(self.options.level)
                     planned_scenarios = tl.scenarios
                     if ts.id not in planned_scenarios and not set(ts.levels).intersection(set(tl.levels)):
-                        instance.add_filter("Not part of requested test plan", Filters.TESTSUITE)
+                        instance.add_filter("Not part of requested test plan", Filters.TESTPLAN)
 
                 if runnable and not instance.run:
                     instance.add_filter("Not runnable on device", Filters.CMD_LINE)
@@ -847,9 +849,9 @@ class TestPlan:
                         instance.testsuite.id, plat.name, plat.arch, plat.simulation
                     )
                     if matched_quarantine and not self.options.quarantine_verify:
-                        instance.add_filter("Quarantine: " + matched_quarantine, Filters.QUARENTINE)
+                        instance.add_filter("Quarantine: " + matched_quarantine, Filters.QUARANTINE)
                     if not matched_quarantine and self.options.quarantine_verify:
-                        instance.add_filter("Not under quarantine", Filters.QUARENTINE)
+                        instance.add_filter("Not under quarantine", Filters.QUARANTINE)
 
 
                 # platform_key is a list of unique platform attributes that form a unique key a test
@@ -1004,12 +1006,12 @@ class TestPlan:
 
 def change_skip_to_error_if_integration(options, instance):
     ''' All skips on integration_platforms are treated as errors.'''
-    if instance.platform.name in instance.testsuite.integration_platforms \
-        and "quarantine" not in instance.reason.lower():
-        # Do not treat this as error if filter type is command line
+    if instance.platform.name in instance.testsuite.integration_platforms:
+        # Do not treat this as error if filter type is among ignore_filters
         filters = {t['type'] for t in instance.filters}
         ignore_filters ={Filters.CMD_LINE, Filters.SKIP, Filters.PLATFORM_KEY,
-                         Filters.TOOLCHAIN, Filters.MODULE}
+                         Filters.TOOLCHAIN, Filters.MODULE, Filters.TESTPLAN,
+                         Filters.QUARANTINE}
         if filters.intersection(ignore_filters):
             return
         instance.status = "error"
