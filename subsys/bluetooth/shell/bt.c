@@ -694,8 +694,6 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		}
 	}
 
-	default_conn = bt_conn_ref(conn);
-
 done:
 	/* clear connection reference for sec mode 3 pairing */
 	if (pairing_conn) {
@@ -2003,7 +2001,7 @@ static int cmd_adv_data(const struct shell *sh, size_t argc, char *argv[])
 	size_t hex_data_len;
 	size_t ad_len = 0;
 	size_t sd_len = 0;
-	size_t len = 0;
+	ssize_t len = 0;
 	bool discoverable = false;
 	size_t *data_len;
 	int err;
@@ -2845,10 +2843,8 @@ static int cmd_connect_le(const struct shell *sh, size_t argc, char *argv[])
 					BT_GAP_SCAN_FAST_INTERVAL,
 					BT_GAP_SCAN_FAST_INTERVAL);
 
-	err = bt_conn_le_create(
-		&addr, create_params,
-		BT_LE_CONN_PARAM(BT_GAP_INIT_CONN_INT_MIN, BT_GAP_INIT_CONN_INT_MIN, 0, 400),
-		&conn);
+	err = bt_conn_le_create(&addr, create_params, BT_LE_CONN_PARAM_DEFAULT,
+				&conn);
 	if (err) {
 		shell_error(sh, "Connection failed (%d)", err);
 		return -ENOEXEC;
@@ -3248,7 +3244,7 @@ static int cmd_conn_phy_update(const struct shell *sh, size_t argc,
 }
 #endif
 
-#if defined(CONFIG_BT_CENTRAL)
+#if defined(CONFIG_BT_CENTRAL) || defined(CONFIG_BT_BROADCASTER)
 static int cmd_chan_map(const struct shell *sh, size_t argc, char *argv[])
 {
 	uint8_t chan_map[5] = {};

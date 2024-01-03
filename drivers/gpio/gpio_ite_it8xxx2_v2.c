@@ -7,6 +7,7 @@
 
 #define DT_DRV_COMPAT ite_it8xxx2_gpio_v2
 
+#include <chip_chipregs.h>
 #include <errno.h>
 #include <soc.h>
 #include <soc_dt.h>
@@ -18,6 +19,7 @@
 #include <zephyr/dt-bindings/interrupt-controller/ite-intc.h>
 #include <zephyr/init.h>
 #include <zephyr/irq.h>
+#include <zephyr/kernel.h>
 #include <zephyr/spinlock.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/types.h>
@@ -60,6 +62,10 @@ struct gpio_ite_data {
 	sys_slist_t callbacks;
 	uint8_t volt_default_set;
 	struct k_spinlock lock;
+	uint8_t level_isr_high;
+	uint8_t level_isr_low;
+	const struct device *instance;
+	struct k_work interrupt_worker;
 };
 
 /**
@@ -86,14 +92,14 @@ static int gpio_ite_configure(const struct device *dev,
 
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
 	if (flags == GPIO_DISCONNECTED) {
-		*reg_gpcr = GPCR_PORT_PIN_MODE_TRISTATE;
+		ECREG(reg_gpcr) = GPCR_PORT_PIN_MODE_TRISTATE;
 		/*
 		 * Since not all GPIOs can be to configured as tri-state,
 		 * prompt error if pin doesn't support the flag.
 		 */
-		if (*reg_gpcr != GPCR_PORT_PIN_MODE_TRISTATE) {
+		if (ECREG(reg_gpcr) != GPCR_PORT_PIN_MODE_TRISTATE) {
 			/* Go back to default setting (input) */
-			*reg_gpcr = GPCR_PORT_PIN_MODE_INPUT;
+			ECREG(reg_gpcr) = GPCR_PORT_PIN_MODE_INPUT;
 			LOG_ERR("Cannot config the node-gpio@%x, pin=%d as tri-state",
 				(uint32_t)reg_gpdr, pin);
 			rc = -ENOTSUP;
@@ -112,9 +118,9 @@ static int gpio_ite_configure(const struct device *dev,
 	 * when changing the line to an output.
 	 */
 	if (flags & GPIO_OPEN_DRAIN) {
-		*reg_gpotr |= mask;
+		ECREG(reg_gpotr) |= mask;
 	} else {
-		*reg_gpotr &= ~mask;
+		ECREG(reg_gpotr) &= ~mask;
 	}
 
 	/* 1.8V or 3.3V */
@@ -124,10 +130,10 @@ static int gpio_ite_configure(const struct device *dev,
 		if (volt == IT8XXX2_GPIO_VOLTAGE_1P8) {
 			__ASSERT(!(flags & GPIO_PULL_UP),
 			"Don't enable internal pullup if 1.8V voltage is used");
-			*reg_p18scr |= mask;
+			ECREG(reg_p18scr) |= mask;
 			data->volt_default_set &= ~mask;
 		} else if (volt == IT8XXX2_GPIO_VOLTAGE_3P3) {
-			*reg_p18scr &= ~mask;
+			ECREG(reg_p18scr) &= ~mask;
 			/*
 			 * A variable is needed to store the difference between
 			 * 3.3V and default so that the flag can be distinguished
@@ -135,7 +141,7 @@ static int gpio_ite_configure(const struct device *dev,
 			 */
 			data->volt_default_set &= ~mask;
 		} else if (volt == IT8XXX2_GPIO_VOLTAGE_DEFAULT) {
-			*reg_p18scr &= ~mask;
+			ECREG(reg_p18scr) &= ~mask;
 			data->volt_default_set |= mask;
 		} else {
 			rc = -EINVAL;
@@ -146,31 +152,31 @@ static int gpio_ite_configure(const struct device *dev,
 	/* If output, set level before changing type to an output. */
 	if (flags & GPIO_OUTPUT) {
 		if (flags & GPIO_OUTPUT_INIT_HIGH) {
-			*reg_gpdr |= mask;
+			ECREG(reg_gpdr) |= mask;
 		} else if (flags & GPIO_OUTPUT_INIT_LOW) {
-			*reg_gpdr &= ~mask;
+			ECREG(reg_gpdr) &= ~mask;
 		}
 	}
 
 	/* Set input or output. */
 	if (flags & GPIO_OUTPUT) {
-		*reg_gpcr = (*reg_gpcr | GPCR_PORT_PIN_MODE_OUTPUT) &
+		ECREG(reg_gpcr) = (ECREG(reg_gpcr) | GPCR_PORT_PIN_MODE_OUTPUT) &
 				~GPCR_PORT_PIN_MODE_INPUT;
 	} else {
-		*reg_gpcr = (*reg_gpcr | GPCR_PORT_PIN_MODE_INPUT) &
+		ECREG(reg_gpcr) = (ECREG(reg_gpcr) | GPCR_PORT_PIN_MODE_INPUT) &
 				~GPCR_PORT_PIN_MODE_OUTPUT;
 	}
 
 	/* Handle pullup / pulldown */
 	if (flags & GPIO_PULL_UP) {
-		*reg_gpcr = (*reg_gpcr | GPCR_PORT_PIN_MODE_PULLUP) &
+		ECREG(reg_gpcr) = (ECREG(reg_gpcr) | GPCR_PORT_PIN_MODE_PULLUP) &
 				~GPCR_PORT_PIN_MODE_PULLDOWN;
 	} else if (flags & GPIO_PULL_DOWN) {
-		*reg_gpcr = (*reg_gpcr | GPCR_PORT_PIN_MODE_PULLDOWN) &
+		ECREG(reg_gpcr) = (ECREG(reg_gpcr) | GPCR_PORT_PIN_MODE_PULLDOWN) &
 				~GPCR_PORT_PIN_MODE_PULLUP;
 	} else {
 		/* No pull up/down */
-		*reg_gpcr &= ~(GPCR_PORT_PIN_MODE_PULLUP |
+		ECREG(reg_gpcr) &= ~(GPCR_PORT_PIN_MODE_PULLUP |
 				GPCR_PORT_PIN_MODE_PULLDOWN);
 	}
 
@@ -195,7 +201,7 @@ static int gpio_ite_get_config(const struct device *dev,
 
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
 	/* push-pull or open-drain */
-	if (*reg_gpotr & mask) {
+	if (ECREG(reg_gpotr) & mask) {
 		flags |= GPIO_OPEN_DRAIN;
 	}
 
@@ -204,7 +210,7 @@ static int gpio_ite_get_config(const struct device *dev,
 		if (data->volt_default_set & mask) {
 			flags |= IT8XXX2_GPIO_VOLTAGE_DEFAULT;
 		} else {
-			if (*reg_p18scr & mask) {
+			if (ECREG(reg_p18scr) & mask) {
 				flags |= IT8XXX2_GPIO_VOLTAGE_1P8;
 			} else {
 				flags |= IT8XXX2_GPIO_VOLTAGE_3P3;
@@ -213,26 +219,26 @@ static int gpio_ite_get_config(const struct device *dev,
 	}
 
 	/* set input or output. */
-	if (*reg_gpcr & GPCR_PORT_PIN_MODE_OUTPUT) {
+	if (ECREG(reg_gpcr) & GPCR_PORT_PIN_MODE_OUTPUT) {
 		flags |= GPIO_OUTPUT;
 
 		/* set level */
-		if (*reg_gpdr & mask) {
+		if (ECREG(reg_gpdr) & mask) {
 			flags |= GPIO_OUTPUT_HIGH;
 		} else {
 			flags |= GPIO_OUTPUT_LOW;
 		}
 	}
 
-	if (*reg_gpcr & GPCR_PORT_PIN_MODE_INPUT) {
+	if (ECREG(reg_gpcr) & GPCR_PORT_PIN_MODE_INPUT) {
 		flags |= GPIO_INPUT;
 
 		/* pullup / pulldown */
-		if (*reg_gpcr & GPCR_PORT_PIN_MODE_PULLUP) {
+		if (ECREG(reg_gpcr) & GPCR_PORT_PIN_MODE_PULLUP) {
 			flags |= GPIO_PULL_UP;
 		}
 
-		if (*reg_gpcr & GPCR_PORT_PIN_MODE_PULLDOWN) {
+		if (ECREG(reg_gpcr) & GPCR_PORT_PIN_MODE_PULLDOWN) {
 			flags |= GPIO_PULL_DOWN;
 		}
 	}
@@ -251,7 +257,7 @@ static int gpio_ite_port_get_raw(const struct device *dev,
 	volatile uint8_t *reg_gpdmr = (uint8_t *)gpio_config->reg_gpdmr;
 
 	/* Get raw bits of GPIO mirror register */
-	*value = *reg_gpdmr;
+	*value = ECREG(reg_gpdmr);
 
 	return 0;
 }
@@ -265,9 +271,9 @@ static int gpio_ite_port_set_masked_raw(const struct device *dev,
 	uint8_t masked_value = value & mask;
 	struct gpio_ite_data *data = dev->data;
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
-	uint8_t out = *reg_gpdr;
+	uint8_t out = ECREG(reg_gpdr);
 
-	*reg_gpdr = ((out & ~mask) | masked_value);
+	ECREG(reg_gpdr) = ((out & ~mask) | masked_value);
 	k_spin_unlock(&data->lock, key);
 
 	return 0;
@@ -282,7 +288,7 @@ static int gpio_ite_port_set_bits_raw(const struct device *dev,
 
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
 	/* Set raw bits of GPIO data register */
-	*reg_gpdr |= pins;
+	ECREG(reg_gpdr) |= pins;
 	k_spin_unlock(&data->lock, key);
 
 	return 0;
@@ -297,7 +303,7 @@ static int gpio_ite_port_clear_bits_raw(const struct device *dev,
 
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
 	/* Clear raw bits of GPIO data register */
-	*reg_gpdr &= ~pins;
+	ECREG(reg_gpdr) &= ~pins;
 	k_spin_unlock(&data->lock, key);
 
 	return 0;
@@ -312,7 +318,7 @@ static int gpio_ite_port_toggle_bits(const struct device *dev,
 
 	k_spinlock_key_t key = k_spin_lock(&data->lock);
 	/* Toggle raw bits of GPIO data register */
-	*reg_gpdr ^= pins;
+	ECREG(reg_gpdr) ^= pins;
 	k_spin_unlock(&data->lock, key);
 
 	return 0;
@@ -349,7 +355,7 @@ static void gpio_ite_isr(const void *arg)
 
 			/* Should be safe even without spinlock. */
 			/* Clear the WUC status register. */
-			*reg_wuesr = wuc_mask;
+			ECREG(reg_wuesr) = wuc_mask;
 			/* The callbacks are user code, and therefore should
 			 * not hold the lock.
 			 */
@@ -357,6 +363,30 @@ static void gpio_ite_isr(const void *arg)
 
 			break;
 		}
+	}
+	/* Reschedule worker */
+	k_work_submit(&data->interrupt_worker);
+}
+
+static void gpio_ite_interrupt_worker(struct k_work *work)
+{
+	struct gpio_ite_data * const data = CONTAINER_OF(
+		work, struct gpio_ite_data, interrupt_worker);
+	gpio_port_value_t value;
+	gpio_port_value_t triggered_int;
+
+	gpio_ite_port_get_raw(data->instance, &value);
+
+	k_spinlock_key_t key = k_spin_lock(&data->lock);
+
+	triggered_int = (value & data->level_isr_high) | (~value & data->level_isr_low);
+	k_spin_unlock(&data->lock, key);
+
+	if (triggered_int != 0) {
+		gpio_fire_callbacks(&data->callbacks, data->instance,
+				    triggered_int);
+		/* Reschedule worker */
+		k_work_submit(&data->interrupt_worker);
 	}
 }
 
@@ -385,11 +415,6 @@ static int gpio_ite_pin_interrupt_configure(const struct device *dev,
 #endif /* CONFIG_GPIO_ENABLE_DISABLE_INTERRUPT */
 	}
 
-	if (mode == GPIO_INT_MODE_LEVEL) {
-		LOG_ERR("Level trigger mode not supported");
-		return -ENOTSUP;
-	}
-
 	/* Disable irq before configuring it */
 	irq_disable(gpio_irq);
 
@@ -404,27 +429,41 @@ static int gpio_ite_pin_interrupt_configure(const struct device *dev,
 
 		/* Set both edges interrupt. */
 		if ((trig & GPIO_INT_TRIG_BOTH) == GPIO_INT_TRIG_BOTH) {
-			*reg_wubemr |= wuc_mask;
+			ECREG(reg_wubemr) |= wuc_mask;
 		} else {
-			*reg_wubemr &= ~wuc_mask;
+			ECREG(reg_wubemr) &= ~wuc_mask;
 		}
 
 		if (trig & GPIO_INT_TRIG_LOW) {
-			*reg_wuemr |= wuc_mask;
+			ECREG(reg_wuemr) |= wuc_mask;
 		} else {
-			*reg_wuemr &= ~wuc_mask;
+			ECREG(reg_wuemr) &= ~wuc_mask;
+		}
+
+		if (mode == GPIO_INT_MODE_LEVEL) {
+			if (trig & GPIO_INT_TRIG_LOW) {
+				data->level_isr_low |= BIT(pin);
+				data->level_isr_high &= ~BIT(pin);
+			} else {
+				data->level_isr_low &= ~BIT(pin);
+				data->level_isr_high |= BIT(pin);
+			}
+		} else {
+			data->level_isr_low &= ~BIT(pin);
+			data->level_isr_high &= ~BIT(pin);
 		}
 		/*
 		 * Always write 1 to clear the WUC status register after
 		 * modifying edge mode selection register (WUBEMR and WUEMR).
 		 */
-		*reg_wuesr = wuc_mask;
+		ECREG(reg_wuesr) = wuc_mask;
 		k_spin_unlock(&data->lock, key);
 	}
 
 	/* Enable GPIO interrupt */
 	irq_connect_dynamic(gpio_irq, 0, gpio_ite_isr, dev, 0);
 	irq_enable(gpio_irq);
+	k_work_submit(&data->interrupt_worker);
 
 	return 0;
 }
@@ -445,6 +484,14 @@ static const struct gpio_driver_api gpio_ite_driver_api = {
 
 static int gpio_ite_init(const struct device *dev)
 {
+	struct gpio_ite_data *data = dev->data;
+	k_spinlock_key_t key = k_spin_lock(&data->lock);
+
+	data->instance = dev;
+	k_work_init(&data->interrupt_worker,
+		gpio_ite_interrupt_worker);
+	k_spin_unlock(&data->lock, key);
+
 	return 0;
 }
 
@@ -477,18 +524,18 @@ DEVICE_DT_INST_DEFINE(inst,                                        \
 
 DT_INST_FOREACH_STATUS_OKAY(GPIO_ITE_DEV_CFG_DATA)
 
+#ifdef CONFIG_SOC_IT8XXX2_GPIO_GROUP_K_L_DEFAULT_PULL_DOWN
 static int gpio_it8xxx2_init_set(void)
 {
-	if (IS_ENABLED(CONFIG_SOC_IT8XXX2_GPIO_GROUP_K_L_DEFAULT_PULL_DOWN)) {
-		const struct device *const gpiok = DEVICE_DT_GET(DT_NODELABEL(gpiok));
-		const struct device *const gpiol = DEVICE_DT_GET(DT_NODELABEL(gpiol));
+	const struct device *const gpiok = DEVICE_DT_GET(DT_NODELABEL(gpiok));
+	const struct device *const gpiol = DEVICE_DT_GET(DT_NODELABEL(gpiol));
 
-		for (int i = 0; i < 8; i++) {
-			gpio_pin_configure(gpiok, i, GPIO_INPUT | GPIO_PULL_DOWN);
-			gpio_pin_configure(gpiol, i, GPIO_INPUT | GPIO_PULL_DOWN);
-		}
+	for (int i = 0; i < 8; i++) {
+		gpio_pin_configure(gpiok, i, GPIO_INPUT | GPIO_PULL_DOWN);
+		gpio_pin_configure(gpiol, i, GPIO_INPUT | GPIO_PULL_DOWN);
 	}
 
 	return 0;
 }
 SYS_INIT(gpio_it8xxx2_init_set, PRE_KERNEL_1, CONFIG_GPIO_INIT_PRIORITY);
+#endif /* CONFIG_SOC_IT8XXX2_GPIO_GROUP_K_L_DEFAULT_PULL_DOWN */

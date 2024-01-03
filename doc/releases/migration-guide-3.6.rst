@@ -29,6 +29,15 @@ Build System
 Kernel
 ======
 
+* The system heap size and its availability is now determined by a ``K_HEAP_MEM_POOL_SIZE``
+  define instead of the :kconfig:option:`CONFIG_HEAP_MEM_POOL_SIZE` Kconfig option. Subsystems
+  can specify their own custom system heap size requirements by specifying Kconfig options with
+  the prefix ``CONFIG_HEAP_MEM_POOL_ADD_SIZE_``. The old Kconfig option still exists, but will be
+  overridden if the custom requirements are larger. To force the old Kconfig option to be used,
+  even when its value is less than the indicated custom requirements, a new
+  :kconfig:option:`CONFIG_HEAP_MEM_POOL_IGNORE_MIN` option has been introduced (which defaults
+  being disabled).
+
 C Library
 =========
 
@@ -185,6 +194,9 @@ Bootloader
 Bluetooth
 =========
 
+* ATT now has its own TX buffer pool.
+  If extra ATT buffers were configured using :kconfig:option:`CONFIG_BT_L2CAP_TX_BUF_COUNT`,
+  they now instead should be configured through :kconfig:option:`CONFIG_BT_ATT_TX_COUNT`.
 * The HCI implementation for both the Host and the Controller sides has been
   renamed for the IPC transport. The ``CONFIG_BT_RPMSG`` Kconfig option is now
   :kconfig:option:`CONFIG_BT_HCI_IPC`, and the ``zephyr,bt-hci-rpmsg-ipc``
@@ -235,6 +247,16 @@ Networking
 * CoAP observer events have moved from a callback function in a CoAP resource to the Network Events
   subsystem. The ``CONFIG_COAP_OBSERVER_EVENTS`` configuration option has been removed.
   (:github:`65936`)
+
+* The CoAP public API function :c:func:`coap_pending_init` has changed. The parameter
+  ``retries`` is replaced with a pointer to :c:struct:`coap_transmission_parameters`. This allows to
+  specify retransmission parameters of the confirmable message. It is safe to pass a NULL pointer to
+  use default values.
+  (:github:`66482`)
+
+* The CoAP public API functions :c:func:`coap_service_send` and :c:func:`coap_resource_send` have
+  changed. An additional parameter pointer to :c:struct:`coap_transmission_parameters` has been
+  added. It is safe to pass a NULL pointer to use default values. (:github:`66540`)
 
 * The IGMP multicast library now supports IGMPv3. This results in a minor change to the existing
   api. The :c:func:`net_ipv4_igmp_join` now takes an additional argument of the type

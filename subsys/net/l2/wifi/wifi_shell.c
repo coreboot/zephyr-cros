@@ -660,7 +660,9 @@ static int cmd_wifi_status(const struct shell *sh, size_t argc, char *argv[])
 				wifi_security_txt(status.security));
 		shell_fprintf(sh, SHELL_NORMAL, "MFP: %s\n",
 				wifi_mfp_txt(status.mfp));
-		shell_fprintf(sh, SHELL_NORMAL, "RSSI: %d\n", status.rssi);
+		if (status.iface_mode == WIFI_MODE_INFRA) {
+			shell_fprintf(sh, SHELL_NORMAL, "RSSI: %d\n", status.rssi);
+		}
 		shell_fprintf(sh, SHELL_NORMAL, "Beacon Interval: %d\n", status.beacon_interval);
 		shell_fprintf(sh, SHELL_NORMAL, "DTIM: %d\n", status.dtim_period);
 		shell_fprintf(sh, SHELL_NORMAL, "TWT: %s\n",
@@ -1602,9 +1604,16 @@ SHELL_STATIC_SUBCMD_SET_CREATE(wifi_cmd_ap,
 		  "Disable Access Point mode",
 		  cmd_wifi_ap_disable,
 		  1, 0),
-	SHELL_CMD_ARG(enable, NULL, "<SSID> [channel] [PSK]",
+	SHELL_CMD_ARG(enable, NULL,
+		  "\"<SSID>\"\n"
+		  "[channel number: 0 means all]\n"
+		  "[PSK: valid only for secure SSIDs]\n"
+		  "[Security type: valid only for secure SSIDs]\n"
+		  "0:None, 1:WPA2-PSK, 2:WPA2-PSK-256, 3:SAE, 4:WAPI, 5:EAP, 6:WEP, 7: WPA-PSK\n"
+		  "[MFP (optional: needs security type to be specified)]\n"
+		  ": 0:Disable, 1:Optional, 2:Required",
 		  cmd_wifi_ap_enable,
-		  2, 1),
+		  2, 4),
 	SHELL_SUBCMD_SET_END
 );
 
@@ -1679,7 +1688,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(wifi_commands,
 		"[-f]: Force to use this regulatory hint over any other regulatory hints\n"
 		"Note: This may cause regulatory compliance issues, use it at your own risk.",
 		cmd_wifi_reg_domain,
-		2, 1),
+		1, 1),
 	SHELL_CMD_ARG(mode, NULL, "mode operational setting\n"
 		"This command may be used to set the Wi-Fi device into a specific mode of operation\n"
 		"parameters:"

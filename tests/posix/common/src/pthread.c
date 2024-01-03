@@ -13,9 +13,12 @@
 #define N_THR_E 3
 #define N_THR_T 4
 #define BOUNCES 64
-#define STACKS (1024 + CONFIG_TEST_EXTRA_STACK_SIZE)
+#define STACKS (MAX(1024, PTHREAD_STACK_MIN) + CONFIG_TEST_EXTRA_STACK_SIZE)
 #define THREAD_PRIORITY 3
 #define ONE_SECOND 1
+
+/* arbitrary number that is also a legal stack size */
+#define OKAY_STACK_SIZE (STACKS + 1)
 
 /* Macros to test invalid states */
 #define PTHREAD_CANCEL_INVALID -1
@@ -30,12 +33,9 @@ K_THREAD_STACK_ARRAY_DEFINE(stack_1, 1, 32);
 void *thread_top_exec(void *p1);
 void *thread_top_term(void *p1);
 
-PTHREAD_MUTEX_DEFINE(lock);
-
-PTHREAD_COND_DEFINE(cvar0);
-
-PTHREAD_COND_DEFINE(cvar1);
-
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cvar0 = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t cvar1 = PTHREAD_COND_INITIALIZER;
 static pthread_barrier_t barrier;
 
 sem_t main_sem;
@@ -473,7 +473,7 @@ ZTEST(posix_apis, test_pthread_errors_errno)
 		      "cancel NULL error");
 	zassert_equal(pthread_join(PTHREAD_INVALID, NULL), ESRCH,
 		      "join with NULL has error");
-	zassert_false(pthread_once(&key, NULL),
+	zassert_equal(pthread_once(&key, NULL), EINVAL,
 		      "pthread dynamic package initialization error");
 	zassert_equal(pthread_getschedparam(PTHREAD_INVALID, &policy, &param), ESRCH,
 		      "get schedparam with NULL error");
@@ -572,7 +572,7 @@ ZTEST(posix_apis, test_pthread_attr_stacksize)
 {
 	size_t act_size;
 	pthread_attr_t attr;
-	const size_t exp_size = 0xB105F00D;
+	const size_t exp_size = OKAY_STACK_SIZE;
 
 	/* TESTPOINT: specify a custom stack size via pthread_attr_t */
 	zassert_equal(0, pthread_attr_init(&attr), "pthread_attr_init() failed");
@@ -930,4 +930,62 @@ ZTEST(posix_apis, test_pthread_cleanup)
 
 	zassert_ok(pthread_create(&th, NULL, test_pthread_cleanup_entry, NULL));
 	zassert_ok(pthread_join(th, NULL));
+}
+
+ZTEST(posix_apis, test_pthread_attr_getguardsize)
+{
+	size_t size_after;
+	pthread_attr_t attr;
+	const size_t size_before = OKAY_STACK_SIZE;
+
+	attr = (pthread_attr_t){0};
+	zassert_equal(pthread_attr_getguardsize(&attr, &size_after), EINVAL);
+	zassert_ok(pthread_attr_init(&attr));
+	zassert_equal(pthread_attr_getguardsize(NULL, NULL), EINVAL);
+	zassert_equal(pthread_attr_getguardsize(NULL, &size_after), EINVAL);
+	zassert_equal(pthread_attr_getguardsize(&attr, NULL), EINVAL);
+	size_after = size_before;
+	zassert_ok(pthread_attr_getguardsize(&attr, &size_after));
+	zassert_not_equal(size_before, size_after);
+	zassert_equal(size_after, CONFIG_POSIX_PTHREAD_ATTR_GUARDSIZE_DEFAULT);
+	zassert_ok(pthread_attr_destroy(&attr));
+}
+
+ZTEST(posix_apis, test_pthread_attr_setguardsize)
+{
+	size_t size_after;
+	size_t size_before;
+	pthread_attr_t attr;
+	size_t sizes[] = {0, BIT_MASK(CONFIG_POSIX_PTHREAD_ATTR_GUARDSIZE_BITS / 2),
+			  BIT_MASK(CONFIG_POSIX_PTHREAD_ATTR_GUARDSIZE_BITS)};
+
+	attr = (pthread_attr_t){0};
+	zassert_equal(pthread_attr_setguardsize(&attr, 0), EINVAL);
+	zassert_ok(pthread_attr_init(&attr));
+	zassert_ok(pthread_attr_getguardsize(&attr, &size_before));
+	zassert_equal(size_before, CONFIG_POSIX_PTHREAD_ATTR_GUARDSIZE_DEFAULT);
+	zassert_equal(pthread_attr_setguardsize(NULL, SIZE_MAX), EINVAL);
+	zassert_equal(pthread_attr_setguardsize(NULL, 0), EINVAL);
+	zassert_equal(pthread_attr_setguardsize(&attr, SIZE_MAX), EINVAL);
+	for (size_t i = 0; i < ARRAY_SIZE(sizes); ++i) {
+		size_after = ~sizes[i];
+		size_before = sizes[i];
+		zassert_ok(pthread_attr_setguardsize(&attr, size_before));
+		zassert_ok(pthread_attr_getguardsize(&attr, &size_after));
+		zassert_equal(size_before, size_after);
+	}
+	zassert_ok(pthread_attr_destroy(&attr));
+}
+
+ZTEST(posix_apis, test_pthread_attr_large_stacksize)
+{
+	size_t actual_size;
+	const size_t expect_size = BIT(CONFIG_POSIX_PTHREAD_ATTR_STACKSIZE_BITS);
+	pthread_attr_t attr;
+
+	zassert_ok(pthread_attr_init(&attr));
+	zassert_ok(pthread_attr_setstacksize(&attr, expect_size));
+	zassert_ok(pthread_attr_getstacksize(&attr, &actual_size));
+	zassert_equal(actual_size, expect_size);
+	zassert_ok(pthread_attr_destroy(&attr));
 }
