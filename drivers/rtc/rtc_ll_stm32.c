@@ -259,6 +259,15 @@ static int rtc_stm32_get_time(const struct device *dev, struct rtc_time *timeptr
 		return err;
 	}
 
+	if (!LL_RTC_IsActiveFlag_INITS(RTC)) {
+		/* INITS flag is set when the calendar has been initialiazed. This flag is
+		 * reset only on backup domain reset, so it can be read after a system
+		 * reset to check if the calendar has been initialized.
+		 */
+		k_mutex_unlock(&data->lock);
+		return -ENODATA;
+	}
+
 	do {
 		/* read date, time and subseconds and relaunch if a day increment occurred
 		 * while doing so as it will result in an erroneous result otherwise
@@ -381,7 +390,7 @@ static int rtc_stm32_get_calibration(const struct device *dev, int32_t *calibrat
 #endif
 #endif /* CONFIG_RTC_CALIBRATION */
 
-struct rtc_driver_api rtc_stm32_driver_api = {
+static const struct rtc_driver_api rtc_stm32_driver_api = {
 	.set_time = rtc_stm32_set_time,
 	.get_time = rtc_stm32_get_time,
 	/* RTC_ALARM not supported */

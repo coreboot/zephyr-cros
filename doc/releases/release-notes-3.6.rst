@@ -202,6 +202,10 @@ Drivers and Sensors
 
 * Retained memory
 
+  * Retained memory driver backend for registers has been added.
+
+  * Retained memory API status changed from experimental to unstable.
+
 * RTC
 
 * SDHC
@@ -224,6 +228,11 @@ Networking
 * CoAP:
 
   * Emit observer/service network events using the Network Event subsystem.
+
+  * Added new API functions:
+
+    * :c:func:`coap_get_transmission_parameters`
+    * :c:func:`coap_set_transmission_parameters`
 
 * Connection Manager:
 
@@ -315,6 +324,9 @@ Libraries / Subsystems
 * Random
 
 * Retention
+
+  * Fixed issue whereby :kconfig:option:`CONFIG_RETENTION_BUFFER_SIZE` values over 256 would cause
+    an infinite loop due to use of 8-bit variables.
 
 * Binary descriptors
 

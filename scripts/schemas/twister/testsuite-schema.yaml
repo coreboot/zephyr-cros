@@ -145,6 +145,7 @@ mapping:
         required: false
         sequence:
           - type: str
+            enum: ["mcu", "qemu", "sim", "unit", "native"]
       "platform_key":
         required: false
         type: seq
@@ -156,6 +157,24 @@ mapping:
         required: false
         sequence:
           - type: str
+      "simulation_exclude":
+        type: seq
+        required: false
+        sequence:
+          - type: str
+            enum:
+              [
+                "qemu",
+                "simics",
+                "xt-sim",
+                "renode",
+                "nsim",
+                "mdb-nsim",
+                "tsim",
+                "armfvp",
+                "native",
+                "custom",
+              ]
       "tags":
         type: any
         required: false
@@ -355,6 +374,24 @@ mapping:
             matching: "all"
             sequence:
               - type: str
+          "simulation_exclude":
+            type: seq
+            required: false
+            sequence:
+              - type: str
+                enum:
+                  [
+                    "qemu",
+                    "simics",
+                    "xt-sim",
+                    "renode",
+                    "nsim",
+                    "mdb-nsim",
+                    "tsim",
+                    "armfvp",
+                    "native",
+                    "custom",
+                  ]
           "tags":
             type: any
             required: false
