@@ -12,6 +12,7 @@ comment "Available modules."
 
 osource "$(KCONFIG_BINARY_DIR)/Kconfig.modules"
 
+menu "Hidden"
 source "modules/Kconfig.altera"
 source "modules/Kconfig.atmel"
 source "modules/Kconfig.chre"
@@ -120,3 +121,5 @@ comment "cmsis-nn module not available."
 if 0
 osource "modules/*/Kconfig"
 endif
+
+endmenu

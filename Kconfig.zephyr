@@ -42,14 +42,6 @@ source "modules/Kconfig"
 
 endmenu
 
-source "boards/Kconfig"
-source "soc/Kconfig"
-source "arch/Kconfig"
-source "kernel/Kconfig"
-source "drivers/Kconfig"
-source "lib/Kconfig"
-source "subsys/Kconfig"
-
 osource "$(TOOLCHAIN_KCONFIG_DIR)/Kconfig"
 
 menu "Build and Link Features"
@@ -382,7 +374,7 @@ config NATIVE_LIBRARY
 	  This library can later be built into an executable for the host.
 
 config COMPILER_FREESTANDING
-	bool "Build in a freestanding compiler mode"
+	bool
 	help
 	  Configure the compiler to operate in freestanding mode according to
 	  the C and C++ language specifications. Freestanding mode reduces the
@@ -867,6 +859,15 @@ config ENFORCE_ZEPHYR_STDINT
 
 endmenu
 
+source "subsys/Kconfig"
+
+menu "Hidden options"
+source "kernel/Kconfig"
+source "soc/Kconfig"
+source "arch/Kconfig"
+source "drivers/Kconfig"
+source "boards/Kconfig"
+source "lib/Kconfig"
 
 menu "Boot Options"
 
@@ -955,3 +956,5 @@ config BOOTLOADER_BOSSA_ADAFRUIT_UF2
 endchoice
 
 endmenu
+endmenu
+
