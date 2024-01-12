@@ -31,9 +31,9 @@ class CoverageTool:
         self.output_formats = None
 
     @staticmethod
-    def factory(tool):
+    def factory(tool, jobs=None):
         if tool == 'lcov':
-            t =  Lcov()
+            t =  Lcov(jobs)
         elif tool == 'gcovr':
             t =  Gcovr()
         else:
@@ -141,11 +141,12 @@ class CoverageTool:
 
 class Lcov(CoverageTool):
 
-    def __init__(self):
+    def __init__(self, jobs=None):
         super().__init__()
         self.ignores = []
         self.output_formats = "lcov,html"
         self.version = self.get_version()
+        self.jobs = jobs
 
     def get_version(self):
         try:
@@ -168,75 +169,81 @@ class Lcov(CoverageTool):
     def add_ignore_directory(self, pattern):
         self.ignores.append('*/' + pattern + '/*')
 
-    @staticmethod
-    def run_command(cmd, coveragelog):
+    @property
+    def is_lcov_v2(self):
+        return self.version.startswith("2")
+
+    def run_command(self, cmd, coveragelog):
+        if self.is_lcov_v2:
+            # The --ignore-errors source option is added for genhtml as well as
+            # lcov to avoid it exiting due to
+            # samples/application_development/external_lib/
+            cmd += [
+                "--ignore-errors", "inconsistent,inconsistent",
+                "--ignore-errors", "negative,negative",
+                "--ignore-errors", "unused,unused",
+                "--ignore-errors", "empty,empty",
+                "--ignore-errors", "mismatch,mismatch",
+            ]
+
         cmd_str = " ".join(cmd)
         logger.debug(f"Running {cmd_str}...")
         return subprocess.call(cmd, stdout=coveragelog)
 
+    def run_lcov(self, args, coveragelog):
+        if self.is_lcov_v2:
+            branch_coverage = "branch_coverage=1"
+            if self.jobs is None:
+                # Default: --parallel=0 will autodetect appropriate parallelism
+                parallel = ["--parallel", "0"]
+            elif self.jobs == 1:
+                # Serial execution requested, don't parallelize at all
+                parallel = []
+            else:
+                parallel = ["--parallel", str(self.jobs)]
+        else:
+            branch_coverage = "lcov_branch_coverage=1"
+            parallel = []
+
+        cmd = [
+            "lcov", "--gcov-tool", self.gcov_tool,
+            "--rc", branch_coverage,
+        ] + parallel + args
+        return self.run_command(cmd, coveragelog)
+
     def _generate(self, outdir, coveragelog):
         coveragefile = os.path.join(outdir, "coverage.info")
         ztestfile = os.path.join(outdir, "ztest.info")
-        if self.version.startswith("2"):
-            branch_coverage = "branch_coverage=1"
-            ignore_errors = [
-                         "--ignore-errors", "inconsistent,inconsistent",
-                         "--ignore-errors", "negative,negative",
-                         "--ignore-errors", "unused,unused",
-                         "--ignore-errors", "empty,empty",
-                         "--ignore-errors", "mismatch,mismatch"
-                         ]
-        else:
-            branch_coverage = "lcov_branch_coverage=1"
-            ignore_errors = []
 
-        cmd = ["lcov", "--gcov-tool", self.gcov_tool,
-                         "--capture", "--directory", outdir,
-                         "--rc", branch_coverage,
-                         "--output-file", coveragefile]
-        cmd = cmd + ignore_errors
-        self.run_command(cmd, coveragelog)
+        cmd = ["--capture", "--directory", outdir, "--output-file", coveragefile]
+        self.run_lcov(cmd, coveragelog)
+
         # We want to remove tests/* and tests/ztest/test/* but save tests/ztest
-        cmd = ["lcov", "--gcov-tool", self.gcov_tool, "--extract",
-                         coveragefile,
-                         os.path.join(self.base_dir, "tests", "ztest", "*"),
-                         "--output-file", ztestfile,
-                         "--rc", branch_coverage]
-
-        cmd = cmd + ignore_errors
-        self.run_command(cmd, coveragelog)
+        cmd = ["--extract", coveragefile,
+               os.path.join(self.base_dir, "tests", "ztest", "*"),
+               "--output-file", ztestfile]
+        self.run_lcov(cmd, coveragelog)
 
         if os.path.exists(ztestfile) and os.path.getsize(ztestfile) > 0:
-            cmd = ["lcov", "--gcov-tool", self.gcov_tool, "--remove",
-                             ztestfile,
-                             os.path.join(self.base_dir, "tests/ztest/test/*"),
-                             "--output-file", ztestfile,
-                             "--rc", branch_coverage]
-            cmd = cmd + ignore_errors
-            self.run_command(cmd, coveragelog)
+            cmd = ["--remove", ztestfile,
+                   os.path.join(self.base_dir, "tests/ztest/test/*"),
+                   "--output-file", ztestfile]
+            self.run_lcov(cmd, coveragelog)
 
             files = [coveragefile, ztestfile]
         else:
             files = [coveragefile]
 
         for i in self.ignores:
-            cmd = ["lcov", "--gcov-tool", self.gcov_tool, "--remove",
-                 coveragefile, i,
-                 "--output-file", coveragefile,
-                 "--rc", branch_coverage]
-            cmd = cmd + ignore_errors
-            self.run_command(cmd, coveragelog)
+            cmd = ["--remove", coveragefile, i, "--output-file", coveragefile]
+            self.run_lcov(cmd, coveragelog)
 
         if 'html' not in self.output_formats.split(','):
             return 0
 
-        # The --ignore-errors source option is added to avoid it exiting due to
-        # samples/application_development/external_lib/
         cmd = ["genhtml", "--legend", "--branch-coverage",
-                                "--prefix", self.base_dir,
-                                "-output-directory",
-                                os.path.join(outdir, "coverage")] + files
-        cmd = cmd + ignore_errors
+               "--prefix", self.base_dir,
+               "-output-directory", os.path.join(outdir, "coverage")] + files
         return self.run_command(cmd, coveragelog)
 
 
@@ -367,7 +374,7 @@ def run_coverage(testplan, options):
 
     logger.info("Generating coverage files...")
     logger.info(f"Using gcov tool: {gcov_tool}")
-    coverage_tool = CoverageTool.factory(options.coverage_tool)
+    coverage_tool = CoverageTool.factory(options.coverage_tool, jobs=options.jobs)
     coverage_tool.gcov_tool = gcov_tool
     coverage_tool.base_dir = os.path.abspath(options.coverage_basedir)
     # Apply output format default
