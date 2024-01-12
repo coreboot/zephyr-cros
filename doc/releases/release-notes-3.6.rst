@@ -138,6 +138,14 @@ Build system and infrastructure
 * Added MCUboot image size reduction to sysbuild images which include MCUboot which prevents
   issues with building firmware images that are too large for MCUboot to swap.
 
+* Deprecated :kconfig:option:`CONFIG_BOOTLOADER_SRAM_SIZE`, users of this should transition to
+  having RAM set up properly in their board devicetree files.
+
+* Fixed an issue whereby shields were processed in order of the root they resided in rather than
+  the order they were supplied to cmake in.
+
+* Fixed an issue whereby using some shields with sysbuild would cause a cmake Kconfig error.
+
 Drivers and Sensors
 *******************
 
@@ -181,6 +189,8 @@ Drivers and Sensors
     to ``I3C_LVR_I2C_*``.
 
 * IEEE 802.15.4
+
+  * Removed :kconfig:option:`CONFIG_IEEE802154_SELECTIVE_TXPOWER` Kconfig option.
 
 * Interrupt Controller
 

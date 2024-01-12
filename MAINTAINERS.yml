@@ -252,8 +252,10 @@ Ambiq Platforms:
     - soc/arm/ambiq/
     - boards/arm/apollo*/
     - dts/arm/ambiq/
-    - dts/bindings/*/ambiq*
-    - drivers/*/*_ambiq*
+    - dts/bindings/*/ambiq,*
+    - drivers/*/*ambiq*
+    - drivers/*/*/*ambiq*
+    - drivers/*/*/*apollo*
   labels:
     - "platform: Ambiq"
 
@@ -2995,7 +2997,7 @@ GD32 Platforms:
     - dts/*/gigadevice/
     - dts/bindings/*/*gd32*
     - soc/arm/gigadevice/
-    - soc/riscv/riscv-privileged/gd32vf103/
+    - soc/riscv/gd_gd32/
     - scripts/west_commands/*/*gd32*
   labels:
     - "platform: GD32"
@@ -3384,7 +3386,7 @@ ITE Platforms:
     - drivers/*/*it8xxx2*.c
     - dts/bindings/*/*ite*
     - dts/riscv/ite/
-    - soc/riscv/riscv-ite/
+    - soc/riscv/ite_ec/
   labels:
     - "platform: ITE"
 
@@ -3473,6 +3475,15 @@ Infineon Platforms:
   description: >-
     Infineon SOCs, dts files and related drivers. Infineon Proto, Pioneer, Eval and Relax
     boards.
+
+Panasonic Platforms:
+  status: maintained
+  maintainers:
+    - pideu-sj
+  files:
+    - boards/arm/pan17*/
+  labels:
+    - "platform: Panasonic"
 
 RTIO:
   status: maintained
