@@ -23,7 +23,8 @@ SHELL_DEFINE(shell_telnet, CONFIG_SHELL_PROMPT_TELNET, &shell_transport_telnet,
 
 LOG_MODULE_REGISTER(shell_telnet, CONFIG_SHELL_TELNET_LOG_LEVEL);
 
-struct shell_telnet *sh_telnet;
+static struct shell_telnet *sh_telnet;
+static bool options_init;
 
 /* Various definitions mapping the TELNET service configuration options */
 #define TELNET_PORT      CONFIG_SHELL_TELNET_PORT
@@ -284,6 +285,12 @@ static void telnet_recv(struct net_context *client,
 	len = net_pkt_remaining_data(pkt);
 
 	(void)net_context_update_recv_wnd(client, len);
+
+	if (!options_init) {
+		struct telnet_simple_command cmd = { .iac = NVT_CMD_IAC, .op = NVT_CMD_WILL, .opt = NVT_OPT_ECHO };
+		telnet_command_send_reply((uint8_t *)&cmd, sizeof(struct telnet_simple_command));
+		options_init = true;
+	}
 
 	while (len >= TELNET_MIN_COMMAND_LEN) {
 		ret = telnet_handle_command(pkt);
