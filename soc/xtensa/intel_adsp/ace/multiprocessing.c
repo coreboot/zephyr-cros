@@ -8,7 +8,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/check.h>
 #include <zephyr/arch/cpu.h>
+#include <zephyr/arch/xtensa/arch.h>
 #include <zephyr/pm/pm.h>
+#include <zephyr/pm/device_runtime.h>
 
 #include <soc.h>
 #include <adsp_boot.h>
@@ -24,6 +26,11 @@
 #define CPU_POWERUP_TIMEOUT_USEC 10000
 
 #define ACE_INTC_IRQ DT_IRQN(DT_NODELABEL(ace_intc))
+
+#if CONFIG_ACE_VERSION_1_5
+/* .bss is uncached, we further check it below */
+uint32_t g_key_read_holder;
+#endif /* CONFIG_ACE_VERSION_1_5 */
 
 static void ipc_isr(void *arg)
 {
@@ -79,8 +86,18 @@ void soc_mp_init(void)
 		IDC[i].agents[0].ipc.ctl = BIT(0); /* IPCTBIE */
 	}
 
+	int ret = pm_device_runtime_get(INTEL_ADSP_HST_DOMAIN_DEV);
+
+	ARG_UNUSED(ret);
+	__ASSERT_NO_MSG(ret == 0);
+
 	/* Set the core 0 active */
 	soc_cpus_active[0] = true;
+#if CONFIG_ACE_VERSION_1_5
+	__ASSERT(!arch_xtensa_is_ptr_cached(&g_key_read_holder),
+		 "g_key_read_holder must be uncached");
+	g_key_read_holder = INTEL_ADSP_ACE15_MAGIC_KEY;
+#endif /* CONFIG_ACE_VERSION_1_5 */
 }
 
 #ifdef CONFIG_ADSP_IMR_CONTEXT_SAVE

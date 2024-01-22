@@ -142,7 +142,7 @@ manifest:
       groups:
         - hal
     - name: hal_ambiq
-      revision: 323048f916faa84cebcf6dfd73e606d8cf64107a
+      revision: ff4ca358d730536addf336c40c3faa4ebf1df00a
       path: modules/hal/ambiq
       groups:
         - hal
@@ -152,7 +152,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: a248460c09b6588428f6edaf5ebe312648c7360c
+      revision: 19d2fe44ba988781f83eb70645c3757f96fcdf1c
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -183,7 +183,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: b55cfbbf0221d709560c2e438beef66842ada272
+      revision: 64bd075a06f6a16d6ea9101cda82b41465a35211
       path: modules/hal/nordic
       groups:
         - hal
@@ -193,7 +193,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 12970d629fc900010dab5cf250be70287bf9e443
+      revision: 9b2693c7659f37f84bcf2604995c88f7fa5206be
       path: modules/hal/nxp
       groups:
         - hal
@@ -219,12 +219,12 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: e670e749760e7a77a75c69f2c932b345cc0e212f
+      revision: 4cfb0e3e363678dd96e19a5ea4eede771d0e3b1d
       path: modules/hal/silabs
       groups:
         - hal
     - name: hal_st
-      revision: fb8e79d1a261fd02aadff7c142729f1954163cf3
+      revision: 0643d20ae85b32c658ad11036f7c964a860ddefe
       path: modules/hal/st
       groups:
         - hal
@@ -295,7 +295,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: c744f2c762aad79e59bd7e99002f2fcab0a2f288
+      revision: a08acc7d3a853f890df2bf82167c02ab2153ffe7
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: da78aea63159771956fe0c9263f2e6985b66e9d5

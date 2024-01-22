@@ -159,6 +159,22 @@ Device Drivers and Device Tree
   * :dtcompatible:`ti,lmp90099`
   * :dtcompatible:`ti,lmp90100`
 
+* The io-channel cells of the :dtcompatible:`microchip,mcp3204` and
+  :dtcompatible:`microchip,mcp3208` devicetree bindings were renamed from ``channel`` to the common
+  ``input``, making it possible to use the various ADC DT macros with Microchip MCP320x ADC devices.
+
+* The :dtcompatible:`st,stm32h7-fdcan` CAN controller driver now supports configuring the
+  domain/kernel clock via devicetree. Previously, the driver only supported using the PLL1_Q clock
+  for kernel clock, but now it defaults to the HSE clock, which is the chip default. Boards that
+  use the PLL1_Q clock for FDCAN will need to override the ``clocks`` property as follows:
+
+  .. code-block:: devicetree
+
+    &fdcan1 {
+            clocks = <&rcc STM32_CLOCK_BUS_APB1_2 0x00000100>,
+                     <&rcc STM32_SRC_PLL1_Q FDCAN_SEL(1)>;
+    };
+
 Power Management
 ================
 
@@ -225,6 +241,10 @@ Bluetooth
   Any pointer to a UUID must be prefixed with `const`, otherwise there will be a compilation warning.
   For example change ``struct bt_uuid *uuid = BT_UUID_DECLARE_16(xx)`` to
   ``const struct bt_uuid *uuid = BT_UUID_DECLARE_16(xx)``. (:github:`66136`)
+* The :c:func:`bt_l2cap_chan_send` API no longer allocates buffers from the same pool as its `buf`
+  parameter when segmenting SDUs into PDUs. In order to reproduce the previous behavior, the
+  application should register the `alloc_seg` channel callback and allocate from the same pool as
+  `buf`.
 
 * Mesh
 

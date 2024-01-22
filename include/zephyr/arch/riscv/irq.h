@@ -14,16 +14,38 @@
 #ifndef ZEPHYR_INCLUDE_ARCH_RISCV_IRQ_H_
 #define ZEPHYR_INCLUDE_ARCH_RISCV_IRQ_H_
 
-#ifndef _ASMLANGUAGE
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#ifndef _ASMLANGUAGE
 #include <zephyr/irq.h>
 #include <zephyr/sw_isr_table.h>
 #include <stdbool.h>
 #include <soc.h>
+#endif /* !_ASMLANGUAGE */
+
+/* Exceptions 0-15 (MCAUSE interrupt=0) */
+
+/* Environment Call from U-mode */
+#define RISCV_EXC_ECALLU 8
+/** Environment Call from M-mode */
+#define RISCV_EXC_ECALLM 11
+
+/* IRQs 0-15 (MCAUSE interrupt=1) */
+
+/** Machine Software Interrupt */
+#define RISCV_IRQ_MSOFT 3
+/** Machine External Interrupt */
+#define RISCV_IRQ_MEXT  11
+
+#ifdef CONFIG_64BIT
+#define RISCV_MCAUSE_IRQ_BIT          (1 << 63)
+#else
+#define RISCV_MCAUSE_IRQ_BIT          (1 << 31)
+#endif
+
+#ifndef _ASMLANGUAGE
 
 extern void arch_irq_enable(unsigned int irq);
 extern void arch_irq_disable(unsigned int irq);
@@ -76,7 +98,7 @@ static inline void arch_isr_direct_footer(int swap)
 
 	/* Get the IRQ number */
 	__asm__ volatile("csrr %0, mcause" : "=r" (mcause));
-	mcause &= SOC_MCAUSE_EXP_MASK;
+	mcause &= CONFIG_RISCV_MCAUSE_EXCEPTION_MASK;
 
 	/* Clear the pending IRQ */
 	__soc_handle_irq(mcause);
@@ -102,10 +124,10 @@ static inline void arch_isr_direct_footer(int swap)
 	} \
 	static inline int name##_body(void)
 
+#endif /* _ASMLANGUAGE */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _ASMLANGUAGE */
 #endif /* ZEPHYR_INCLUDE_ARCH_RISCV_IRQ_H_ */
