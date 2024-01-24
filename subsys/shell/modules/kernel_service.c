@@ -10,7 +10,7 @@
  * #line marks the *next* line, so it is off by one.
  */
 #line 13
-#include <version.h>
+#include <zephyr/version.h>
 
 #include <zephyr/sys/printk.h>
 #include <zephyr/shell/shell.h>
