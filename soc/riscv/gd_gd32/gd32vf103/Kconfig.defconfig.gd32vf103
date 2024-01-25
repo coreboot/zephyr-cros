@@ -14,13 +14,10 @@ config SYS_CLOCK_HW_CYCLES_PER_SEC
 	# The CPU frequency is set to the maximum value of 108MHz by default.
 	default 27000000
 
-config RISCV_SOC_MCAUSE_EXCEPTION_MASK
-	default $(dt_node_int_prop_hex,/cpus/cpu@0,mcause-exception-mask)
+config RISCV_MCAUSE_EXCEPTION_MASK
+	default 0xFFF
 
 config RISCV_SOC_INTERRUPT_INIT
-	default y
-
-config RISCV_HAS_CPU_IDLE
 	default y
 
 config RISCV_GP
@@ -44,5 +41,11 @@ config RESET
 
 config CLOCK_CONTROL
 	default y
+
+config ARCH_IRQ_VECTOR_TABLE_ALIGN
+	default 512 if NUCLEI_ECLIC
+
+config RISCV_TRAP_HANDLER_ALIGNMENT
+	default 64 if NUCLEI_ECLIC && !RISCV_VECTORED_MODE
 
 endif # GD32VF103

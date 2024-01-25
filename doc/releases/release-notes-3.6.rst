@@ -58,6 +58,7 @@ Bluetooth
     the transmitted responses on the Access layer.
     The functionality is enabled by the :kconfig:option:`CONFIG_BT_MESH_ACCESS_DELAYABLE_MSG`
     Kconfig option.
+  * The Bluetooth Mesh Protocol 1.1 is now supported by default.
 
 * Controller
 
@@ -324,6 +325,9 @@ Libraries / Subsystems
 
   * Fixed an issue whereby the ``mcuboot erase`` DFU shell command could be used to erase the
     MCUboot or currently running application slot.
+
+  * Fixed an issue whereby messages that were too large to be sent over the UDP transport would
+    wrongly return :c:enum:`MGMT_ERR_EINVAL` instead of :c:enum:`MGMT_ERR_EMSGSIZE`.
 
 * File systems
 

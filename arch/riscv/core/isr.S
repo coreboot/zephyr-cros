@@ -14,6 +14,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/syscall.h>
 #include <zephyr/arch/riscv/csr.h>
+#include <zephyr/arch/riscv/irq.h>
 #include <zephyr/arch/riscv/syscall.h>
 #include "asm_macros.inc"
 
@@ -70,6 +71,10 @@ GTEXT(sys_trace_isr_exit)
 
 #ifdef CONFIG_USERSPACE
 GDATA(_k_syscall_table)
+#endif
+
+#ifdef CONFIG_RISCV_SOC_HAS_CUSTOM_IRQ_HANDLING
+GTEXT(__soc_handle_all_irqs)
 #endif
 
 /* exports */
@@ -294,22 +299,22 @@ no_fp:	/* increment _current->arch.exception_depth */
 	 * to report the exception.
 	 */
 	csrr t0, mcause
-	li t2, SOC_MCAUSE_EXP_MASK
+	li t2, CONFIG_RISCV_MCAUSE_EXCEPTION_MASK
 	and t0, t0, t2
 
 	/*
-	 * If mcause == SOC_MCAUSE_ECALL_EXP, handle system call from
+	 * If mcause == RISCV_EXC_ECALLM, handle system call from
 	 * kernel thread.
 	 */
-	li t1, SOC_MCAUSE_ECALL_EXP
+	li t1, RISCV_EXC_ECALLM
 	beq t0, t1, is_kernel_syscall
 
 #ifdef CONFIG_USERSPACE
 	/*
-	 * If mcause == SOC_MCAUSE_USER_ECALL_EXP, handle system call
+	 * If mcause == RISCV_EXC_ECALLU, handle system call
 	 * for user mode thread.
 	 */
-	li t1, SOC_MCAUSE_USER_ECALL_EXP
+	li t1, RISCV_EXC_ECALLU
 	beq t0, t1, is_user_syscall
 #endif /* CONFIG_USERSPACE */
 
@@ -521,13 +526,17 @@ is_interrupt:
 
 on_irq_stack:
 
+#ifdef CONFIG_RISCV_SOC_HAS_CUSTOM_IRQ_HANDLING
+	call __soc_handle_all_irqs
+#else
+
 #ifdef CONFIG_TRACING_ISR
 	call sys_trace_isr_enter
 #endif
 
 	/* Get IRQ causing interrupt */
 	csrr a0, mcause
-	li t0, SOC_MCAUSE_EXP_MASK
+	li t0, CONFIG_RISCV_MCAUSE_EXCEPTION_MASK
 	and a0, a0, t0
 
 	/*
@@ -555,6 +564,8 @@ on_irq_stack:
 
 #ifdef CONFIG_TRACING_ISR
 	call sys_trace_isr_exit
+#endif
+
 #endif
 
 irq_done:

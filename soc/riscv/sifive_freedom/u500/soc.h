@@ -11,13 +11,8 @@
 #ifndef __RISCV_SIFIVE_FREEDOM_U500_SOC_H_
 #define __RISCV_SIFIVE_FREEDOM_U500_SOC_H_
 
-#include <soc_common.h>
-
 /* Clock controller. */
 #define PRCI_BASE_ADDR               0x10000000
-
-/* PINMUX MAX PINS */
-#define SIFIVE_PINMUX_PINS           16
 
 /*
  * On FE310 and FU540, peripherals such as SPI, UART, I2C and PWM are clocked

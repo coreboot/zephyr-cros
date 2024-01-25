@@ -11,11 +11,6 @@
 #ifndef __RISCV_SIFIVE_FREEDOM_FE300_SOC_H_
 #define __RISCV_SIFIVE_FREEDOM_FE300_SOC_H_
 
-#include <soc_common.h>
-
-/* PINMUX MAX PINS */
-#define SIFIVE_PINMUX_PINS            32
-
 /* Clock controller. */
 #define PRCI_BASE_ADDR               0x10008000
 

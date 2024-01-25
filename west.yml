@@ -142,7 +142,7 @@ manifest:
       groups:
         - hal
     - name: hal_ambiq
-      revision: 323048f916faa84cebcf6dfd73e606d8cf64107a
+      revision: ff4ca358d730536addf336c40c3faa4ebf1df00a
       path: modules/hal/ambiq
       groups:
         - hal
@@ -152,7 +152,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: a248460c09b6588428f6edaf5ebe312648c7360c
+      revision: 67fa60bdffca7ba8ed199aecfaa26f485f24878b
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -183,7 +183,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: b55cfbbf0221d709560c2e438beef66842ada272
+      revision: 64bd075a06f6a16d6ea9101cda82b41465a35211
       path: modules/hal/nordic
       groups:
         - hal
@@ -193,7 +193,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 12970d629fc900010dab5cf250be70287bf9e443
+      revision: 9b2693c7659f37f84bcf2604995c88f7fa5206be
       path: modules/hal/nxp
       groups:
         - hal
@@ -210,7 +210,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: 1471ed3cbf501434a5f3df2f9df520c3bd8e0258
+      revision: 0b1f2fdb99d6386f125a8dba72083e3c56aecc2b
       groups:
         - hal
     - name: hal_rpi_pico
@@ -219,12 +219,12 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: e670e749760e7a77a75c69f2c932b345cc0e212f
+      revision: 11ab59175a5ded618680a7692dbaae8f4fbd6325
       path: modules/hal/silabs
       groups:
         - hal
     - name: hal_st
-      revision: fb8e79d1a261fd02aadff7c142729f1954163cf3
+      revision: 0643d20ae85b32c658ad11036f7c964a860ddefe
       path: modules/hal/st
       groups:
         - hal
@@ -277,7 +277,7 @@ manifest:
       revision: 7c61a4cec26402d20c845c95dcad0e39dcd319f8
       path: modules/lib/gui/lvgl
     - name: mbedtls
-      revision: 7053083b0cff8462464e3cbb826e87852fc03da6
+      revision: 66ed2279d6222056af172c188eaf4dcfed481032
       path: modules/crypto/mbedtls
       groups:
         - crypto
@@ -295,7 +295,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: c744f2c762aad79e59bd7e99002f2fcab0a2f288
+      revision: d17c9d749c817d2522468fa3c0eee3705feb8951
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: da78aea63159771956fe0c9263f2e6985b66e9d5
@@ -322,7 +322,7 @@ manifest:
       groups:
         - crypto
     - name: trusted-firmware-m
-      revision: 33c0f47bcb19721a5c33e6fe1eee9225d00bb5bc
+      revision: 58d0b5367f0fada9dbaddad1e08e302aeb044863
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee

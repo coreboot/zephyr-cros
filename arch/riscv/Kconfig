@@ -84,6 +84,13 @@ config RISCV_SOC_HAS_ISR_STACKING
 	    saved on the stack by the hardware, and the registers saved by the
 	    software macros. The structure must be called '__esf'.
 
+config RISCV_SOC_HAS_CUSTOM_IRQ_HANDLING
+	bool
+	help
+	  This allows the SoC to overwrite the irq handling. If enabled, the
+	  function __soc_handle_all_irqs has to be implemented. It shall service
+	  and clear all pending interrupts.
+
 config RISCV_SOC_HAS_CUSTOM_IRQ_LOCK_OPS
 	bool
 	help
@@ -159,7 +166,7 @@ config RISCV_SOC_INTERRUPT_INIT
 	  Enable SOC-based interrupt initialization
 	  (call soc_interrupt_init, within _IntLibInit when enabled)
 
-config RISCV_SOC_MCAUSE_EXCEPTION_MASK
+config RISCV_MCAUSE_EXCEPTION_MASK
 	hex
 	default 0x7FFFFFFFFFFFFFFF if 64BIT
 	default 0x7FFFFFFF
@@ -173,11 +180,6 @@ config RISCV_GENERIC_TOOLCHAIN
 	  Compile using generic riscv32 toolchain.
 	  Allow SOCs that have custom extended riscv ISA to still
 	  compile with generic riscv32 toolchain.
-
-config RISCV_HAS_CPU_IDLE
-	bool "Does SOC has CPU IDLE instruction"
-	help
-	  Does SOC has CPU IDLE instruction
 
 config GEN_ISR_TABLES
 	default y

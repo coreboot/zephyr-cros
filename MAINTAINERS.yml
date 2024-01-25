@@ -353,17 +353,14 @@ Bluetooth controller:
 Bluetooth Host:
   status: maintained
   maintainers:
+    - jori-nordic
     - jhedberg
   collaborators:
     - hermabe
-    - jori-nordic
     - alwa-nordic
-    - Vudentz
     - Thalley
-    - asbjornsabo
     - sjanc
     - theob-pro
-    - kruithofa
   files:
     - drivers/bluetooth/
     - subsys/bluetooth/host/
@@ -385,6 +382,7 @@ Bluetooth Mesh:
     - alxelax
     - Andrewpini
     - akredalen
+    - HaavardRei
   files:
     - subsys/bluetooth/mesh/
     - include/zephyr/bluetooth/mesh/
@@ -422,6 +420,28 @@ Bluetooth Audio:
     - "area: Bluetooth"
   tests:
     - bluetooth.audio
+
+Bluetooth Classic:
+  status: maintained
+  maintainers:
+    - lylezhu2012
+  collaborators:
+    - jhedberg
+    - sjanc
+  files:
+    - subsys/bluetooth/host/a2dp*
+    - subsys/bluetooth/host/at.*
+    - subsys/bluetooth/host/avdtp*
+    - subsys/bluetooth/host/br.*
+    - subsys/bluetooth/host/hfp*
+    - subsys/bluetooth/host/l2cap_br*
+    - subsys/bluetooth/host/rfcomm*
+    - subsys/bluetooth/host/sdp*
+    - subsys/bluetooth/host/ssp*
+  labels:
+    - "area: Bluetooth Classic"
+  tests:
+    - bluetooth
 
 Bootloaders:
   status: odd fixes
@@ -624,6 +644,7 @@ Common Architecture Interface:
     - dcpleung
     - nashif
   files:
+    - arch/Kconfig
     - include/zephyr/arch/
     - arch/common/
     - include/zephyr/arch/common/
@@ -714,7 +735,6 @@ DFU:
 Devicetree:
   status: maintained
   maintainers:
-    - mbolivar-ampere
     - galak
   files:
     - scripts/dts/
@@ -1166,6 +1186,8 @@ Release Notes:
 
 "Drivers: Ethernet":
   status: odd fixes
+  collaborators:
+    - decsny
   files:
     - drivers/ethernet/
     - include/zephyr/dt-bindings/ethernet/
@@ -1391,6 +1413,8 @@ Release Notes:
 
 "Drivers: MDIO":
   status: odd fixes
+  collaborators:
+    - decsny
   files:
     - doc/hardware/peripherals/mdio.rst
     - drivers/mdio/
@@ -2730,6 +2754,8 @@ POSIX API layer:
   status: maintained
   maintainers:
     - cfriedt
+  collaborators:
+    - ycsin
   files:
     - include/zephyr/posix/
     - lib/posix/
@@ -2960,6 +2986,7 @@ ADI Platforms:
     - galak
     - microbuilder
   files:
+    - boards/arm/adi_*/
     - drivers/*/max*
     - drivers/*/*max*/
     - drivers/dac/dac_ltc*
@@ -2994,10 +3021,9 @@ GD32 Platforms:
     - boards/riscv/gd32*/
     - boards/riscv/longan_nano/
     - drivers/*/*gd32*
-    - dts/*/gigadevice/
+    - dts/*/gd/
     - dts/bindings/*/*gd32*
-    - soc/arm/gigadevice/
-    - soc/riscv/gd_gd32/
+    - soc/*/gd_gd32/
     - scripts/west_commands/*/*gd32*
   labels:
     - "platform: GD32"
@@ -3121,7 +3147,6 @@ Intel Platforms (Xtensa):
     - marc-hb
     - kv2019i
     - ceolin
-    - aborisovich
     - tmleman
     - softwarecki
     - jxstelter
@@ -3169,6 +3194,28 @@ Intel Platforms (Agilex):
   labels:
     - "platform: Intel SoC FPGA Agilex"
 
+NXP Platforms (S32):
+  status: maintained
+  maintainers:
+    - manuargue
+  collaborators:
+    - PetervdPerk-NXP
+    - bperseghetti
+    - Dat-NguyenDuy
+  files:
+    - boards/arm/s32*/
+    - boards/arm/mr_canhubk3/
+    - boards/arm/ucans32k1sic/
+    - soc/arm/nxp_s32/
+    - drivers/*/*nxp_s32*
+    - dts/bindings/*/nxp,s32*
+    - samples/boards/nxp_s32/
+    - include/zephyr/dt-bindings/*/nxp-s32*
+    - include/zephyr/dt-bindings/*/nxp_s32*
+    - include/zephyr/drivers/*/*nxp_s32*
+  labels:
+    - "platform: NXP S32"
+
 NXP Platforms:
   status: maintained
   maintainers:
@@ -3180,21 +3227,14 @@ NXP Platforms:
     - yvanderv
     - EmilioCBen
     - decsny
-    - manuargue
-    - PetervdPerk-NXP
-    - bperseghetti
-    - dbaluta
-    - iuliana-prodan
-    - Dat-NguyenDuy
   files:
     - boards/arm/mimx*/
     - boards/arm/frdm_k*/
     - boards/arm/lpcxpress*/
     - boards/arm/twr_*/
-    - boards/arm/s32*/
-    - boards/arm/mr_canhubk3/
-    - boards/arm/vmu_rt*/
-    - soc/arm/nxp_*/
+    - soc/arm/nxp_imx/
+    - soc/arm/nxp_kinetis/
+    - soc/arm/nxp_lpc/
     - drivers/*/*imx*
     - drivers/*/*lpc*.c
     - drivers/*/*mcux*.c
@@ -3203,13 +3243,22 @@ NXP Platforms:
     - drivers/*/*nxp*
     - dts/arm/nxp/
     - dts/bindings/*/nxp*
-    - soc/xtensa/nxp_adsp/
-    - boards/xtensa/nxp_adsp_*/
     - samples/boards/nxp*/
     - include/zephyr/dt-bindings/*/nxp*
-    - include/zephyr/drivers/*/*nxp*
   labels:
     - "platform: NXP"
+
+NXP Platforms (Xtensa):
+  status: maintained
+  maintainers:
+    - dbaluta
+  collaborators:
+    - iuliana-prodan
+  files:
+    - soc/xtensa/nxp_adsp/
+    - boards/xtensa/nxp_adsp_*/
+  labels:
+    - "platform: NXP ADSP"
 
 Microchip MEC Platforms:
   status: maintained
@@ -4043,7 +4092,7 @@ West:
   collaborators:
     - erwango
   files:
-    - modules/Kconfig.st
+    - modules/hal_st/Kconfig
   labels:
     - "area: Sensors"
 
