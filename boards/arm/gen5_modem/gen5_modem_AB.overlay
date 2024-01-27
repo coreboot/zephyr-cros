@@ -1,0 +1,83 @@
+/{
+	aliases {
+		temp-sensor = &temp_sensor_adt7310;
+	};
+};
+
+&plc {
+	hw-reset-gpios = <&gpio0 15 0>;
+};
+
+&temp_sensor_adt7310 {
+	status = "okay";
+};
+
+&ebu {
+	fpga: gen5-fpga@2 {
+		reg = <2>;
+		device-type = "Muxed Asynchronous Type";
+		address-bus-width = "16-bit";
+
+		address-valid-cycles = <15 15>;
+		address-hold-cycles = <4 4>;
+		command-delay-cycles = <0 0>;
+		command-cycles = <32 20>;
+		data-hold-cycles = <0 4>;
+		recovery-cycles = <7 0>;
+	};
+};
+
+/{
+	gen5_fpga: gen5_fpga@68000000 {
+		status = "disabled";
+		compatible = "infineon,xmc4xxx-gen5-fpga";
+		reg = <0x68000000 0x4000000>;
+		int-gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+		rx-enable-gpios = <&gpio5 11 0>;
+		current-measure-enable-gpios = <&gpio5 10 0>;
+		pll-locked-gpios = <&gpio2 14 0>;
+		modb-int-de-gpios = <&gpio5 7 0>;
+		modb-int-tx-gpios = <&gpio5 6 0>;
+		clocks = <&pwmclock 0>;
+	};
+
+	gen5_time_sync: gen5_time_sync {
+		status = "disabled";
+		compatible = "infineon,xmc4xxx-gen5-time-sync";
+		time-sync-error-gpios = <&gpio6 4 0>;
+	};
+
+	gen5_emotas_can: gen5_emotas_can {
+		compatible = "emotas,can-open";
+		can-handles = <&canfd>;
+	};
+};
+
+&usic0ch0 {
+	cs-gpios = <&gpio4 5 GPIO_ACTIVE_LOW
+		    &gpio1 0 GPIO_ACTIVE_LOW
+		    &gpio6 6 GPIO_ACTIVE_LOW>;
+
+	mac_eeprom: mac_eeprom@2 {
+		status = "okay";
+		compatible = "microchip,25aa02e48", "atmel,at25";
+		spi-max-frequency = <1000000>;
+		reg = <0x2>;
+		size = <256>;
+		pagesize = <16>;
+		timeout = <100>;
+		address-width = <8>;
+	};
+};
+
+&eth {
+	mac-eeprom = <&mac_eeprom>;
+};
+
+&gpio5 {
+	status = "okay";
+};
+
+&gpio6 {
+	status = "okay";
+};

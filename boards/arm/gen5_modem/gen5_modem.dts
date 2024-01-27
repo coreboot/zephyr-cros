@@ -1,0 +1,323 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright (c) 2022 Schlumberger
+ *
+ */
+
+/dts-v1/;
+
+#include <infineon/xmc4700_F144x2048.dtsi>
+#include "gen5_modem-pinctrl.dtsi"
+#include <infineon/xmc4700_F144x2048-intc.dtsi>
+#include <zephyr/dt-bindings/dma/infineon-xmc4xxx-dma.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
+#include <zephyr/dt-bindings/memory-controller/infineon-xmc4xxx-ebu.h>
+
+/ {
+	model = "Infineon XMC4700 Gen5 Modem";
+	compatible = "infineon,xmc4700", "infineon,xmc4xxx";
+
+	chosen {
+		zephyr,sram = &dsram_joined;
+		zephyr,flash = &flash0;
+		zephyr,flash-controller = &flash_controller;
+		zephyr,canbus = &canfd;
+		zephyr,code-partition = &boot_partition;
+		zephyr,uart-pipe = &usic1ch1;
+		zephyr,boot-mode = &retention0;
+	};
+
+	aliases {
+		modb-uart = &usic0ch1;
+		plc-uart = &usic1ch1;
+		temp-sensor = &die_temp;
+		watchdog0 = &wdt0;
+		spi-flash0 = &flashspi;
+	};
+
+	pwmclock: pwmclock {
+		status = "okay";
+		compatible = "pwm-clock";
+		#clock-cells = <1>;
+		clock-frequency = <12000000>;
+		pwm-on-delay = <10000>;
+		pwms = <&pwm_ccu40 1 PWM_HZ(12000000) PWM_POLARITY_NORMAL>;
+	};
+
+	plc: plc {
+		status = "disabled";
+		compatible = "maxim,max79356-plc";
+		ext-mac-address = [00 00 00 00 00 00 00 aa];
+		multicast-group = <0x8000>;
+		broadcast-group = <0x8fff>;
+		short-address = <0x0000>;
+		pan-id = [40 21];
+		hw-reset-gpios = <&gpio4 7 0>;
+		hw-prog-gpios = <&gpio0 12 0>;
+	};
+
+	psram@1ffffc00 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x1ffffc00 DT_SIZE_K(1)>;
+		zephyr,memory-region = "RetainedMem";
+		status = "okay";
+
+		retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			retention0: retention@0 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x0 0x1>;
+			};
+		};
+	};
+};
+
+&psram1 {
+	compatible = "zephyr,memory-region", "mmio-sram";
+	zephyr,memory-region = "PSRAM1";
+	reg = <0x1ffe8000 DT_SIZE_K(95)>;
+};
+
+&usic0ch1 {
+	compatible = "infineon,xmc4xxx-uart";
+	current-speed = <921600>;
+	interrupts = <84 1 85 1>;
+	interrupt-names = "tx", "rx";
+	dmas = <&dma0 0 0 XMC4XXX_SET_CONFIG(0,10)>, <&dma0 1 0 XMC4XXX_SET_CONFIG(2,11)>;
+	dma-names = "tx", "rx";
+	pinctrl-0 = <&uart_tx_p3_13_u0c1 &uart_rx_p6_3_u0c1>;
+	pinctrl-names = "default";
+	input-src = "DX0C";
+	fifo-start-offset = <0>;
+	fifo-tx-size = <0>;
+	fifo-rx-size = <0>;
+	dir-gpios = <&gpio5 4 0>;
+	status = "okay";
+};
+
+&usic1ch1 {
+	compatible = "infineon,xmc4xxx-uart";
+	current-speed = <230400>;
+	interrupts = <90 1 91 1>;
+	interrupt-names = "tx", "rx";
+	dmas = <&dma0 2 0 XMC4XXX_SET_CONFIG(1,11)>, <&dma0 3 0 XMC4XXX_SET_CONFIG(3,12)>;
+	dma-names = "tx", "rx";
+	pinctrl-0 = <&uart_tx_p3_15_u1c1 &uart_rx_p3_14_u1c1>;
+	pinctrl-names = "default";
+	input-src = "DX0B";
+	fifo-start-offset = <0>;
+	fifo-tx-size = <0>;
+	fifo-rx-size = <0>;
+	status = "okay";
+};
+
+&dma0 {
+	status = "okay";
+};
+
+&dma1 {
+	status = "okay";
+};
+
+&cpu0 {
+	clock-frequency = <144000000>;
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			reg = <0x00000000 0x0001c0000>;
+			read-only;
+		};
+	};
+};
+
+&usic2ch0 {
+	compatible = "infineon,xmc4xxx-spi";
+	pinctrl-0 = <&spi_mosi_p3_8_u2c0 &spi_miso_p3_7_u2c0 &spi_sclk_p3_9_u2c0>;
+	pinctrl-names = "default";
+	miso-src = "DX0C";
+	cs-gpios = <&gpio3 10 GPIO_ACTIVE_LOW>;
+	status = "okay";
+	interrupts = <96 1 97 1>;
+	interrupt-names = "tx", "rx";
+
+	dmas = <&dma1 0 0 XMC4XXX_SET_CONFIG(8,6)>, <&dma1 1 0 XMC4XXX_SET_CONFIG(9,6)>;
+	dma-names = "tx", "rx";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	canfd: mcp251xfd@0 {
+		compatible = "microchip,mcp251xfd";
+		spi-max-frequency = <18000000>;
+		int-gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
+		status = "okay";
+		reg = <0x0>;
+		osc-freq = <40000000>;
+		sof-on-clko;
+		bus-speed = <500000>;
+		bus-speed-data = <2000000>;
+		sample-point = <800>;
+		sample-point-data = <800>;
+	};
+};
+
+&usic0ch0 {
+	status = "okay";
+	compatible = "infineon,xmc4xxx-spi";
+	pinctrl-0 = <&spi_mosi_p1_5_u0c0 &spi_miso_p1_4_u0c0 &spi_sclk_p1_1_u0c0>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpio4 5 GPIO_ACTIVE_LOW &gpio1 0 GPIO_ACTIVE_LOW>;
+	miso-src = "DX0B";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+	interrupts = <86 1 87 1>;
+	interrupt-names = "tx", "rx";
+
+	/* temp sensor is currently not working on the revAD board becuase of the FPGA */
+	/* spi conflict */
+	temp_sensor_adt7310: temp_sensor@0 {
+		status = "disabled";
+		compatible = "adi,adt7310";
+		spi-max-frequency = <1000000>;
+		reg = <0x0>;
+	};
+
+	flashspi: flashspi@1 {
+		status = "disabled";
+		compatible = "jedec,spi-nor";
+		size = <DT_SIZE_M(16)>;
+		jedec-id = [bf 25 41];
+		page-size = <1>;
+		has-lock = <0x1c>;
+		reg = <1>;
+		spi-max-frequency = <1000000>;
+	};
+};
+
+&ebu {
+	status = "okay";
+	pinctrl-0 = <
+		&ebu_p0_2_ad0
+		&ebu_p0_3_ad1
+		&ebu_p0_4_ad2
+		&ebu_p0_5_ad3
+		&ebu_p3_5_ad4
+		&ebu_p3_6_ad5
+		&ebu_p0_7_ad6
+		&ebu_p0_8_ad7
+		&ebu_p4_0_ad8
+		&ebu_p4_1_ad9
+		&ebu_p1_6_ad10
+		&ebu_p1_7_ad11
+		&ebu_p1_8_ad12
+		&ebu_p1_9_ad13
+		&ebu_p1_2_ad14
+		&ebu_p1_3_ad15
+		&ebu_p1_12_ad16
+		&ebu_p0_6_adv
+		&ebu_p3_0_rd
+		&ebu_p3_1_rd_nwr
+		&ebu_p3_2_cs0
+		&ebu_p0_9_cs1
+		&ebu_p5_8_cs2
+		&ebu_p5_9_cs3
+	>;
+	pinctrl-names = "default";
+	clock-divider = <1>;
+	modes-config = <XMC4XXX_EBU_SET_MODCON(1, 0, 0, 3, 0, 0)>;
+	gpio-control-config = <XMC4XXX_EBU_SET_USERCON(0x1ff, 0)>;
+};
+
+&eth {
+	status = "okay";
+	pinctrl-0 = <&eth_p5_3_rxer &eth_p2_2_rxd0 &eth_p2_3_rxd1
+		     &eth_p6_5_clk_rmii &eth_p5_2_crs_dv &eth_p2_5_tx_en
+		     &eth_p2_8_txd0 &eth_p2_9_txd1>;
+	pinctrl-names = "default";
+
+	rxer-port-ctrl = "P5_3";
+	rxd0-port-ctrl = "P2_2";
+	rxd1-port-ctrl = "P2_3";
+	rmii-rx-clk-port-ctrl = "P6_5";
+	crs-rx-dv-port-ctrl = "P5_2";
+
+	phy-connection-type = "rmii";
+	phy-handle = <&phy>;
+};
+
+&mdio {
+	status = "okay";
+	mdi-port-ctrl = "P1_11";
+	pinctrl-0 = <&eth_p1_11_mdo &eth_p1_10_mdc>;
+	pinctrl-names = "default";
+
+	phy: ethernet-phy@1 {
+		status = "okay";
+		compatible = "ethernet-phy";
+		reg = <1>;
+	};
+};
+
+&gpio0 {
+    status = "okay";
+};
+
+&gpio1 {
+    status = "okay";
+};
+
+&gpio2 {
+	status = "okay";
+	phy-enable-hog {
+		gpio-hog;
+		gpios = <11 GPIO_ACTIVE_HIGH>;
+		output-high;
+	};
+};
+
+&gpio3 {
+    status = "okay";
+};
+
+&gpio4 {
+    status = "okay";
+};
+
+&pwm_ccu40 {
+	status = "okay";
+	slice-prescaler = <0 0 0 0>;
+	pinctrl-0 = <&pwm_out_p0_14_ccu40_ch1>;
+	pinctrl-names = "default";
+};
+
+&adc0 {
+	vref-internal-mv = <5000>;
+	status = "okay";
+};
+
+&adc1 {
+	vref-internal-mv = <5000>;
+	status = "okay";
+};
+
+&adc3 {
+	vref-internal-mv = <5000>;
+	status = "okay";
+};
+
+&wdt0 {
+	status = "okay";
+};

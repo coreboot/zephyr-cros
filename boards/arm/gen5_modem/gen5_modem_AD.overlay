@@ -1,0 +1,75 @@
+&die_temp {
+	status = "okay";
+};
+
+&ebu {
+	fpga: gen5-fpga@0 {
+		reg = <0>;
+		device-type = "Muxed Asynchronous Type";
+		address-bus-width = "16-bit";
+
+		address-valid-cycles = <15 15>;
+		address-hold-cycles = <4 4>;
+		command-delay-cycles = <0 0>;
+		command-cycles = <32 20>;
+		data-hold-cycles = <0 4>;
+		recovery-cycles = <7 0>;
+	};
+};
+
+/{
+	gen5_fpga: gen5_fpga@60000000 {
+		status = "disabled";
+		compatible = "infineon,xmc4xxx-gen5-fpga";
+		reg = <0x60000000 0x4000000>;
+		int-gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
+		rx-enable-gpios = <&gpio5 11 0>;
+		current-measure-enable-gpios = <&gpio5 10 0>;
+		pll-locked-gpios = <&gpio0 15 0>;
+		modb-int-de-gpios = <&gpio5 7 0>;
+		modb-int-tx-gpios = <&gpio3 11 0>;
+		clocks = <&pwmclock 0>;
+	};
+
+	gen5_time_sync: gen5_time_sync {
+		status = "disabled";
+		compatible = "infineon,xmc4xxx-gen5-time-sync";
+		time-sync-error-gpios = <&gpio6 4 0>;
+	};
+
+	gen5_emotas_can: gen5_emotas_can {
+		compatible = "emotas,can-open";
+		can-handles = <&canfd>;
+	};
+};
+
+&gpio1 {
+    status = "okay";
+    flash-spi-ce {
+	gpio-hog;
+	gpios = <0 GPIO_ACTIVE_HIGH>;
+	output-high;
+    };
+};
+
+&gpio4 {
+    status = "okay";
+    mac-spi-ce {
+	gpio-hog;
+	gpios = <6 GPIO_ACTIVE_HIGH>;
+	output-high;
+    };
+    temp-sensor-ce {
+	gpio-hog;
+	gpios = <5 GPIO_ACTIVE_HIGH>;
+	output-high;
+    };
+};
+
+&gpio5 {
+	status = "okay";
+};
+
+&gpio6 {
+	status = "okay";
+};

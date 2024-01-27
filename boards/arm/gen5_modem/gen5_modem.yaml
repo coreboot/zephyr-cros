@@ -1,0 +1,10 @@
+identifier: gen5_modem
+name: GEN5-MODEM
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+ram: 352
+flash: 2048

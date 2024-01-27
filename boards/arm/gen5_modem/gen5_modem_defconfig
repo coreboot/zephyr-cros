@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2020 Schlumberger
+# Author: Andriy Gelman <andriy.gelman@gmail.com>
+
+CONFIG_BOARD_GEN5_MODEM=y
+CONFIG_SOC_SERIES_XMC_4XXX=y
+CONFIG_SOC_XMC4700=y
+CONFIG_CORTEX_M_SYSTICK=y
+
+# enable uart driver
+CONFIG_SERIAL=y
+
+# enable console
+CONFIG_CONSOLE=n
+CONFIG_UART_CONSOLE=n
+
+CONFIG_GPIO=y
+
+CONFIG_USE_DT_CODE_PARTITION=y

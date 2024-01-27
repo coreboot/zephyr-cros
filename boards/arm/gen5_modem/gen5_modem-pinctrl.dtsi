@@ -1,0 +1,246 @@
+/*
+ * Copyright (c) 2022 Schlumberger
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <infineon/xmc4700_F144x2048-pinctrl.dtsi>
+
+&uart_tx_p3_13_u0c1 {
+	drive-strength = "strong-soft-edge";
+	drive-push-pull;
+	hwctrl = "disabled";
+};
+
+&uart_rx_p6_3_u0c1 {
+	drive-strength = "strong-soft-edge";
+	hwctrl = "disabled";
+};
+
+&uart_tx_p3_15_u1c1 {
+	drive-strength = "strong-soft-edge";
+	drive-push-pull;
+	hwctrl = "disabled";
+};
+
+&uart_rx_p3_14_u1c1 {
+	drive-strength = "strong-soft-edge";
+	hwctrl = "disabled";
+};
+
+&spi_mosi_p3_8_u2c0 {
+	drive-strength = "strong-soft-edge";
+	drive-push-pull;
+	hwctrl = "disabled";
+};
+
+&spi_sclk_p3_9_u2c0 {
+	drive-strength = "strong-soft-edge";
+	drive-push-pull;
+	hwctrl = "disabled";
+};
+
+&spi_miso_p3_7_u2c0 {
+	drive-strength = "strong-soft-edge";
+	hwctrl = "disabled";
+};
+
+&spi_mosi_p1_5_u0c0 {
+	drive-strength = "strong-soft-edge";
+	drive-push-pull;
+	hwctrl = "disabled";
+};
+
+&spi_sclk_p1_1_u0c0 {
+	drive-strength = "strong-soft-edge";
+	drive-push-pull;
+	hwctrl = "disabled";
+};
+
+&spi_miso_p1_4_u0c0 {
+	drive-strength = "strong-soft-edge";
+	hwctrl = "disabled";
+};
+
+&ebu_p0_2_ad0 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p0_3_ad1 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p0_4_ad2 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p0_5_ad3 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p0_6_adv {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p0_7_ad6 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p0_8_ad7 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p1_2_ad14 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p1_3_ad15 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p1_6_ad10 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p1_7_ad11 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p1_8_ad12 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p1_9_ad13 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p1_12_ad16 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p3_5_ad4 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p3_6_ad5 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p4_0_ad8 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p4_1_ad9 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p3_0_rd {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p3_1_rd_nwr {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p3_2_cs0 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p0_9_cs1 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p5_8_cs2 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&ebu_p5_9_cs3 {
+    drive-strength = "strong-soft-edge";
+    drive-push-pull;
+};
+
+&pwm_out_p0_14_ccu40_ch1 {
+	drive-strength = "strong-medium-edge";
+	drive-push-pull;
+	hwctrl = "disabled";
+};
+
+&eth_p1_11_mdo {
+	drive-strength = "strong-sharp-edge";
+	output-low;
+};
+
+&eth_p1_10_mdc {
+	drive-strength = "strong-medium-edge";
+	drive-push-pull;
+	output-low;
+	hwctrl = "disabled";
+};
+
+&eth_p2_5_tx_en {
+	drive-strength = "strong-medium-edge";
+	drive-push-pull;
+	output-low;
+	hwctrl = "disabled";
+};
+
+&eth_p2_8_txd0 {
+	drive-strength = "strong-medium-edge";
+	drive-push-pull;
+	output-low;
+	hwctrl = "disabled";
+};
+
+&eth_p2_9_txd1 {
+	drive-strength = "strong-medium-edge";
+	drive-push-pull;
+	output-low;
+	hwctrl = "disabled";
+};
+
+&eth_p5_3_rxer {
+	drive-strength = "strong-medium-edge";
+	hwctrl = "disabled";
+};
+
+&eth_p2_2_rxd0{
+	drive-strength = "strong-medium-edge";
+	hwctrl = "disabled";
+};
+
+&eth_p2_3_rxd1 {
+	drive-strength = "strong-medium-edge";
+	hwctrl = "disabled";
+};
+
+&eth_p6_5_clk_rmii {
+	drive-strength = "strong-medium-edge";
+	hwctrl = "disabled";
+};
+
+&eth_p5_2_crs_dv {
+	drive-strength = "strong-medium-edge";
+	hwctrl = "disabled";
+};

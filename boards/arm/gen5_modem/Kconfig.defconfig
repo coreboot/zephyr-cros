@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2022 Schlumberger
+
+if BOARD_GEN5_MODEM
+
+config BOARD
+	default "gen5_modem"
+
+config ETH_XMC4XXX_MAC_EEPROM_ADDRESS
+	default 0xfa
+	depends on ETH_XMC4XXX
+
+endif
