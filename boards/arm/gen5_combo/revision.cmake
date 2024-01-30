@@ -1,0 +1,8 @@
+set(MODEM_REVISIONS "AA")
+if (NOT DEFINED BOARD_REVISION)
+  set(BOARD_REVISION "AA")
+else()
+  if (NOT BOARD_REVISION IN_LIST MODEM_REVISIONS)
+    message(FATAL_ERROR "${BOARD_REVISION} is not a valid revision for Gen5 Combo. Accepted revisions: ${MODEM_REVISIONS}")
+  endif()
+endif()
