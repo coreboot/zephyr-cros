@@ -275,7 +275,14 @@ static int cmd_kernel_stacks(const struct shell *sh,
 #endif
 
 #if defined(CONFIG_SYS_HEAP_RUNTIME_STATS) && (K_HEAP_MEM_POOL_SIZE > 0)
+
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+extern void malloc_lock(void);
+extern void malloc_unlock(void);
+#include <zephyr/multi_heap/shared_multi_heap.h>
+#else
 extern struct sys_heap _system_heap;
+#endif
 
 static int cmd_kernel_heap(const struct shell *sh,
 			   size_t argc, char **argv)
@@ -286,6 +293,36 @@ static int cmd_kernel_heap(const struct shell *sh,
 	int err;
 	struct sys_memory_stats stats;
 
+#ifdef CONFIG_GEN5_USE_CUSTOM_HEAP
+	malloc_lock();
+
+	err = shared_multiheap_runtime_stats_get(0, &stats);
+	if (err != 0) {
+		malloc_unlock();
+		shell_error(sh, "Failed to read fast RAM kernel heap statistics (err %d)", err);
+		return -ENOEXEC;
+	}
+
+	shell_print(sh, "Fast RAM (bytes):");
+	shell_print(sh, "free:           %zu", stats.free_bytes);
+	shell_print(sh, "allocated:      %zu", stats.allocated_bytes);
+	shell_print(sh, "max. allocated: %zu\n", stats.max_allocated_bytes);
+
+	err = shared_multiheap_runtime_stats_get(1, &stats);
+	if (err != 0) {
+		shell_error(sh, "Failed to read slow RAM kernel heap statistics (err %d)", err);
+		malloc_unlock();
+		return -ENOEXEC;
+	}
+
+	shell_print(sh, "Slow RAM (bytes):");
+	shell_print(sh, "free:           %zu", stats.free_bytes);
+	shell_print(sh, "allocated:      %zu", stats.allocated_bytes);
+	shell_print(sh, "max. allocated: %zu\n", stats.max_allocated_bytes);
+
+	malloc_unlock();
+
+#else
 	err = sys_heap_runtime_stats_get(&_system_heap, &stats);
 	if (err) {
 		shell_error(sh, "Failed to read kernel system heap statistics (err %d)", err);
@@ -295,6 +332,7 @@ static int cmd_kernel_heap(const struct shell *sh,
 	shell_print(sh, "free:           %zu", stats.free_bytes);
 	shell_print(sh, "allocated:      %zu", stats.allocated_bytes);
 	shell_print(sh, "max. allocated: %zu", stats.max_allocated_bytes);
+#endif
 
 	return 0;
 }
