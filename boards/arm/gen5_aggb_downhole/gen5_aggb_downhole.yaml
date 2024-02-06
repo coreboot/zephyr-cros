@@ -1,0 +1,10 @@
+identifier: gen5_aggb_downhole
+name: GEN5-AGGB-DOWNHOLE
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+ram: 352
+flash: 2048

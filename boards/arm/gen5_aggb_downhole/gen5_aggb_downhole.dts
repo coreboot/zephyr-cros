@@ -1,0 +1,433 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright (c) 2022 Schlumberger
+ *
+ */
+
+/dts-v1/;
+
+#include <infineon/xmc4700_F144x2048.dtsi>
+#include "gen5_aggb_downhole-pinctrl.dtsi"
+#include <infineon/xmc4700_F144x2048-intc.dtsi>
+#include <zephyr/dt-bindings/clock/infineon-xmc4xxx-clocks.h>
+#include <zephyr/dt-bindings/dma/infineon-xmc4xxx-dma.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
+#include <zephyr/dt-bindings/memory-controller/infineon-xmc4xxx-ebu.h>
+
+/ {
+	model = "Infineon XMC4700 Gen5 Aggregator Downhole";
+	compatible = "infineon,xmc4700", "infineon,xmc4xxx";
+
+	chosen {
+		zephyr,sram = &dsram_joined;
+		zephyr,flash = &flash0;
+		zephyr,flash-controller = &flash_controller;
+		zephyr,canbus = &canfd;
+		zephyr,code-partition = &boot_partition;
+		zephyr,boot-mode = &retention0;
+	};
+
+	aliases {
+		ssb-uart = &usic0ch1;
+		watchdog0 = &wdt0;
+		spi-flash0 = &flashspi;
+		rtc = &rtc;
+		can-open = &can_node1;
+	};
+
+	external-flash {
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		flashebu1: flashebu@68000000 {
+			status = "okay";
+			compatible = "micron,mt29fx-memc-nand";
+			reg = <0x68000000>;
+			ale-address-mask = <0x80000>; // labelled a16 in schematic but actually p6_2 -> a18
+			cle-address-mask = <0x40000>; // labelled a17 in schematic but actually p6_1 -> a17
+			write-page-size = <8192>;
+			partial-write-page-size = <2048>;
+			num-blocks = <8192>;
+			pages-per-block = <128>;
+			memc-handle = <&ebu>;
+			memc-index = <2>;
+			dmas = <&dma0 0 0 0>;
+			dma-names = "read";
+		};
+
+		flashebu2: flashebu@6c000000 {
+			status = "okay";
+			compatible = "micron,mt29fx-memc-nand";
+			reg = <0x6c000000>;
+			ale-address-mask = <0x80000>; // labelled a16 in schematic but actually p6_2 -> a18
+			cle-address-mask = <0x40000>; // labelled a17 in schematic but actually p6_1 -> a17
+			write-page-size = <8192>;
+			partial-write-page-size = <2048>;
+			num-blocks = <8192>;
+			pages-per-block = <128>;
+			memc-handle = <&ebu>;
+			memc-index = <3>;
+			dmas = <&dma0 1 0 0>;
+			dma-names = "read";
+		};
+	};
+
+	sram1: sram@64000000 {
+		status = "okay";
+		compatible = "zephyr,memory-region", "mmio-sram";
+		device_type = "memory";
+		reg = <0x64000000 DT_SIZE_M(2)>;
+		zephyr,memory-region = "SRAM1";
+		delay-relocation;
+	};
+
+	psram@1ffffc00 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x1ffffc00 DT_SIZE_K(1)>;
+		zephyr,memory-region = "RetainedMem";
+		status = "okay";
+
+		retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			retention0: retention@0 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x0 0x1>;
+			};
+		};
+	};
+
+	gen5_emotas_can: gen5_emotas_can {
+		compatible = "emotas,can-open";
+		can-handles = <&canfd &can_node1>;
+	};
+};
+
+&psram1 {
+	compatible = "zephyr,memory-region", "mmio-sram";
+	zephyr,memory-region = "PSRAM1";
+	reg = <0x1ffe8000 DT_SIZE_K(95)>;
+};
+
+&usic0ch1 {
+	compatible = "infineon,xmc4xxx-uart";
+	current-speed = <57600>;
+	interrupts = <84 1 85 1>; //SR2, SR3
+	interrupt-names = "tx", "rx";
+	// lines 8,9 are used. use line 10, 11
+	pinctrl-0 = <&uart_tx_p3_13_u0c1 &uart_rx_p6_3_u0c1>;
+	pinctrl-names = "default";
+	input-src = "DX0C";
+	fifo-start-offset = <0>;
+	fifo-tx-size = <0>;
+	fifo-rx-size = <0>;
+	dir-gpios = <&gpio5 4 0>;
+	status = "okay";
+};
+
+&dma0 {
+	status = "okay";
+};
+
+&dma1 {
+	status = "okay";
+};
+
+&cpu0 {
+	clock-frequency = <144000000>;
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			reg = <0x00000000 0x001c0000>;
+			read-only;
+		};
+	};
+};
+
+&usic2ch0 {
+	compatible = "infineon,xmc4xxx-spi";
+	pinctrl-0 = <&spi_mosi_p3_8_u2c0 &spi_miso_p3_7_u2c0 &spi_sclk_p3_9_u2c0>;
+	pinctrl-names = "default";
+	miso-src = "DX0C";
+	cs-gpios = <&gpio3 10 GPIO_ACTIVE_LOW>;
+	status = "okay";
+	interrupts = <96 1 97 1>;
+	interrupt-names = "tx", "rx";
+
+	dmas = <&dma1 0 0 XMC4XXX_SET_CONFIG(8,6)>, <&dma1 1 0 XMC4XXX_SET_CONFIG(9,6)>;
+	dma-names = "tx", "rx";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	canfd: mcp251xfd@0 {
+		compatible = "microchip,mcp251xfd";
+		spi-max-frequency = <18000000>;
+		int-gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
+		status = "okay";
+		reg = <0x0>;
+		clocks = <&csu XMC4XXX_EXT_CLOCK>;
+		osc-freq = <40000000>;
+		sof-on-clko;
+		bus-speed = <500000>;
+		bus-speed-data = <2000000>;
+		sample-point = <800>;
+		sample-point-data = <800>;
+	};
+};
+
+&usic0ch0 {
+	status = "okay";
+	compatible = "infineon,xmc4xxx-spi";
+	pinctrl-0 = <&spi_mosi_p1_5_u0c0 &spi_miso_p1_4_u0c0 &spi_sclk_p1_1_u0c0>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpio1 0 GPIO_ACTIVE_LOW
+		    &gpio4 6 GPIO_ACTIVE_LOW>;
+	miso-src = "DX0B";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+	interrupts = <86 1 87 1>;
+	interrupt-names = "tx", "rx";
+
+	flashspi: flashspi@0 {
+		compatible = "jedec,spi-nor";
+		status = "okay";
+		size = <DT_SIZE_M(16)>; //bits
+		jedec-id = [bf 25 41];
+		page-size = <1>;
+		has-lock = <0x1c>;
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			context_partition: partition@0 {
+					   label = "context-partition";
+					   reg = <0x0 DT_SIZE_M(2)>; //bytes
+			};
+		};
+	};
+
+	mac_eeprom: mac_eeprom@1 {
+		status = "okay";
+		compatible = "microchip,25aa02e48", "atmel,at25";
+		spi-max-frequency = <1000000>;
+		reg = <0x1>;
+		size = <256>;
+		pagesize = <16>;
+		timeout = <100>;
+		address-width = <8>;
+	};
+};
+
+&ebu {
+	pinctrl-0 = <
+		&ebu_p0_2_ad0
+		&ebu_p0_3_ad1
+		&ebu_p0_4_ad2
+		&ebu_p0_5_ad3
+		&ebu_p3_5_ad4
+		&ebu_p3_6_ad5
+		&ebu_p0_7_ad6
+		&ebu_p0_8_ad7
+		&ebu_p4_0_ad8
+		&ebu_p4_1_ad9
+		&ebu_p1_6_ad10
+		&ebu_p1_7_ad11
+		&ebu_p1_8_ad12
+		&ebu_p1_9_ad13
+		&ebu_p1_2_ad14
+		&ebu_p1_3_ad15
+		&ebu_p6_0_a16
+		&ebu_p6_1_a17
+		&ebu_p6_2_a18
+		&ebu_p6_4_a19
+		&ebu_p0_6_adv
+		&ebu_p3_0_rd
+		&ebu_p3_1_rd_nwr
+		&ebu_p3_3_nwait
+		&ebu_p3_2_cs0
+		&ebu_p0_9_cs1
+		&ebu_p5_8_cs2
+		&ebu_p5_9_cs3
+		&ebu_p2_14_bc0
+		&ebu_p2_15_bc1
+	>;
+	pinctrl-names = "default";
+	clock-divider = <1>;
+	modes-config = <XMC4XXX_EBU_SET_MODCON(1, 0, 0, 3, 0, 1)>;
+	gpio-control-config = <XMC4XXX_EBU_SET_USERCON(0x1f0, 0)>;
+	unused@0 {
+		reg = <0>;
+		device-type = "Muxed Asynchronous Type";
+		address-bus-width = "16-bit";
+
+		address-valid-cycles = <15 15>;
+		address-hold-cycles = <4 4>;
+		command-delay-cycles = <0 0>;
+		command-cycles = <32 20>;
+		data-hold-cycles = <0 4>;
+		recovery-cycles = <7 0>;
+	};
+	gen5-sram@1 {
+		reg = <1>;
+		device-type = "Muxed Asynchronous Type";
+		address-bus-width = "16-bit";
+
+		address-valid-cycles = <11 11>;
+		address-hold-cycles = <8 8>;
+		command-delay-cycles = <0 0>;
+		command-cycles = <28 28>;
+		data-hold-cycles = <0 0>;
+		recovery-cycles = <7 7>;
+	};
+	gen5-flash1@2 {
+		reg = <2>;
+		device-type = "Muxed Asynchronous Type";
+		address-bus-width = "16-bit";
+
+		read-nwait-enable;
+		write-nwait-enable;
+
+		address-valid-cycles = <3 11>;
+		address-hold-cycles = <0 4>;
+		command-delay-cycles = <0 0>;
+		command-cycles = <6 12>;
+		data-hold-cycles = <0 0>;
+		recovery-cycles = <0 0>;
+	};
+	gen5-flash2@3 {
+		reg = <3>;
+		device-type = "Muxed Asynchronous Type";
+		address-bus-width = "16-bit";
+		read-nwait-enable;
+		write-nwait-enable;
+
+		address-valid-cycles = <3 11>;
+		address-hold-cycles = <0 4>;
+		command-delay-cycles = <0 0>;
+		command-cycles = <6 12>;
+		data-hold-cycles = <0 0>;
+		recovery-cycles = <0 0>;
+	};
+	status = "okay";
+};
+
+&eth {
+	status = "okay";
+	pinctrl-0 = <&eth_p5_3_rxer &eth_p2_2_rxd0 &eth_p2_3_rxd1
+		     &eth_p6_5_clk_rmii &eth_p5_2_crs_dv &eth_p2_5_tx_en
+		     &eth_p2_8_txd0 &eth_p2_9_txd1>;
+	pinctrl-names = "default";
+
+	rxer-port-ctrl = "P5_3";
+	rxd0-port-ctrl = "P2_2";
+	rxd1-port-ctrl = "P2_3";
+	rmii-rx-clk-port-ctrl = "P6_5";
+	crs-rx-dv-port-ctrl = "P5_2";
+
+	phy-connection-type = "rmii";
+	phy-handle = <&phy>;
+	mac-eeprom = <&mac_eeprom>;
+};
+
+&mdio {
+	status = "okay";
+	mdi-port-ctrl = "P1_11";
+	pinctrl-0 = <&eth_p1_11_mdo &eth_p1_10_mdc>;
+	pinctrl-names = "default";
+
+	phy: ethernet-phy@1 {
+		status = "okay";
+		compatible = "ethernet-phy";
+		reg = <1>;
+	};
+};
+
+&gpio2 {
+	status = "okay";
+	phy-enable-hog {
+		gpio-hog;
+		gpios = <11 GPIO_ACTIVE_HIGH>;
+		output-high;
+	};
+};
+
+&gpio0 {
+    status = "okay";
+};
+
+&gpio1 {
+    status = "okay";
+};
+
+&gpio3 {
+    status = "okay";
+};
+
+&gpio4 {
+    status = "okay";
+    esip-spi-ce {
+	    gpio-hog;
+	    gpios = <3 GPIO_ACTIVE_HIGH>;
+	    output-high;
+    };
+    temp-sensor-spi-ce {
+	    gpio-hog;
+	    gpios = <5 GPIO_ACTIVE_HIGH>;
+	    output-high;
+    };
+};
+
+&gpio5 {
+    status = "okay";
+};
+
+&can {
+	clock-prescaler = <6>;
+};
+
+&can_node1 {
+	status = "okay";
+	input-src = "RXDA";
+	bus-speed = <1000000>;
+	sample-point = <800>;
+	pinctrl-0 = <&can_tx_p2_7_node1 &can_rx_p2_6_node1>;
+	pinctrl-names = "default";
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&usbpll {
+	status = "okay";
+};
+
+&csu {
+	status = "okay";
+	pinctrl-0 = <&scu_p1_15_ext_clock>;
+	fext-clk-source = "f_usbpll";
+	fext-clk-divider = <6>;
+	pinctrl-names = "default";
+};
+
+&rtc {
+	status = "okay";
+};
