@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/sys/mem_stats.h>
 #include <zephyr/sys/sys_heap.h>
 #include <zephyr/sys/multi_heap.h>
 
@@ -17,6 +19,38 @@ static struct {
 	struct sys_heap heap_pool[MAX_MULTI_HEAPS];
 	unsigned int heap_cnt;
 } smh_data[MAX_SHARED_MULTI_HEAP_ATTR];
+
+int shared_multiheap_runtime_stats_get(enum shared_multi_heap_attr attr, struct sys_memory_stats *stats)
+
+{
+#ifdef CONFIG_SYS_HEAP_RUNTIME_STATS
+	int ret;
+	struct sys_memory_stats stats_heap;
+
+	if (attr >= MAX_SHARED_MULTI_HEAP_ATTR || stats == NULL) {
+		return -EINVAL;
+	}
+
+	memset(stats, 0, sizeof(*stats));
+
+	for (size_t hdx = 0; hdx < smh_data[attr].heap_cnt; hdx++) {
+		ret = sys_heap_runtime_stats_get(&smh_data[attr].heap_pool[hdx], &stats_heap);
+		if (ret < 0) {
+			return ret;
+		}
+
+		stats->free_bytes += stats_heap.free_bytes;
+		stats->allocated_bytes += stats_heap.allocated_bytes;
+		stats->max_allocated_bytes += stats_heap.max_allocated_bytes;
+	}
+
+	return 0;
+#else
+	ARG_UNUSED(attr);
+	ARG_UNUSED(stats);
+	return -ENOTSUP;
+#endif
+}
 
 static void *smh_choice(struct sys_multi_heap *mheap, void *cfg, size_t align, size_t size)
 {

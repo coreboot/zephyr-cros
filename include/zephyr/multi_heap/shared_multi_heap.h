@@ -12,6 +12,8 @@
 #ifndef ZEPHYR_INCLUDE_MULTI_HEAP_MANAGER_SMH_H_
 #define ZEPHYR_INCLUDE_MULTI_HEAP_MANAGER_SMH_H_
 
+#include <zephyr/sys/mem_stats.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -172,6 +174,19 @@ void shared_multi_heap_free(void *block);
  * @retval other	errno codes
  */
 int shared_multi_heap_add(struct shared_multi_heap_region *region, void *user_data);
+
+/**
+ * @brief Runtime stats of a shared multi-heap
+ *
+ * Returns runtime stats of a shared multi-heap with a given attribute.
+ *
+ * @param attr		capability / attribute requested for the memory block.
+ * @param region	pointer to the struct storing the results.
+ *
+ * @retval 0		on success.
+ * @retval -EINVAL	when the region attribute is out-of-bound.
+ */
+int shared_multiheap_runtime_stats_get(enum shared_multi_heap_attr attr, struct sys_memory_stats *stats);
 
 /**
  * @}
