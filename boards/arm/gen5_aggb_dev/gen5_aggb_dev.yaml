@@ -1,0 +1,10 @@
+identifier: gen5_aggb_dev
+name: GEN5-AGGB-DEV
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+ram: 352
+flash: 2048
