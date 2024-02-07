@@ -118,10 +118,9 @@ static void shell_tdata_dump(const struct k_thread *cthread, void *user_data)
 		      thread,
 		      tname ? tname : "NA");
 	/* Cannot use lld as it's less portable. */
-	shell_print(sh, "\toptions: 0x%x, priority: %d timeout: %" PRId64,
+	shell_print(sh, "\toptions: 0x%x, priority: %d",
 		      thread->base.user_options,
-		      thread->base.prio,
-		      (int64_t)thread->base.timeout.dticks);
+		      thread->base.prio);
 	shell_print(sh, "\tstate: %s, entry: %p",
 		    k_thread_state_str(thread, state_str, sizeof(state_str)),
 		    thread->entry.pEntry);
