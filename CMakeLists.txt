@@ -1898,6 +1898,17 @@ if(log_dict_db_output)
   unset(log_dict_db_output)
 endif()
 
+if (CONFIG_GEN_DEBUG_FILE_FOR_VSCODE)
+  list(APPEND
+    post_build_commands
+    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/${KERNEL_ELF_NAME} ${PROJECT_BINARY_DIR}/debug_file_for_vscode.elf
+    )
+  list(APPEND
+    post_build_byproducts
+    ${PROJECT_BINARY_DIR}/debug_file_for_vscode.elf
+    )
+endif()
+
 # Add post_build_commands to post-process the final .elf file produced by
 # either the ZEPHYR_LINK_STAGE_EXECUTABLE or the KERNEL_ELF executable
 # targets above.

@@ -714,6 +714,12 @@ config BUILD_OUTPUT_INFO_HEADER
 	  - VMA address of each segment
 	  - Size of each segment
 
+config GEN_DEBUG_FILE_FOR_VSCODE
+	bool "Generate debug file for vscode"
+	help
+	  Creates a elf file for vscode with a fixed name that can be used by launch.json.
+	  The name of the file is debug_file_for_vscode.elf.
+
 config BUILD_ALIGN_LMA
 	bool "Align LMA in output image"
 	default y if BUILD_OUTPUT_ADJUST_LMA!=""
