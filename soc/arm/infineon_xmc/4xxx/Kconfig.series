@@ -25,5 +25,6 @@ config SOC_SERIES_XMC_4XXX
 	select HAS_XMCLIB_ETH
 	select HAS_XMCLIB_CAN
 	select HAS_XMCLIB_EBU
+	select HAS_XMCLIB_RTC
 	help
 	  Enable support for XMC 4xxx MCU series

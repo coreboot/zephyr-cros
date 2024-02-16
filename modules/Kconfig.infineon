@@ -70,4 +70,9 @@ config HAS_XMCLIB_EBU
 	help
 	  Enable XMCLIB EBU
 
+config HAS_XMCLIB_RTC
+	bool
+	help
+	  Enable XMCLIB RTC
+
 endif # HAS_XMCLIB

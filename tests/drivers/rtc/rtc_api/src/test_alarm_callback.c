@@ -77,6 +77,10 @@ ZTEST(rtc_api, test_alarm_callback)
 
 	for (uint16_t i = 0; i < alarms_count; i++) {
 		ret = rtc_alarm_set_time(rtc, i, alarm_time_mask_set, &alarm_time_set);
+		if (ret == -ENOTSUP) {
+			/* Driver may need all mask fields to be set */
+			ztest_test_skip();
+		}
 
 		zassert_ok(ret, "Failed to set alarm time");
 	}

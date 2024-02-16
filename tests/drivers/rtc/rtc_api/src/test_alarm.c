@@ -68,6 +68,10 @@ ZTEST(rtc_api, test_alarm)
 
 	for (uint16_t i = 0; i < alarms_count; i++) {
 		ret = rtc_alarm_set_time(rtc, i, alarm_time_mask_set, &alarm_time_set);
+		if (ret == -ENOTSUP) {
+			/* Driver may need all the fields to be set */
+			ztest_test_skip();
+		}
 
 		zassert_ok(ret, "Failed to set alarm time");
 	}
@@ -81,10 +85,10 @@ ZTEST(rtc_api, test_alarm)
 		zassert_equal(alarm_time_mask_get, alarm_time_mask_set,
 			      "Incorrect alarm time mask");
 
-		zassert_equal(alarm_time_get.tm_min, alarm_time_get.tm_min,
+		zassert_equal(alarm_time_get.tm_min, alarm_time_set.tm_min,
 			      "Incorrect alarm time minute field");
 
-		zassert_equal(alarm_time_get.tm_hour, alarm_time_get.tm_hour,
+		zassert_equal(alarm_time_get.tm_hour, alarm_time_set.tm_hour,
 			      "Incorrect alarm time hour field");
 	}
 
