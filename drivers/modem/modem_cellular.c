@@ -301,7 +301,7 @@ static void modem_cellular_chat_on_imei(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->imei, argv[1], sizeof(data->imei));
+	strncpy(data->imei, argv[1], sizeof(data->imei) - 1);
 }
 
 static void modem_cellular_chat_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -313,7 +313,7 @@ static void modem_cellular_chat_on_cgmm(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->model_id, argv[1], sizeof(data->model_id));
+	strncpy(data->model_id, argv[1], sizeof(data->model_id) - 1);
 }
 
 static void modem_cellular_chat_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -325,7 +325,7 @@ static void modem_cellular_chat_on_cgmi(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->manufacturer, argv[1], sizeof(data->manufacturer));
+	strncpy(data->manufacturer, argv[1], sizeof(data->manufacturer) - 1);
 }
 
 static void modem_cellular_chat_on_cgmr(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -337,7 +337,7 @@ static void modem_cellular_chat_on_cgmr(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->fw_version, argv[1], sizeof(data->fw_version));
+	strncpy(data->fw_version, argv[1], sizeof(data->fw_version) - 1);
 }
 
 static void modem_cellular_chat_on_csq(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -370,7 +370,7 @@ static void modem_cellular_chat_on_imsi(struct modem_chat *chat, char **argv, ui
 {
 	struct modem_cellular_data *data = (struct modem_cellular_data *)user_data;
 
-	strncpy(data->imsi, (char *)argv[1], sizeof(data->imsi));
+	strncpy(data->imsi, argv[1], sizeof(data->imsi) - 1);
 }
 
 static bool modem_cellular_is_registered(struct modem_cellular_data *data)
@@ -445,13 +445,13 @@ MODEM_CHAT_MATCHES_DEFINE(dial_abort_matches,
 static void modem_cellular_log_state_changed(enum modem_cellular_state last_state,
 					     enum modem_cellular_state new_state)
 {
-	LOG_INF("switch from %s to %s", modem_cellular_state_str(last_state),
+	LOG_DBG("switch from %s to %s", modem_cellular_state_str(last_state),
 		modem_cellular_state_str(new_state));
 }
 
 static void modem_cellular_log_event(enum modem_cellular_event evt)
 {
-	LOG_INF("event %s", modem_cellular_event_str(evt));
+	LOG_DBG("event %s", modem_cellular_event_str(evt));
 }
 
 static void modem_cellular_start_timer(struct modem_cellular_data *data, k_timeout_t timeout)
@@ -1520,7 +1520,6 @@ static int modem_cellular_init(const struct device *dev)
 			.argv_size = ARRAY_SIZE(data->chat_argv),
 			.unsol_matches = unsol_matches,
 			.unsol_matches_size = ARRAY_SIZE(unsol_matches),
-			.process_timeout = K_MSEC(2),
 		};
 
 		modem_chat_init(&data->chat, &chat_config);

@@ -13,7 +13,7 @@ jobs:
     if: github.repository == 'zephyrproject-rtos/zephyr'
     runs-on: zephyr-runner-linux-x64-4xlarge
     container:
-      image: ghcr.io/zephyrproject-rtos/ci:v0.26.6
+      image: ghcr.io/zephyrproject-rtos/ci:v0.26.7
       options: '--entrypoint /bin/bash'
       volumes:
         - /repo-cache/zephyrproject:/github/cache/zephyrproject
@@ -41,7 +41,7 @@ jobs:
           git remote set-url origin ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}
 
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -89,7 +89,7 @@ jobs:
           export ZEPHYR_BASE=${PWD}
           export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
           mkdir -p coverage/reports
-          pip3 install gcovr
+          pip3 install gcovr==6.0
           ./scripts/twister -i --force-color -N -v --filter runnable -p ${{ matrix.platform }} --coverage -T tests --coverage-tool gcovr -xCONFIG_TEST_EXTRA_STACK_SIZE=4096 -e nano
 
       - name: ccache stats post
@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload Coverage Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Coverage Data (Subset ${{ matrix.platform }})
           path: coverage/reports/${{ matrix.platform }}.json
@@ -118,11 +118,11 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: coverage/reports
 
@@ -160,13 +160,13 @@ jobs:
       - name: Merge coverage files
         run: |
           cd ./coverage/reports
-          pip3 install gcovr
+          pip3 install gcovr==6.0
           gcovr ${{ steps.get-coverage-files.outputs.mergefiles }}  --merge-mode-functions=separate --json merged.json
           gcovr ${{ steps.get-coverage-files.outputs.mergefiles }} --merge-mode-functions=separate --cobertura merged.xml
 
       - name: Upload Merged Coverage Results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Merged Coverage Data
           path: |

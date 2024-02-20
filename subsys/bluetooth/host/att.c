@@ -595,6 +595,13 @@ static void att_on_sent_cb(struct bt_att_tx_meta_data *meta)
 
 	LOG_DBG("opcode 0x%x", meta->opcode);
 
+	if (!meta->att_chan ||
+	    !meta->att_chan->att ||
+	    !meta->att_chan->att->conn) {
+		LOG_DBG("Bearer not connected, dropping ATT cb");
+		return;
+	}
+
 	if (meta->err) {
 		LOG_ERR("Got err %d, not calling ATT cb", meta->err);
 		return;
@@ -1271,11 +1278,11 @@ static bool attr_read_authorize(struct bt_conn *conn,
 		return true;
 	}
 
-	if (!authorization_cb || !authorization_cb->read_operation_authorize) {
+	if (!authorization_cb || !authorization_cb->read_authorize) {
 		return true;
 	}
 
-	return authorization_cb->read_operation_authorize(conn, attr);
+	return authorization_cb->read_authorize(conn, attr);
 }
 
 static bool attr_read_type_cb(struct net_buf *frag, ssize_t read,
@@ -1949,11 +1956,11 @@ static bool attr_write_authorize(struct bt_conn *conn,
 		return true;
 	}
 
-	if (!authorization_cb || !authorization_cb->write_operation_authorize) {
+	if (!authorization_cb || !authorization_cb->write_authorize) {
 		return true;
 	}
 
-	return authorization_cb->write_operation_authorize(conn, attr);
+	return authorization_cb->write_authorize(conn, attr);
 }
 
 static uint8_t write_cb(const struct bt_gatt_attr *attr, uint16_t handle,

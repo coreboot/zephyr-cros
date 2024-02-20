@@ -158,15 +158,6 @@ static int mcux_flexcan_get_max_filters(const struct device *dev, bool ide)
 	return CONFIG_CAN_MAX_FILTER;
 }
 
-static int mcux_flexcan_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
-{
-	const struct mcux_flexcan_config *config = dev->config;
-
-	*max_bitrate = config->common.max_bitrate;
-
-	return 0;
-}
-
 static int mcux_flexcan_set_timing(const struct device *dev,
 				   const struct can_timing *timing)
 {
@@ -284,7 +275,7 @@ static int mcux_flexcan_start(const struct device *dev)
 	}
 
 	if (config->common.phy != NULL) {
-		err = can_transceiver_enable(config->common.phy);
+		err = can_transceiver_enable(config->common.phy, data->common.mode);
 		if (err != 0) {
 			LOG_ERR("failed to enable CAN transceiver (err %d)", err);
 			return err;
@@ -625,8 +616,7 @@ static void mcux_flexcan_can_filter_to_mbconfig(const struct can_filter *src,
 						uint32_t *mask)
 {
 	static const uint32_t ide_mask = 1U;
-	uint32_t rtr_mask = (src->flags & (CAN_FILTER_DATA | CAN_FILTER_RTR)) !=
-		(CAN_FILTER_DATA | CAN_FILTER_RTR) ? 1U : 0U;
+	static const uint32_t rtr_mask = !IS_ENABLED(CONFIG_CAN_ACCEPT_RTR);
 
 	if ((src->flags & CAN_FILTER_IDE) != 0) {
 		dest->format = kFLEXCAN_FrameFormatExtend;
@@ -638,11 +628,7 @@ static void mcux_flexcan_can_filter_to_mbconfig(const struct can_filter *src,
 		*mask = FLEXCAN_RX_MB_STD_MASK(src->mask, rtr_mask, ide_mask);
 	}
 
-	if ((src->flags & CAN_FILTER_RTR) != 0) {
-		dest->type = kFLEXCAN_FrameTypeRemote;
-	} else {
-		dest->type = kFLEXCAN_FrameTypeData;
-	}
+	dest->type = kFLEXCAN_FrameTypeData;
 }
 
 static int mcux_flexcan_get_state(const struct device *dev, enum can_state *state,
@@ -786,7 +772,6 @@ static int mcux_flexcan_add_rx_filter(const struct device *dev,
 				      void *user_data,
 				      const struct can_filter *filter)
 {
-	const uint8_t supported = CAN_FILTER_IDE | CAN_FILTER_DATA | CAN_FILTER_RTR;
 	const struct mcux_flexcan_config *config = dev->config;
 	struct mcux_flexcan_data *data = dev->data;
 	status_t status;
@@ -796,7 +781,7 @@ static int mcux_flexcan_add_rx_filter(const struct device *dev,
 
 	__ASSERT_NO_MSG(callback);
 
-	if ((filter->flags & ~(supported)) != 0) {
+	if ((filter->flags & ~(CAN_FILTER_IDE)) != 0) {
 		LOG_ERR("unsupported CAN filter flags 0x%02x", filter->flags);
 		return -ENOTSUP;
 	}
@@ -1316,7 +1301,6 @@ __maybe_unused static const struct can_driver_api mcux_flexcan_driver_api = {
 	.set_state_change_callback = mcux_flexcan_set_state_change_callback,
 	.get_core_clock = mcux_flexcan_get_core_clock,
 	.get_max_filters = mcux_flexcan_get_max_filters,
-	.get_max_bitrate = mcux_flexcan_get_max_bitrate,
 	/*
 	 * FlexCAN timing limits are specified in the "FLEXCANx_CTRL1 field
 	 * descriptions" table in the SoC reference manual.
@@ -1360,7 +1344,6 @@ static const struct can_driver_api mcux_flexcan_fd_driver_api = {
 	.set_state_change_callback = mcux_flexcan_set_state_change_callback,
 	.get_core_clock = mcux_flexcan_get_core_clock,
 	.get_max_filters = mcux_flexcan_get_max_filters,
-	.get_max_bitrate = mcux_flexcan_get_max_bitrate,
 	/*
 	 * FlexCAN FD timing limits are specified in the "CAN Bit Timing
 	 * Register (CBT)" and "CAN FD Bit Timing Register" field description

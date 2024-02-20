@@ -10,7 +10,7 @@ jobs:
   check-errno:
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/zephyrproject-rtos/ci:v0.26.6
+      image: ghcr.io/zephyrproject-rtos/ci:v0.26.7
 
     steps:
       - name: Apply container owner mismatch workaround
@@ -22,7 +22,7 @@ jobs:
           git config --global --add safe.directory ${GITHUB_WORKSPACE}
 
       - name: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Environment Setup
         run: |

@@ -34,7 +34,7 @@ static uint8_t received_base_size;
 static struct bt_auto_scan {
 	uint32_t broadcast_id;
 	bool pa_sync;
-	struct bt_bap_scan_delegator_subgroup subgroup;
+	struct bt_bap_bass_subgroup subgroup;
 } auto_scan = {
 	.broadcast_id = INVALID_BROADCAST_ID,
 };
@@ -128,7 +128,7 @@ static void bap_broadcast_assistant_recv_state_cb(
 		is_bad_code ? ", bad code" : "", is_bad_code ? bad_code : "");
 
 	for (int i = 0; i < state->num_subgroups; i++) {
-		const struct bt_bap_scan_delegator_subgroup *subgroup = &state->subgroups[i];
+		const struct bt_bap_bass_subgroup *subgroup = &state->subgroups[i];
 		struct net_buf_simple buf;
 
 		shell_print(ctx_shell, "\t[%d]: BIS sync 0x%04X, metadata_len %zu", i,
@@ -361,7 +361,7 @@ static int cmd_bap_broadcast_assistant_add_src(const struct shell *sh,
 					       size_t argc, char **argv)
 {
 	struct bt_bap_broadcast_assistant_add_src_param param = { 0 };
-	struct bt_bap_scan_delegator_subgroup subgroup = { 0 };
+	struct bt_bap_bass_subgroup subgroup = { 0 };
 	unsigned long broadcast_id;
 	unsigned long adv_sid;
 	int result;
@@ -586,10 +586,9 @@ static int cmd_bap_broadcast_assistant_add_broadcast_id(const struct shell *sh,
 							size_t argc,
 							char **argv)
 {
-	struct bt_bap_scan_delegator_subgroup subgroup = { 0 };
+	struct bt_bap_bass_subgroup subgroup = { 0 };
 	static bool scan_cbs_registered;
 	unsigned long broadcast_id;
-	unsigned long pa_sync;
 	int err = 0;
 
 	if (!scan_cbs_registered) {
@@ -614,13 +613,9 @@ static int cmd_bap_broadcast_assistant_add_broadcast_id(const struct shell *sh,
 		return -ENOEXEC;
 	}
 
-	pa_sync = shell_strtoul(argv[2], 0, &err);
+	auto_scan.pa_sync = shell_strtobool(argv[2], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "failed to parse pa_sync: %d", err);
-
-		return -ENOEXEC;
-	} else if (pa_sync != 0U && pa_sync != 1U) {
-		shell_error(sh, "pa_sync shall be boolean: %lu", pa_sync);
+		shell_error(sh, "Could not parse pa_sync: %d", err);
 
 		return -ENOEXEC;
 	}
@@ -662,7 +657,6 @@ static int cmd_bap_broadcast_assistant_add_broadcast_id(const struct shell *sh,
 
 	/* Store results in the `auto_scan` struct */
 	auto_scan.broadcast_id = broadcast_id;
-	auto_scan.pa_sync = pa_sync;
 	memcpy(&auto_scan.subgroup, &subgroup, sizeof(subgroup));
 
 	return 0;
@@ -672,7 +666,7 @@ static int cmd_bap_broadcast_assistant_mod_src(const struct shell *sh,
 					       size_t argc, char **argv)
 {
 	struct bt_bap_broadcast_assistant_mod_src_param param = { 0 };
-	struct bt_bap_scan_delegator_subgroup subgroup = { 0 };
+	struct bt_bap_bass_subgroup subgroup = { 0 };
 	unsigned long src_id;
 	int result = 0;
 
@@ -772,7 +766,7 @@ static int cmd_bap_broadcast_assistant_mod_src(const struct shell *sh,
 static inline bool add_pa_sync_base_subgroup_bis_cb(const struct bt_bap_base_subgroup_bis *bis,
 						    void *user_data)
 {
-	struct bt_bap_scan_delegator_subgroup *subgroup_param = user_data;
+	struct bt_bap_bass_subgroup *subgroup_param = user_data;
 
 	subgroup_param->bis_sync |= BIT(bis->index);
 
@@ -783,7 +777,7 @@ static inline bool add_pa_sync_base_subgroup_cb(const struct bt_bap_base_subgrou
 						void *user_data)
 {
 	struct bt_bap_broadcast_assistant_add_src_param *param = user_data;
-	struct bt_bap_scan_delegator_subgroup *subgroup_param;
+	struct bt_bap_bass_subgroup *subgroup_param;
 	uint8_t *data;
 	int ret;
 
@@ -819,7 +813,6 @@ static int cmd_bap_broadcast_assistant_add_pa_sync(const struct shell *sh,
 	struct bt_le_per_adv_sync *pa_sync = per_adv_syncs[0];
 	struct bt_le_per_adv_sync_info pa_info;
 	unsigned long broadcast_id;
-	unsigned long pa_sync_req;
 	uint32_t bis_bitfield_req;
 	int err;
 
@@ -840,18 +833,12 @@ static int cmd_bap_broadcast_assistant_add_pa_sync(const struct shell *sh,
 	param.adv_sid = pa_info.sid;
 	param.pa_interval = pa_info.interval;
 
-	pa_sync_req = shell_strtoul(argv[1], 0, &err);
+	param.pa_sync = shell_strtobool(argv[1], 0, &err);
 	if (err != 0) {
-		shell_error(sh, "failed to parse pa_sync: %d", err);
-
-		return -ENOEXEC;
-	} else if (pa_sync_req != 0U && pa_sync_req != 1U) {
-		shell_error(sh, "pa_sync_req shall be boolean: %lu", pa_sync_req);
+		shell_error(sh, "Could not parse pa_sync: %d", err);
 
 		return -ENOEXEC;
 	}
-
-	param.pa_sync = (bool)pa_sync_req;
 
 	broadcast_id = shell_strtoul(argv[2], 0, &err);
 	if (err != 0) {

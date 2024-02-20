@@ -155,7 +155,7 @@ int can_sja1000_start(const struct device *dev)
 	}
 
 	if (config->common.phy != NULL) {
-		err = can_transceiver_enable(config->common.phy);
+		err = can_transceiver_enable(config->common.phy, data->common.mode);
 		if (err != 0) {
 			LOG_ERR("failed to enable CAN transceiver (err %d)", err);
 			return err;
@@ -427,7 +427,7 @@ int can_sja1000_add_rx_filter(const struct device *dev, can_rx_callback_t callba
 	int filter_id = -ENOSPC;
 	int i;
 
-	if ((filter->flags & ~(CAN_FILTER_IDE | CAN_FILTER_DATA | CAN_FILTER_RTR)) != 0) {
+	if ((filter->flags & ~(CAN_FILTER_IDE)) != 0) {
 		LOG_ERR("unsupported CAN filter flags 0x%02x", filter->flags);
 		return -ENOTSUP;
 	}
@@ -549,15 +549,6 @@ int can_sja1000_get_max_filters(const struct device *dev, bool ide)
 	return CONFIG_CAN_MAX_FILTER;
 }
 
-int can_sja1000_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
-{
-	const struct can_sja1000_config *config = dev->config;
-
-	*max_bitrate = config->common.max_bitrate;
-
-	return 0;
-}
-
 static void can_sja1000_handle_receive_irq(const struct device *dev)
 {
 	struct can_sja1000_data *data = dev->data;
@@ -569,18 +560,24 @@ static void can_sja1000_handle_receive_irq(const struct device *dev)
 	do {
 		can_sja1000_read_frame(dev, &frame);
 
-		for (i = 0; i < ARRAY_SIZE(data->filters); i++) {
-			if (!atomic_test_bit(data->rx_allocs, i)) {
-				continue;
-			}
+#ifndef CONFIG_CAN_ACCEPT_RTR
+		if ((frame.flags & CAN_FRAME_RTR) == 0U) {
+#endif /* !CONFIG_CAN_ACCEPT_RTR */
+			for (i = 0; i < ARRAY_SIZE(data->filters); i++) {
+				if (!atomic_test_bit(data->rx_allocs, i)) {
+					continue;
+				}
 
-			if (can_frame_matches_filter(&frame, &data->filters[i].filter)) {
-				callback = data->filters[i].callback;
-				if (callback != NULL) {
-					callback(dev, &frame, data->filters[i].user_data);
+				if (can_frame_matches_filter(&frame, &data->filters[i].filter)) {
+					callback = data->filters[i].callback;
+					if (callback != NULL) {
+						callback(dev, &frame, data->filters[i].user_data);
+					}
 				}
 			}
+#ifndef CONFIG_CAN_ACCEPT_RTR
 		}
+#endif /* !CONFIG_CAN_ACCEPT_RTR */
 
 		can_sja1000_write_reg(dev, CAN_SJA1000_CMR, CAN_SJA1000_CMR_RRB);
 		sr = can_sja1000_read_reg(dev, CAN_SJA1000_SR);

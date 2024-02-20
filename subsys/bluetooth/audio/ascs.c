@@ -386,7 +386,6 @@ static void ase_exit_state_streaming(struct bt_ascs_ase *ase)
 	struct bt_bap_stream *stream = ase->ep.stream;
 	struct bt_bap_stream_ops *ops;
 	const enum bt_bap_ep_state next_state = ascs_ep_get_state(&ase->ep);
-
 	uint8_t reason = ase->ep.reason;
 
 	__ASSERT_NO_MSG(stream != NULL);
@@ -397,11 +396,6 @@ static void ase_exit_state_streaming(struct bt_ascs_ase *ase)
 	}
 
 	ops = stream->ops;
-	if (ops != NULL && ops->stopped != NULL) {
-		ops->stopped(stream, reason);
-	} else {
-		LOG_WRN("No callback for stopped set");
-	}
 
 	/*
 	 * On link-loss we go from streaming state to QOS configured state,
@@ -414,6 +408,12 @@ static void ase_exit_state_streaming(struct bt_ascs_ase *ase)
 		} else {
 			LOG_WRN("No callback for disabled set");
 		}
+	}
+
+	if (ops != NULL && ops->stopped != NULL) {
+		ops->stopped(stream, reason);
+	} else {
+		LOG_WRN("No callback for stopped set");
 	}
 }
 
@@ -853,7 +853,8 @@ static void ascs_iso_recv(struct bt_iso_chan *chan,
 		 * host as HCI ISO data packets, which we should just ignore
 		 */
 		if ((info->flags & BT_ISO_FLAGS_VALID) != 0) {
-			LOG_ERR("iso %p not bound with ep", chan);
+			LOG_DBG("Valid ISO packet of len %zu received for iso %p not bound with ep",
+				net_buf_frags_len(buf), chan);
 		}
 
 		return;
@@ -940,6 +941,7 @@ static void ascs_update_sdu_size(struct bt_bap_ep *ep)
 static void ascs_ep_iso_connected(struct bt_bap_ep *ep)
 {
 	struct bt_ascs_ase *ase = CONTAINER_OF(ep, struct bt_ascs_ase, ep);
+	const struct bt_bap_stream_ops *stream_ops;
 	struct bt_bap_stream *stream;
 
 	if (ep->status.state != BT_BAP_EP_STATE_ENABLING) {
@@ -964,6 +966,18 @@ static void ascs_ep_iso_connected(struct bt_bap_ep *ep)
 	 */
 	ascs_update_sdu_size(ep);
 
+	LOG_DBG("stream %p ep %p dir %s", stream, ep, bt_audio_dir_str(ep->dir));
+
+#if defined(CONFIG_BT_BAP_DEBUG_STREAM_SEQ_NUM)
+	/* reset sequence number */
+	stream->_prev_seq_num = 0U;
+#endif /* CONFIG_BT_BAP_DEBUG_STREAM_SEQ_NUM */
+
+	stream_ops = stream->ops;
+	if (stream_ops != NULL && stream_ops->connected != NULL) {
+		stream_ops->connected(stream);
+	}
+
 	if (ep->dir == BT_AUDIO_DIR_SINK && ep->receiver_ready) {
 		/* Source ASEs shall be ISO connected first, and then receive
 		 * the receiver start ready command to enter the streaming
@@ -971,8 +985,6 @@ static void ascs_ep_iso_connected(struct bt_bap_ep *ep)
 		 */
 		ascs_ep_set_state(ep, BT_BAP_EP_STATE_STREAMING);
 	}
-
-	LOG_DBG("stream %p ep %p dir %s", stream, ep, bt_audio_dir_str(ep->dir));
 }
 
 static void ascs_iso_connected(struct bt_iso_chan *chan)
@@ -996,6 +1008,7 @@ static void ascs_iso_connected(struct bt_iso_chan *chan)
 static void ascs_ep_iso_disconnected(struct bt_bap_ep *ep, uint8_t reason)
 {
 	struct bt_ascs_ase *ase = CONTAINER_OF(ep, struct bt_ascs_ase, ep);
+	const struct bt_bap_stream_ops *stream_ops;
 	struct bt_bap_stream *stream;
 
 	stream = ep->stream;
@@ -1006,6 +1019,11 @@ static void ascs_ep_iso_disconnected(struct bt_bap_ep *ep, uint8_t reason)
 
 	LOG_DBG("stream %p ep %p state %s reason 0x%02x", stream, stream->ep,
 		bt_bap_ep_state_str(ep->status.state), reason);
+
+	stream_ops = stream->ops;
+	if (stream_ops != NULL && stream_ops->disconnected != NULL) {
+		stream_ops->disconnected(stream, reason);
+	}
 
 	/* Cancel ASE disconnect work if pending */
 	(void)k_work_cancel_delayable(&ase->disconnect_work);
@@ -1917,11 +1935,7 @@ static void ase_qos(struct bt_ascs_ase *ase, uint8_t cig_id, uint8_t cis_id,
 	 * we have the ISO <-> EP coupling completed (due to setting
 	 * the CIS ID in the QoS procedure).
 	 */
-	if (ep->dir == BT_AUDIO_DIR_SINK) {
-		bt_audio_codec_cfg_to_iso_path(&ep->iso->rx.path, stream->codec_cfg);
-	} else {
-		bt_audio_codec_cfg_to_iso_path(&ep->iso->tx.path, stream->codec_cfg);
-	}
+	bt_bap_iso_configure_data_path(ep, stream->codec_cfg);
 
 	ep->cig_id = cig_id;
 	ep->cis_id = cis_id;

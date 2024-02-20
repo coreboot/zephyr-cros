@@ -415,8 +415,8 @@ static int tle9104_init(const struct device *dev)
 
 		register_cfg |= TLE9104_CFG_OUT1DD_BIT << i;
 
-		if (!device_is_ready(current->port)) {
-			LOG_ERR("control GPIO %s is not ready", current->port->name);
+		if (!gpio_is_ready_dt(current)) {
+			LOG_ERR("%s: control GPIO is not ready", dev->name);
 			return -ENODEV;
 		}
 
@@ -428,8 +428,8 @@ static int tle9104_init(const struct device *dev)
 	}
 
 	if (config->gpio_enable.port != NULL) {
-		if (!device_is_ready(config->gpio_enable.port)) {
-			LOG_ERR("enable GPIO %s is not ready", config->gpio_enable.port->name);
+		if (!gpio_is_ready_dt(&config->gpio_enable)) {
+			LOG_ERR("%s: enable GPIO is not ready", dev->name);
 			return -ENODEV;
 		}
 
@@ -440,16 +440,23 @@ static int tle9104_init(const struct device *dev)
 		}
 	}
 
-	result = gpio_pin_configure_dt(&config->gpio_reset, GPIO_OUTPUT_ACTIVE);
-	if (result != 0) {
-		LOG_ERR("failed to initialize GPIO for reset");
-		return result;
-	}
+	if (config->gpio_reset.port != NULL) {
+		if (!gpio_is_ready_dt(&config->gpio_reset)) {
+			LOG_ERR("%s: reset GPIO is not yet ready", dev->name);
+			return -ENODEV;
+		}
 
-	k_busy_wait(TLE9104_RESET_DURATION_TIME_US);
-	gpio_pin_set_dt(&config->gpio_reset, 0);
-	k_busy_wait(TLE9104_RESET_DURATION_WAIT_TIME_US +
-		    TLE9104_RESET_DURATION_WAIT_TIME_SAFETY_MARGIN_US);
+		result = gpio_pin_configure_dt(&config->gpio_reset, GPIO_OUTPUT_ACTIVE);
+		if (result != 0) {
+			LOG_ERR("failed to initialize GPIO for reset");
+			return result;
+		}
+
+		k_busy_wait(TLE9104_RESET_DURATION_TIME_US);
+		gpio_pin_set_dt(&config->gpio_reset, 0);
+		k_busy_wait(TLE9104_RESET_DURATION_WAIT_TIME_US +
+			    TLE9104_RESET_DURATION_WAIT_TIME_SAFETY_MARGIN_US);
+	}
 
 	/*
 	 * The first read value should be the ICVID, this acts also as the setup of the
@@ -525,7 +532,7 @@ BUILD_ASSERT(CONFIG_GPIO_TLE9104_INIT_PRIORITY > CONFIG_SPI_INIT_PRIORITY,
 		.bus = SPI_DT_SPEC_INST_GET(                                                       \
 			inst, SPI_OP_MODE_MASTER | SPI_MODE_CPHA | SPI_WORD_SET(8), 0),            \
 		.gpio_enable = TLE9104_INIT_GPIO_FIELDS(inst, en_gpios),                           \
-		.gpio_reset = GPIO_DT_SPEC_GET_BY_IDX(DT_DRV_INST(inst), resn_gpios, 0),           \
+		.gpio_reset = TLE9104_INIT_GPIO_FIELDS(inst, resn_gpios),                          \
 		.gpio_control = {                                                                  \
 				TLE9104_INIT_GPIO_FIELDS(inst, in1_gpios),                         \
 				TLE9104_INIT_GPIO_FIELDS(inst, in2_gpios),                         \

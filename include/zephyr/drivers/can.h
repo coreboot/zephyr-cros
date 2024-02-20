@@ -203,11 +203,6 @@ struct can_frame {
 /** Filter matches frames with extended (29-bit) CAN IDs */
 #define CAN_FILTER_IDE  BIT(0)
 
-/** Filter matches Remote Transmission Request (RTR) frames */
-#define CAN_FILTER_RTR  BIT(1)
-
-/** Filter matches data frames */
-#define CAN_FILTER_DATA BIT(2)
 
 /** @} */
 
@@ -487,12 +482,6 @@ typedef int (*can_get_core_clock_t)(const struct device *dev, uint32_t *rate);
  */
 typedef int (*can_get_max_filters_t)(const struct device *dev, bool ide);
 
-/**
- * @brief Optional callback API upon getting the maximum supported bitrate
- * See @a can_get_max_bitrate() for argument description
- */
-typedef int (*can_get_max_bitrate_t)(const struct device *dev, uint32_t *max_bitrate);
-
 __subsystem struct can_driver_api {
 	can_get_capabilities_t get_capabilities;
 	can_start_t start;
@@ -509,7 +498,6 @@ __subsystem struct can_driver_api {
 	can_set_state_change_callback_t set_state_change_callback;
 	can_get_core_clock_t get_core_clock;
 	can_get_max_filters_t get_max_filters;
-	can_get_max_bitrate_t get_max_bitrate;
 	/* Min values for the timing registers */
 	struct can_timing timing_min;
 	/* Max values for the timing registers */
@@ -829,13 +817,15 @@ __syscall int can_get_max_bitrate(const struct device *dev, uint32_t *max_bitrat
 
 static inline int z_impl_can_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
 {
-	const struct can_driver_api *api = (const struct can_driver_api *)dev->api;
+	const struct can_driver_config *common = (const struct can_driver_config *)dev->config;
 
-	if (api->get_max_bitrate == NULL) {
+	if (common->max_bitrate == 0U) {
 		return -ENOSYS;
 	}
 
-	return api->get_max_bitrate(dev, max_bitrate);
+	*max_bitrate = common->max_bitrate;
+
+	return 0;
 }
 
 /**
@@ -1072,6 +1062,24 @@ static inline int z_impl_can_get_capabilities(const struct device *dev, can_mode
 }
 
 /**
+ * @brief Get the CAN transceiver associated with the CAN controller
+ *
+ * Get a pointer to the device structure for the CAN transceiver associated with the CAN controller.
+ *
+ * @param dev Pointer to the device structure for the driver instance.
+ * @return Pointer to the device structure for the associated CAN transceiver driver instance, or
+ *         NULL if no transceiver is associated.
+ */
+__syscall const struct device *can_get_transceiver(const struct device *dev);
+
+static const struct device *z_impl_can_get_transceiver(const struct device *dev)
+{
+	const struct can_driver_config *common = (const struct can_driver_config *)dev->config;
+
+	return common->phy;
+}
+
+/**
  * @brief Start the CAN controller
  *
  * Bring the CAN controller out of `CAN_STATE_STOPPED`. This will reset the RX/TX error counters,
@@ -1138,6 +1146,22 @@ static inline int z_impl_can_set_mode(const struct device *dev, can_mode_t mode)
 	const struct can_driver_api *api = (const struct can_driver_api *)dev->api;
 
 	return api->set_mode(dev, mode);
+}
+
+/**
+ * @brief Get the operation mode of the CAN controller
+ *
+ * @param dev Pointer to the device structure for the driver instance.
+ *
+ * @return Current operation mode.
+ */
+__syscall can_mode_t can_get_mode(const struct device *dev);
+
+static inline can_mode_t z_impl_can_get_mode(const struct device *dev)
+{
+	const struct can_driver_data *common = (const struct can_driver_data *)dev->data;
+
+	return common->mode;
 }
 
 /**
@@ -1259,7 +1283,7 @@ static inline int can_add_rx_filter(const struct device *dev, can_rx_callback_t 
 {
 	const struct can_driver_api *api = (const struct can_driver_api *)dev->api;
 
-	if (filter == NULL || (filter->flags & (CAN_FILTER_DATA | CAN_FILTER_RTR)) == 0) {
+	if (filter == NULL) {
 		return -EINVAL;
 	}
 
@@ -1680,16 +1704,6 @@ static inline bool can_frame_matches_filter(const struct can_frame *frame,
 
 	if ((frame->flags & CAN_FRAME_IDE) == 0 && (filter->flags & CAN_FILTER_IDE) != 0) {
 		/* Standard (11-bit) ID frame, extended (29-bit) filter */
-		return false;
-	}
-
-	if ((frame->flags & CAN_FRAME_RTR) == 0 && (filter->flags & CAN_FILTER_DATA) == 0) {
-		/* non-RTR frame, remote transmission request (RTR) filter */
-		return false;
-	}
-
-	if ((frame->flags & CAN_FRAME_RTR) != 0 && (filter->flags & CAN_FILTER_RTR) == 0) {
-		/* Remote transmission request (RTR) frame, non-RTR filter */
 		return false;
 	}
 

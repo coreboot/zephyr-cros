@@ -9,9 +9,9 @@
 #include <zephyr/pm/device_runtime.h>
 #include <adsp_shim.h>
 
-#if CONFIG_ACE_VERSION_1_5
+#if CONFIG_SOC_INTEL_ACE15_MTPM
 #include <adsp_power.h>
-#endif /* CONFIG_ACE_VERSION_1_5 */
+#endif /* CONFIG_SOC_INTEL_ACE15_MTPM */
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(power_domain_intel_adsp, LOG_LEVEL_INF);
@@ -35,7 +35,7 @@ static int pd_intel_adsp_set_power_enable(struct pg_bits *bits, bool power_enabl
 			return -EIO;
 		}
 	} else {
-#if CONFIG_ACE_VERSION_1_5
+#if CONFIG_SOC_INTEL_ACE15_MTPM
 		extern uint32_t g_key_read_holder;
 
 		if (bits->SPA_bit == INTEL_ADSP_HST_DOMAIN_BIT) {
@@ -99,6 +99,6 @@ static int pd_intel_adsp_init(const struct device *dev)
 	PM_DEVICE_DT_INST_DEFINE(id, pd_intel_adsp_pm_action);				\
 	DEVICE_DT_INST_DEFINE(id, pd_intel_adsp_init, PM_DEVICE_DT_INST_GET(id),	\
 			      &pd_pg_reg##id, NULL, POST_KERNEL,			\
-			      CONFIG_KERNEL_INIT_PRIORITY_DEFAULT, NULL);
+			      CONFIG_POWER_DOMAIN_INTEL_ADSP_INIT_PRIORITY, NULL);
 
 DT_INST_FOREACH_STATUS_OKAY(POWER_DOMAIN_DEVICE)

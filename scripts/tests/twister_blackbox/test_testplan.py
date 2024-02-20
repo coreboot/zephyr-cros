@@ -53,7 +53,6 @@ class TestTestPlan:
     def teardown_class(cls):
         pass
 
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'level, expected_tests',
         TESTDATA_1,
@@ -62,7 +61,7 @@ class TestTestPlan:
     @mock.patch.object(TestPlan, 'TESTSUITE_FILENAME', testsuite_filename_mock)
     def test_level(self, out_path, level, expected_tests):
         test_platforms = ['qemu_x86', 'frdm_k64f']
-        path = os.path.join(TEST_DATA, 'tests')
+        path = os.path.join(TEST_DATA, 'tests', 'dummy')
         config_path = os.path.join(TEST_DATA, 'test_config.yaml')
         args = ['-i','--outdir', out_path, '-T', path, '--level', level, '-y',
                 '--test-config', config_path] + \
@@ -86,7 +85,6 @@ class TestTestPlan:
 
         assert expected_tests == len(filtered_j)
 
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'test, expected_exception, expected_subtest_count',
         TESTDATA_2,
@@ -120,8 +118,6 @@ class TestTestPlan:
         assert str(exc.value) == '0'
         assert len(filtered_j) == expected_subtest_count
 
-
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'filter, expected_count',
         TESTDATA_3,
@@ -152,7 +148,6 @@ class TestTestPlan:
 
         assert expected_count == len(filtered_j)
 
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'integration, expected_count',
         TESTDATA_4,

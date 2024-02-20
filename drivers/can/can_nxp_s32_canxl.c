@@ -50,6 +50,10 @@
 #define CAN_NXP_S32_RX_FIFO_WATERMARK 1
 #endif
 
+#if defined(CONFIG_CAN_FD_MODE) && defined(CONFIG_CAN_NXP_S32_RX_FIFO)
+#define CAN_NXP_S32_FD_MODE 1
+#endif
+
 LOG_MODULE_REGISTER(nxp_s32_canxl, CONFIG_CAN_LOG_LEVEL);
 
 #define SP_AND_TIMING_NOT_SET(inst)				\
@@ -62,7 +66,7 @@ LOG_MODULE_REGISTER(nxp_s32_canxl, CONFIG_CAN_LOG_LEVEL);
 #error You must either set a sampling-point or timings (phase-seg* and prop-seg)
 #endif
 
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 
 #define SP_AND_TIMING_DATA_NOT_SET(inst)			\
 	(!DT_INST_NODE_HAS_PROP(inst, sample_point_data) &&	\
@@ -91,7 +95,7 @@ struct can_nxp_s32_config {
 	uint32_t prop_seg;
 	uint32_t phase_seg1;
 	uint32_t phase_seg2;
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	uint32_t sjw_data;
 	uint32_t prop_seg_data;
 	uint32_t phase_seg1_data;
@@ -140,7 +144,7 @@ struct can_nxp_s32_data {
 #endif
 
 	struct can_timing timing;
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	struct can_timing timing_data;
 #endif
 	enum can_state state;
@@ -152,7 +156,7 @@ static int can_nxp_s32_get_capabilities(const struct device *dev, can_mode_t *ca
 
 	*cap = CAN_MODE_NORMAL | CAN_MODE_LOOPBACK | CAN_MODE_LISTENONLY;
 
-#if CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	*cap |= CAN_MODE_FD;
 #endif
 
@@ -214,7 +218,7 @@ static int can_nxp_s32_start(const struct device *dev)
 	}
 
 	if (config->common.phy != NULL) {
-		err = can_transceiver_enable(config->common.phy);
+		err = can_transceiver_enable(config->common.phy, data->common.mode);
 		if (err != 0) {
 			LOG_ERR("failed to enable CAN transceiver (err %d)", err);
 			return err;
@@ -309,7 +313,7 @@ static int can_nxp_s32_set_mode(const struct device *dev, can_mode_t mode)
 	if (data->common.started) {
 		return -EBUSY;
 	}
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	if ((mode & ~(CAN_MODE_LOOPBACK | CAN_MODE_LISTENONLY | CAN_MODE_FD)) != 0) {
 #else
 	if ((mode & ~(CAN_MODE_LOOPBACK | CAN_MODE_LISTENONLY)) != 0) {
@@ -361,15 +365,6 @@ static int can_nxp_s32_get_max_filters(const struct device *dev, bool ide)
 	ARG_UNUSED(ide);
 
 	return CONFIG_CAN_NXP_S32_MAX_RX;
-}
-
-static int can_nxp_s32_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
-{
-	const struct can_nxp_s32_config *config = dev->config;
-
-	*max_bitrate = config->common.max_bitrate;
-
-	return 0;
 }
 
 static int can_nxp_s32_get_state(const struct device *dev, enum can_state *state,
@@ -506,7 +501,8 @@ static int can_nxp_s32_add_rx_filter(const struct device *dev,
 	uint32_t mask;
 
 	__ASSERT_NO_MSG(callback != NULL);
-	if ((filter->flags & ~(CAN_FILTER_IDE | CAN_FILTER_DATA)) != 0) {
+
+	if ((filter->flags & ~(CAN_FILTER_IDE)) != 0) {
 		LOG_ERR("unsupported CAN filter flags 0x%02x", filter->flags);
 		return -ENOTSUP;
 	}
@@ -537,6 +533,10 @@ static int can_nxp_s32_add_rx_filter(const struct device *dev,
 	} else {
 		mask = (filter->mask << CANXL_IP_ID_STD_SHIFT) & CANXL_IP_ID_STD_MASK;
 	}
+
+#ifndef CONFIG_CAN_ACCEPT_RTR
+	mask |= CANXL_MSG_DESCRIPTORS_MDFLT1FD_RTRMSK_MASK;
+#endif /* !CONFIG_CAN_ACCEPT_RTR */
 
 	Canexcel_Ip_EnterFreezeMode(config->instance);
 
@@ -593,7 +593,7 @@ static int can_nxp_s32_send(const struct device *dev,
 
 	__ASSERT_NO_MSG(callback != NULL);
 
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	if ((frame->flags & ~(CAN_FRAME_IDE | CAN_FRAME_FDF | CAN_FRAME_BRS)) != 0) {
 		LOG_ERR("unsupported CAN frame flags 0x%02x", frame->flags);
 		return -ENOTSUP;
@@ -628,7 +628,7 @@ static int can_nxp_s32_send(const struct device *dev,
 			LOG_ERR("DLC of %d for non-FD format frame", frame->dlc);
 			return -EINVAL;
 		}
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	} else {
 		if (frame->dlc > CANFD_MAX_DLC) {
 			LOG_ERR("DLC of %d for CAN FD format frame", frame->dlc);
@@ -729,7 +729,7 @@ static int can_nxp_s32_set_timing(const struct device *dev,
 	return 0;
 }
 
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 static int can_nxp_s32_set_timing_data(const struct device *dev,
 			const struct can_timing *timing_data)
 {
@@ -995,7 +995,7 @@ static int can_nxp_s32_init(const struct device *dev)
 	LOG_DBG("Setting CAN bitrate %d:", config->common.bus_speed);
 	nxp_s32_zcan_timing_to_canxl_timing(&data->timing, &config->can_cfg->bitrate);
 
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	data->timing_data.sjw = config->sjw_data;
 	if (config->common.sample_point_data) {
 		err = can_calc_timing_data(dev, &data->timing_data, config->common.bus_speed_data,
@@ -1083,7 +1083,6 @@ static const struct can_driver_api can_nxp_s32_driver_api = {
 	.set_state_change_callback = can_nxp_s32_set_state_change_callback,
 	.get_core_clock = can_nxp_s32_get_core_clock,
 	.get_max_filters = can_nxp_s32_get_max_filters,
-	.get_max_bitrate = can_nxp_s32_get_max_bitrate,
 	.timing_min = {
 		.sjw = 0x01,
 		.prop_seg = 0x01,
@@ -1098,7 +1097,7 @@ static const struct can_driver_api can_nxp_s32_driver_api = {
 		.phase_seg2 = 0x08,
 		.prescaler = 0x100
 	},
-#ifdef CONFIG_CAN_FD_MODE
+#ifdef CAN_NXP_S32_FD_MODE
 	.set_timing_data = can_nxp_s32_set_timing_data,
 	.timing_data_min = {
 		.sjw = 0x01,
@@ -1150,17 +1149,15 @@ static const struct can_driver_api can_nxp_s32_driver_api = {
 		can_nxp_s32_ctrl_callback(dev, eventType, buffIdx, canexcelState);	\
 	}
 
-#if defined(CONFIG_CAN_FD_MODE)
+#if defined(CAN_NXP_S32_FD_MODE)
 #define CAN_NXP_S32_TIMING_DATA_CONFIG(n)						\
 		.sjw_data = DT_INST_PROP(n, sjw_data),					\
 		.prop_seg_data = DT_INST_PROP_OR(n, prop_seg_data, 0),			\
 		.phase_seg1_data = DT_INST_PROP_OR(n, phase_seg1_data, 0),		\
 		.phase_seg2_data = DT_INST_PROP_OR(n, phase_seg2_data, 0),
-#define CAN_NXP_S32_FD_MODE	1
 #define CAN_NXP_S32_BRS		1
 #else
 #define CAN_NXP_S32_TIMING_DATA_CONFIG(n)
-#define CAN_NXP_S32_FD_MODE	0
 #define CAN_NXP_S32_BRS		0
 #endif
 
@@ -1195,7 +1192,7 @@ static const struct can_driver_api can_nxp_s32_driver_api = {
 							0 : CONFIG_CAN_NXP_S32_MAX_RX,	\
 		.tx_mbdesc = (uint8)CONFIG_CAN_NXP_S32_MAX_TX,				\
 		.CanxlMode = CANEXCEL_LISTEN_ONLY_MODE,					\
-		.fd_enable = (boolean)CAN_NXP_S32_FD_MODE,				\
+		.fd_enable = (boolean)IS_ENABLED(CAN_NXP_S32_FD_MODE),			\
 		.bitRateSwitch = (boolean)CAN_NXP_S32_BRS,				\
 		.ctrlOptions = (uint32)CAN_NXP_S32_CTRL_OPTIONS,			\
 		.Callback = nxp_s32_can_##n##_ctrl_callback,				\

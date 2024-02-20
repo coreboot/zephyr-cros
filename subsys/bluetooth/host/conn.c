@@ -85,6 +85,8 @@ static void conn_tx_destroy(struct bt_conn *conn, struct bt_conn_tx *tx)
 static void tx_complete_work(struct k_work *work);
 #endif /* CONFIG_BT_CONN_TX */
 
+static void notify_recycled_conn_slot(void);
+
 /* Group Connected BT_CONN only in this */
 #if defined(CONFIG_BT_CONN)
 /* Peripheral timeout to initialize Connection Parameter Update procedure */
@@ -584,12 +586,6 @@ static int do_send_frag(struct bt_conn *conn, struct net_buf *buf, uint8_t flags
 	unsigned int key;
 	int err = 0;
 
-	/* Check for disconnection while waiting for pkts_sem */
-	if (conn->state != BT_CONN_CONNECTED) {
-		err = -ENOTCONN;
-		goto fail;
-	}
-
 	LOG_DBG("conn %p buf %p len %u flags 0x%02x", conn, buf, buf->len,
 		flags);
 
@@ -667,6 +663,14 @@ static int send_frag(struct bt_conn *conn,
 		return -ENOBUFS;
 	}
 
+	/* Check for disconnection. It can't be done higher up (ie `send_buf`)
+	 * as `create_frag` blocks with K_FOREVER and the connection could
+	 * change state after waiting.
+	 */
+	if (conn->state != BT_CONN_CONNECTED) {
+		return -ENOTCONN;
+	}
+
 	/* Add the data to the buffer */
 	if (frag) {
 		uint16_t frag_len = MIN(conn_mtu(conn), net_buf_tailroom(frag));
@@ -718,6 +722,23 @@ static struct net_buf *create_frag(struct bt_conn *conn, struct net_buf *buf)
 	return frag;
 }
 
+/* Tentatively send a buffer to the HCI driver.
+ *
+ * This is designed to be async, as in most failures due to lack of resources
+ * are not fatal. The caller should call `send_buf()` again later.
+ *
+ * Return values:
+ *
+ * - 0: `buf` sent. `buf` ownership transferred to lower layers.
+ *
+ * - -EIO: buffer failed to send due to HCI error. `buf` ownership returned to
+ *    caller BUT `buf` is popped from the TX queue. The caller shall destroy
+ *    `buf` and its TX context.
+ *
+ * - Any other error: buffer failed to send. `buf` ownership returned to caller
+ *   and `buf` is still the head of the TX queue
+ *
+ */
 static int send_buf(struct bt_conn *conn, struct net_buf *buf)
 {
 	struct net_buf *frag;
@@ -927,6 +948,12 @@ void bt_conn_process_tx(struct bt_conn *conn)
 	err = send_buf(conn, buf);
 	net_buf_unref(buf);
 
+	/* HCI driver error. `buf` may have been popped from `tx_queue` and
+	 * should be destroyed.
+	 *
+	 * TODO: In that case we might want to disable Bluetooth or at the very
+	 * least tear down the connection.
+	 */
 	if (err  == -EIO) {
 		struct bt_conn_tx *tx = tx_data(buf)->tx;
 
@@ -1311,15 +1338,38 @@ struct bt_conn *bt_conn_ref(struct bt_conn *conn)
 void bt_conn_unref(struct bt_conn *conn)
 {
 	atomic_val_t old;
+	bool deallocated;
+	enum bt_conn_type conn_type;
+	uint8_t conn_role;
+	uint16_t conn_handle;
+
+	__ASSERT(conn, "Invalid connection reference");
+
+	/* Storing parameters of interest so we don't access the object
+	 * after decrementing its ref-count
+	 */
+	conn_type = conn->type;
+	conn_role = conn->role;
+	conn_handle = conn->handle;
 
 	old = atomic_dec(&conn->ref);
+	/* Prevent from accessing connection object */
+	conn = NULL;
+	deallocated = (atomic_get(&old) == 1);
 
-	LOG_DBG("handle %u ref %ld -> %ld", conn->handle, old, atomic_get(&conn->ref));
+	LOG_DBG("handle %u ref %ld -> %ld", conn_handle, old, (old - 1));
 
 	__ASSERT(old > 0, "Conn reference counter is 0");
 
-	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->type == BT_CONN_TYPE_LE &&
-	    conn->role == BT_CONN_ROLE_PERIPHERAL && atomic_get(&conn->ref) == 0) {
+	/* Slot has been freed and can be taken. No guarantees are made on requests
+	 * to claim connection object as only the first claim will be served.
+	 */
+	if (deallocated) {
+		notify_recycled_conn_slot();
+	}
+
+	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn_type == BT_CONN_TYPE_LE &&
+	    conn_role == BT_CONN_ROLE_PERIPHERAL && deallocated) {
 		bt_le_adv_resume();
 	}
 }
@@ -1430,6 +1480,23 @@ static void tx_complete_work(struct k_work *work)
 	tx_notify(conn);
 }
 #endif /* CONFIG_BT_CONN_TX */
+
+static void notify_recycled_conn_slot(void)
+{
+#if defined(CONFIG_BT_CONN)
+	for (struct bt_conn_cb *cb = callback_list; cb; cb = cb->_next) {
+		if (cb->recycled) {
+			cb->recycled();
+		}
+	}
+
+	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
+		if (cb->recycled) {
+			cb->recycled();
+		}
+	}
+#endif
+}
 
 /* Group Connected BT_CONN only in this */
 #if defined(CONFIG_BT_CONN)
@@ -2337,6 +2404,33 @@ void bt_conn_cb_register(struct bt_conn_cb *cb)
 {
 	cb->_next = callback_list;
 	callback_list = cb;
+}
+
+int bt_conn_cb_unregister(struct bt_conn_cb *cb)
+{
+	struct bt_conn_cb *previous_callback;
+
+	CHECKIF(cb == NULL) {
+		return -EINVAL;
+	}
+
+	if (callback_list == cb) {
+		callback_list = callback_list->_next;
+		return 0;
+	}
+
+	previous_callback = callback_list;
+
+	while (previous_callback->_next) {
+		if (previous_callback->_next == cb) {
+			previous_callback->_next = previous_callback->_next->_next;
+			return 0;
+		}
+
+		previous_callback = previous_callback->_next;
+	}
+
+	return -ENOENT;
 }
 
 bool bt_conn_exists_le(uint8_t id, const bt_addr_le_t *peer)

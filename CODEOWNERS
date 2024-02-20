@@ -234,6 +234,7 @@
 /drivers/flash/*cc13xx_cc26xx*            @pepe2k
 /drivers/flash/*nrf*                      @de-nordic
 /drivers/flash/*esp32*                    @sylvioalves
+/drivers/flash/flash_cadence_nand*        @nbalabak
 /drivers/gpio/*b91*                       @andy-liu-telink
 /drivers/gpio/*lmp90xxx*                  @henrikbrixandersen
 /drivers/gpio/*nct38xx*                   @MulinChao @ChiHuaL
@@ -365,7 +366,7 @@
 /drivers/spi/*esp32*                      @sylvioalves
 /drivers/spi/*pl022*                      @soburi
 /drivers/sdhc/                            @danieldegrasse
-/drivers/sdhc/sdhc_cdns*                  @roymurlidhar
+/drivers/sdhc/sdhc_cdns*                  @roymurlidhar @tanmaykathpalia
 /drivers/timer/*arm_arch*                 @carlocaione
 /drivers/timer/*cortex_m_systick*         @anangl
 /drivers/timer/*altera_avalon*            @nashif

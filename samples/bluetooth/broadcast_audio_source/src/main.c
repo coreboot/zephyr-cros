@@ -98,7 +98,7 @@ static void fill_audio_buf_sin(int16_t *buf, int length_us, int frequency_hz, in
 	const float step = 2 * 3.1415f / sine_period_samples;
 
 	for (unsigned int i = 0; i < num_samples; i++) {
-		const float sample = sin(i * step);
+		const float sample = sinf(i * step);
 
 		buf[i] = (int16_t)(AUDIO_VOLUME * sample);
 	}
@@ -171,6 +171,7 @@ static void send_data(struct broadcast_source_stream *source_stream)
 
 	if (source_stream->lc3_encoder == NULL) {
 		printk("LC3 encoder not setup, cannot encode data.\n");
+		net_buf_unref(buf);
 		return;
 	}
 
@@ -190,6 +191,7 @@ static void send_data(struct broadcast_source_stream *source_stream)
 			 send_pcm_data, 1, octets_per_frame, lc3_encoded_buffer);
 	if (ret == -1) {
 		printk("LC3 encoder failed - wrong parameters?: %d", ret);
+		net_buf_unref(buf);
 		return;
 	}
 
@@ -198,7 +200,7 @@ static void send_data(struct broadcast_source_stream *source_stream)
 	net_buf_add_mem(buf, send_pcm_data, preset_active.qos.sdu);
 #endif /* defined(CONFIG_LIBLC3) */
 
-	ret = bt_bap_stream_send(stream, buf, source_stream->seq_num++, BT_ISO_TIMESTAMP_NONE);
+	ret = bt_bap_stream_send(stream, buf, source_stream->seq_num++);
 	if (ret < 0) {
 		/* This will end broadcasting on this stream. */
 		printk("Unable to broadcast data on %p: %d\n", stream, ret);
@@ -384,9 +386,9 @@ static int setup_broadcast_source(struct bt_bap_broadcast_source **source)
 		subgroup_param[CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT];
 	struct bt_bap_broadcast_source_param create_param;
 	const size_t streams_per_subgroup = ARRAY_SIZE(stream_params) / ARRAY_SIZE(subgroup_param);
-	uint8_t left[] = {BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CONFIG_LC3_CHAN_ALLOC,
+	uint8_t left[] = {BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CFG_CHAN_ALLOC,
 			  BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_LEFT))};
-	uint8_t right[] = {BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CONFIG_LC3_CHAN_ALLOC,
+	uint8_t right[] = {BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CFG_CHAN_ALLOC,
 			   BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_RIGHT))};
 	int err;
 

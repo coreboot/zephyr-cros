@@ -81,13 +81,15 @@ _region_min_align = 4;
 
 #define BSS_ALIGN ALIGN(_region_min_align)
 
+#define MMU_ALIGN    . = ALIGN(_region_min_align)
+
 MEMORY
 {
     FLASH    (rx) : ORIGIN = ROM_ADDR, LENGTH = ROM_SIZE
     RAM      (wx) : ORIGIN = RAM_ADDR, LENGTH = RAM_SIZE
     LINKER_DT_REGIONS()
     /* Used by and documented in include/linker/intlist.ld */
-    IDT_LIST (wx) : ORIGIN = 0xFFFFF7FF, LENGTH = 2K
+    IDT_LIST (wx) : ORIGIN = 0xFFFF8000, LENGTH = 32K
 }
 
 ENTRY(CONFIG_KERNEL_ENTRY)

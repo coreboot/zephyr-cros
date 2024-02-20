@@ -362,6 +362,12 @@ static void can_rcar_rx_filter_isr(const struct device *dev,
 	struct can_frame tmp_frame;
 	uint8_t i;
 
+#ifndef CONFIG_CAN_ACCEPT_RTR
+	if ((frame->flags & CAN_FRAME_RTR) != 0U) {
+		return;
+	}
+#endif /* !CONFIG_CAN_ACCEPT_RTR */
+
 	for (i = 0; i < CONFIG_CAN_RCAR_MAX_FILTER; i++) {
 		if (data->rx_callback[i] == NULL) {
 			continue;
@@ -578,7 +584,7 @@ static int can_rcar_start(const struct device *dev)
 	}
 
 	if (config->common.phy != NULL) {
-		ret = can_transceiver_enable(config->common.phy);
+		ret = can_transceiver_enable(config->common.phy, data->common.mode);
 		if (ret != 0) {
 			LOG_ERR("failed to enable CAN transceiver (err %d)", ret);
 			return ret;
@@ -957,7 +963,7 @@ static int can_rcar_add_rx_filter(const struct device *dev, can_rx_callback_t cb
 	struct can_rcar_data *data = dev->data;
 	int filter_id;
 
-	if ((filter->flags & ~(CAN_FILTER_IDE | CAN_FILTER_DATA)) != 0) {
+	if ((filter->flags & ~(CAN_FILTER_IDE)) != 0) {
 		LOG_ERR("unsupported CAN filter flags 0x%02x", filter->flags);
 		return -ENOTSUP;
 	}
@@ -1140,15 +1146,6 @@ static int can_rcar_get_max_filters(const struct device *dev, bool ide)
 	return CONFIG_CAN_RCAR_MAX_FILTER;
 }
 
-static int can_rcar_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
-{
-	const struct can_rcar_cfg *config = dev->config;
-
-	*max_bitrate = config->common.max_bitrate;
-
-	return 0;
-}
-
 static const struct can_driver_api can_rcar_driver_api = {
 	.get_capabilities = can_rcar_get_capabilities,
 	.start = can_rcar_start,
@@ -1165,7 +1162,6 @@ static const struct can_driver_api can_rcar_driver_api = {
 	.set_state_change_callback = can_rcar_set_state_change_callback,
 	.get_core_clock = can_rcar_get_core_clock,
 	.get_max_filters = can_rcar_get_max_filters,
-	.get_max_bitrate = can_rcar_get_max_bitrate,
 	.timing_min = {
 		.sjw = 0x1,
 		.prop_seg = 0x00,

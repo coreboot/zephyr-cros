@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2022 Byte-Lab d.o.o. <dev@byte-lab.com>
  * Copyright 2023 NXP
+ * Copyright (c) 2024 STMicroelectronics
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -18,6 +19,7 @@
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/sys/barrier.h>
+#include <zephyr/cache.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(display_stm32_ltdc, CONFIG_DISPLAY_LOG_LEVEL);
@@ -54,22 +56,6 @@ LOG_MODULE_REGISTER(display_stm32_ltdc, CONFIG_DISPLAY_LOG_LEVEL);
 #error "Invalid LTDC pixel format chosen"
 #endif
 
-#if defined(CONFIG_HAS_CMSIS_CORE_M)
-#include <cmsis_core.h>
-
-#if defined(CONFIG_DCACHE)
-#define CACHE_INVALIDATE(addr, size)	SCB_InvalidateDCache_by_Addr((addr), (size))
-#define CACHE_CLEAN(addr, size)		SCB_CleanDCache_by_Addr((addr), (size))
-#else
-#define CACHE_INVALIDATE(addr, size)
-#define CACHE_CLEAN(addr, size)		barrier_dsync_fence_full();
-#endif /* CONFIG_DCACHE */
-
-#else
-#define CACHE_INVALIDATE(addr, size)
-#define CACHE_CLEAN(addr, size)
-#endif /* CONFIG_HAS_CMSIS_CORE_M */
-
 struct display_stm32_ltdc_data {
 	LTDC_HandleTypeDef hltdc;
 	enum display_pixel_format current_pixel_format;
@@ -89,6 +75,7 @@ struct display_stm32_ltdc_config {
 	struct stm32_pclken pclken;
 	const struct pinctrl_dev_config *pctrl;
 	void (*irq_config_func)(const struct device *dev);
+	const struct device *display_controller;
 };
 
 static void stm32_ltdc_global_isr(const struct device *dev)
@@ -215,7 +202,7 @@ static int stm32_ltdc_write(const struct device *dev, const uint16_t x,
 
 		for (row = 0; row < desc->height; row++) {
 			(void) memcpy(dst, src, desc->width * data->current_pixel_size);
-			CACHE_CLEAN(dst, desc->width * data->current_pixel_size);
+			sys_cache_data_flush_range(dst, desc->width * data->current_pixel_size);
 			dst += (config->width * data->current_pixel_size);
 			src += (desc->pitch * data->current_pixel_size);
 		}
@@ -252,12 +239,46 @@ static int stm32_ltdc_read(const struct device *dev, const uint16_t x,
 
 	for (row = 0; row < desc->height; row++) {
 		(void) memcpy(dst, src, desc->width * data->current_pixel_size);
-		CACHE_CLEAN(dst, desc->width * data->current_pixel_size);
+		sys_cache_data_flush_range(dst, desc->width * data->current_pixel_size);
 		src += (config->width * data->current_pixel_size);
 		dst += (desc->pitch * data->current_pixel_size);
 	}
 
 	return 0;
+}
+
+static int stm32_ltdc_display_blanking_off(const struct device *dev)
+{
+	const struct display_stm32_ltdc_config *config = dev->config;
+	const struct device *display_dev = config->display_controller;
+
+	if (display_dev == NULL) {
+		return 0;
+	}
+
+	if (!device_is_ready(display_dev)) {
+		LOG_ERR("Display device %s not ready", display_dev->name);
+		return -ENODEV;
+	}
+
+	return display_blanking_off(display_dev);
+}
+
+static int stm32_ltdc_display_blanking_on(const struct device *dev)
+{
+	const struct display_stm32_ltdc_config *config = dev->config;
+	const struct device *display_dev = config->display_controller;
+
+	if (display_dev == NULL) {
+		return 0;
+	}
+
+	if (!device_is_ready(config->display_controller)) {
+		LOG_ERR("Display device %s not ready", display_dev->name);
+		return -ENODEV;
+	}
+
+	return display_blanking_on(display_dev);
 }
 
 static int stm32_ltdc_init(const struct device *dev)
@@ -439,7 +460,9 @@ static const struct display_driver_api stm32_ltdc_display_api = {
 	.read = stm32_ltdc_read,
 	.get_capabilities = stm32_ltdc_get_capabilities,
 	.set_pixel_format = stm32_ltdc_set_pixel_format,
-	.set_orientation = stm32_ltdc_set_orientation
+	.set_orientation = stm32_ltdc_set_orientation,
+	.blanking_off = stm32_ltdc_display_blanking_off,
+	.blanking_on = stm32_ltdc_display_blanking_on,
 };
 
 #if DT_INST_NODE_HAS_PROP(0, ext_sdram)
@@ -584,6 +607,8 @@ static const struct display_driver_api stm32_ltdc_display_api = {
 		},										\
 		.pctrl = STM32_LTDC_DEVICE_PINCTRL_GET(inst),					\
 		.irq_config_func = stm32_ltdc_irq_config_func_##inst,				\
+		.display_controller = DEVICE_DT_GET_OR_NULL(					\
+			DT_INST_PHANDLE(inst, display_controller)),				\
 	};											\
 	DEVICE_DT_INST_DEFINE(inst,								\
 			&stm32_ltdc_init,							\

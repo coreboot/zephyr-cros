@@ -10,6 +10,8 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
+#define DETACH_THR_ID 2
+
 #define N_THR_E 3
 #define N_THR_T 4
 #define BOUNCES 64
@@ -202,7 +204,7 @@ static void *thread_top_term(void *p1)
 		zassert_false(ret, "Unable to set cancel state!");
 	}
 
-	if (id >= 2) {
+	if (id >= DETACH_THR_ID) {
 		zassert_ok(pthread_detach(self), "failed to set detach state");
 		zassert_equal(pthread_detach(self), EINVAL, "re-detached thread!");
 	}
@@ -355,7 +357,9 @@ ZTEST(pthread, test_pthread_termination)
 	zassert_equal(ret, EINVAL, "invalid cancel state set!");
 
 	for (i = 0; i < N_THR_T; i++) {
-		pthread_join(newthread[i], &retval);
+		if (i < DETACH_THR_ID) {
+			zassert_ok(pthread_join(newthread[i], &retval));
+		}
 	}
 
 	/* TESTPOINT: Test for deadlock */
@@ -363,7 +367,7 @@ ZTEST(pthread, test_pthread_termination)
 	zassert_equal(ret, EDEADLK, "thread joined with self inexplicably!");
 
 	/* TESTPOINT: Try canceling a terminated thread */
-	ret = pthread_cancel(newthread[N_THR_T/2]);
+	ret = pthread_cancel(newthread[0]);
 	zassert_equal(ret, ESRCH, "cancelled a terminated thread!");
 }
 
@@ -397,6 +401,40 @@ ZTEST(pthread, test_sched_getparam)
 ZTEST(pthread, test_sched_getscheduler)
 {
 	int rc = sched_getscheduler(0);
+	int err = errno;
+
+	zassert_true((rc == -1 && err == ENOSYS));
+}
+ZTEST(pthread, test_sched_setparam)
+{
+	struct sched_param param = {
+		.sched_priority = 2,
+	};
+	int rc = sched_setparam(0, &param);
+	int err = errno;
+
+	zassert_true((rc == -1 && err == ENOSYS));
+}
+
+ZTEST(pthread, test_sched_setscheduler)
+{
+	struct sched_param param = {
+		.sched_priority = 2,
+	};
+	int policy = 0;
+	int rc = sched_setscheduler(0, policy, &param);
+	int err = errno;
+
+	zassert_true((rc == -1 && err == ENOSYS));
+}
+
+ZTEST(pthread, test_sched_rr_get_interval)
+{
+	struct timespec interval = {
+		.tv_sec = 0,
+		.tv_nsec = 0,
+	};
+	int rc = sched_rr_get_interval(0, &interval);
 	int err = errno;
 
 	zassert_true((rc == -1 && err == ENOSYS));
@@ -461,4 +499,54 @@ ZTEST(pthread, test_pthread_cleanup)
 	zassert_ok(pthread_join(th, NULL));
 }
 
-ZTEST_SUITE(pthread, NULL, NULL, NULL, NULL, NULL);
+static bool testcancel_ignored;
+static bool testcancel_failed;
+
+static void *test_pthread_cancel_fn(void *arg)
+{
+	zassert_ok(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL));
+
+	testcancel_ignored = false;
+
+	/* this should be ignored */
+	pthread_testcancel();
+
+	testcancel_ignored = true;
+
+	/* this will mark it pending */
+	zassert_ok(pthread_cancel(pthread_self()));
+
+	/* enable the thread to be cancelled */
+	zassert_ok(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL));
+
+	testcancel_failed = false;
+
+	/* this should terminate the thread */
+	pthread_testcancel();
+
+	testcancel_failed = true;
+
+	return NULL;
+}
+
+ZTEST(pthread, test_pthread_testcancel)
+{
+	pthread_t th;
+
+	zassert_ok(pthread_create(&th, NULL, test_pthread_cancel_fn, NULL));
+	zassert_ok(pthread_join(th, NULL));
+	zassert_true(testcancel_ignored);
+	zassert_false(testcancel_failed);
+}
+
+static void before(void *arg)
+{
+	ARG_UNUSED(arg);
+
+	if (!IS_ENABLED(CONFIG_DYNAMIC_THREAD)) {
+		/* skip redundant testing if there is no thread pool / heap allocation */
+		ztest_test_skip();
+	}
+}
+
+ZTEST_SUITE(pthread, NULL, NULL, before, NULL, NULL);

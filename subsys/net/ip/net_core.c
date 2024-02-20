@@ -44,8 +44,8 @@ LOG_MODULE_REGISTER(net_core, CONFIG_NET_CORE_LOG_LEVEL);
 #include "icmpv4.h"
 #include "ipv4.h"
 
-#include "dhcpv4.h"
-#include "dhcpv6_internal.h"
+#include "dhcpv4/dhcpv4_internal.h"
+#include "dhcpv6/dhcpv6_internal.h"
 
 #include "route.h"
 

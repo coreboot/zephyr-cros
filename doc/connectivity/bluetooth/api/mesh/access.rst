@@ -179,7 +179,7 @@ the :ref:`bluetooth_mesh_lcd_srv` model.
 Composition Data Page 0
 -----------------------
 
-Composition Data Page 0 provides the fundemental information about a device, and
+Composition Data Page 0 provides the fundamental information about a device, and
 is mandatory for all mesh devices. It contains the element and model composition,
 the supported features, and manufacturer information.
 
@@ -245,6 +245,14 @@ message, it will send messages with delay close to expiration to free memory.
 
 When the mesh stack is suspended or reset, messages not yet sent are removed and
 the :c:member:`bt_mesh_send_cb.start` callback is raised with an error code.
+
+.. note::
+   When a model sends several messages in a row, it may happen that the messages are not sent in
+   the order they were passed to the access layer. This is because some messages can be delayed
+   for a longer time than the others.
+
+   Disable the randomization by setting the :c:member:`bt_mesh_msg_ctx.rnd_delay` to ``false``,
+   when a set of messages originated by the same model needs to be sent in a certain order.
 
 Delayable publications
 ======================

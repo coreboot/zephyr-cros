@@ -811,6 +811,8 @@ static void test_discover(void)
 {
 	int err;
 
+	g_discovery_complete = false;
+
 	/* Invalid behavior */
 	err = bt_vcp_vol_ctlr_discover(NULL, &vol_ctlr);
 	if (err == 0) {
@@ -1159,6 +1161,7 @@ static void test_main(void)
 	WAIT_FOR_FLAG(flag_connected);
 
 	test_discover();
+	test_discover(); /* test that we can discover twice */
 	test_included_get();
 	test_conn_get();
 	test_read_state();

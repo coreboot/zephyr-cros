@@ -38,13 +38,11 @@ static struct bt_le_per_adv_sync *bcast_pa_sync;
 static struct bt_bap_stream streams[CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT];
 static struct bt_bap_stream *streams_p[ARRAY_SIZE(streams)];
 
-static const struct bt_audio_codec_cap codec =
-	BT_AUDIO_CODEC_CAP_LC3(BT_AUDIO_CODEC_LC3_FREQ_16KHZ | BT_AUDIO_CODEC_LC3_FREQ_24KHZ
-				| BT_AUDIO_CODEC_LC3_FREQ_48KHZ,
-				BT_AUDIO_CODEC_LC3_DURATION_10,
-				BT_AUDIO_CODEC_LC3_CHAN_COUNT_SUPPORT(1), 40u, 155u, 1u,
-				BT_AUDIO_CONTEXT_TYPE_MEDIA
-);
+static const struct bt_audio_codec_cap codec = BT_AUDIO_CODEC_CAP_LC3(
+	BT_AUDIO_CODEC_CAP_FREQ_16KHZ | BT_AUDIO_CODEC_CAP_FREQ_24KHZ |
+		BT_AUDIO_CODEC_CAP_FREQ_48KHZ,
+	BT_AUDIO_CODEC_CAP_DURATION_10, BT_AUDIO_CODEC_CAP_CHAN_COUNT_SUPPORT(1), 40u, 155u, 1u,
+	BT_AUDIO_CONTEXT_TYPE_MEDIA);
 
 /* Create a mask for the maximum BIS we can sync to using the number of streams
  * we have. We add an additional 1 since the bis indexes start from 1 and not
@@ -264,9 +262,10 @@ static void sync_broadcast_pa(const struct bt_le_scan_recv_info *info)
 
 static bool scan_check_and_sync_broadcast(struct bt_data *data, void *user_data)
 {
+	enum bt_pbp_announcement_feature source_features;
 	struct bt_uuid_16 adv_uuid;
-	uint8_t source_features = 0U;
-	uint8_t meta[50];
+	uint8_t *tmp_meta;
+	int ret;
 
 	if (data->type != BT_DATA_SVC_DATA16) {
 		return true;
@@ -288,17 +287,18 @@ static bool scan_check_and_sync_broadcast(struct bt_data *data, void *user_data)
 		}
 	}
 
-	if (!bt_uuid_cmp(&adv_uuid.uuid, BT_UUID_PBA)) {
-		bt_pbp_parse_announcement(data, &source_features, meta);
+	ret = bt_pbp_parse_announcement(data, &source_features, &tmp_meta);
+	if (ret >= 0) {
 		if (!(source_features & BT_PBP_ANNOUNCEMENT_FEATURE_HIGH_QUALITY)) {
 			/* This is a Standard Quality Public Broadcast Audio stream - do not sync */
 			printk("This is a Standard Quality Public Broadcast Audio stream\n");
 			pbs_found = false;
 
-			return true;
+			return false;
 		}
 
-		printk("Found Suitable Public Broadcast Announcement\n");
+		printk("Found Suitable Public Broadcast Announcement with %d octets of metadata\n",
+		       ret);
 		pbs_found = true;
 
 		/* Continue parsing if Broadcast Audio Announcement Service was not found */

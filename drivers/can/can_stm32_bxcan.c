@@ -5,19 +5,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/drivers/can/transceiver.h>
-#include <zephyr/drivers/clock_control/stm32_clock_control.h>
-#include <zephyr/drivers/clock_control.h>
-#include <zephyr/drivers/pinctrl.h>
-#include <zephyr/sys/util.h>
-#include <string.h>
-#include <zephyr/kernel.h>
+/* Include soc.h prior to Zephyr CAN headers to pull in HAL fixups */
 #include <soc.h>
-#include <errno.h>
-#include <stdbool.h>
 #include <zephyr/drivers/can.h>
-#include <zephyr/logging/log.h>
+#include <zephyr/drivers/can/transceiver.h>
+
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/drivers/clock_control/stm32_clock_control.h>
+#include <zephyr/drivers/pinctrl.h>
 #include <zephyr/irq.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 
 LOG_MODULE_REGISTER(can_stm32, CONFIG_CAN_LOG_LEVEL);
 
@@ -419,7 +418,7 @@ static int can_stm32_start(const struct device *dev)
 	}
 
 	if (cfg->common.phy != NULL) {
-		ret = can_transceiver_enable(cfg->common.phy);
+		ret = can_transceiver_enable(cfg->common.phy, data->common.mode);
 		if (ret != 0) {
 			LOG_ERR("failed to enable CAN transceiver (err %d)", ret);
 			goto unlock;
@@ -532,6 +531,8 @@ static int can_stm32_set_mode(const struct device *dev, can_mode_t mode)
 		can->MCR &= ~CAN_MCR_NART;
 	}
 
+	data->common.mode = mode;
+
 	k_mutex_unlock(&data->inst_mutex);
 
 	return 0;
@@ -578,15 +579,6 @@ static int can_stm32_get_core_clock(const struct device *dev, uint32_t *rate)
 		LOG_ERR("Failed call clock_control_get_rate: return [%d]", ret);
 		return -EIO;
 	}
-
-	return 0;
-}
-
-static int can_stm32_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
-{
-	const struct can_stm32_config *config = dev->config;
-
-	*max_bitrate = config->common.max_bitrate;
 
 	return 0;
 }
@@ -886,8 +878,7 @@ static void can_stm32_set_filter_bank(int filter_id, CAN_FilterRegister_TypeDef 
 
 static inline uint32_t can_stm32_filter_to_std_mask(const struct can_filter *filter)
 {
-	uint32_t rtr_mask = (filter->flags & (CAN_FILTER_DATA | CAN_FILTER_RTR)) !=
-		(CAN_FILTER_DATA | CAN_FILTER_RTR) ? 1U : 0U;
+	uint32_t rtr_mask = !IS_ENABLED(CONFIG_CAN_ACCEPT_RTR);
 
 	return  (filter->mask << CAN_STM32_FIRX_STD_ID_POS) |
 		(rtr_mask << CAN_STM32_FIRX_STD_RTR_POS) |
@@ -896,8 +887,7 @@ static inline uint32_t can_stm32_filter_to_std_mask(const struct can_filter *fil
 
 static inline uint32_t can_stm32_filter_to_ext_mask(const struct can_filter *filter)
 {
-	uint32_t rtr_mask = (filter->flags & (CAN_FILTER_DATA | CAN_FILTER_RTR)) !=
-		(CAN_FILTER_DATA | CAN_FILTER_RTR) ? 1U : 0U;
+	uint32_t rtr_mask = !IS_ENABLED(CONFIG_CAN_ACCEPT_RTR);
 
 	return  (filter->mask << CAN_STM32_FIRX_EXT_EXT_ID_POS) |
 		(rtr_mask << CAN_STM32_FIRX_EXT_RTR_POS) |
@@ -906,15 +896,12 @@ static inline uint32_t can_stm32_filter_to_ext_mask(const struct can_filter *fil
 
 static inline uint32_t can_stm32_filter_to_std_id(const struct can_filter *filter)
 {
-	return  (filter->id  << CAN_STM32_FIRX_STD_ID_POS) |
-		(((filter->flags & CAN_FILTER_RTR) != 0) ? (1U << CAN_STM32_FIRX_STD_RTR_POS) : 0U);
+	return  (filter->id  << CAN_STM32_FIRX_STD_ID_POS);
 }
 
 static inline uint32_t can_stm32_filter_to_ext_id(const struct can_filter *filter)
 {
 	return  (filter->id << CAN_STM32_FIRX_EXT_EXT_ID_POS) |
-		(((filter->flags & CAN_FILTER_RTR) != 0) ?
-		(1U << CAN_STM32_FIRX_EXT_RTR_POS) : 0U) |
 		(1U << CAN_STM32_FIRX_EXT_IDE_POS);
 }
 
@@ -995,7 +982,7 @@ static int can_stm32_add_rx_filter(const struct device *dev, can_rx_callback_t c
 	struct can_stm32_data *data = dev->data;
 	int filter_id;
 
-	if ((filter->flags & ~(CAN_FILTER_IDE | CAN_FILTER_DATA | CAN_FILTER_RTR)) != 0) {
+	if ((filter->flags & ~(CAN_FILTER_IDE)) != 0) {
 		LOG_ERR("unsupported CAN filter flags 0x%02x", filter->flags);
 		return -ENOTSUP;
 	}
@@ -1102,7 +1089,6 @@ static const struct can_driver_api can_api_funcs = {
 #endif
 	.set_state_change_callback = can_stm32_set_state_change_callback,
 	.get_core_clock = can_stm32_get_core_clock,
-	.get_max_bitrate = can_stm32_get_max_bitrate,
 	.get_max_filters = can_stm32_get_max_filters,
 	.timing_min = {
 		.sjw = 0x1,

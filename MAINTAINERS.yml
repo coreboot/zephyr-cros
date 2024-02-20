@@ -259,6 +259,20 @@ Ambiq Platforms:
   labels:
     - "platform: Ambiq"
 
+BeagleBoard Platforms:
+  status: maintained
+  maintainers:
+    - jadonk
+  collaborators:
+    - ayush1325
+    - con-pax
+    - vaishnavachath
+  files:
+    - boards/arm/beagle*/
+    - boards/riscv/beagle*/
+  labels:
+    - "platform: BeagleBoard"
+
 Benchmarks:
   status: maintained
   maintainers:
@@ -299,7 +313,6 @@ Bluetooth:
   files:
     - doc/connectivity/bluetooth/
     - include/zephyr/bluetooth/
-    - include/zephyr/drivers/bluetooth/
     - samples/bluetooth/
     - subsys/bluetooth/
     - subsys/bluetooth/common/
@@ -324,6 +337,28 @@ Bluetooth:
     - tests/bsim/bluetooth/mesh/
     - tests/bluetooth/shell/audio*
   labels:
+    - "area: Bluetooth"
+  tests:
+    - bluetooth
+
+Bluetooth HCI:
+  status: maintained
+  maintainers:
+    - jhedberg
+    - jori-nordic
+  collaborators:
+    - hermabe
+    - alwa-nordic
+    - Thalley
+    - sjanc
+    - theob-pro
+    - HoZHel
+  files:
+    - include/zephyr/drivers/bluetooth/
+    - drivers/bluetooth/
+    - samples/bluetooth/hci_*/
+  labels:
+    - "area: Bluetooth Host"
     - "area: Bluetooth"
   tests:
     - bluetooth
@@ -362,7 +397,6 @@ Bluetooth Host:
     - sjanc
     - theob-pro
   files:
-    - drivers/bluetooth/
     - subsys/bluetooth/host/
     - subsys/bluetooth/services/
     - subsys/bluetooth/shell/
@@ -409,6 +443,7 @@ Bluetooth Audio:
     - fredrikdanebjer
     - kruithofa
     - larsgk
+    - pin-zephyr
   files:
     - subsys/bluetooth/audio/
     - include/zephyr/bluetooth/audio/
@@ -717,6 +752,7 @@ Device Driver Model:
     - "area: Device Model"
   tests:
     - kernel.device
+    - init
 
 DFU:
   status: maintained
@@ -785,6 +821,7 @@ Display drivers:
   status: odd fixes
   collaborators:
     - jfischer-no
+    - danieldegrasse
   files:
     - drivers/display/
     - dts/bindings/display/
@@ -966,8 +1003,9 @@ Release Notes:
 "Drivers: Charger":
   status: maintained
   maintainers:
-    - aaronemassey
     - rriveramcrus
+  collaborators:
+    - GRobertZieba
   files:
     - drivers/charger/
     - dts/bindings/charger/
@@ -1524,6 +1562,8 @@ Release Notes:
   maintainers:
     - mbolivar-ampere
     - simonguinot
+  collaborators:
+    - soburi
   files:
     - drivers/led_strip/
     - dts/bindings/led_strip/
@@ -1918,6 +1958,16 @@ Release Notes:
   labels:
     - "area: Memory Management"
 
+"Drivers: MIPI DBI":
+  status: maintained
+  maintainers:
+    - danieldegrasse
+  files:
+    - drivers/mipi_dbi/
+    - dts/bindings/mipi-dbi/
+  labels:
+    - "area: Display Controller"
+
 "Drivers: Virtualization":
   status: maintained
   maintainers:
@@ -2242,6 +2292,8 @@ Memory Management:
     - include/zephyr/mem_mgmt/mem_attr.h
     - tests/lib/mem_blocks_stats/
     - tests/drivers/mm/
+  tests:
+    - mem_mgmt
 
 Laird Connectivity platforms:
   status: maintained
@@ -3194,29 +3246,42 @@ Intel Platforms (Agilex):
   labels:
     - "platform: Intel SoC FPGA Agilex"
 
-NXP Platforms (S32):
+NXP Drivers:
   status: maintained
   maintainers:
-    - manuargue
+    - dleach02
   collaborators:
-    - PetervdPerk-NXP
-    - bperseghetti
-    - Dat-NguyenDuy
+    - mmahadevan108
+    - danieldegrasse
+    - decsny
+    - manuargue
+    - dbaluta
   files:
-    - boards/arm/s32*/
-    - boards/arm/mr_canhubk3/
-    - boards/arm/ucans32k1sic/
-    - soc/arm/nxp_s32/
-    - drivers/*/*nxp_s32*
-    - dts/bindings/*/nxp,s32*
-    - samples/boards/nxp_s32/
-    - include/zephyr/dt-bindings/*/nxp-s32*
-    - include/zephyr/dt-bindings/*/nxp_s32*
-    - include/zephyr/drivers/*/*nxp_s32*
+    - drivers/*/*imx*
+    - drivers/*/*lpc*.c
+    - drivers/*/*mcux*.c
+    - drivers/*/*.mcux
+    - drivers/*/*.nxp
+    - drivers/*/*nxp*
+    - drivers/*/*kinetis*
+    - drivers/misc/*/nxp*
+    - include/zephyr/dt-bindings/*/*nxp*
+    - include/zephyr/dt-bindings/*/*mcux*
+    - include/zephyr/drivers/*/*nxp*
+    - include/zephyr/drivers/*/*mcux*
+    - arch/arm/core/mpu/nxp_mpu.c
+    - dts/bindings/*/nxp*
+  files-exclude:
+    - drivers/*/*s32*
+    - drivers/misc/*/*s32*
+    - include/zephyr/dt-bindings/*/*s32*
+    - include/zephyr/drivers/*/*s32*
+    - dts/bindings/*/*s32*
   labels:
-    - "platform: NXP S32"
+    - "platform: NXP Drivers"
+  description: NXP Drivers
 
-NXP Platforms:
+NXP Platforms (MCUX):
   status: maintained
   maintainers:
     - dleach02
@@ -3229,24 +3294,48 @@ NXP Platforms:
     - decsny
   files:
     - boards/arm/mimx*/
-    - boards/arm/frdm_k*/
+    - boards/arm/frdm*/
     - boards/arm/lpcxpress*/
     - boards/arm/twr_*/
+    - boards/arm/vmu*/
     - soc/arm/nxp_imx/
     - soc/arm/nxp_kinetis/
     - soc/arm/nxp_lpc/
-    - drivers/*/*imx*
-    - drivers/*/*lpc*.c
-    - drivers/*/*mcux*.c
-    - drivers/*/*.mcux
-    - drivers/*/*.nxp
-    - drivers/*/*nxp*
     - dts/arm/nxp/
-    - dts/bindings/*/nxp*
     - samples/boards/nxp*/
-    - include/zephyr/dt-bindings/*/nxp*
+  files-exclude:
+    - boards/arm/*s32*/
+    - dts/arm/nxp/*s32*
+    - samples/boards/nxp_s32/
   labels:
     - "platform: NXP"
+  description: NXP Platforms supported by MCUXpresso suite
+
+NXP Platforms (S32):
+  status: maintained
+  maintainers:
+    - manuargue
+  collaborators:
+    - PetervdPerk-NXP
+    - bperseghetti
+    - Dat-NguyenDuy
+  files:
+    - boards/arm/s32*/
+    - boards/arm/mr_canhubk3/
+    - boards/arm/ucans32k1sic/
+    - boards/common/*nxp_s32*
+    - soc/arm/nxp_s32/
+    - drivers/*/*nxp_s32*
+    - drivers/misc/*nxp_s32*/
+    - dts/bindings/*/nxp,s32*
+    - dts/arm/nxp/*s32*
+    - samples/boards/nxp_s32/
+    - include/zephyr/dt-bindings/*/nxp-s32*
+    - include/zephyr/dt-bindings/*/nxp_s32*
+    - include/zephyr/drivers/*/*nxp_s32*
+  labels:
+    - "platform: NXP S32"
+  description: NXP S32 platforms and S32-specific drivers
 
 NXP Platforms (Xtensa):
   status: maintained
@@ -3259,6 +3348,7 @@ NXP Platforms (Xtensa):
     - boards/xtensa/nxp_adsp_*/
   labels:
     - "platform: NXP ADSP"
+  description: NXP Xtensa platforms
 
 Microchip MEC Platforms:
   status: maintained
@@ -3329,14 +3419,37 @@ Renesas SmartBond Platforms:
     Renesas SmartBond SOCs, dts files, and related drivers. Renesas boards based
     on SmartBond SoCs.
 
-Renesas Platforms:
-  status: odd fixes
+Renesas RA Platforms:
+  status: maintained
+  maintainers:
+    - soburi
   files:
-    - soc/arm/renesas_ra/
+    - boards/arm/arduino_uno_r4/
+    - drivers/*/*renesas_ra*
     - dts/arm/renesas/ra/
+    - dts/bindings/*/*renesas,ra*
+    - soc/arm/renesas_ra/
+  labels:
+    - "platforms: Renesas RA"
+  description: >-
+    Renesas RA SOCs, dts files, and related drivers. Boards based
+    on Renesas RA SoCs.
+
+Renesas RZ Platforms:
+  status: maintained
+  maintainers:
+    - tgorochowik
+  files:
+    - boards/arm/rzt2m_*/
+    - drivers/*/*rzt2m*
+    - dts/arm/renesas/rz/
+    - dts/bindings/*/*rzt2m*
     - soc/arm/renesas_rzt2m/
   labels:
-    - "platforms: Renesas"
+    - "platforms: Renesas RZ"
+  description: >-
+    Renesas RZ SOCs, dts files, and related drivers. Renesas boards based
+    on RZ SoCs.
 
 Renesas R-Car Platforms:
   status: maintained
@@ -3356,7 +3469,6 @@ Renesas R-Car Platforms:
     - dts/bindings/*/*rcar*
     - soc/arm/renesas_rcar/
     - soc/arm64/renesas_rcar/
-    - dts/arm/renesas/rzt2m.dtsi
   labels:
     - "platform: Renesas R-Car"
   description: >-
@@ -3433,6 +3545,7 @@ ITE Platforms:
     - boards/riscv/it8*_evb/
     - drivers/*/*/*it8xxx2*.c
     - drivers/*/*it8xxx2*.c
+    - drivers/*/*_ite_*
     - dts/bindings/*/*ite*
     - dts/riscv/ite/
     - soc/riscv/ite_ec/
@@ -4093,8 +4206,6 @@ West:
     - erwango
   files:
     - modules/hal_st/Kconfig
-  labels:
-    - "area: Sensors"
 
 "West project: hal_stm32":
   status: maintained
@@ -4133,8 +4244,6 @@ West:
     - mah-eiSmart
   files:
     - modules/Kconfig.wurthelektronik
-  labels:
-    - "area: Sensors"
 
 "West project: hal_xtensa":
   status: maintained
@@ -4372,10 +4481,12 @@ West:
   files:
     - modules/thrift/
     - samples/modules/thrift/
-    - tests/lib/thrift/
+    - tests/modules/thrift/
   labels:
     - "area: Thrift"
     - "area: Serialization"
+  tests:
+    - thrift
 
 "West project: tinycrypt":
   status: odd fixes
@@ -4453,8 +4564,6 @@ West:
   maintainers:
     - microbuilder
   files: []
-  labels:
-    - "area: Sensors"
 
 "West project: hostap":
   status: maintained
@@ -4513,7 +4622,9 @@ Continuous Integration:
   maintainers:
     - stephanosio
     - nashif
-    - galak
+  collaborators:
+    - fabiobaltieri
+    - kartben
   files:
     - .github/
     - scripts/ci/
@@ -4541,6 +4652,8 @@ Test Framework (Ztest):
     - doc/develop/test/ztest.rst
   labels:
     - "area: Testsuite"
+  tests:
+    - testing
 
 Emulation:
   status: maintained
@@ -4563,6 +4676,8 @@ Emulation:
     - doc/hardware/emulator/
   labels:
     - "area: HW Emulation"
+  tests:
+    - emul
 
 Random:
   status: maintained

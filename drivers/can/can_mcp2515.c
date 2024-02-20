@@ -334,15 +334,6 @@ static int mcp2515_get_max_filters(const struct device *dev, bool ide)
 	return CONFIG_CAN_MAX_FILTER;
 }
 
-static int mcp2515_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
-{
-	const struct mcp2515_config *dev_cfg = dev->config;
-
-	*max_bitrate = dev_cfg->common.max_bitrate;
-
-	return 0;
-}
-
 static int mcp2515_set_timing(const struct device *dev,
 			      const struct can_timing *timing)
 {
@@ -444,7 +435,7 @@ static int mcp2515_start(const struct device *dev)
 	}
 
 	if (dev_cfg->common.phy != NULL) {
-		ret = can_transceiver_enable(dev_cfg->common.phy);
+		ret = can_transceiver_enable(dev_cfg->common.phy, dev_data->common.mode);
 		if (ret != 0) {
 			LOG_ERR("Failed to enable CAN transceiver [%d]", ret);
 			return ret;
@@ -631,7 +622,7 @@ static int mcp2515_add_rx_filter(const struct device *dev,
 
 	__ASSERT(rx_cb != NULL, "response_ptr can not be null");
 
-	if ((filter->flags & ~(CAN_FILTER_IDE | CAN_FILTER_DATA | CAN_FILTER_RTR)) != 0) {
+	if ((filter->flags & ~(CAN_FILTER_IDE)) != 0) {
 		LOG_ERR("unsupported CAN filter flags 0x%02x", filter->flags);
 		return -ENOTSUP;
 	}
@@ -692,6 +683,12 @@ static void mcp2515_rx_filter(const struct device *dev,
 	uint8_t filter_id = 0U;
 	can_rx_callback_t callback;
 	struct can_frame tmp_frame;
+
+#ifndef CONFIG_CAN_ACCEPT_RTR
+	if ((frame->flags & CAN_FRAME_RTR) != 0U) {
+		return;
+	}
+#endif /* !CONFIG_CAN_ACCEPT_RTR */
 
 	k_mutex_lock(&dev_data->mutex, K_FOREVER);
 
@@ -930,7 +927,6 @@ static const struct can_driver_api can_api_funcs = {
 	.set_state_change_callback = mcp2515_set_state_change_callback,
 	.get_core_clock = mcp2515_get_core_clock,
 	.get_max_filters = mcp2515_get_max_filters,
-	.get_max_bitrate = mcp2515_get_max_bitrate,
 	.timing_min = {
 		.sjw = 0x1,
 		.prop_seg = 0x01,

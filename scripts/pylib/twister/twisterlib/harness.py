@@ -366,6 +366,8 @@ class Pytest(Harness):
         hardware = handler.get_hardware()
         if not hardware:
             raise PytestHarnessException('Hardware is not available')
+        # update the instance with the device id to have it in the summary report
+        self.instance.dut = hardware.id
 
         self.reserved_serial = hardware.serial_pty or hardware.serial
         if hardware.serial_pty:
@@ -511,6 +513,7 @@ class Gtest(Harness):
     ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     TEST_START_PATTERN = r".*\[ RUN      \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
     TEST_PASS_PATTERN = r".*\[       OK \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
+    TEST_SKIP_PATTERN = r".*\[ DISABLED \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
     TEST_FAIL_PATTERN = r".*\[  FAILED  \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
     FINISHED_PATTERN = r".*\[==========\] Done running all tests\.$"
 
@@ -592,6 +595,9 @@ class Gtest(Harness):
         test_pass_match = re.search(self.TEST_PASS_PATTERN, line)
         if test_pass_match:
             return "passed", "{}.{}.{}".format(self.id, test_pass_match.group("suite_name"), test_pass_match.group("test_name"))
+        test_skip_match = re.search(self.TEST_SKIP_PATTERN, line)
+        if test_skip_match:
+            return "skipped", "{}.{}.{}".format(self.id, test_skip_match.group("suite_name"), test_skip_match.group("test_name"))
         test_fail_match = re.search(self.TEST_FAIL_PATTERN, line)
         if test_fail_match:
             return "failed", "{}.{}.{}".format(self.id, test_fail_match.group("suite_name"), test_fail_match.group("test_name"))
@@ -624,6 +630,12 @@ class Test(Harness):
             self._match = True
 
         result_match = result_re.match(line)
+        # some testcases are skipped based on predicates and do not show up
+        # during test execution, however they are listed in the summary. Parse
+        # the summary for status and use that status instead.
+
+        summary_re = re.compile(r"- (PASS|FAIL|SKIP) - \[([^\.]*).(test_)?(\S*)\] duration = (\d*[.,]?\d*) seconds")
+        summary_match = summary_re.match(line)
 
         if result_match:
             matched_status = result_match.group(1)
@@ -633,6 +645,20 @@ class Test(Harness):
             if tc.status == "skipped":
                 tc.reason = "ztest skip"
             tc.duration = float(result_match.group(4))
+            if tc.status == "failed":
+                tc.output = self.testcase_output
+            self.testcase_output = ""
+            self._match = False
+            self.ztest = True
+        elif summary_match:
+            matched_status = summary_match.group(1)
+            self.detected_suite_names.append(summary_match.group(2))
+            name = "{}.{}".format(self.id, summary_match.group(4))
+            tc = self.instance.get_case_or_create(name)
+            tc.status = self.ztest_to_status[matched_status]
+            if tc.status == "skipped":
+                tc.reason = "ztest skip"
+            tc.duration = float(summary_match.group(5))
             if tc.status == "failed":
                 tc.output = self.testcase_output
             self.testcase_output = ""
