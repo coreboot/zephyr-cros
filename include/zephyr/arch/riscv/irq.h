@@ -22,7 +22,6 @@ extern "C" {
 #include <zephyr/irq.h>
 #include <zephyr/sw_isr_table.h>
 #include <stdbool.h>
-#include <soc.h>
 #endif /* !_ASMLANGUAGE */
 
 /* Exceptions 0-15 (MCAUSE interrupt=0) */
@@ -40,9 +39,11 @@ extern "C" {
 #define RISCV_IRQ_MEXT  11
 
 #ifdef CONFIG_64BIT
-#define RISCV_MCAUSE_IRQ_BIT          (1 << 63)
+#define RISCV_MCAUSE_IRQ_POS          63U
+#define RISCV_MCAUSE_IRQ_BIT          BIT64(RISCV_MCAUSE_IRQ_POS)
 #else
-#define RISCV_MCAUSE_IRQ_BIT          (1 << 31)
+#define RISCV_MCAUSE_IRQ_POS          31U
+#define RISCV_MCAUSE_IRQ_BIT          BIT(RISCV_MCAUSE_IRQ_POS)
 #endif
 
 #ifndef _ASMLANGUAGE
@@ -68,8 +69,9 @@ extern void z_riscv_irq_priority_set(unsigned int irq,
 
 #define ARCH_IRQ_DIRECT_CONNECT(irq_p, priority_p, isr_p, flags_p) \
 { \
-	Z_ISR_DECLARE(irq_p + CONFIG_RISCV_RESERVED_IRQ_ISR_TABLES_OFFSET, \
-		      ISR_FLAG_DIRECT, isr_p, NULL); \
+	Z_ISR_DECLARE_DIRECT(irq_p + CONFIG_RISCV_RESERVED_IRQ_ISR_TABLES_OFFSET, \
+		      ISR_FLAG_DIRECT, isr_p); \
+	z_riscv_irq_priority_set(irq_p, priority_p, flags_p); \
 }
 
 #define ARCH_ISR_DIRECT_HEADER() arch_isr_direct_header()

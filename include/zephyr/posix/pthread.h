@@ -136,6 +136,13 @@ int pthread_condattr_setclock(pthread_condattr_t *att, clockid_t clock_id);
  */
 #define PTHREAD_MUTEX_INITIALIZER (-1)
 
+/**
+ * @brief Declare a rwlock as initialized
+ *
+ * Initialize a rwlock with the default rwlock attributes.
+ */
+#define PTHREAD_RWLOCK_INITIALIZER (-1)
+
 /*
  *  Mutex attributes - type
  *
@@ -425,7 +432,7 @@ int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr,
 #ifdef CONFIG_PTHREAD_IPC
 int pthread_once(pthread_once_t *once, void (*initFunc)(void));
 #endif
-void pthread_exit(void *retval);
+FUNC_NORETURN void pthread_exit(void *retval);
 int pthread_join(pthread_t thread, void **status);
 int pthread_cancel(pthread_t pthread);
 int pthread_detach(pthread_t thread);
@@ -433,6 +440,7 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr,
 		   void *(*threadroutine)(void *), void *arg);
 int pthread_setcancelstate(int state, int *oldstate);
 int pthread_setcanceltype(int type, int *oldtype);
+void pthread_testcancel(void);
 int pthread_attr_setschedparam(pthread_attr_t *attr,
 			       const struct sched_param *schedparam);
 int pthread_setschedparam(pthread_t pthread, int policy,

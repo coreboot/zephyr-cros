@@ -111,6 +111,7 @@ struct core_state {
 	uint32_t excsave3;
 	uint32_t thread_ptr;
 	uint32_t intenable;
+	uint32_t ps;
 	uint32_t bctl;
 };
 
@@ -127,6 +128,7 @@ struct lpsram_header {
 
 static ALWAYS_INLINE void _save_core_context(uint32_t core_id)
 {
+	core_desc[core_id].ps = XTENSA_RSR("PS");
 	core_desc[core_id].vecbase = XTENSA_RSR("VECBASE");
 	core_desc[core_id].excsave2 = XTENSA_RSR("EXCSAVE2");
 	core_desc[core_id].excsave3 = XTENSA_RSR("EXCSAVE3");
@@ -140,6 +142,7 @@ static ALWAYS_INLINE void _restore_core_context(void)
 {
 	uint32_t core_id = arch_proc_id();
 
+	XTENSA_WSR("PS", core_desc[core_id].ps);
 	XTENSA_WSR("VECBASE", core_desc[core_id].vecbase);
 	XTENSA_WSR("EXCSAVE2", core_desc[core_id].excsave2);
 	XTENSA_WSR("EXCSAVE3", core_desc[core_id].excsave3);
@@ -150,6 +153,7 @@ static ALWAYS_INLINE void _restore_core_context(void)
 }
 
 void dsp_restore_vector(void);
+void mp_resume_entry(void);
 
 void power_gate_entry(uint32_t core_id)
 {
@@ -180,6 +184,11 @@ void power_gate_exit(void)
 	cpu_early_init();
 	sys_cache_data_flush_and_invd_all();
 	_restore_core_context();
+
+	/* Secondary core is resumed by set_dx */
+	if (arch_proc_id()) {
+		mp_resume_entry();
+	}
 }
 
 __asm__(".align 4\n\t"
@@ -218,7 +227,7 @@ __imr void pm_state_imr_restore(void)
 {
 	struct imr_layout *imr_layout = (struct imr_layout *)(IMR_LAYOUT_ADDRESS);
 	/* restore lpsram power and contents */
-	bmemcpy(z_soc_uncached_ptr((__sparse_force void __sparse_cache *)
+	bmemcpy(sys_cache_uncached_ptr_get((__sparse_force void __sparse_cache *)
 				   UINT_TO_POINTER(LP_SRAM_BASE)),
 		imr_layout->imr_state.header.imr_ram_storage,
 		LP_SRAM_SIZE);
@@ -235,7 +244,7 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 {
 	ARG_UNUSED(substate_id);
 	uint32_t cpu = arch_proc_id();
-	int ret = 0;
+	int ret;
 
 	ARG_UNUSED(ret);
 
@@ -243,7 +252,8 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 	core_desc[cpu].intenable = XTENSA_RSR("INTENABLE");
 	z_xt_ints_off(0xffffffff);
 
-	if (state == PM_STATE_SOFT_OFF) {
+	switch (state) {
+	case PM_STATE_SOFT_OFF:
 		core_desc[cpu].bctl = DSPCS.bootctl[cpu].bctl;
 		DSPCS.bootctl[cpu].bctl &= ~DSPBR_BCTL_WAITIPCG;
 		if (cpu == 0) {
@@ -307,7 +317,8 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 		} else {
 			power_gate_entry(cpu);
 		}
-	} else if (state == PM_STATE_RUNTIME_IDLE) {
+		break;
+	case PM_STATE_RUNTIME_IDLE:
 		DSPCS.bootctl[cpu].bctl &= ~DSPBR_BCTL_WAITIPPG;
 		DSPCS.bootctl[cpu].bctl &= ~DSPBR_BCTL_WAITIPCG;
 		soc_cpu_power_down(cpu);
@@ -321,7 +332,8 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 		ret = pm_device_runtime_put(INTEL_ADSP_HST_DOMAIN_DEV);
 		__ASSERT_NO_MSG(ret == 0);
 		power_gate_entry(cpu);
-	} else {
+		break;
+	default:
 		__ASSERT(false, "invalid argument - unsupported power state");
 	}
 }
@@ -342,7 +354,7 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 	if (state == PM_STATE_SOFT_OFF) {
 		/* restore clock gating state */
 		DSPCS.bootctl[cpu].bctl |=
-			(core_desc[0].bctl & DSPBR_BCTL_WAITIPCG);
+			(core_desc[cpu].bctl & DSPBR_BCTL_WAITIPCG);
 
 #ifdef CONFIG_ADSP_IMR_CONTEXT_SAVE
 		if (cpu == 0) {
@@ -395,6 +407,11 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 	}
 
 	z_xt_ints_on(core_desc[cpu].intenable);
+
+	/* We don't have the key used to lock interruptions here.
+	 * Just set PS.INTLEVEL to 0.
+	 */
+	__asm__ volatile ("rsil a2, 0");
 }
 
 #endif /* CONFIG_PM */

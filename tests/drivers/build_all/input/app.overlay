@@ -64,6 +64,13 @@
 				    <&test_gpio 3 GPIO_ACTIVE_LOW>,
 				    <&test_gpio 4 GPIO_ACTIVE_LOW>;
 			actual-key-mask = <0x0f 0x0a 0x0b>;
+
+			keymap {
+				compatible = "input-keymap";
+				keymap = <0 1 2>;
+				row-size = <2>;
+				col-size = <2>;
+			};
 		};
 
 		kbd-matrix-1 {
@@ -95,6 +102,18 @@
 			zephyr,axis = <0>;
 			sample-time-us = <2000>;
 			idle-timeout-ms = <200>;
+		};
+
+		qdec-gpio-polled {
+			compatible = "gpio-qdec";
+			gpios = <&test_gpio 0 0>, <&test_gpio 1 0>;
+			led-gpios = <&test_gpio 2 0>;
+			led-pre-us = <5>;
+			steps-per-period = <4>;
+			zephyr,axis = <0>;
+			sample-time-us = <2000>;
+			idle-timeout-ms = <200>;
+			idle-poll-time-us = <5000>;
 		};
 
 		analog_axis {

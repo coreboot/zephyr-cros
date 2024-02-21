@@ -23,9 +23,6 @@ config RISCV_SOC_INTERRUPT_INIT
 config RISCV_GP
 	default y
 
-config RISCV_HAS_PLIC
-	default n
-
 config NUM_IRQS
 	default 87 if  NUCLEI_ECLIC
 	default 16 if !NUCLEI_ECLIC
@@ -41,5 +38,11 @@ config RESET
 
 config CLOCK_CONTROL
 	default y
+
+config ARCH_IRQ_VECTOR_TABLE_ALIGN
+	default 512 if NUCLEI_ECLIC
+
+config RISCV_TRAP_HANDLER_ALIGNMENT
+	default 64 if NUCLEI_ECLIC && !RISCV_VECTORED_MODE
 
 endif # GD32VF103

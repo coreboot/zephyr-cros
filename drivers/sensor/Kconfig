@@ -68,6 +68,14 @@ config SENSOR_SHELL_TRIG_PRINT_TIMEOUT_MS
 	  Control the frequency of the sampling window over which the sensor
 	  interrupt handler will collect data.
 
+config SENSOR_SHELL_MAX_TRIGGER_DEVICES
+	int "Maximum number of sensor devices that can have enabled triggers in shell"
+	default 1
+	depends on SENSOR_SHELL
+	help
+	  Maximum number of sensor devices that the shell cmd can have
+	  enabled triggers for.
+
 config SENSOR_INFO
 	bool "Sensor Info iterable section"
 
@@ -81,6 +89,7 @@ source "drivers/sensor/adxl345/Kconfig"
 source "drivers/sensor/adxl362/Kconfig"
 source "drivers/sensor/adxl367/Kconfig"
 source "drivers/sensor/adxl372/Kconfig"
+source "drivers/sensor/ags10/Kconfig"
 source "drivers/sensor/ak8975/Kconfig"
 source "drivers/sensor/akm09918c/Kconfig"
 source "drivers/sensor/amd_sb_tsi/Kconfig"
@@ -101,6 +110,7 @@ source "drivers/sensor/bmi270/Kconfig"
 source "drivers/sensor/bmi323/Kconfig"
 source "drivers/sensor/bmm150/Kconfig"
 source "drivers/sensor/bmp388/Kconfig"
+source "drivers/sensor/bmp581/Kconfig"
 source "drivers/sensor/bq274xx/Kconfig"
 source "drivers/sensor/ccs811/Kconfig"
 source "drivers/sensor/current_amp/Kconfig"
@@ -140,6 +150,7 @@ source "drivers/sensor/ism330dhcx/Kconfig"
 source "drivers/sensor/ite_tach_it8xxx2/Kconfig"
 source "drivers/sensor/ite_vcmp_it8xxx2/Kconfig"
 source "drivers/sensor/lis2dh/Kconfig"
+source "drivers/sensor/lis2de12/Kconfig"
 source "drivers/sensor/lis2ds12/Kconfig"
 source "drivers/sensor/lis2du12/Kconfig"
 source "drivers/sensor/lis2dw12/Kconfig"
@@ -218,6 +229,7 @@ source "drivers/sensor/th02/Kconfig"
 source "drivers/sensor/ti_hdc/Kconfig"
 source "drivers/sensor/ti_hdc20xx/Kconfig"
 source "drivers/sensor/tmag5170/Kconfig"
+source "drivers/sensor/tmag5273/Kconfig"
 source "drivers/sensor/tmd2620/Kconfig"
 source "drivers/sensor/tmp007/Kconfig"
 source "drivers/sensor/tmp108/Kconfig"
@@ -226,6 +238,7 @@ source "drivers/sensor/tmp116/Kconfig"
 source "drivers/sensor/tsl2540/Kconfig"
 source "drivers/sensor/tsl2561/Kconfig"
 source "drivers/sensor/vcnl4040/Kconfig"
+source "drivers/sensor/vcnl36825t/Kconfig"
 source "drivers/sensor/veml7700/Kconfig"
 source "drivers/sensor/vl53l0x/Kconfig"
 source "drivers/sensor/vl53l1x/Kconfig"

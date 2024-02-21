@@ -427,6 +427,19 @@ void __weak rt5xx_clock_init(void)
 	RESET_PeripheralReset(kMRT0_RST_SHIFT_RSTn);
 #endif
 
+#if DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(dmic0), nxp_dmic, okay)
+	/* Using the Audio PLL as input clock leads to better clock dividers
+	 * for typical PCM sample rates ({8,16,24,32,48,96} kHz.
+	 */
+	/* DMIC source from audio pll, divider 8, 24.576M/8=3.072MHZ
+	 * Select Audio PLL as clock source. This should produce a bit clock
+	 * of 3.072MHZ
+	 */
+	CLOCK_AttachClk(kAUDIO_PLL_to_DMIC);
+	CLOCK_SetClkDiv(kCLOCK_DivDmicClk, 8);
+
+#endif
+
 	/* Set SystemCoreClock variable. */
 	SystemCoreClock = CLOCK_INIT_CORE_CLOCK;
 
@@ -516,6 +529,14 @@ static int nxp_rt500_init(void)
 #ifndef CONFIG_IMXRT5XX_CODE_CACHE
 	CACHE64_DisableCache(CACHE64_CTRL0);
 #endif
+
+	/* Some ROM versions may have errata leaving these pins in a non-reset state,
+	 * which can often cause power leakage on most expected board designs,
+	 * restore the reset state here and leave the pin configuration up to board/user DT
+	 */
+	IOPCTL->PIO[1][15] = 0;
+	IOPCTL->PIO[3][28] = 0;
+	IOPCTL->PIO[3][29] = 0;
 
 	return 0;
 }

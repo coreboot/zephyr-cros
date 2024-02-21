@@ -2995,10 +2995,12 @@ static void iface_ipv6_start(struct net_if *iface)
 	if (IS_ENABLED(CONFIG_NET_IPV6_DAD)) {
 		net_if_start_dad(iface);
 	} else {
-		struct net_if_ipv6 *ipv6 __unused = iface->config.ip.ipv6;
+		struct net_if_ipv6 *ipv6 = iface->config.ip.ipv6;
 
-		join_mcast_nodes(iface,
-				 &ipv6->mcast[0].address.in6_addr);
+		if (ipv6 != NULL) {
+			join_mcast_nodes(iface,
+					 &ipv6->mcast[0].address.in6_addr);
+		}
 	}
 
 	net_if_start_rs(iface);
@@ -3618,6 +3620,27 @@ static inline int z_vrfy_net_if_ipv4_addr_lookup_by_index(
 }
 #include <syscalls/net_if_ipv4_addr_lookup_by_index_mrsh.c>
 #endif
+
+struct in_addr net_if_ipv4_get_netmask(struct net_if *iface)
+{
+	struct in_addr netmask = { 0 };
+
+	net_if_lock(iface);
+
+	if (net_if_config_ipv4_get(iface, NULL) < 0) {
+		goto out;
+	}
+
+	if (!iface->config.ip.ipv4) {
+		goto out;
+	}
+
+	netmask = iface->config.ip.ipv4->netmask;
+out:
+	net_if_unlock(iface);
+
+	return netmask;
+}
 
 void net_if_ipv4_set_netmask(struct net_if *iface,
 			     const struct in_addr *netmask)

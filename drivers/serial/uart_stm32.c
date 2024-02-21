@@ -96,6 +96,9 @@ static void uart_stm32_pm_policy_state_lock_get(const struct device *dev)
 	if (!data->pm_policy_state_on) {
 		data->pm_policy_state_on = true;
 		pm_policy_state_lock_get(PM_STATE_SUSPEND_TO_IDLE, PM_ALL_SUBSTATES);
+		if (IS_ENABLED(CONFIG_PM_S2RAM)) {
+			pm_policy_state_lock_get(PM_STATE_SUSPEND_TO_RAM, PM_ALL_SUBSTATES);
+		}
 	}
 }
 
@@ -106,6 +109,9 @@ static void uart_stm32_pm_policy_state_lock_put(const struct device *dev)
 	if (data->pm_policy_state_on) {
 		data->pm_policy_state_on = false;
 		pm_policy_state_lock_put(PM_STATE_SUSPEND_TO_IDLE, PM_ALL_SUBSTATES);
+		if (IS_ENABLED(CONFIG_PM_S2RAM)) {
+			pm_policy_state_lock_put(PM_STATE_SUSPEND_TO_RAM, PM_ALL_SUBSTATES);
+		}
 	}
 }
 #endif /* CONFIG_PM */
@@ -2081,18 +2087,28 @@ static int uart_stm32_pm_action(const struct device *dev,
 			return err;
 		}
 
-		/* enable clock */
-		err = clock_control_on(data->clock, (clock_control_subsys_t)&config->pclken[0]);
-		if (err != 0) {
+		/* Enable clock */
+		err = clock_control_on(data->clock,
+					(clock_control_subsys_t)&config->pclken[0]);
+		if (err < 0) {
 			LOG_ERR("Could not enable (LP)UART clock");
 			return err;
+		}
+
+		if ((IS_ENABLED(CONFIG_PM_S2RAM)) &&
+			(!LL_USART_IsEnabled(config->usart))) {
+			/* When exiting low power mode, check whether UART is enabled.
+			 * If not, it means we are exiting Suspend to RAM mode (STM32
+			 * Standby), and the driver needs to be reinitialized.
+			 */
+			uart_stm32_init(dev);
 		}
 		break;
 	case PM_DEVICE_ACTION_SUSPEND:
 		uart_stm32_suspend_setup(dev);
 		/* Stop device clock. Note: fixed clocks are not handled yet. */
 		err = clock_control_off(data->clock, (clock_control_subsys_t)&config->pclken[0]);
-		if (err != 0) {
+		if (err < 0) {
 			LOG_ERR("Could not enable (LP)UART clock");
 			return err;
 		}
@@ -2330,8 +2346,8 @@ static const struct uart_stm32_config uart_stm32_cfg_##index = {	\
 	.pclken = pclken_##index,					\
 	.pclk_len = DT_INST_NUM_CLOCKS(index),				\
 	.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(index),			\
-	.single_wire = DT_INST_PROP_OR(index, single_wire, false),	\
-	.tx_rx_swap = DT_INST_PROP_OR(index, tx_rx_swap, false),	\
+	.single_wire = DT_INST_PROP(index, single_wire),		\
+	.tx_rx_swap = DT_INST_PROP(index, tx_rx_swap),			\
 	.rx_invert = DT_INST_PROP(index, rx_invert),			\
 	.tx_invert = DT_INST_PROP(index, tx_invert),			\
 	.de_enable = DT_INST_PROP(index, de_enable),			\

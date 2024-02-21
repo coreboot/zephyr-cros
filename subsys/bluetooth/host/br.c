@@ -751,12 +751,16 @@ static int read_ext_features(void)
 void device_supported_pkt_type(void)
 {
 	/* Device supported features and sco packet types */
+	if (BT_FEAT_LMP_SCO_CAPABLE(bt_dev.features)) {
+		bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_SCO_HV1);
+	}
+
 	if (BT_FEAT_HV2_PKT(bt_dev.features)) {
-		bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_ESCO_HV2);
+		bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_SCO_HV2);
 	}
 
 	if (BT_FEAT_HV3_PKT(bt_dev.features)) {
-		bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_ESCO_HV3);
+		bt_dev.br.esco_pkt_type |= (HCI_PKT_TYPE_SCO_HV3);
 	}
 
 	if (BT_FEAT_LMP_ESCO_CAPABLE(bt_dev.features)) {
@@ -806,6 +810,7 @@ int bt_br_init(void)
 	struct bt_hci_cp_write_ssp_mode *ssp_cp;
 	struct bt_hci_cp_write_inquiry_mode *inq_cp;
 	struct bt_hci_write_local_name *name_cp;
+	struct bt_hci_cp_write_class_of_device *cod;
 	int err;
 
 	/* Read extended local features */
@@ -865,6 +870,19 @@ int bt_br_init(void)
 		sizeof(name_cp->local_name));
 
 	err = bt_hci_cmd_send_sync(BT_HCI_OP_WRITE_LOCAL_NAME, buf, NULL);
+	if (err) {
+		return err;
+	}
+
+	/* Set Class of device */
+	buf = bt_hci_cmd_create(BT_HCI_OP_WRITE_CLASS_OF_DEVICE, sizeof(*cod));
+	if (!buf) {
+		return -ENOBUFS;
+	}
+
+	net_buf_add_le24(buf, CONFIG_BT_COD);
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_WRITE_CLASS_OF_DEVICE, buf, NULL);
 	if (err) {
 		return err;
 	}

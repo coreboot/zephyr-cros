@@ -965,6 +965,7 @@ struct net_buf_data_cb {
 struct net_buf_data_alloc {
 	const struct net_buf_data_cb *cb;
 	void *alloc_data;
+	size_t max_alloc_size;
 };
 
 /**
@@ -1078,7 +1079,6 @@ extern const struct net_buf_data_alloc net_buf_heap_alloc;
 					 _destroy)
 
 struct net_buf_pool_fixed {
-	size_t data_size;
 	uint8_t *data_pool;
 };
 
@@ -1118,12 +1118,12 @@ extern const struct net_buf_data_cb net_buf_fixed_cb;
 	_NET_BUF_ARRAY_DEFINE(_name, _count, _ud_size);                        \
 	static uint8_t __noinit net_buf_data_##_name[_count][_data_size] __net_buf_align; \
 	static const struct net_buf_pool_fixed net_buf_fixed_##_name = {       \
-		.data_size = _data_size,                                       \
 		.data_pool = (uint8_t *)net_buf_data_##_name,                  \
 	};                                                                     \
 	static const struct net_buf_data_alloc net_buf_fixed_alloc_##_name = { \
 		.cb = &net_buf_fixed_cb,                                       \
 		.alloc_data = (void *)&net_buf_fixed_##_name,                  \
+		.max_alloc_size = _data_size,                                  \
 	};                                                                     \
 	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_fixed_alloc_##_name,  \
@@ -1164,6 +1164,7 @@ extern const struct net_buf_data_cb net_buf_var_cb;
 	static const struct net_buf_data_alloc net_buf_data_alloc_##_name = {  \
 		.cb = &net_buf_var_cb,                                         \
 		.alloc_data = &net_buf_mem_pool_##_name,                       \
+		.max_alloc_size = 0,                                           \
 	};                                                                     \
 	static STRUCT_SECTION_ITERABLE(net_buf_pool, _name) =                  \
 		NET_BUF_POOL_INITIALIZER(_name, &net_buf_data_alloc_##_name,   \
@@ -2413,6 +2414,22 @@ typedef struct net_buf * __must_check (*net_buf_allocator_cb)(k_timeout_t timeou
 size_t net_buf_append_bytes(struct net_buf *buf, size_t len,
 			    const void *value, k_timeout_t timeout,
 			    net_buf_allocator_cb allocate_cb, void *user_data);
+
+/**
+ * @brief Match data with a net_buf's content
+ *
+ * @details Compare data with a content of a net_buf. Provide information about
+ * the number of bytes matching between both. If needed, traverse
+ * through multiple buffer fragments.
+ *
+ * @param buf Network buffer
+ * @param offset Starting offset to compare from
+ * @param data Data buffer for comparison
+ * @param len Number of bytes to compare
+ *
+ * @return The number of bytes compared before the first difference.
+ */
+size_t net_buf_data_match(const struct net_buf *buf, size_t offset, const void *data, size_t len);
 
 /**
  * @brief Skip N number of bytes in a net_buf

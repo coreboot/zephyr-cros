@@ -38,8 +38,8 @@ Benefits of POSIX support in Zephyr include:
 POSIX Subprofiles
 =================
 
-While Zephyr supports running multiple `threads <threads_v2>`_ (possibly in an `SMP <smp_arch>`_
-configuration), as well as `Virtual Memory and MMUs <memory_management_api>`_, Zephyr code and data
+While Zephyr supports running multiple `threads <threads_v2>` (possibly in an `SMP <smp_arch>`
+configuration), as well as `Virtual Memory and MMUs <memory_management_api>`, Zephyr code and data
 normally share a common address space. The Zephyr kernel executable code and the application
 executable code are typically compiled into the same binary artifact. From that perspective, Zephyr
 apps can be seen as running in the context of a single process.
@@ -103,8 +103,7 @@ leverages the ``nanosleep()`` and ``perror()`` POSIX functions.
         return 0;
     }
 
-..
-    TODO: insert a link to a list of all samples tagged with 'posix'
+For more examples of POSIX applications, please see the :ref:`POSIX sample applications<posix-samples>`.
 
 .. _posix_config:
 

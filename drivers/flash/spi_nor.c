@@ -186,6 +186,13 @@ static const struct jesd216_erase_type minimal_erase_types[JESD216_NUM_ERASE_TYP
 };
 #endif /* CONFIG_SPI_NOR_SFDP_MINIMAL */
 
+/* Register writes should be ready extremely quickly */
+#define WAIT_READY_REGISTER K_NO_WAIT
+/* Page writes range from sub-ms to 10ms */
+#define WAIT_READY_WRITE K_TICKS(1)
+/* Erases can range from 45ms to 240sec */
+#define WAIT_READY_ERASE K_MSEC(50)
+
 static int spi_nor_write_protection_set(const struct device *dev,
 					bool write_protect);
 
@@ -395,17 +402,27 @@ static int spi_nor_access(const struct device *const dev,
  * in the code.
  *
  * @param dev The device structure
+ * @param poll_delay Duration between polls of status register
  * @return 0 on success, negative errno code otherwise
  */
-static int spi_nor_wait_until_ready(const struct device *dev)
+static int spi_nor_wait_until_ready(const struct device *dev, k_timeout_t poll_delay)
 {
 	int ret;
 	uint8_t reg;
 
-	do {
-		ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, sizeof(reg));
-	} while (!ret && (reg & SPI_NOR_WIP_BIT));
+	ARG_UNUSED(poll_delay);
 
+	while (true) {
+		ret = spi_nor_cmd_read(dev, SPI_NOR_CMD_RDSR, &reg, sizeof(reg));
+		/* Exit on error or no longer WIP */
+		if (ret || !(reg & SPI_NOR_WIP_BIT)) {
+			break;
+		}
+#ifdef CONFIG_SPI_NOR_SLEEP_WHILE_WAITING_UNTIL_READY
+		/* Don't monopolise the CPU while waiting for ready */
+		k_sleep(poll_delay);
+#endif /* CONFIG_SPI_NOR_SLEEP_WHILE_WAITING_UNTIL_READY */
+	}
 	return ret;
 }
 
@@ -558,7 +575,7 @@ static int spi_nor_wrsr(const struct device *dev,
 	if (ret == 0) {
 		ret = spi_nor_access(dev, SPI_NOR_CMD_WRSR, NOR_ACCESS_WRITE, 0, &sr,
 				     sizeof(sr));
-		spi_nor_wait_until_ready(dev);
+		spi_nor_wait_until_ready(dev, WAIT_READY_REGISTER);
 	}
 
 	return ret;
@@ -626,7 +643,7 @@ static int mxicy_wrcr(const struct device *dev,
 
 		ret = spi_nor_access(dev, SPI_NOR_CMD_WRSR, NOR_ACCESS_WRITE, 0, data,
 			sizeof(data));
-		spi_nor_wait_until_ready(dev);
+		spi_nor_wait_until_ready(dev, WAIT_READY_REGISTER);
 	}
 
 	return ret;
@@ -772,7 +789,7 @@ static int spi_nor_write(const struct device *dev, off_t addr,
 			src = (const uint8_t *)src + to_write;
 			addr += to_write;
 
-			spi_nor_wait_until_ready(dev);
+			spi_nor_wait_until_ready(dev, WAIT_READY_WRITE);
 		}
 	}
 
@@ -854,7 +871,7 @@ static int spi_nor_erase(const struct device *dev, off_t addr, size_t size)
 		 */
 		volatile int xcc_ret =
 #endif
-		spi_nor_wait_until_ready(dev);
+		spi_nor_wait_until_ready(dev, WAIT_READY_ERASE);
 	}
 
 	int ret2 = spi_nor_write_protection_set(dev, true);
@@ -1239,7 +1256,7 @@ static int spi_nor_configure(const struct device *dev)
 	rc = spi_nor_rdsr(dev);
 	if (rc > 0 && (rc & SPI_NOR_WIP_BIT)) {
 		LOG_WRN("Waiting until flash is ready");
-		spi_nor_wait_until_ready(dev);
+		spi_nor_wait_until_ready(dev, WAIT_READY_REGISTER);
 	}
 	release_device(dev);
 

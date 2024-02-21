@@ -10,10 +10,26 @@
 #include <zephyr/device.h>
 #include <zephyr/init.h>
 #include "ilm.h"
-#include <soc.h>
+#include <soc_common.h>
 #include "soc_espi.h"
 #include <zephyr/dt-bindings/interrupt-controller/ite-intc.h>
 
+/*
+ * This define gets the total number of USBPD ports available on the
+ * ITE EC chip from dtsi (include status disable). Both it81202 and
+ * it81302 support two USBPD ports.
+ */
+#define SOC_USBPD_ITE_PHY_PORT_COUNT \
+COND_CODE_1(DT_NODE_EXISTS(DT_INST(1, ite_it8xxx2_usbpd)), (2), (1))
+
+/*
+ * This define gets the number of active USB Power Delivery (USB PD)
+ * ports in use on the ITE microcontroller from dts (only status okay).
+ * The active port usage should follow the order of ITE TCPC port index,
+ * ex. if we're active only one ITE USB PD port, then the port should be
+ * 0x3700 (port0 register base), instead of 0x3800 (port1 register base).
+ */
+#define SOC_USBPD_ITE_ACTIVE_PORT_COUNT DT_NUM_INST_STATUS_OKAY(ite_it8xxx2_usbpd)
 
 uint32_t chip_get_pll_freq(void)
 {
@@ -94,7 +110,11 @@ static const struct pll_config_t pll_configuration[] = {
 	 .div_uart  = 1,
 	 .div_smb   = 1,
 	 .div_sspi  = 1,
+#ifdef CONFIG_SOC_IT8XXX2_EC_BUS_24MHZ
+	 .div_ec    = 1,
+#else
 	 .div_ec    = 6,
+#endif
 	 .div_jtag  = 1,
 	 .div_pwm   = 0,
 	 .div_usbpd = 5}
@@ -272,6 +292,13 @@ static int ite_it8xxx2_init(void)
 	struct gpio_it8xxx2_regs *const gpio_regs = GPIO_IT8XXX2_REG_BASE;
 	struct gctrl_it8xxx2_regs *const gctrl_regs = GCTRL_IT8XXX2_REGS_BASE;
 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(usb0), disabled)
+	struct usb_it82xx2_regs *const usb_regs = USB_IT82XX2_REGS_BASE;
+
+	usb_regs->port0_misc_control &= ~PULL_DOWN_EN;
+	usb_regs->port1_misc_control &= ~PULL_DOWN_EN;
+#endif
+
 	/*
 	 * bit7: wake up CPU if it is in low power mode and
 	 * an interrupt is pending.
@@ -287,6 +314,11 @@ static int ite_it8xxx2_init(void)
 	IT8XXX2_SMB_SFFCTL &= ~IT8XXX2_SMB_HSAPE;
 #elif CONFIG_SOC_IT8XXX2_REG_SET_V2
 	IT8XXX2_SMB_SCLKTS_BRGS &= ~IT8XXX2_SMB_PREDEN;
+	/*
+	 * Setting this bit will disable EGAD pin output driving to avoid
+	 * leakage when GPIO E1/E2 on it82002 are set to alternate function.
+	 */
+	IT8XXX2_EGPIO_EGCR |= IT8XXX2_EGPIO_EEPODD;
 #endif
 
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(uart1), okay)

@@ -55,6 +55,8 @@ static struct bt_conn *connected_conns[CAP_AC_MAX_CONN];
 static size_t connected_conn_cnt;
 static const struct named_lc3_preset *snk_named_preset;
 static const struct named_lc3_preset *src_named_preset;
+static struct bt_cap_stream *non_idle_streams[CONFIG_BT_BAP_UNICAST_CLIENT_GROUP_STREAM_COUNT];
+static size_t non_idle_streams_cnt;
 
 CREATE_FLAG(flag_discovered);
 CREATE_FLAG(flag_codec_found);
@@ -106,7 +108,18 @@ static const struct named_lc3_preset lc3_unicast_presets[] = {
 static void unicast_stream_configured(struct bt_bap_stream *stream,
 				      const struct bt_audio_codec_qos_pref *pref)
 {
+	struct bt_cap_stream *cap_stream = cap_stream_from_bap_stream(stream);
 	printk("Configured stream %p\n", stream);
+
+	for (size_t i = 0U; i < ARRAY_SIZE(non_idle_streams); i++) {
+		if (non_idle_streams[i] == NULL) {
+			non_idle_streams[i] = cap_stream;
+			non_idle_streams_cnt++;
+			return;
+		}
+	}
+
+	FAIL("Could not store cap_stream in non_idle_streams\n");
 
 	/* TODO: The preference should be used/taken into account when
 	 * setting the QoS
@@ -145,7 +158,19 @@ static void unicast_stream_stopped(struct bt_bap_stream *stream, uint8_t reason)
 
 static void unicast_stream_released(struct bt_bap_stream *stream)
 {
+	struct bt_cap_stream *cap_stream = cap_stream_from_bap_stream(stream);
+
 	printk("Released stream %p\n", stream);
+
+	for (size_t i = 0U; i < ARRAY_SIZE(non_idle_streams); i++) {
+		if (non_idle_streams[i] == cap_stream) {
+			non_idle_streams[i] = NULL;
+			non_idle_streams_cnt--;
+			return;
+		}
+	}
+
+	FAIL("Could not find cap_stream in non_idle_streams\n");
 }
 
 static struct bt_bap_stream_ops unicast_stream_ops = {
@@ -183,8 +208,7 @@ static void cap_discovery_complete_cb(struct bt_conn *conn, int err,
 	SET_FLAG(flag_discovered);
 }
 
-static void unicast_start_complete_cb(struct bt_bap_unicast_group *unicast_group, int err,
-				      struct bt_conn *conn)
+static void unicast_start_complete_cb(int err, struct bt_conn *conn)
 {
 	if (err == -ECANCELED) {
 		SET_FLAG(flag_start_timeout);
@@ -206,8 +230,7 @@ static void unicast_update_complete_cb(int err, struct bt_conn *conn)
 	SET_FLAG(flag_updated);
 }
 
-static void unicast_stop_complete_cb(struct bt_bap_unicast_group *unicast_group, int err,
-				     struct bt_conn *conn)
+static void unicast_stop_complete_cb(int err, struct bt_conn *conn)
 {
 	if (err != 0) {
 		FAIL("Failed to stop (failing conn %p): %d", conn, err);
@@ -348,6 +371,10 @@ static void init(void)
 
 	for (size_t i = 0; i < ARRAY_SIZE(unicast_client_source_streams); i++) {
 		bt_cap_stream_ops_register(&unicast_client_source_streams[i], &unicast_stream_ops);
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(unicast_streams); i++) {
+		bt_cap_stream_ops_register(&unicast_streams[i].stream, &unicast_stream_ops);
 	}
 }
 
@@ -545,15 +572,9 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 	valid_stream_param.codec_cfg = &unicast_preset_16_2_1.codec_cfg;
 
 	/* Test NULL parameters */
-	err = bt_cap_initiator_unicast_audio_start(NULL, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(NULL);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with NULL param did not fail\n");
-		return;
-	}
-
-	err = bt_cap_initiator_unicast_audio_start(&valid_start_param, NULL);
-	if (err == 0) {
-		FAIL("bt_cap_initiator_unicast_audio_start with NULL group did not fail\n");
 		return;
 	}
 
@@ -564,7 +585,7 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 
 	/* Test invalid stream_start parameters */
 	invalid_start_param.count = 0U;
-	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with 0 count did not fail\n");
 		return;
@@ -574,7 +595,7 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 	invalid_start_param.stream_params = &invalid_stream_param;
 
 	invalid_start_param.stream_params = NULL;
-	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with NULL stream params did not fail\n");
 		return;
@@ -585,7 +606,7 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 
 	/* Test invalid stream_param parameters */
 	invalid_stream_param.member.member = NULL;
-	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with NULL stream params member did not "
 		     "fail\n");
@@ -595,7 +616,7 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 	memcpy(&invalid_stream_param, &valid_stream_param, sizeof(valid_stream_param));
 
 	invalid_stream_param.stream = NULL;
-	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with NULL stream params stream did not "
 		     "fail\n");
@@ -605,7 +626,7 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 	memcpy(&invalid_stream_param, &valid_stream_param, sizeof(valid_stream_param));
 
 	invalid_stream_param.ep = NULL;
-	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with NULL stream params ep did not "
 		     "fail\n");
@@ -615,7 +636,7 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 	memcpy(&invalid_stream_param, &valid_stream_param, sizeof(valid_stream_param));
 
 	invalid_stream_param.codec_cfg = NULL;
-	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with NULL stream params codec did not "
 		     "fail\n");
@@ -627,7 +648,7 @@ static void unicast_audio_start_inval(struct bt_bap_unicast_group *unicast_group
 	memset(&invalid_codec.meta, 0, sizeof(invalid_codec.meta));
 
 	invalid_stream_param.codec_cfg = &invalid_codec;
-	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&invalid_start_param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_start with invalid Codec metadata did not "
 		     "fail\n");
@@ -656,7 +677,7 @@ static void unicast_audio_start(struct bt_bap_unicast_group *unicast_group, bool
 
 	UNSET_FLAG(flag_started);
 
-	err = bt_cap_initiator_unicast_audio_start(&param, unicast_group);
+	err = bt_cap_initiator_unicast_audio_start(&param);
 	if (err != 0) {
 		FAIL("Failed to start unicast audio: %d\n", err);
 		return;
@@ -671,30 +692,36 @@ static void unicast_audio_update_inval(void)
 {
 	struct bt_audio_codec_cfg invalid_codec = BT_AUDIO_CODEC_LC3_CONFIG_16_2(
 		BT_AUDIO_LOCATION_FRONT_LEFT, BT_AUDIO_CONTEXT_TYPE_MEDIA);
-	struct bt_cap_unicast_audio_update_param param;
+	struct bt_cap_unicast_audio_update_stream_param stream_params[1] = {0};
+	struct bt_cap_unicast_audio_update_param param = {0};
 	int err;
 
-	param.stream = &unicast_client_sink_streams[0];
-	param.meta = unicast_preset_16_2_1.codec_cfg.meta;
-	param.meta_len = unicast_preset_16_2_1.codec_cfg.meta_len;
+	stream_params[0].stream = &unicast_client_sink_streams[0];
+	stream_params[0].meta = unicast_preset_16_2_1.codec_cfg.meta;
+	stream_params[0].meta_len = unicast_preset_16_2_1.codec_cfg.meta_len;
+	param.count = ARRAY_SIZE(stream_params);
+	param.stream_params = stream_params;
+	param.type = BT_CAP_SET_TYPE_AD_HOC;
 
-	err = bt_cap_initiator_unicast_audio_update(NULL, 1);
+	err = bt_cap_initiator_unicast_audio_update(NULL);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_update with NULL params did not fail\n");
 		return;
 	}
 
-	err = bt_cap_initiator_unicast_audio_update(&param, 0);
+	param.count = 0U;
+	err = bt_cap_initiator_unicast_audio_update(&param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_update with 0 param count did not fail\n");
 		return;
 	}
 
 	/* Clear metadata so that it does not contain the mandatory stream context */
+	param.count = ARRAY_SIZE(stream_params);
 	memset(&invalid_codec.meta, 0, sizeof(invalid_codec.meta));
-	param.meta = invalid_codec.meta;
+	stream_params[0].meta = invalid_codec.meta;
 
-	err = bt_cap_initiator_unicast_audio_update(&param, 1);
+	err = bt_cap_initiator_unicast_audio_update(&param);
 	if (err == 0) {
 		FAIL("bt_cap_initiator_unicast_audio_update with invalid Codec metadata did not "
 		     "fail\n");
@@ -704,7 +731,8 @@ static void unicast_audio_update_inval(void)
 
 static void unicast_audio_update(void)
 {
-	struct bt_cap_unicast_audio_update_param param[2];
+	struct bt_cap_unicast_audio_update_stream_param stream_params[2] = {0};
+	struct bt_cap_unicast_audio_update_param param = {0};
 	uint8_t new_meta[] = {
 		3,
 		BT_AUDIO_METADATA_TYPE_STREAM_CONTEXT,
@@ -715,17 +743,21 @@ static void unicast_audio_update(void)
 	};
 	int err;
 
-	param[0].stream = &unicast_client_sink_streams[0];
-	param[0].meta = new_meta;
-	param[0].meta_len = ARRAY_SIZE(new_meta);
+	stream_params[0].stream = &unicast_client_sink_streams[0];
+	stream_params[0].meta = new_meta;
+	stream_params[0].meta_len = ARRAY_SIZE(new_meta);
 
-	param[1].stream = &unicast_client_source_streams[0];
-	param[1].meta = new_meta;
-	param[1].meta_len = ARRAY_SIZE(new_meta);
+	stream_params[1].stream = &unicast_client_source_streams[0];
+	stream_params[1].meta = new_meta;
+	stream_params[1].meta_len = ARRAY_SIZE(new_meta);
+
+	param.count = ARRAY_SIZE(stream_params);
+	param.stream_params = stream_params;
+	param.type = BT_CAP_SET_TYPE_AD_HOC;
 
 	UNSET_FLAG(flag_updated);
 
-	err = bt_cap_initiator_unicast_audio_update(param, ARRAY_SIZE(param));
+	err = bt_cap_initiator_unicast_audio_update(&param);
 	if (err != 0) {
 		FAIL("Failed to update unicast audio: %d\n", err);
 		return;
@@ -741,30 +773,35 @@ static void unicast_audio_stop_inval(void)
 
 	err = bt_cap_initiator_unicast_audio_stop(NULL);
 	if (err == 0) {
-		FAIL("bt_cap_initiator_unicast_audio_stop with NULL group did not fail\n");
+		FAIL("bt_cap_initiator_unicast_audio_stop with NULL param did not fail\n");
 		return;
 	}
 }
 
 static void unicast_audio_stop(struct bt_bap_unicast_group *unicast_group)
 {
+	struct bt_cap_unicast_audio_stop_param param;
 	int err;
+
+	param.type = BT_CAP_SET_TYPE_AD_HOC;
+	param.count = non_idle_streams_cnt;
+	param.streams = non_idle_streams;
 
 	UNSET_FLAG(flag_stopped);
 
-	err = bt_cap_initiator_unicast_audio_stop(unicast_group);
+	err = bt_cap_initiator_unicast_audio_stop(&param);
 	if (err != 0) {
-		FAIL("Failed to start unicast audio: %d\n", err);
+		FAIL("Failed to stop unicast audio: %d\n", err);
 		return;
 	}
 
 	WAIT_FOR_FLAG(flag_stopped);
 
 	/* Verify that it cannot be stopped twice */
-	err = bt_cap_initiator_unicast_audio_stop(unicast_group);
+	err = bt_cap_initiator_unicast_audio_stop(&param);
 	if (err == 0) {
-		FAIL("bt_cap_initiator_unicast_audio_stop with already-stopped unicast group did "
-		     "not fail\n");
+		FAIL("bt_cap_initiator_unicast_audio_stop with already-stopped streams did not "
+		     "fail\n");
 		return;
 	}
 }
@@ -822,6 +859,7 @@ static void test_main_cap_initiator_unicast(void)
 	WAIT_FOR_FLAG(flag_mtu_exchanged);
 
 	discover_cas(default_conn);
+	discover_cas(default_conn); /* test that we can discover twice */
 
 	discover_sink(default_conn);
 	discover_source(default_conn);
@@ -1083,7 +1121,10 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 			snk_stream_cnt++;
 			stream_cnt++;
 
-			if (param->conn_cnt > 1) {
+			/* If we have more than 1 connection or stream in one direction, we set the
+			 * location bit accordingly
+			 */
+			if (param->conn_cnt > 1U || param->snk_cnt[i] > 1U) {
 				const int err = bt_audio_codec_cfg_set_chan_allocation(
 					stream_param->codec_cfg, (enum bt_audio_location)BIT(i));
 
@@ -1106,7 +1147,10 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 			src_stream_cnt++;
 			stream_cnt++;
 
-			if (param->conn_cnt > 1) {
+			/* If we have more than 1 connection or stream in one direction, we set the
+			 * location bit accordingly
+			 */
+			if (param->conn_cnt > 1U || param->src_cnt[i] > 1U) {
 				const int err = bt_audio_codec_cfg_set_chan_allocation(
 					stream_param->codec_cfg, (enum bt_audio_location)BIT(i));
 
@@ -1122,7 +1166,7 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 	start_param.count = stream_cnt;
 	start_param.type = BT_CAP_SET_TYPE_AD_HOC;
 
-	return bt_cap_initiator_unicast_audio_start(&start_param, unicast_group);
+	return bt_cap_initiator_unicast_audio_start(&start_param);
 }
 
 static int cap_initiator_ac_unicast(const struct cap_initiator_ac_param *param,

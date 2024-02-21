@@ -197,8 +197,17 @@ static void modem_cmux_bus_callback(struct modem_pipe *pipe, enum modem_pipe_eve
 {
 	struct modem_cmux *cmux = (struct modem_cmux *)user_data;
 
-	if (event == MODEM_PIPE_EVENT_RECEIVE_READY) {
+	switch (event) {
+	case MODEM_PIPE_EVENT_RECEIVE_READY:
 		k_work_schedule(&cmux->receive_work, K_NO_WAIT);
+		break;
+
+	case MODEM_PIPE_EVENT_TRANSMIT_IDLE:
+		k_work_schedule(&cmux->transmit_work, K_NO_WAIT);
+		break;
+
+	default:
+		break;
 	}
 }
 
@@ -446,6 +455,10 @@ static void modem_cmux_on_control_frame_uih(struct modem_cmux *cmux)
 
 static void modem_cmux_connect_response_transmit(struct modem_cmux *cmux)
 {
+	if (cmux == NULL) {
+		return;
+	}
+
 	struct modem_cmux_frame frame = {
 		.dlci_address = cmux->frame.dlci_address,
 		.cr = cmux->frame.cr,
@@ -833,6 +846,17 @@ static void modem_cmux_receive_handler(struct k_work *item)
 	k_work_schedule(&cmux->receive_work, K_NO_WAIT);
 }
 
+static void modem_cmux_dlci_notify_transmit_idle(struct modem_cmux *cmux)
+{
+	sys_snode_t *node;
+	struct modem_cmux_dlci *dlci;
+
+	SYS_SLIST_FOR_EACH_NODE(&cmux->dlcis, node) {
+		dlci = (struct modem_cmux_dlci *)node;
+		modem_pipe_notify_transmit_idle(&dlci->pipe);
+	}
+}
+
 static void modem_cmux_transmit_handler(struct k_work *item)
 {
 	struct k_work_delayable *dwork = k_work_delayable_from_work(item);
@@ -840,41 +864,50 @@ static void modem_cmux_transmit_handler(struct k_work *item)
 	uint8_t *reserved;
 	uint32_t reserved_size;
 	int ret;
+	bool transmit_rb_empty;
 
 	k_mutex_lock(&cmux->transmit_rb_lock, K_FOREVER);
 
-	/* Reserve data to transmit from transmit ring buffer */
-	reserved_size = ring_buf_get_claim(&cmux->transmit_rb, &reserved, UINT32_MAX);
+	while (true) {
+		transmit_rb_empty = ring_buf_is_empty(&cmux->transmit_rb);
 
-	/* Transmit reserved data */
-	ret = modem_pipe_transmit(cmux->pipe, reserved, reserved_size);
-	if (ret < 1) {
-		ring_buf_get_finish(&cmux->transmit_rb, 0);
-		k_mutex_unlock(&cmux->transmit_rb_lock);
-		k_work_schedule(&cmux->transmit_work, K_NO_WAIT);
+		if (transmit_rb_empty) {
+			break;
+		}
 
-		return;
-	}
+		reserved_size = ring_buf_get_claim(&cmux->transmit_rb, &reserved, UINT32_MAX);
 
-	/* Release remaining reserved data */
-	ring_buf_get_finish(&cmux->transmit_rb, ret);
+		ret = modem_pipe_transmit(cmux->pipe, reserved, reserved_size);
+		if (ret < 0) {
+			ring_buf_get_finish(&cmux->transmit_rb, 0);
+			break;
+		}
 
-	/* Resubmit transmit work if data remains */
-	if (ring_buf_is_empty(&cmux->transmit_rb) == false) {
-		k_work_schedule(&cmux->transmit_work, K_NO_WAIT);
+		ring_buf_get_finish(&cmux->transmit_rb, (uint32_t)ret);
+
+		if (ret < reserved_size) {
+			break;
+		}
 	}
 
 	k_mutex_unlock(&cmux->transmit_rb_lock);
+
+	if (transmit_rb_empty) {
+		modem_cmux_dlci_notify_transmit_idle(cmux);
+	}
 }
 
 static void modem_cmux_connect_handler(struct k_work *item)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(item);
-	struct modem_cmux *cmux = CONTAINER_OF(dwork, struct modem_cmux, connect_work);
+	struct k_work_delayable *dwork;
+	struct modem_cmux *cmux;
 
-	if (cmux == NULL) {
+	if (item == NULL) {
 		return;
 	}
+
+	dwork = k_work_delayable_from_work(item);
+	cmux = CONTAINER_OF(dwork, struct modem_cmux, connect_work);
 
 	cmux->state = MODEM_CMUX_STATE_CONNECTING;
 
@@ -982,12 +1015,15 @@ struct modem_pipe_api modem_cmux_dlci_pipe_api = {
 
 static void modem_cmux_dlci_open_handler(struct k_work *item)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(item);
-	struct modem_cmux_dlci *dlci = CONTAINER_OF(dwork, struct modem_cmux_dlci, open_work);
+	struct k_work_delayable *dwork;
+	struct modem_cmux_dlci *dlci;
 
-	if (dlci == NULL) {
+	if (item == NULL) {
 		return;
 	}
+
+	dwork = k_work_delayable_from_work(item);
+	dlci = CONTAINER_OF(dwork, struct modem_cmux_dlci, open_work);
 
 	dlci->state = MODEM_CMUX_DLCI_STATE_OPENING;
 
@@ -1006,13 +1042,17 @@ static void modem_cmux_dlci_open_handler(struct k_work *item)
 
 static void modem_cmux_dlci_close_handler(struct k_work *item)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(item);
-	struct modem_cmux_dlci *dlci = CONTAINER_OF(dwork, struct modem_cmux_dlci, close_work);
-	struct modem_cmux *cmux = dlci->cmux;
+	struct k_work_delayable *dwork;
+	struct modem_cmux_dlci *dlci;
+	struct modem_cmux *cmux;
 
-	if (cmux == NULL) {
+	if (item == NULL) {
 		return;
 	}
+
+	dwork = k_work_delayable_from_work(item);
+	dlci = CONTAINER_OF(dwork, struct modem_cmux_dlci, close_work);
+	cmux = dlci->cmux;
 
 	dlci->state = MODEM_CMUX_DLCI_STATE_CLOSING;
 

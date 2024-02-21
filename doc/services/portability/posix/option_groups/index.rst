@@ -64,7 +64,7 @@ multiple processes.
     pthread_setcanceltype(),yes
     pthread_setspecific(),yes
     pthread_sigmask(),yes
-    pthread_testcancel(),
+    pthread_testcancel(),yes
 
 .. _posix_option_group_posix_threads_ext:
 
@@ -168,7 +168,7 @@ process applications.
     errno,yes
     getenv(),
     setenv(),
-    sysconf(),
+    sysconf(),yes
     uname(),yes
     unsetenv()
 
@@ -359,7 +359,7 @@ _POSIX_MESSAGE_PASSING
 
     mq_close(),yes
     mq_getattr(),yes
-    mq_notify(),
+    mq_notify(),yes
     mq_open(),yes
     mq_receive(),yes
     mq_send(),yes
@@ -377,11 +377,11 @@ _POSIX_PRIORITY_SCHEDULING
 
     sched_get_priority_max(),yes
     sched_get_priority_min(),yes
-    sched_getparam(),
-    sched_getscheduler(),
-    sched_rr_get_interval(),
-    sched_setparam(),
-    sched_setscheduler(),
+    sched_getparam(),yes
+    sched_getscheduler(),yes
+    sched_rr_get_interval(),yes
+    sched_setparam(),yes
+    sched_setscheduler(),yes
     sched_yield(),yes
 
 .. _posix_option_reader_writer_locks:
@@ -486,8 +486,8 @@ _POSIX_TIMEOUTS
    :header: API, Supported
    :widths: 50,10
 
-    mq_timedreceive(),
-    mq_timedsend(),
+    mq_timedreceive(),yes
+    mq_timedsend(),yes
     pthread_mutex_timedlock(),yes
     pthread_rwlock_timedrdlock(),yes
     pthread_rwlock_timedwrlock(),yes

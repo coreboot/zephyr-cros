@@ -38,12 +38,27 @@
  * EC clock frequency (PWM and tachometer driver need it to reply
  * to api or calculate RPM)
  */
+#ifdef CONFIG_SOC_IT8XXX2_EC_BUS_24MHZ
+#define EC_FREQ			MHZ(24)
+#else
 #define EC_FREQ			MHZ(8)
 
+#endif
 
 /* --- General Control (GCTRL) --- */
 #define IT8XXX2_GCTRL_BASE      0x00F02000
 #define IT8XXX2_GCTRL_EIDSR     ECREG(IT8XXX2_GCTRL_BASE + 0x31)
+
+/* --- External GPIO Control (EGPIO) --- */
+#define IT8XXX2_EGPIO_BASE      0x00F02100
+#define IT8XXX2_EGPIO_EGCR      ECREG(IT8XXX2_EGPIO_BASE + 0x04)
+
+/* EGPIO register fields */
+/*
+ * 0x04: External GPIO Control
+ * BIT(4): EXGPIO EGAD Pin Output Driving Disable
+ */
+#define IT8XXX2_EGPIO_EEPODD    BIT(4)
 
 /**
  *
@@ -392,7 +407,7 @@ enum ext_clk_src_sel {
 	EXT_PSR_32P768K = 0,
 	EXT_PSR_1P024K,
 	EXT_PSR_32,
-	EXT_PSR_8M,
+	EXT_PSR_EC_CLK,
 };
 /*
  * 24-bit timers: external timer 3, 5, and 7
@@ -696,6 +711,13 @@ struct it82xx2_usb_ep_fifo_regs {
 	};
 
 };
+
+/* USB Control registers */
+#define USB_IT82XX2_REGS_BASE \
+	((struct usb_it82xx2_regs *)DT_REG_ADDR(DT_NODELABEL(usb0)))
+
+/* Bit definitions of the register Port0/Port1 MISC Control: 0XE4/0xE8 */
+#define PULL_DOWN_EN	BIT(4)
 
 struct usb_it82xx2_regs {
 	/* 0x00:  Host TX Contrl Register */
@@ -1062,6 +1084,11 @@ struct gpio_it8xxx2_regs {
 #define IT8XXX2_GPIO_GPH1VS                BIT(1)
 #define IT8XXX2_GPIO_GPH2VS                BIT(0)
 
+#define KSIX_KSOX_KBS_GPIO_MODE     BIT(7)
+#define KSIX_KSOX_GPIO_OUTPUT       BIT(6)
+#define KSIX_KSOX_GPIO_PULLUP       BIT(2)
+#define KSIX_KSOX_GPIO_PULLDOWN     BIT(1)
+
 #define GPCR_PORT_PIN_MODE_INPUT    BIT(7)
 #define GPCR_PORT_PIN_MODE_OUTPUT   BIT(6)
 #define GPCR_PORT_PIN_MODE_PULLUP   BIT(2)
@@ -1158,6 +1185,10 @@ struct adc_it8xxx2_regs {
 	struct adc_vchs_ctrl_t adc_vchs_ctrl[4];
 	/* 0x6c: ADC Data Valid Status 2 */
 	volatile uint8_t ADCDVSTS2;
+	/* 0x6d-0xef: Reserved4 */
+	volatile uint8_t reserved4[131];
+	/* 0xf0: ADC Clock Control Register 1 */
+	volatile uint8_t ADCCTL1;
 };
 #endif /* !__ASSEMBLER__ */
 

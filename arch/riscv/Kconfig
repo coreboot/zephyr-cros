@@ -84,6 +84,13 @@ config RISCV_SOC_HAS_ISR_STACKING
 	    saved on the stack by the hardware, and the registers saved by the
 	    software macros. The structure must be called '__esf'.
 
+config RISCV_SOC_HAS_CUSTOM_IRQ_HANDLING
+	bool
+	help
+	  This allows the SoC to overwrite the irq handling. If enabled, the
+	  function __soc_handle_all_irqs has to be implemented. It shall service
+	  and clear all pending interrupts.
+
 config RISCV_SOC_HAS_CUSTOM_IRQ_LOCK_OPS
 	bool
 	help
@@ -152,6 +159,25 @@ config RISCV_SOC_OFFSETS
 	    to ensure offset macros for SOC_ESF_MEMBERS are defined
 	    in offsets.h. The last one should not end in a semicolon.
 	    See gen_offset.h for more details.
+
+config RISCV_HAS_PLIC
+	bool
+	depends on RISCV_PRIVILEGED
+	help
+	  Does the SOC provide support for a Platform Level Interrupt Controller (PLIC).
+
+config RISCV_HAS_CLIC
+	bool
+	depends on RISCV_PRIVILEGED
+	help
+	  Does the SOC provide support for a Core-Local Interrupt Controller (CLIC).
+
+config RISCV_SOC_EXCEPTION_FROM_IRQ
+	bool
+	help
+	  Option selected by SoCs that require a custom mechanism to check if
+	  an exception is the result of an interrupt or not. If selected,
+	  __soc_is_irq() needs to be implemented by the SoC.
 
 config RISCV_SOC_INTERRUPT_INIT
 	bool "SOC-based interrupt initialization"

@@ -22,6 +22,8 @@ source ${ZEPHYR_BASE}/tests/bsim/compile.source
 app=tests/bsim/bluetooth/host/adv/resume compile
 app=tests/bsim/bluetooth/host/adv/resume conf_file=prj_2.conf compile
 app=tests/bsim/bluetooth/host/adv/chain compile
+app=tests/bsim/bluetooth/host/adv/extended conf_file=prj_advertiser.conf compile
+app=tests/bsim/bluetooth/host/adv/extended conf_file=prj_scanner.conf compile
 app=tests/bsim/bluetooth/host/adv/periodic compile
 app=tests/bsim/bluetooth/host/adv/periodic conf_file=prj_long_data.conf compile
 app=tests/bsim/bluetooth/host/adv/encrypted/css_sample_data compile
@@ -44,6 +46,7 @@ app=tests/bsim/bluetooth/host/att/pipeline/tester compile
 app=tests/bsim/bluetooth/host/att/long_read compile
 app=tests/bsim/bluetooth/host/att/open_close compile
 
+app=tests/bsim/bluetooth/host/gatt/authorization compile
 app=tests/bsim/bluetooth/host/gatt/caching compile
 app=tests/bsim/bluetooth/host/gatt/general compile
 app=tests/bsim/bluetooth/host/gatt/notify compile
@@ -65,6 +68,7 @@ app=tests/bsim/bluetooth/host/l2cap/credits compile
 app=tests/bsim/bluetooth/host/l2cap/credits conf_file=prj_ecred.conf compile
 app=tests/bsim/bluetooth/host/l2cap/credits_seg_recv compile
 app=tests/bsim/bluetooth/host/l2cap/credits_seg_recv conf_file=prj_ecred.conf compile
+app=tests/bsim/bluetooth/host/l2cap/frags compile
 app=tests/bsim/bluetooth/host/l2cap/send_on_connect compile
 app=tests/bsim/bluetooth/host/l2cap/send_on_connect conf_file=prj_ecred.conf compile
 
@@ -73,6 +77,7 @@ app=tests/bsim/bluetooth/host/misc/disconnect/dut compile
 app=tests/bsim/bluetooth/host/misc/disconnect/tester compile
 app=tests/bsim/bluetooth/host/misc/conn_stress/central compile
 app=tests/bsim/bluetooth/host/misc/conn_stress/peripheral compile
+app=tests/bsim/bluetooth/host/misc/unregister_conn_cb compile
 
 app=tests/bsim/bluetooth/host/privacy/central compile
 app=tests/bsim/bluetooth/host/privacy/peripheral compile

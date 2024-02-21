@@ -956,6 +956,35 @@ static void tcp_send_timer_cancel(struct tcp *conn)
 	}
 }
 
+#if defined(CONFIG_NET_TCP_IPV6_ND_REACHABILITY_HINT)
+
+static void tcp_nbr_reachability_hint(struct tcp *conn)
+{
+	int64_t now;
+	struct net_if *iface;
+
+	if (net_context_get_family(conn->context) != AF_INET6) {
+		return;
+	}
+
+	now = k_uptime_get();
+	iface = net_context_get_iface(conn->context);
+
+	/* Ensure that Neighbor Reachability hints are rate-limited (using threshold
+	 * of half of reachable time).
+	 */
+	if ((now - conn->last_nd_hint_time) > (net_if_ipv6_get_reachable_time(iface) / 2)) {
+		net_ipv6_nbr_reachability_hint(iface, &conn->dst.sin6.sin6_addr);
+		conn->last_nd_hint_time = now;
+	}
+}
+
+#else /* CONFIG_NET_TCP_IPV6_ND_REACHABILITY_HINT */
+
+#define tcp_nbr_reachability_hint(...)
+
+#endif /* CONFIG_NET_TCP_IPV6_ND_REACHABILITY_HINT */
+
 static const char *tcp_state_to_str(enum tcp_state state, bool prefix)
 {
 	const char *s = NULL;
@@ -2921,6 +2950,11 @@ next_state:
 			} else {
 				verdict = NET_OK;
 			}
+
+			/* ACK for SYN | ACK has been received. This signilizes that
+			 * the connection makes a "forward progress".
+			 */
+			tcp_nbr_reachability_hint(conn);
 		}
 		break;
 	case TCP_SYN_SENT:
@@ -2957,6 +2991,11 @@ next_state:
 			 * priority.
 			 */
 			connection_ok = true;
+
+			/* ACK for SYN has been received. This signilizes that
+			 * the connection makes a "forward progress".
+			 */
+			tcp_nbr_reachability_hint(conn);
 		} else if (pkt) {
 			net_tcp_reply_rst(pkt);
 		}
@@ -3089,6 +3128,12 @@ next_state:
 
 			conn_seq(conn, + len_acked);
 			net_stats_update_tcp_seg_recv(conn->iface);
+
+			/* Receipt of an acknowledgment that covers a sequence number
+			 * not previously acknowledged indicates that the connection
+			 * makes a "forward progress".
+			 */
+			tcp_nbr_reachability_hint(conn);
 
 			conn_send_data_dump(conn);
 

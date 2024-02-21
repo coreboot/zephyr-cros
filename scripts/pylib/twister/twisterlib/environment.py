@@ -86,14 +86,14 @@ Artificially long but functional example:
         "--save-tests",
         metavar="FILENAME",
         action="store",
-        help="Append list of tests and platforms to be run to file.")
+        help="Write a list of tests and platforms to be run to file.")
 
     case_select.add_argument(
         "-F",
         "--load-tests",
         metavar="FILENAME",
         action="store",
-        help="Load list of tests and platforms to be run from file.")
+        help="Load a list of tests and platforms to be run from file.")
 
     case_select.add_argument(
         "-T", "--testsuite-root", action="append", default=[],
@@ -862,6 +862,13 @@ class TwisterEnv:
         else:
             self.board_roots = None
             self.outdir = None
+
+        self.snippet_roots = [Path(ZEPHYR_BASE)]
+        modules = zephyr_module.parse_modules(ZEPHYR_BASE)
+        for module in modules:
+            snippet_root = module.meta.get("build", {}).get("settings", {}).get("snippet_root")
+            if snippet_root:
+                self.snippet_roots.append(Path(module.project) / snippet_root)
 
         self.hwm = None
 

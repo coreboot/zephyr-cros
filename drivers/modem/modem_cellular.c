@@ -33,6 +33,16 @@ LOG_MODULE_REGISTER(modem_cellular, CONFIG_MODEM_LOG_LEVEL);
 #define MODEM_CELLULAR_DATA_MANUFACTURER_LEN (64)
 #define MODEM_CELLULAR_DATA_FW_VERSION_LEN   (64)
 
+/* Magic constants */
+#define CSQ_RSSI_UNKNOWN		     (99)
+#define CESQ_RSRP_UNKNOWN		     (255)
+#define CESQ_RSRQ_UNKNOWN		     (255)
+
+/* Magic numbers to units conversions */
+#define CSQ_RSSI_TO_DB(v) (-113 + (2 * (rssi)))
+#define CESQ_RSRP_TO_DB(v) (-140 + (v))
+#define CESQ_RSRQ_TO_DB(v) (-20 + ((v) / 2))
+
 enum modem_cellular_state {
 	MODEM_CELLULAR_STATE_IDLE = 0,
 	MODEM_CELLULAR_STATE_RESET_PULSE,
@@ -95,6 +105,8 @@ struct modem_cellular_data {
 	uint8_t registration_status_gprs;
 	uint8_t registration_status_lte;
 	uint8_t rssi;
+	uint8_t rsrp;
+	uint8_t rsrq;
 	uint8_t imei[MODEM_CELLULAR_DATA_IMEI_LEN];
 	uint8_t model_id[MODEM_CELLULAR_DATA_MODEL_ID_LEN];
 	uint8_t imsi[MODEM_CELLULAR_DATA_IMSI_LEN];
@@ -289,7 +301,7 @@ static void modem_cellular_chat_on_imei(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->imei, argv[1], sizeof(data->imei));
+	strncpy(data->imei, argv[1], sizeof(data->imei) - 1);
 }
 
 static void modem_cellular_chat_on_cgmm(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -301,7 +313,7 @@ static void modem_cellular_chat_on_cgmm(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->model_id, argv[1], sizeof(data->model_id));
+	strncpy(data->model_id, argv[1], sizeof(data->model_id) - 1);
 }
 
 static void modem_cellular_chat_on_cgmi(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -313,7 +325,7 @@ static void modem_cellular_chat_on_cgmi(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->manufacturer, argv[1], sizeof(data->manufacturer));
+	strncpy(data->manufacturer, argv[1], sizeof(data->manufacturer) - 1);
 }
 
 static void modem_cellular_chat_on_cgmr(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -325,7 +337,7 @@ static void modem_cellular_chat_on_cgmr(struct modem_chat *chat, char **argv, ui
 		return;
 	}
 
-	strncpy(data->fw_version, argv[1], sizeof(data->fw_version));
+	strncpy(data->fw_version, argv[1], sizeof(data->fw_version) - 1);
 }
 
 static void modem_cellular_chat_on_csq(struct modem_chat *chat, char **argv, uint16_t argc,
@@ -340,12 +352,25 @@ static void modem_cellular_chat_on_csq(struct modem_chat *chat, char **argv, uin
 	data->rssi = (uint8_t)atoi(argv[1]);
 }
 
+static void modem_cellular_chat_on_cesq(struct modem_chat *chat, char **argv, uint16_t argc,
+					void *user_data)
+{
+	struct modem_cellular_data *data = (struct modem_cellular_data *)user_data;
+
+	if (argc != 7) {
+		return;
+	}
+
+	data->rsrq = (uint8_t)atoi(argv[5]);
+	data->rsrp = (uint8_t)atoi(argv[6]);
+}
+
 static void modem_cellular_chat_on_imsi(struct modem_chat *chat, char **argv, uint16_t argc,
 					void *user_data)
 {
 	struct modem_cellular_data *data = (struct modem_cellular_data *)user_data;
 
-	strncpy(data->imsi, (char *)argv[1], sizeof(data->imsi));
+	strncpy(data->imsi, argv[1], sizeof(data->imsi) - 1);
 }
 
 static bool modem_cellular_is_registered(struct modem_cellular_data *data)
@@ -398,6 +423,7 @@ MODEM_CHAT_MATCHES_DEFINE(allow_match,
 MODEM_CHAT_MATCH_DEFINE(imei_match, "", "", modem_cellular_chat_on_imei);
 MODEM_CHAT_MATCH_DEFINE(cgmm_match, "", "", modem_cellular_chat_on_cgmm);
 MODEM_CHAT_MATCH_DEFINE(csq_match, "+CSQ: ", ",", modem_cellular_chat_on_csq);
+MODEM_CHAT_MATCH_DEFINE(cesq_match, "+CESQ: ", ",", modem_cellular_chat_on_cesq);
 MODEM_CHAT_MATCH_DEFINE(cimi_match, "", "", modem_cellular_chat_on_imsi);
 MODEM_CHAT_MATCH_DEFINE(cgmi_match, "", "", modem_cellular_chat_on_cgmi);
 MODEM_CHAT_MATCH_DEFINE(cgmr_match, "", "", modem_cellular_chat_on_cgmr);
@@ -419,13 +445,13 @@ MODEM_CHAT_MATCHES_DEFINE(dial_abort_matches,
 static void modem_cellular_log_state_changed(enum modem_cellular_state last_state,
 					     enum modem_cellular_state new_state)
 {
-	LOG_INF("switch from %s to %s", modem_cellular_state_str(last_state),
+	LOG_DBG("switch from %s to %s", modem_cellular_state_str(last_state),
 		modem_cellular_state_str(new_state));
 }
 
 static void modem_cellular_log_event(enum modem_cellular_event evt)
 {
-	LOG_INF("event %s", modem_cellular_event_str(evt));
+	LOG_DBG("event %s", modem_cellular_event_str(evt));
 }
 
 static void modem_cellular_start_timer(struct modem_cellular_data *data, k_timeout_t timeout)
@@ -1253,11 +1279,44 @@ static inline int modem_cellular_csq_parse_rssi(uint8_t rssi, int16_t *value)
 	 * - ber is an integer from 0 to 7 that describes the error rate, it can also
 	 *   be 99 for an unknown error rate
 	 */
-	if (rssi == 99) {
+	if (rssi == CSQ_RSSI_UNKNOWN) {
 		return -EINVAL;
 	}
 
-	*value = (int16_t)(-113 + (2 * rssi));
+	*value = (int16_t)CSQ_RSSI_TO_DB(rssi);
+	return 0;
+}
+
+MODEM_CHAT_SCRIPT_CMDS_DEFINE(get_signal_cesq_chat_script_cmds,
+			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CESQ", cesq_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match));
+
+MODEM_CHAT_SCRIPT_DEFINE(get_signal_cesq_chat_script, get_signal_cesq_chat_script_cmds,
+			 abort_matches, modem_cellular_chat_callback_handler, 2);
+
+/* AT+CESQ returns a response +CESQ: <rxlev>,<ber>,<rscp>,<ecn0>,<rsrq>,<rsrp> where:
+ * - rsrq is a integer from 0 to 34 whose values describes the Reference Signal Receive
+ *   Quality between -20 dB for 0 and -3 dB for 34 (0.5 dB steps), or unknown for 255
+ * - rsrp is an integer from 0 to 97 that describes the Reference Signal Receive Power
+ *   between -140 dBm for 0 and -44 dBm for 97 (1 dBm steps), or unknown for 255
+ */
+static inline int modem_cellular_cesq_parse_rsrp(uint8_t rsrp, int16_t *value)
+{
+	if (rsrp == CESQ_RSRP_UNKNOWN) {
+		return -EINVAL;
+	}
+
+	*value = (int16_t)CESQ_RSRP_TO_DB(rsrp);
+	return 0;
+}
+
+static inline int modem_cellular_cesq_parse_rsrq(uint8_t rsrq, int16_t *value)
+{
+	if (rsrq == CESQ_RSRQ_UNKNOWN) {
+		return -EINVAL;
+	}
+
+	*value = (int16_t)CESQ_RSRQ_TO_DB(rsrq);
 	return 0;
 }
 
@@ -1281,8 +1340,7 @@ static int modem_cellular_get_signal(const struct device *dev,
 
 	case CELLULAR_SIGNAL_RSRP:
 	case CELLULAR_SIGNAL_RSRQ:
-		/* TODO: Run CESQ script */
-		ret = -ENOTSUP;
+		ret = modem_chat_run_script(&data->chat, &get_signal_cesq_chat_script);
 		break;
 
 	default:
@@ -1302,9 +1360,11 @@ static int modem_cellular_get_signal(const struct device *dev,
 		break;
 
 	case CELLULAR_SIGNAL_RSRP:
+		ret = modem_cellular_cesq_parse_rsrp(data->rsrp, value);
+		break;
+
 	case CELLULAR_SIGNAL_RSRQ:
-		/* TODO: Validate and set values */
-		ret = -ENODATA;
+		ret = modem_cellular_cesq_parse_rsrq(data->rsrq, value);
 		break;
 
 	default:
@@ -1460,7 +1520,6 @@ static int modem_cellular_init(const struct device *dev)
 			.argv_size = ARRAY_SIZE(data->chat_argv),
 			.unsol_matches = unsol_matches,
 			.unsol_matches_size = ARRAY_SIZE(unsol_matches),
-			.process_timeout = K_MSEC(2),
 		};
 
 		modem_chat_init(&data->chat, &chat_config);
@@ -1743,6 +1802,12 @@ MODEM_CHAT_SCRIPT_CMDS_DEFINE(u_blox_sara_r5_init_chat_script_cmds,
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGSN", imei_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMM", cgmm_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMI", cgmi_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CGMR", cgmr_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
+			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CIMI", cimi_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("", ok_match),
 			      MODEM_CHAT_SCRIPT_CMD_RESP("AT+CMUX=0,0,5,127", ok_match));
 

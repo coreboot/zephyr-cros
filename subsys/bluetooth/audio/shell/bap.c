@@ -220,7 +220,7 @@ static void fill_audio_buf_sin(int16_t *buf, int length_us, int frequency_hz, in
 	const float step = 2 * 3.1415 / sine_period_samples;
 
 	for (size_t i = 0; i < num_samples; i++) {
-		const float sample = sin(i * step);
+		const float sample = sinf(i * step);
 
 		buf[i] = (int16_t)(AUDIO_VOLUME * sample);
 	}
@@ -351,7 +351,7 @@ static void lc3_audio_send_data(struct k_work *work)
 		}
 	}
 
-	err = bt_bap_stream_send(bap_stream, buf, sh_stream->seq_num, BT_ISO_TIMESTAMP_NONE);
+	err = bt_bap_stream_send(bap_stream, buf, sh_stream->seq_num);
 	if (err < 0) {
 		shell_error(ctx_shell, "Failed to send LC3 audio data (%d)", err);
 		net_buf_unref(buf);
@@ -590,8 +590,8 @@ static int lc3_release(struct bt_bap_stream *stream, struct bt_bap_ascs_rsp *rsp
 }
 
 static const struct bt_audio_codec_cap lc3_codec_cap = BT_AUDIO_CODEC_CAP_LC3(
-	BT_AUDIO_CODEC_LC3_FREQ_ANY, BT_AUDIO_CODEC_LC3_DURATION_ANY,
-	BT_AUDIO_CODEC_LC3_CHAN_COUNT_SUPPORT(1, 2), 30, 240, 2, CONTEXT);
+	BT_AUDIO_CODEC_CAP_FREQ_ANY, BT_AUDIO_CODEC_CAP_DURATION_ANY,
+	BT_AUDIO_CODEC_CAP_CHAN_COUNT_SUPPORT(1, 2), 30, 240, 2, CONTEXT);
 
 static const struct bt_bap_unicast_server_cb unicast_server_cb = {
 	.config = lc3_config,
@@ -993,7 +993,7 @@ static int cmd_discover(const struct shell *sh, size_t argc, char *argv[])
 
 static int cmd_config(const struct shell *sh, size_t argc, char *argv[])
 {
-	enum bt_audio_location location = BT_AUDIO_LOCATION_PROHIBITED;
+	enum bt_audio_location location = BT_AUDIO_LOCATION_MONO_AUDIO;
 	const struct named_lc3_preset *named_preset;
 	struct shell_stream *uni_stream;
 	struct bt_bap_stream *bap_stream;
@@ -1076,8 +1076,7 @@ static int cmd_config(const struct shell *sh, size_t argc, char *argv[])
 				return -ENOEXEC;
 			}
 
-			if (loc_bits == BT_AUDIO_LOCATION_PROHIBITED ||
-			    loc_bits > BT_AUDIO_LOCATION_ANY) {
+			if (loc_bits > BT_AUDIO_LOCATION_ANY) {
 				shell_error(sh, "Invalid loc_bits: %lu", loc_bits);
 
 				return -ENOEXEC;
@@ -1109,39 +1108,37 @@ static int cmd_config(const struct shell *sh, size_t argc, char *argv[])
 	copy_unicast_stream_preset(uni_stream, named_preset);
 
 	/* If location has been modifed, we update the location in the codec configuration */
-	if (location != BT_AUDIO_LOCATION_PROHIBITED) {
-		struct bt_audio_codec_cfg *codec_cfg = &uni_stream->codec_cfg;
+	struct bt_audio_codec_cfg *codec_cfg = &uni_stream->codec_cfg;
 
-		for (size_t i = 0U; i < codec_cfg->data_len;) {
-			const uint8_t len = codec_cfg->data[i++];
-			uint8_t *value;
-			uint8_t data_len;
-			uint8_t type;
+	for (size_t i = 0U; i < codec_cfg->data_len;) {
+		const uint8_t len = codec_cfg->data[i++];
+		uint8_t *value;
+		uint8_t data_len;
+		uint8_t type;
 
-			if (len == 0 || len > codec_cfg->data_len - i) {
-				/* Invalid len field */
-				return false;
-			}
-
-			type = codec_cfg->data[i++];
-			value = &codec_cfg->data[i];
-
-			if (type == BT_AUDIO_CODEC_CONFIG_LC3_CHAN_ALLOC) {
-				const uint32_t loc_32 = location;
-
-				sys_put_le32(loc_32, value);
-
-				shell_print(sh, "Setting location to 0x%08X", location);
-				break;
-			}
-
-			data_len = len - sizeof(type);
-
-			/* Since we are incrementing i by the value_len, we don't need to increment
-			 * it further in the `for` statement
-			 */
-			i += data_len;
+		if (len == 0 || len > codec_cfg->data_len - i) {
+			/* Invalid len field */
+			return false;
 		}
+
+		type = codec_cfg->data[i++];
+		value = &codec_cfg->data[i];
+
+		if (type == BT_AUDIO_CODEC_CFG_CHAN_ALLOC) {
+			const uint32_t loc_32 = location;
+
+			sys_put_le32(loc_32, value);
+
+			shell_print(sh, "Setting location to 0x%08X", location);
+			break;
+		}
+
+		data_len = len - sizeof(type);
+
+		/* Since we are incrementing i by the value_len, we don't need to increment
+		 * it further in the `for` statement
+		 */
+		i += data_len;
 	}
 
 	if (bap_stream->ep == ep) {
@@ -2347,8 +2344,7 @@ static int cmd_set_loc(const struct shell *sh, size_t argc, char *argv[])
 		return -ENOEXEC;
 	}
 
-	if (loc_val == BT_AUDIO_LOCATION_PROHIBITED ||
-	    loc_val > BT_AUDIO_LOCATION_ANY) {
+	if (loc_val > BT_AUDIO_LOCATION_ANY) {
 		shell_error(sh, "Invalid location: %lu", loc_val);
 
 		return -ENOEXEC;
@@ -2550,8 +2546,7 @@ static int cmd_send(const struct shell *sh, size_t argc, char *argv[])
 
 	net_buf_add_mem(buf, data, len);
 
-	ret = bt_bap_stream_send(default_stream, buf, get_next_seq_num(default_stream),
-				 BT_ISO_TIMESTAMP_NONE);
+	ret = bt_bap_stream_send(default_stream, buf, get_next_seq_num(default_stream));
 	if (ret < 0) {
 		shell_print(sh, "Unable to send: %d", -ret);
 		net_buf_unref(buf);

@@ -5,6 +5,12 @@
  */
 
 /*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
+/*
  * Copyright (c) 2015 Intel Corporation
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -466,6 +472,18 @@ static inline bool i2c_is_ready_dt(const struct i2c_dt_spec *spec)
 {
 	/* Validate bus is ready */
 	return device_is_ready(spec->bus);
+}
+
+/**
+ * @brief Check if the current message is a read operation
+ *
+ * @param msg The message to check
+ * @return true if the I2C message is sa read operation
+ * @return false if the I2C message is a write operation
+ */
+static inline bool i2c_is_read_op(struct i2c_msg *msg)
+{
+	return (msg->flags & I2C_MSG_READ) == I2C_MSG_READ;
 }
 
 /**

@@ -21,19 +21,31 @@
 #if defined(CONFIG_SOC_SERIES_RCAR_GEN3)
 #define PFC_RCAR_GPSR 0x100
 #define PFC_RCAR_IPSR 0x200
-DEVICE_MMIO_TOPLEVEL_STATIC(pfc, DT_DRV_INST(0));
-static uintptr_t reg_base[1];
 #elif defined(CONFIG_SOC_SERIES_RCAR_GEN4)
 #define PFC_RCAR_GPSR 0x040
 #define PFC_RCAR_IPSR 0x060
-/* swap both arguments */
-#define PFC_REG_ADDRESS(idx, node_id) DT_REG_ADDR_BY_IDX(node_id, idx)
-static const uintptr_t reg_base[] = {
-	LISTIFY(DT_NUM_REGS(DT_DRV_INST(0)), PFC_REG_ADDRESS, (,), DT_DRV_INST(0))
-};
 #else
 #error Unsupported SoC Series
 #endif
+
+/* swap both arguments */
+#define PFC_REG_ADDRESS(idx, inst) DT_INST_REG_ADDR_BY_IDX(inst, idx)
+static uintptr_t reg_base[] = {
+	LISTIFY(DT_NUM_REGS(DT_DRV_INST(0)), PFC_REG_ADDRESS, (,), 0)
+};
+
+#define PFC_REG_SIZE(idx, inst) DT_INST_REG_SIZE_BY_IDX(inst, idx)
+static const uintptr_t __maybe_unused reg_sizes[] = {
+	LISTIFY(DT_NUM_REGS(DT_DRV_INST(0)), PFC_REG_SIZE, (,), 0)
+};
+
+#ifdef CONFIG_PINCTRL_RCAR_VOLTAGE_CONTROL
+/* POC Control Register can control IO voltage level that is supplied to the pin */
+struct pfc_pocctrl_reg {
+	uint32_t offset;
+	const uint16_t pins[32];
+};
+#endif /* CONFIG_PINCTRL_RCAR_VOLTAGE_CONTROL */
 
 /*
  * Each drive step is either encoded in 2 or 3 bits.
@@ -189,6 +201,110 @@ int pfc_rcar_set_bias(uintptr_t pfc_base, uint16_t pin, uint16_t flags)
 	return 0;
 }
 
+#ifdef CONFIG_PINCTRL_RCAR_VOLTAGE_CONTROL
+
+const struct pfc_pocctrl_reg pfc_r8a77951_r8a77961_volt_regs[] = {
+	{
+		.offset = 0x0380,
+		.pins = {
+			[0]  = RCAR_GP_PIN(3,  0),    /* SD0_CLK  */
+			[1]  = RCAR_GP_PIN(3,  1),    /* SD0_CMD  */
+			[2]  = RCAR_GP_PIN(3,  2),    /* SD0_DAT0 */
+			[3]  = RCAR_GP_PIN(3,  3),    /* SD0_DAT1 */
+			[4]  = RCAR_GP_PIN(3,  4),    /* SD0_DAT2 */
+			[5]  = RCAR_GP_PIN(3,  5),    /* SD0_DAT3 */
+			[6]  = RCAR_GP_PIN(3,  6),    /* SD1_CLK  */
+			[7]  = RCAR_GP_PIN(3,  7),    /* SD1_CMD  */
+			[8]  = RCAR_GP_PIN(3,  8),    /* SD1_DAT0 */
+			[9]  = RCAR_GP_PIN(3,  9),    /* SD1_DAT1 */
+			[10] = RCAR_GP_PIN(3,  10),   /* SD1_DAT2 */
+			[11] = RCAR_GP_PIN(3,  11),   /* SD1_DAT3 */
+			[12] = RCAR_GP_PIN(4,  0),    /* SD2_CLK  */
+			[13] = RCAR_GP_PIN(4,  1),    /* SD2_CMD  */
+			[14] = RCAR_GP_PIN(4,  2),    /* SD2_DAT0 */
+			[15] = RCAR_GP_PIN(4,  3),    /* SD2_DAT1 */
+			[16] = RCAR_GP_PIN(4,  4),    /* SD2_DAT2 */
+			[17] = RCAR_GP_PIN(4,  5),    /* SD2_DAT3 */
+			[18] = RCAR_GP_PIN(4,  6),    /* SD2_DS   */
+			[19] = RCAR_GP_PIN(4,  7),    /* SD3_CLK  */
+			[20] = RCAR_GP_PIN(4,  8),    /* SD3_CMD  */
+			[21] = RCAR_GP_PIN(4,  9),    /* SD3_DAT0 */
+			[22] = RCAR_GP_PIN(4,  10),   /* SD3_DAT1 */
+			[23] = RCAR_GP_PIN(4,  11),   /* SD3_DAT2 */
+			[24] = RCAR_GP_PIN(4,  12),   /* SD3_DAT3 */
+			[25] = RCAR_GP_PIN(4,  13),   /* SD3_DAT4 */
+			[26] = RCAR_GP_PIN(4,  14),   /* SD3_DAT5 */
+			[27] = RCAR_GP_PIN(4,  15),   /* SD3_DAT6 */
+			[28] = RCAR_GP_PIN(4,  16),   /* SD3_DAT7 */
+			[29] = RCAR_GP_PIN(4,  17),   /* SD3_DS   */
+			[30] = -1,
+			[31] = -1,
+		}
+	},
+	{ /* sentinel */ },
+};
+
+static const struct pfc_pocctrl_reg *pfc_rcar_get_io_voltage_regs(void)
+{
+	return pfc_r8a77951_r8a77961_volt_regs;
+}
+
+static const struct pfc_pocctrl_reg *pfc_rcar_get_pocctrl_reg(uint16_t pin, uint8_t *bit)
+{
+	const struct pfc_pocctrl_reg *voltage_regs = pfc_rcar_get_io_voltage_regs();
+
+	BUILD_ASSERT(ARRAY_SIZE(voltage_regs->pins) < UINT8_MAX);
+
+	/* Loop around all the registers to find the bit for a given pin */
+	while (voltage_regs && voltage_regs->offset) {
+		uint8_t i;
+
+		for (i = 0U; i < ARRAY_SIZE(voltage_regs->pins); i++) {
+			if (voltage_regs->pins[i] == pin) {
+				*bit = i;
+				return voltage_regs;
+			}
+		}
+		voltage_regs++;
+	}
+
+	return NULL;
+}
+
+static void pfc_rcar_set_voltage(uintptr_t pfc_base, uint16_t pin, uint16_t voltage)
+{
+	uint32_t val;
+	uint8_t bit;
+	const struct pfc_pocctrl_reg *voltage_reg;
+
+	voltage_reg = pfc_rcar_get_pocctrl_reg(pin, &bit);
+	if (!voltage_reg) {
+		return;
+	}
+
+	val = sys_read32(pfc_base + voltage_reg->offset);
+
+	switch (voltage) {
+	case PIN_VOLTAGE_1P8V:
+		if (!(val & BIT(bit))) {
+			return;
+		}
+		val &= ~BIT(bit);
+		break;
+	case PIN_VOLTAGE_3P3V:
+		if (val & BIT(bit)) {
+			return;
+		}
+		val |= BIT(bit);
+		break;
+	default:
+		break;
+	}
+
+	pfc_rcar_write(pfc_base, voltage_reg->offset, val);
+}
+#endif /* CONFIG_PINCTRL_RCAR_VOLTAGE_CONTROL */
+
 int pinctrl_configure_pin(const pinctrl_soc_pin_t *pin)
 {
 	int ret = 0;
@@ -213,6 +329,12 @@ int pinctrl_configure_pin(const pinctrl_soc_pin_t *pin)
 		/* A function must be set for non GPIO capable pin */
 		return -EINVAL;
 	}
+
+#ifdef CONFIG_PINCTRL_RCAR_VOLTAGE_CONTROL
+	if (pin->voltage != PIN_VOLTAGE_NONE) {
+		pfc_rcar_set_voltage(pfc_base, pin->pin, pin->voltage);
+	}
+#endif
 
 	/* Select function for pin */
 	if ((pin->flags & RCAR_PIN_FLAGS_FUNC_SET) != 0U) {
@@ -254,11 +376,12 @@ int pinctrl_configure_pins(const pinctrl_soc_pin_t *pins, uint8_t pin_cnt,
 	return ret;
 }
 
-#if defined(CONFIG_SOC_SERIES_RCAR_GEN3)
+#if defined(DEVICE_MMIO_IS_IN_RAM)
 __boot_func static int pfc_rcar_driver_init(void)
 {
-	DEVICE_MMIO_TOPLEVEL_MAP(pfc, K_MEM_CACHE_NONE);
-	reg_base[0] = DEVICE_MMIO_TOPLEVEL_GET(pfc);
+	for (unsigned int i = 0; i < ARRAY_SIZE(reg_base); i++) {
+		device_map(reg_base + i, reg_base[i], reg_sizes[i], K_MEM_CACHE_NONE);
+	}
 	return 0;
 }
 

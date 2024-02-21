@@ -63,6 +63,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_OPENTHREAD_L2_LOG_LEVEL);
  */
 #define PHR_DURATION_US 32U
 
+#define DEFAULT_SENSITIVITY -100
+
 enum pending_events {
 	PENDING_EVENT_FRAME_TO_SEND, /* There is a tx frame to send  */
 	PENDING_EVENT_FRAME_RECEIVED, /* Radio has received new frame */
@@ -361,10 +363,6 @@ void platformRadioInit(void)
 
 	cfg.event_handler = handle_radio_event;
 	radio_api->configure(radio_dev, IEEE802154_CONFIG_EVENT_HANDLER, &cfg);
-
-#if defined(CONFIG_OPENTHREAD_LINK_METRICS_SUBJECT)
-	otLinkMetricsInit(otPlatRadioGetReceiveSensitivity());
-#endif
 }
 
 void transmit_message(struct k_work *tx_job)
@@ -1110,7 +1108,7 @@ int8_t otPlatRadioGetReceiveSensitivity(otInstance *aInstance)
 {
 	ARG_UNUSED(aInstance);
 
-	return -100;
+	return DEFAULT_SENSITIVITY;
 }
 
 otError otPlatRadioGetTransmitPower(otInstance *aInstance, int8_t *aPower)
@@ -1259,10 +1257,7 @@ void otPlatRadioSetMacFrameCounterIfLarger(otInstance *aInstance, uint32_t aMacF
 otError otPlatRadioEnableCsl(otInstance *aInstance, uint32_t aCslPeriod, otShortAddress aShortAddr,
 			     const otExtAddress *aExtAddr)
 {
-	struct ieee802154_config config = {
-		.ack_ie.short_addr = aShortAddr,
-		.ack_ie.ext_addr = aExtAddr->m8,
-	};
+	struct ieee802154_config config = { 0 };
 	int result;
 
 	ARG_UNUSED(aInstance);
@@ -1275,6 +1270,8 @@ otError otPlatRadioEnableCsl(otInstance *aInstance, uint32_t aCslPeriod, otShort
 	if (result) {
 		return OT_ERROR_FAILED;
 	}
+	config.ack_ie.short_addr = aShortAddr;
+	config.ack_ie.ext_addr = aExtAddr != NULL ? aExtAddr->m8 : NULL;
 
 	/* Configure the CSL IE. */
 	if (aCslPeriod > 0) {
@@ -1294,6 +1291,22 @@ otError otPlatRadioEnableCsl(otInstance *aInstance, uint32_t aCslPeriod, otShort
 		config.ack_ie.header_ie = NULL;
 	}
 
+	result = radio_api->configure(radio_dev, IEEE802154_CONFIG_ENH_ACK_HEADER_IE, &config);
+
+	return result ? OT_ERROR_FAILED : OT_ERROR_NONE;
+}
+
+otError otPlatRadioResetCsl(otInstance *aInstance)
+{
+	struct ieee802154_config config = { 0 };
+	int result;
+
+	result = radio_api->configure(radio_dev, IEEE802154_CONFIG_CSL_PERIOD, &config);
+	if (result) {
+		return OT_ERROR_FAILED;
+	}
+
+	config.ack_ie.purge_ie = true;
 	result = radio_api->configure(radio_dev, IEEE802154_CONFIG_ENH_ACK_HEADER_IE, &config);
 
 	return result ? OT_ERROR_FAILED : OT_ERROR_NONE;
@@ -1352,7 +1365,7 @@ uint8_t otPlatRadioGetCslUncertainty(otInstance *aInstance)
  * | IE_VENDOR_THREAD_ACK_PROBING_ID | LINK_METRIC_TOKEN | LINK_METRIC_TOKEN|
  * |---------------------------------|-------------------|------------------|
  */
-static uint8_t set_vendor_ie_header_lm(bool lqi, bool link_margin, bool rssi, uint8_t *ie_header)
+static void set_vendor_ie_header_lm(bool lqi, bool link_margin, bool rssi, uint8_t *ie_header)
 {
 	/* Vendor-specific IE identifier */
 	const uint8_t ie_vendor_id = 0x00;
@@ -1366,7 +1379,6 @@ static uint8_t set_vendor_ie_header_lm(bool lqi, bool link_margin, bool rssi, ui
 	const uint8_t ie_vendor_thread_margin_token = 0x02;
 	/* Thread Vendor-specific ACK Probing IE LQI value placeholder */
 	const uint8_t ie_vendor_thread_lqi_token = 0x03;
-	const uint8_t ie_header_size = 2;
 	const uint8_t oui_size = 3;
 	const uint8_t sub_type = 1;
 	const uint8_t id_offset = 7;
@@ -1384,7 +1396,8 @@ static uint8_t set_vendor_ie_header_lm(bool lqi, bool link_margin, bool rssi, ui
 	__ASSERT(ie_header, "Invalid argument");
 
 	if (link_metrics_data_len == 0) {
-		return 0;
+		ie_header[0] = 0;
+		return;
 	}
 
 	/* Set Element ID */
@@ -1419,8 +1432,6 @@ static uint8_t set_vendor_ie_header_lm(bool lqi, bool link_margin, bool rssi, ui
 	if (rssi) {
 		ie_header[link_metrics_idx++] = ie_vendor_thread_rssi_token;
 	}
-
-	return ie_header_size + content_len;
 }
 
 otError otPlatRadioConfigureEnhAckProbing(otInstance *aInstance, otLinkMetrics aLinkMetrics,
@@ -1432,13 +1443,12 @@ otError otPlatRadioConfigureEnhAckProbing(otInstance *aInstance, otLinkMetrics a
 		.ack_ie.ext_addr = aExtAddress->m8,
 	};
 	uint8_t header_ie_buf[OT_ACK_IE_MAX_SIZE];
-	uint16_t header_ie_len;
 	int result;
 
 	ARG_UNUSED(aInstance);
 
-	header_ie_len = set_vendor_ie_header_lm(aLinkMetrics.mLqi, aLinkMetrics.mLinkMargin,
-						aLinkMetrics.mRssi, header_ie_buf);
+	set_vendor_ie_header_lm(aLinkMetrics.mLqi, aLinkMetrics.mLinkMargin,
+				aLinkMetrics.mRssi, header_ie_buf);
 	config.ack_ie.header_ie = (struct ieee802154_header_ie *)header_ie_buf;
 	result = radio_api->configure(radio_dev, IEEE802154_CONFIG_ENH_ACK_HEADER_IE, &config);
 

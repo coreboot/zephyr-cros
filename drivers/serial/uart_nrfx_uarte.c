@@ -484,7 +484,11 @@ static int wait_tx_ready(const struct device *dev)
 		/* wait arbitrary time before back off. */
 		bool res;
 
+#if defined(CONFIG_ARCH_POSIX)
+		NRFX_WAIT_FOR(is_tx_ready(dev), 33, 3, res);
+#else
 		NRFX_WAIT_FOR(is_tx_ready(dev), 100, 1, res);
+#endif
 
 		if (res) {
 			key = irq_lock();
@@ -1043,9 +1047,11 @@ static void rx_timeout(struct k_timer *timer)
 			(data->async->rx_timeout_left
 				< data->async->rx_timeout_slab)) {
 			/* rx_timeout us elapsed since last receiving */
-			notify_uart_rx_rdy(dev, len);
-			data->async->rx_offset += len;
-			data->async->rx_total_user_byte_cnt += len;
+			if (data->async->rx_buf != NULL) {
+				notify_uart_rx_rdy(dev, len);
+				data->async->rx_offset += len;
+				data->async->rx_total_user_byte_cnt += len;
+			}
 		} else {
 			data->async->rx_timeout_left -=
 				data->async->rx_timeout_slab;
@@ -1502,7 +1508,7 @@ static void uarte_nrfx_poll_out(const struct device *dev, unsigned char c)
 			}
 
 			irq_unlock(key);
-			Z_SPIN_DELAY(2);
+			Z_SPIN_DELAY(3);
 		}
 	} else {
 		key = wait_tx_ready(dev);

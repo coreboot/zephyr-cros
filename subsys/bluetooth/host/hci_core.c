@@ -424,6 +424,22 @@ uint8_t bt_get_phy(uint8_t hci_phy)
 	}
 }
 
+int bt_get_df_cte_type(uint8_t hci_cte_type)
+{
+	switch (hci_cte_type) {
+	case BT_HCI_LE_AOA_CTE:
+		return BT_DF_CTE_TYPE_AOA;
+	case BT_HCI_LE_AOD_CTE_1US:
+		return BT_DF_CTE_TYPE_AOD_1US;
+	case BT_HCI_LE_AOD_CTE_2US:
+		return BT_DF_CTE_TYPE_AOD_2US;
+	case BT_HCI_LE_NO_CTE:
+		return BT_DF_CTE_TYPE_NONE;
+	default:
+		return BT_DF_CTE_TYPE_NONE;
+	}
+}
+
 #if defined(CONFIG_BT_CONN_TX)
 static void hci_num_completed_packets(struct net_buf *buf)
 {
@@ -2284,25 +2300,44 @@ static void hci_reset_complete(struct net_buf *buf)
 	atomic_set(bt_dev.flags, flags);
 }
 
-static void hci_cmd_done(uint16_t opcode, uint8_t status, struct net_buf *buf)
+static void hci_cmd_done(uint16_t opcode, uint8_t status, struct net_buf *evt_buf)
 {
-	LOG_DBG("opcode 0x%04x status 0x%02x buf %p", opcode, status, buf);
+	/* Original command buffer. */
+	struct net_buf *buf = NULL;
 
-	if (net_buf_pool_get(buf->pool_id) != &hci_cmd_pool) {
-		LOG_WRN("opcode 0x%04x pool id %u pool %p != &hci_cmd_pool %p", opcode,
-			buf->pool_id, net_buf_pool_get(buf->pool_id), &hci_cmd_pool);
-		return;
+	LOG_DBG("opcode 0x%04x status 0x%02x buf %p", opcode, status, evt_buf);
+
+	/* Unsolicited cmd complete. This does not complete a command.
+	 * The controller can send these for effect of the `ncmd` field.
+	 */
+	if (opcode == 0) {
+		goto exit;
+	}
+
+	/* Take the original command buffer reference. */
+	buf = atomic_ptr_clear((atomic_ptr_t *)&bt_dev.sent_cmd);
+
+	if (!buf) {
+		LOG_ERR("No command sent for cmd complete 0x%04x", opcode);
+		goto exit;
 	}
 
 	if (cmd(buf)->opcode != opcode) {
-		LOG_WRN("OpCode 0x%04x completed instead of expected 0x%04x", opcode,
+		LOG_ERR("OpCode 0x%04x completed instead of expected 0x%04x", opcode,
 			cmd(buf)->opcode);
-		return;
+		buf = atomic_ptr_set((atomic_ptr_t *)&bt_dev.sent_cmd, buf);
+		__ASSERT_NO_MSG(!buf);
+		goto exit;
 	}
 
-	if (bt_dev.sent_cmd) {
-		net_buf_unref(bt_dev.sent_cmd);
-		bt_dev.sent_cmd = NULL;
+	/* Response data is to be delivered in the original command
+	 * buffer.
+	 */
+	if (evt_buf != buf) {
+		net_buf_reset(buf);
+		bt_buf_set_type(buf, BT_BUF_EVT);
+		net_buf_reserve(buf, BT_BUF_RESERVE);
+		net_buf_add_mem(buf, evt_buf->data, evt_buf->len);
 	}
 
 	if (cmd(buf)->state && !status) {
@@ -2315,6 +2350,11 @@ static void hci_cmd_done(uint16_t opcode, uint8_t status, struct net_buf *buf)
 	if (cmd(buf)->sync) {
 		cmd(buf)->status = status;
 		k_sem_give(cmd(buf)->sync);
+	}
+
+exit:
+	if (buf) {
+		net_buf_unref(buf);
 	}
 }
 
@@ -3226,8 +3266,10 @@ static int le_init_iso(void)
 
 		net_buf_unref(rsp);
 	} else if (IS_ENABLED(CONFIG_BT_CONN)) {
-		LOG_WRN("Read Buffer Size V2 command is not supported."
-			"No ISO buffers will be available");
+		if (IS_ENABLED(CONFIG_BT_ISO_UNICAST) || IS_ENABLED(CONFIG_BT_ISO_BROADCASTER)) {
+			LOG_WRN("Read Buffer Size V2 command is not supported. "
+				"No ISO TX buffers will be available");
+		}
 
 		/* Read LE Buffer Size */
 		err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_READ_BUFFER_SIZE,

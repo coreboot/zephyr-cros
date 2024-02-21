@@ -47,7 +47,7 @@ static void *thread_top(void *p1)
 	return NULL;
 }
 
-ZTEST(posix_apis, test_rw_lock)
+ZTEST(rwlock, test_rw_lock)
 {
 	int ret;
 	pthread_t newthread[N_THR];
@@ -116,3 +116,15 @@ ZTEST(posix_apis, test_rw_lock)
 
 	zassert_ok(pthread_rwlock_destroy(&rwlock), "Failed to destroy rwlock");
 }
+
+static void before(void *arg)
+{
+	ARG_UNUSED(arg);
+
+	if (!IS_ENABLED(CONFIG_DYNAMIC_THREAD)) {
+		/* skip redundant testing if there is no thread pool / heap allocation */
+		ztest_test_skip();
+	}
+}
+
+ZTEST_SUITE(rwlock, NULL, NULL, before, NULL, NULL);

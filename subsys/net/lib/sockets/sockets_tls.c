@@ -1769,6 +1769,10 @@ static int tls_opt_dtls_peer_connection_id_value_get(struct tls_context *context
 	int enabled = false;
 	int ret;
 
+	if (!context->is_initialized) {
+		return -ENOTCONN;
+	}
+
 	ret = mbedtls_ssl_get_peer_cid(&context->ssl, &enabled, optval, optlen);
 	if (!enabled) {
 		*optlen = 0;
@@ -1792,6 +1796,10 @@ static int tls_opt_dtls_connection_id_status_get(struct tls_context *context,
 
 	if (sizeof(int) != *optlen) {
 		return -EINVAL;
+	}
+
+	if (!context->is_initialized) {
+		return -ENOTCONN;
 	}
 
 	ret = mbedtls_ssl_get_peer_cid(&context->ssl, &enabled,
@@ -3020,11 +3028,16 @@ static int ztls_socket_data_check(struct tls_context *ctx)
 		/* MbedTLS API documentation requires session to
 		 * be reset in other error cases
 		 */
-		ret = tls_mbedtls_reset(ctx);
-		if (ret != 0) {
+		if (tls_mbedtls_reset(ctx) != 0) {
 			return -ENOMEM;
 		}
 
+#if defined(CONFIG_NET_SOCKETS_ENABLE_DTLS)
+		if (ret == MBEDTLS_ERR_SSL_TIMEOUT && ctx->type == SOCK_DGRAM) {
+			/* DTLS timeout interpreted as closing of connection. */
+			return -ENOTCONN;
+		}
+#endif
 		return -ECONNABORTED;
 	}
 
@@ -3044,15 +3057,26 @@ static int ztls_poll_update_pollin(int fd, struct tls_context *ctx,
 		}
 	}
 
-	if (!(pfd->revents & ZSOCK_POLLIN)) {
-		/* No new data on a socket. */
-		goto next;
-	}
+	if (ctx->type == SOCK_STREAM) {
+		if (!(pfd->revents & ZSOCK_POLLIN)) {
+			/* No new data on a socket. */
+			goto next;
+		}
 
-	if (ctx->is_listening) {
-		goto next;
+		if (ctx->is_listening) {
+			goto next;
+		}
 	}
-
+#if defined(CONFIG_NET_SOCKETS_ENABLE_DTLS)
+	else {
+		/* Perform data check without incoming data for completed DTLS connections.
+		 * This allows the connections to timeout with CONFIG_NET_SOCKETS_DTLS_TIMEOUT.
+		 */
+		if (!is_handshake_complete(ctx) && !(pfd->revents & ZSOCK_POLLIN)) {
+			goto next;
+		}
+	}
+#endif
 	ret = ztls_socket_data_check(ctx);
 	if (ret == -ENOTCONN || (pfd->revents & ZSOCK_POLLHUP)) {
 		/* Datagram does not return 0 on consecutive recv, but an error

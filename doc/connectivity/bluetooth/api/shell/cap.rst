@@ -56,11 +56,12 @@ the optionally included CSIS instance by calling (:code:`cap_initiator discover`
    cap_initiator - Bluetooth CAP initiator shell commands
    Subcommands:
      discover        :Discover CAS
-     unicast-start   :Unicast Start [csip] [sinks <cnt> (default 1)] [sources <cnt>
+     unicast_start   :Unicast Start [csip] [sinks <cnt> (default 1)] [sources <cnt>
                       (default 1)] [conns (<cnt> | all) (default 1)]
-     unicast-list    :Unicast list streams
-     unicast-update  :Unicast Update <all | stream [stream [stream...]]>
-     unicast-stop    :Unicast stop all streams
+     unicast_list    :Unicast list streams
+     unicast_update  :Unicast Update <all | stream [stream [stream...]]>
+     unicast_stop    :Unicast stop streams <all | stream [stream [stream...]]>
+     unicast_cancel  :Unicast cancel current procedure
 
 Before being able to perform any stream operation, the device must also perform the
 :code:`bap discover` operation to discover the ASEs and PAC records. The :code:`bap init`
@@ -119,24 +120,24 @@ To use multiple devices, simply connect to more and then use :code:`bt select` t
 the commands on.
 
 Once all devices have been connected and the respective discovery commands have been called, the
-:code:`cap_initiator unicast-start` command can be used to put one or more streams into the
+:code:`cap_initiator unicast_start` command can be used to put one or more streams into the
 streaming state.
 
 .. code-block:: console
 
-   uart:~$ cap_initiator unicast-start sinks 1 sources 0 conns all
+   uart:~$ cap_initiator unicast_start sinks 1 sources 0 conns all
    Setting up 1 sinks and 0 sources on each (2) conn
    Starting 1 streams
    Unicast start completed
 
-To stop all the streams that has been started, the :code:`cap_initiator unicast-stop` command can be
+To stop all the streams that has been started, the :code:`cap_initiator unicast_stop` command can be
 used.
 
 
 .. code-block:: console
 
-   uart:~$ cap_initiator unicast-stop
-   Unicast stopped for group 0x81e41c0 completed
+   uart:~$ cap_initiator unicast_stop all
+   Unicast stop completed
 
 CAP Commander
 *************
@@ -159,7 +160,11 @@ the optionally included CSIS instance by calling (:code:`cap_commander discover`
    cap_commander --help
    cap_commander - Bluetooth CAP commander shell commands
    Subcommands:
-     discover        :Discover CAS
+     discover              :Discover CAS
+     change_volume         :Change volume on all connections <volume>
+     change_volume_offset  :Change volume offset per connection <volume_offset
+                            [volume_offset [...]]>
+
 
 Before being able to perform any stream operation, the device must also perform the
 :code:`bap discover` operation to discover the ASEs and PAC records. The :code:`bap init`
@@ -174,3 +179,53 @@ Discovering CAS and CSIS on a device:
 
    uart:~$ cap_commander discover
    discovery completed with CSIS
+
+
+Setting the volume on all connected devices:
+
+.. code-block:: console
+
+   uart:~$ vcp_vol_ctlr discover
+   VCP discover done with 1 VOCS and 1 AICS
+   uart:~$ cap_commander change_volume 15
+   uart:~$ cap_commander change_volume 15
+   Setting volume to 15 on 2 connections
+   VCP volume 15, mute 0
+   VCP vol_set done
+   VCP volume 15, mute 0
+   VCP flags 0x01
+   VCP vol_set done
+   Volume change completed
+
+
+Setting the volume offset on one or more connected devices. The offsets are set by connection index,
+so connection index 0 gets the first offset, and index 1 gets the second offset, etc.:
+
+.. code-block:: console
+
+   uart:~$ bt connect <device A>
+   Connected: <device A>
+   uart:~$ cap_commander discover
+   discovery completed with CSIS
+   uart:~$ vcp_vol_ctlr discover
+   VCP discover done with 1 VOCS and 1 AICS
+   uart:~$
+   uart:~$ bt connect <device B>
+   Connected: <device B>
+   uart:~$ cap_commander discover
+   discovery completed with CSIS
+   uart:~$ vcp_vol_ctlr discover
+   VCP discover done with 1 VOCS and 1 AICS
+   uart:~$
+   uart:~$ cap_commander change_volume_offset 10
+   Setting volume offset on 1 connections
+   VOCS inst 0x200140a4 offset 10
+   Offset set for inst 0x200140a4
+   Volume offset change completed
+   uart:~$
+   uart:~$ cap_commander change_volume_offset 10 15
+   Setting volume offset on 2 connections
+   Offset set for inst 0x200140a4
+   VOCS inst 0x20014188 offset 15
+   Offset set for inst 0x20014188
+   Volume offset change completed

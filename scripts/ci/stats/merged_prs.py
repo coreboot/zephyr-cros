@@ -74,23 +74,32 @@ def process_pr(pr):
         prj['review_rule'] = "no"
 
 
+    created = pr.created_at
+    # if a PR was made ready for review from draft, calculate based on when it
+    # was moved out of draft.
+    for event in pr.get_issue_events():
+        if event.event == 'ready_for_review':
+            created = event.created_at
+
     # calculate time the PR was in review, hours and business days.
-    delta = pr.closed_at - pr.created_at
+    delta = pr.closed_at - created
     deltah = delta.total_seconds() / 3600
     prj['hours_open'] = deltah
 
-    dates = (pr.created_at + timedelta(idx + 1) for idx in range((pr.closed_at - pr.created_at).days))
+    dates = (created + timedelta(idx + 1) for idx in range((pr.closed_at - created).days))
 
     # Get number of business days per the guidelines, we need at least 2.
     business_days = sum(1 for day in dates if day.weekday() < 5)
     prj['business_days_open'] = business_days
 
-    # less than 2 business days ...
-    if business_days < 2 and not ('Trivial' in labels or 'Hotfix' in labels) or \
-        deltah < 4 and 'Trivial' in labels:
-        prj['time_rule'] = "no"
-    else:
-        prj['time_rule'] = "yes"
+    trivial = 'Trivial' in labels
+    hotfix = 'Hotfix' in labels
+    min_review_time_rule = "no"
+
+    if hotfix or (trivial and deltah >= 4) or business_days >= 2:
+        min_review_time_rule = "yes"
+
+    prj['time_rule'] = min_review_time_rule
 
     # This is all data we get easily though the Github API and serves as the basis
     # for displaying some trends and metrics.
