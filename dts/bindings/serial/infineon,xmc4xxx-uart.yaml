@@ -31,6 +31,10 @@ properties:
   pinctrl-names:
     required: true
 
+  dir-gpios:
+    type: phandle-array
+    description: Direction pin if the UART is used in RS485 configuration
+
   fifo-start-offset:
     description: |
       Each USIC0..2 has a fifo that is shared between two channels. For example,
