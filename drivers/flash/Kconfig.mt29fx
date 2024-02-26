@@ -11,6 +11,7 @@ config MICRON_MT29FX_MEMC_NAND
 	select MEMC
 	select FLASH_HAS_EX_OP
 	select FLASH_EX_OP_ENABLED
+	select FLASH_64_BIT_API
 	help
           Enables Micron mt29fx Nand flash driver.
 

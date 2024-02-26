@@ -22,6 +22,9 @@ LOG_MODULE_REGISTER(flash_mt29fx, CONFIG_FLASH_LOG_LEVEL);
 
 #define MAX_DMA_TRANSACTION_SIZE 4095
 
+#define ROUND_DOWN_64(x, align) (((uint64_t)(x) / (align)) * (align))
+#define ROUND_UP_64(x, align)                                                                      \
+	((((uint64_t)(x) + ((uint64_t)(align)-1)) / (uint64_t)(align)) * (uint64_t)(align))
 
 #define ERASE_VALUE	    0xff
 
@@ -157,7 +160,7 @@ static int dma_init(const struct device *dev)
 #endif
 
 static void flash_mt29fx_generate_address_segment(const struct flash_mt29fx_config *dev_config,
-						  uint32_t address, uint64_t *address_segment, bool oob_data)
+						  uint64_t address, uint64_t *address_segment, bool oob_data)
 {
 	int page_size = dev_config->parameters.write_block_size;
 	int leading_zeros = __builtin_clz(page_size - 1) - 16;
@@ -168,7 +171,7 @@ static void flash_mt29fx_generate_address_segment(const struct flash_mt29fx_conf
 		*address_segment += page_size;
 	}
 
-	*address_segment |= (uint64_t)(address & ~(page_size - 1)) << leading_zeros;
+	*address_segment |= (address & ~(page_size - 1)) << leading_zeros;
 	*address_segment = sys_cpu_to_le64(*address_segment);
 }
 
@@ -391,10 +394,11 @@ static int flash_mt29fx_init(const struct device *dev)
 	return 0;
 }
 
-static void flash_mt29fx_load_page_into_cache_reg(const struct flash_mt29fx_config *dev_config, off_t offset)
+static void flash_mt29fx_load_page_into_cache_reg(const struct flash_mt29fx_config *dev_config,
+						  uint64_t address)
 {
 	uint64_t address_segment;
-	uint32_t offset_page_start = ROUND_DOWN((uint32_t)offset, dev_config->write_page_size);
+	uint64_t offset_page_start = ROUND_DOWN_64(address, dev_config->write_page_size);
 
 	flash_mt29fx_generate_address_segment(dev_config, offset_page_start, &address_segment, false);
 	flash_mt29fx_write_command(dev_config, NAND_FLASH_READ_PAGE_START_COMMAND);
@@ -463,7 +467,7 @@ static int flash_mt29fx_read_ecc_chunk(const struct device *dev,
 /* ecc chunks, otherwise we can read the whole page. do we need to check the status register */
 /* when this is done? */
 
-static int flash_mt29fx_read_single_page(const struct device *dev, off_t offset, uint8_t *dst,
+static int flash_mt29fx_read_single_page(const struct device *dev, int64_t offset, uint8_t *dst,
 					 size_t len)
 {
 	const struct flash_mt29fx_config *dev_config = dev->config;;
@@ -544,7 +548,7 @@ static int flash_mt29fx_read_single_page(const struct device *dev, off_t offset,
 
 }
 
-static int flash_mt29fx_read(const struct device *dev, off_t offset, void *data, size_t len)
+static int flash_mt29fx_read_64(const struct device *dev, int64_t offset, void *data, size_t len)
 {
 	struct flash_mt29fx_data *dev_data = dev->data;
 	const struct flash_mt29fx_config *dev_config = dev->config;
@@ -561,7 +565,7 @@ static int flash_mt29fx_read(const struct device *dev, off_t offset, void *data,
 
 	k_sem_take(&dev_data->sem, K_FOREVER);
 
-	read_size = MIN(ROUND_UP(offset, page_size) - offset, len);
+	read_size = MIN(ROUND_UP_64(offset, page_size) - offset, len);
 	if (read_size > 0) {
 		ret = flash_mt29fx_read_single_page(dev, offset, &dst[dst_offset], read_size);
 		if (ret < 0) {
@@ -606,7 +610,7 @@ static int flash_mt29fx_read(const struct device *dev, off_t offset, void *data,
 	return 0;
 }
 
-static int flash_mt29fx_write_single_partial_page(const struct device *dev, off_t offset,
+static int flash_mt29fx_write_single_partial_page(const struct device *dev, int64_t offset,
 						  const uint8_t *src, size_t len)
 {
 	int ret = 0;
@@ -658,7 +662,8 @@ static int flash_mt29fx_write_single_partial_page(const struct device *dev, off_
 	return ret;
 }
 
-static int flash_mt29fx_write(const struct device *dev, off_t offset, const void *data, size_t len)
+static int flash_mt29fx_write_64(const struct device *dev, int64_t offset, const void *data,
+				 size_t len)
 {
 	struct flash_mt29fx_data *dev_data = dev->data;
 	const struct flash_mt29fx_config *dev_config = dev->config;
@@ -783,7 +788,7 @@ static int flash_mt29fx_is_bad_block(const struct device *dev, uint64_t block_in
 }
 
 
-static int flash_mt29fx_erase(const struct device *dev, off_t offset, size_t size)
+static int flash_mt29fx_erase_64(const struct device *dev, int64_t offset, uint64_t size)
 {
 	struct flash_mt29fx_data *dev_data = dev->data;
 	const struct flash_mt29fx_config *dev_config = dev->config;
@@ -895,9 +900,9 @@ static int flash_mt29fx_ex_op(const struct device *dev, uint16_t code, const uin
 }
 
 static const struct flash_driver_api flash_mt29fx_api = {
-	.erase = flash_mt29fx_erase,
-	.write = flash_mt29fx_write,
-	.read = flash_mt29fx_read,
+	.read_64 = flash_mt29fx_read_64,
+	.write_64 = flash_mt29fx_write_64,
+	.erase_64 = flash_mt29fx_erase_64,
 #ifdef CONFIG_FLASH_PAGE_LAYOUT
 	.page_layout = flash_mt29fx_get_page_layout,
 #endif
