@@ -89,9 +89,4 @@ else()
     WORKING_DIRECTORY ${ZEPHYR_BASE}
     )
 
-  if(west_topdir_result)
-    # west topdir is undefined.
-    # That's fine; west is optional, so could be custom Zephyr project.
-    set(WEST WEST-NOTFOUND CACHE INTERNAL "West")
-  endif()
 endif()
