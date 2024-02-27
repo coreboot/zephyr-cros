@@ -236,8 +236,7 @@ static int bt_att_chan_send(struct bt_att_chan *chan, struct net_buf *buf);
 static void att_chan_mtu_updated(struct bt_att_chan *updated_chan);
 static void bt_att_disconnected(struct bt_l2cap_chan *chan);
 
-struct net_buf *bt_att_create_rsp_pdu(struct bt_att_chan *chan,
-				      uint8_t op, size_t len);
+struct net_buf *bt_att_create_rsp_pdu(struct bt_att_chan *chan, uint8_t op);
 
 static void bt_att_sent(struct bt_l2cap_chan *ch);
 
@@ -777,7 +776,7 @@ static uint8_t att_mtu_req(struct bt_att_chan *chan, struct net_buf *buf)
 		return BT_ATT_ERR_INVALID_PDU;
 	}
 
-	pdu = bt_att_create_rsp_pdu(chan, BT_ATT_OP_MTU_RSP, sizeof(*rsp));
+	pdu = bt_att_create_rsp_pdu(chan, BT_ATT_OP_MTU_RSP);
 	if (!pdu) {
 		return BT_ATT_ERR_UNLIKELY;
 	}
@@ -1029,7 +1028,7 @@ static uint8_t att_find_info_rsp(struct bt_att_chan *chan, uint16_t start_handle
 
 	(void)memset(&data, 0, sizeof(data));
 
-	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_FIND_INFO_RSP, 0);
+	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_FIND_INFO_RSP);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -1183,7 +1182,7 @@ static uint8_t att_find_type_rsp(struct bt_att_chan *chan, uint16_t start_handle
 
 	(void)memset(&data, 0, sizeof(data));
 
-	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_FIND_TYPE_RSP, 0);
+	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_FIND_TYPE_RSP);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -1433,8 +1432,7 @@ static uint8_t att_read_type_rsp(struct bt_att_chan *chan, struct bt_uuid *uuid,
 
 	(void)memset(&data, 0, sizeof(data));
 
-	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_TYPE_RSP,
-				     sizeof(*data.rsp));
+	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_TYPE_RSP);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -1562,7 +1560,7 @@ static uint8_t att_read_rsp(struct bt_att_chan *chan, uint8_t op, uint8_t rsp,
 
 	(void)memset(&data, 0, sizeof(data));
 
-	data.buf = bt_att_create_rsp_pdu(chan, rsp, 0);
+	data.buf = bt_att_create_rsp_pdu(chan, rsp);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -1635,7 +1633,7 @@ static uint8_t att_read_mult_req(struct bt_att_chan *chan, struct net_buf *buf)
 
 	(void)memset(&data, 0, sizeof(data));
 
-	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_MULT_RSP, 0);
+	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_MULT_RSP);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -1739,7 +1737,7 @@ static uint8_t att_read_mult_vl_req(struct bt_att_chan *chan, struct net_buf *bu
 
 	(void)memset(&data, 0, sizeof(data));
 
-	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_MULT_VL_RSP, 0);
+	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_MULT_VL_RSP);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -1861,8 +1859,7 @@ static uint8_t att_read_group_rsp(struct bt_att_chan *chan, struct bt_uuid *uuid
 
 	(void)memset(&data, 0, sizeof(data));
 
-	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_GROUP_RSP,
-				     sizeof(*data.rsp));
+	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_READ_GROUP_RSP);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -2176,7 +2173,7 @@ static uint8_t att_prep_write_rsp(struct bt_att_chan *chan, uint16_t handle,
 	net_buf_slist_put(&chan->att->prep_queue, data.buf);
 
 	/* Generate response */
-	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_PREPARE_WRITE_RSP, 0);
+	data.buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_PREPARE_WRITE_RSP);
 	if (!data.buf) {
 		return BT_ATT_ERR_INSUFFICIENT_RESOURCES;
 	}
@@ -2323,7 +2320,7 @@ static uint8_t att_exec_write_rsp(struct bt_att_chan *chan, uint8_t flags)
 	}
 
 	/* Generate response */
-	buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_EXEC_WRITE_RSP, 0);
+	buf = bt_att_create_rsp_pdu(chan, BT_ATT_OP_EXEC_WRITE_RSP);
 	if (!buf) {
 		return BT_ATT_ERR_UNLIKELY;
 	}
@@ -2963,15 +2960,34 @@ struct net_buf *bt_att_create_pdu(struct bt_conn *conn, uint8_t op, size_t len)
 	return NULL;
 }
 
-struct net_buf *bt_att_create_rsp_pdu(struct bt_att_chan *chan, uint8_t op, size_t len)
+struct net_buf *bt_att_create_rsp_pdu(struct bt_att_chan *chan, uint8_t op)
 {
-	if (len + sizeof(op) > bt_att_mtu(chan)) {
-		LOG_WRN("ATT channel %p MTU too small for RSP (%u < %u)",
-			chan, bt_att_mtu(chan), len + sizeof(op));
+	size_t headroom;
+	struct bt_att_hdr *hdr;
+	struct bt_att_tx_meta_data *data;
+	struct net_buf *buf;
+
+	buf = net_buf_alloc(&att_pool, BT_ATT_TIMEOUT);
+	if (!buf) {
+		LOG_ERR("Unable to allocate buffer for op 0x%02x", op);
 		return NULL;
 	}
 
-	return bt_att_chan_create_pdu(chan, op, len);
+	headroom = BT_L2CAP_BUF_SIZE(0);
+
+	if (bt_att_is_enhanced(chan)) {
+		headroom += BT_L2CAP_SDU_HDR_SIZE;
+	}
+
+	net_buf_reserve(buf, headroom);
+
+	data = bt_att_get_tx_meta_data(buf);
+	data->att_chan = chan;
+
+	hdr = net_buf_add(buf, sizeof(*hdr));
+	hdr->code = op;
+
+	return buf;
 }
 
 static void att_reset(struct bt_att *att)
