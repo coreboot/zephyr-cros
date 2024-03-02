@@ -28,6 +28,8 @@ LOG_MODULE_REGISTER(net_tcp, CONFIG_NET_TCP_LOG_LEVEL);
 
 #define ACK_TIMEOUT_MS CONFIG_NET_TCP_ACK_TIMEOUT
 #define ACK_TIMEOUT K_MSEC(ACK_TIMEOUT_MS)
+#define LAST_ACK_TIMEOUT_MS tcp_fin_timeout_ms
+#define LAST_ACK_TIMEOUT K_MSEC(LAST_ACK_TIMEOUT_MS)
 #define FIN_TIMEOUT K_MSEC(tcp_fin_timeout_ms)
 #define ACK_DELAY K_MSEC(100)
 #define ZWP_MAX_DELAY_MS 120000
@@ -712,17 +714,19 @@ static void tcp_conn_release(struct k_work *work)
 	struct tcp *conn = CONTAINER_OF(work, struct tcp, conn_release);
 	struct net_pkt *pkt;
 
+#if defined(CONFIG_NET_TEST)
+	if (conn->test_closed_cb != NULL) {
+		conn->test_closed_cb(conn, conn->test_user_data);
+	}
+#endif
+
 	k_mutex_lock(&tcp_lock, K_FOREVER);
 
-	/* If there is any pending data, pass that to application */
+	/* Application is no longer there, unref any remaining packets on the
+	 * fifo (although there shouldn't be any at this point.)
+	 */
 	while ((pkt = k_fifo_get(&conn->recv_data, K_NO_WAIT)) != NULL) {
-		if (net_context_packet_received(
-			    (struct net_conn *)conn->context->conn_handler,
-			    pkt, NULL, NULL, conn->recv_user_data) ==
-		    NET_DROP) {
-			/* Application is no longer there, unref the pkt */
-			tcp_pkt_unref(pkt);
-		}
+		tcp_pkt_unref(pkt);
 	}
 
 	k_mutex_lock(&conn->lock, K_FOREVER);
@@ -763,6 +767,18 @@ static void tcp_conn_release(struct k_work *work)
 
 	k_mutex_unlock(&tcp_lock);
 }
+
+#if defined(CONFIG_NET_TEST)
+void tcp_install_close_cb(struct net_context *ctx,
+			  net_tcp_closed_cb_t cb,
+			  void *user_data)
+{
+	NET_ASSERT(ctx->tcp != NULL);
+
+	((struct tcp *)ctx->tcp)->test_closed_cb = cb;
+	((struct tcp *)ctx->tcp)->test_user_data = user_data;
+}
+#endif
 
 static int tcp_conn_unref(struct tcp *conn)
 {
@@ -939,6 +955,35 @@ static void tcp_send_timer_cancel(struct tcp *conn)
 					    K_MSEC(TCP_RTO_MS));
 	}
 }
+
+#if defined(CONFIG_NET_TCP_IPV6_ND_REACHABILITY_HINT)
+
+static void tcp_nbr_reachability_hint(struct tcp *conn)
+{
+	int64_t now;
+	struct net_if *iface;
+
+	if (net_context_get_family(conn->context) != AF_INET6) {
+		return;
+	}
+
+	now = k_uptime_get();
+	iface = net_context_get_iface(conn->context);
+
+	/* Ensure that Neighbor Reachability hints are rate-limited (using threshold
+	 * of half of reachable time).
+	 */
+	if ((now - conn->last_nd_hint_time) > (net_if_ipv6_get_reachable_time(iface) / 2)) {
+		net_ipv6_nbr_reachability_hint(iface, &conn->dst.sin6.sin6_addr);
+		conn->last_nd_hint_time = now;
+	}
+}
+
+#else /* CONFIG_NET_TCP_IPV6_ND_REACHABILITY_HINT */
+
+#define tcp_nbr_reachability_hint(...)
+
+#endif /* CONFIG_NET_TCP_IPV6_ND_REACHABILITY_HINT */
 
 static const char *tcp_state_to_str(enum tcp_state state, bool prefix)
 {
@@ -1778,9 +1823,9 @@ static void tcp_resend_data(struct k_work *work)
 	conn->send_data_retries++;
 	if (ret == 0) {
 		if (conn->in_close && conn->send_data_total == 0) {
-			NET_DBG("TCP connection in active close, "
+			NET_DBG("TCP connection in %s close, "
 				"not disposing yet (waiting %dms)",
-				tcp_fin_timeout_ms);
+				"active", tcp_fin_timeout_ms);
 			k_work_reschedule_for_queue(&tcp_work_q,
 						    &conn->fin_timer,
 						    FIN_TIMEOUT);
@@ -1859,6 +1904,40 @@ static void tcp_fin_timeout(struct k_work *work)
 	NET_DBG("conn: %p %s", conn, tcp_conn_state(conn, NULL));
 
 	(void)tcp_conn_close(conn, -ETIMEDOUT);
+}
+
+static void tcp_last_ack_timeout(struct k_work *work)
+{
+	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+	struct tcp *conn = CONTAINER_OF(dwork, struct tcp, fin_timer);
+
+	NET_DBG("Did not receive %s in %dms", "last ACK", LAST_ACK_TIMEOUT_MS);
+	NET_DBG("conn: %p %s", conn, tcp_conn_state(conn, NULL));
+
+	(void)tcp_conn_close(conn, -ETIMEDOUT);
+}
+
+static void tcp_setup_last_ack_timer(struct tcp *conn)
+{
+	/* Just in case the last ack is lost, install a timer that will
+	 * close the connection in that case. Use the fin_timer for that
+	 * as the fin handling cannot be done in this passive close state.
+	 * Instead of default tcp_fin_timeout() function, have a separate
+	 * function to catch this last ack case.
+	 */
+	k_work_init_delayable(&conn->fin_timer, tcp_last_ack_timeout);
+
+	NET_DBG("TCP connection in %s close, "
+		"not disposing yet (waiting %dms)",
+		"passive", LAST_ACK_TIMEOUT_MS);
+	k_work_reschedule_for_queue(&tcp_work_q,
+				    &conn->fin_timer,
+				    LAST_ACK_TIMEOUT);
+}
+
+static void tcp_cancel_last_ack_timer(struct tcp *conn)
+{
+	k_work_cancel_delayable(&conn->fin_timer);
 }
 
 #if defined(CONFIG_NET_TCP_KEEPALIVE)
@@ -2871,6 +2950,11 @@ next_state:
 			} else {
 				verdict = NET_OK;
 			}
+
+			/* ACK for SYN | ACK has been received. This signilizes that
+			 * the connection makes a "forward progress".
+			 */
+			tcp_nbr_reachability_hint(conn);
 		}
 		break;
 	case TCP_SYN_SENT:
@@ -2907,6 +2991,11 @@ next_state:
 			 * priority.
 			 */
 			connection_ok = true;
+
+			/* ACK for SYN has been received. This signilizes that
+			 * the connection makes a "forward progress".
+			 */
+			tcp_nbr_reachability_hint(conn);
 		} else if (pkt) {
 			net_tcp_reply_rst(pkt);
 		}
@@ -2926,6 +3015,7 @@ next_state:
 			next = TCP_LAST_ACK;
 			verdict = NET_OK;
 			keep_alive_timer_stop(conn);
+			tcp_setup_last_ack_timer(conn);
 			break;
 		} else if (th && FL(&fl, ==, FIN, th_seq(th) == conn->ack)) {
 			conn_ack(conn, + 1);
@@ -2950,6 +3040,7 @@ next_state:
 			tcp_out(conn, FIN | ACK);
 			next = TCP_LAST_ACK;
 			keep_alive_timer_stop(conn);
+			tcp_setup_last_ack_timer(conn);
 			break;
 		}
 
@@ -3038,6 +3129,12 @@ next_state:
 			conn_seq(conn, + len_acked);
 			net_stats_update_tcp_seg_recv(conn->iface);
 
+			/* Receipt of an acknowledgment that covers a sequence number
+			 * not previously acknowledged indicates that the connection
+			 * makes a "forward progress".
+			 */
+			tcp_nbr_reachability_hint(conn);
+
 			conn_send_data_dump(conn);
 
 			conn->send_data_retries = 0;
@@ -3055,6 +3152,10 @@ next_state:
 			if (conn->in_close && conn->send_data_total == 0) {
 				tcp_send_timer_cancel(conn);
 				next = TCP_FIN_WAIT_1;
+
+				k_work_reschedule_for_queue(&tcp_work_q,
+							    &conn->fin_timer,
+							    FIN_TIMEOUT);
 
 				tcp_out(conn, FIN | ACK);
 				conn_seq(conn, + 1);
@@ -3130,6 +3231,7 @@ next_state:
 	case TCP_CLOSE_WAIT:
 		tcp_out(conn, FIN);
 		next = TCP_LAST_ACK;
+		tcp_setup_last_ack_timer(conn);
 		break;
 	case TCP_LAST_ACK:
 		if (th && FL(&fl, ==, ACK, th_seq(th) == conn->ack)) {
@@ -3137,6 +3239,9 @@ next_state:
 			do_close = true;
 			verdict = NET_OK;
 			close_status = 0;
+
+			/* Remove the last ack timer if we received it in time */
+			tcp_cancel_last_ack_timer(conn);
 		}
 		break;
 	case TCP_CLOSED:
@@ -3392,12 +3497,7 @@ out:
 		goto next_state;
 	}
 
-	/* Make sure we close the connection only once by checking connection
-	 * state.
-	 */
-	if (do_close && conn->state != TCP_UNUSED && conn->state != TCP_CLOSED) {
-		tcp_conn_close(conn, close_status);
-	} else if (conn->context) {
+	if (conn->context) {
 		/* If the conn->context is not set, then the connection was
 		 * already closed.
 		 */
@@ -3421,6 +3521,13 @@ out:
 			/* Application is no longer there, unref the pkt */
 			tcp_pkt_unref(recv_pkt);
 		}
+	}
+
+	/* Make sure we close the connection only once by checking connection
+	 * state.
+	 */
+	if (do_close && conn->state != TCP_UNUSED && conn->state != TCP_CLOSED) {
+		tcp_conn_close(conn, close_status);
 	}
 
 	return verdict;
@@ -3458,8 +3565,9 @@ int net_tcp_put(struct net_context *context)
 		} else {
 			int ret;
 
-			NET_DBG("TCP connection in active close, not "
-				"disposing yet (waiting %dms)", tcp_fin_timeout_ms);
+			NET_DBG("TCP connection in %s close, "
+				"not disposing yet (waiting %dms)",
+				"active", tcp_fin_timeout_ms);
 			k_work_reschedule_for_queue(&tcp_work_q,
 						    &conn->fin_timer,
 						    FIN_TIMEOUT);

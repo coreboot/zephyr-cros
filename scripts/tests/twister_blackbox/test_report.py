@@ -7,6 +7,8 @@ Blackbox tests for twister's command line functions
 """
 
 import importlib
+import re
+
 import mock
 import os
 import shutil
@@ -98,6 +100,32 @@ class TestReport:
             "OUT_DIR"
         ),
     ]
+    TESTDATA_6 = [
+        (
+            os.path.join(TEST_DATA, 'tests', 'dummy', 'agnostic'),
+            ['qemu_x86'],
+            "TEST_LOG_FILE.log"
+        ),
+    ]
+    TESTDATA_7 = [
+        (
+            os.path.join(TEST_DATA, 'tests', 'dummy', 'agnostic'),
+            ['qemu_x86'],
+            [
+                'coverage.log', 'coverage.json',
+                'coverage'
+            ],
+        ),
+    ]
+    TESTDATA_8 = [
+        (
+            os.path.join(TEST_DATA, 'tests', 'dummy', 'agnostic'),
+            ['qemu_x86'],
+            [
+                'GCOV_COVERAGE_DUMP_START', 'GCOV_COVERAGE_DUMP_END'
+            ],
+        ),
+    ]
 
     @classmethod
     def setup_class(cls):
@@ -110,7 +138,6 @@ class TestReport:
     def teardown_class(cls):
         pass
 
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'test_path, test_platforms, file_name',
         TESTDATA_1,
@@ -118,14 +145,11 @@ class TestReport:
             'platform_reports'
         ]
     )
-    def test_platform_reports(self, capfd, test_path, test_platforms, file_name):
-        args = ['-i', '-T', test_path, '--platform-reports'] + \
+    def test_platform_reports(self, capfd, out_path, test_path, test_platforms, file_name):
+        args = ['-i', '--outdir', out_path, '-T', test_path, '--platform-reports'] + \
                [val for pair in zip(
                    ['-p'] * len(test_platforms), test_platforms
                ) for val in pair]
-        twister_path = os.path.join(ZEPHYR_BASE, "twister-out")
-        if os.path.exists(twister_path):
-            shutil.rmtree(twister_path)
 
         with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
                 pytest.raises(SystemExit) as sys_exit:
@@ -136,7 +160,7 @@ class TestReport:
         sys.stderr.write(err)
 
         for f_name in file_name:
-            path = os.path.join(twister_path, f_name)
+            path = os.path.join(out_path, f_name)
             assert os.path.exists(path), 'file not found'
 
             if path.endswith(".json"):
@@ -158,12 +182,11 @@ class TestReport:
                 pytest.fail(f"Unsupported file type: '{path}'")
 
         for f_platform in test_platforms:
-            platform_path = os.path.join(twister_path, f_platform)
+            platform_path = os.path.join(out_path, f_platform)
             assert os.path.exists(platform_path), f'file not found {f_platform}'
 
         assert str(sys_exit.value) == '0'
 
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'test_path, test_platforms, file_name',
         TESTDATA_2,
@@ -171,15 +194,11 @@ class TestReport:
             'report_suffix',
         ]
     )
-    def test_report_suffix(self, capfd, test_path, test_platforms, file_name):
-        args = ['-i', '-T', test_path, '--platform-reports', '--report-suffix=TEST'] + \
+    def test_report_suffix(self, capfd, out_path, test_path, test_platforms, file_name):
+        args = ['-i', '--outdir', out_path, '-T', test_path, '--platform-reports', '--report-suffix=TEST'] + \
                [val for pair in zip(
                    ['-p'] * len(test_platforms), test_platforms
                ) for val in pair]
-
-        twister_path = os.path.join(ZEPHYR_BASE, "twister-out")
-        if os.path.exists(twister_path):
-            shutil.rmtree(twister_path)
 
         with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
                 pytest.raises(SystemExit) as sys_exit:
@@ -190,12 +209,11 @@ class TestReport:
         sys.stderr.write(err)
 
         for f_name in file_name:
-            path = os.path.join(twister_path, f_name)
+            path = os.path.join(out_path, f_name)
             assert os.path.exists(path), f'file not found {f_name}'
 
         assert str(sys_exit.value) == '0'
 
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'test_path, test_platforms, report_arg, file_name',
         TESTDATA_3,
@@ -205,18 +223,14 @@ class TestReport:
             'report-name + platform-reports + report-suffix'
         ]
     )
-    def test_report_name(self, capfd, test_path, test_platforms, report_arg, file_name):
-        args = ['-i', '-T', test_path] + \
+    def test_report_name(self, capfd, out_path, test_path, test_platforms, report_arg, file_name):
+        args = ['-i', '--outdir', out_path, '-T', test_path] + \
                [val for pair in zip(
                    ['-p'] * len(test_platforms), test_platforms
                ) for val in pair] + \
                [val for pair in zip(
                    report_arg
                ) for val in pair]
-
-        twister_path = os.path.join(ZEPHYR_BASE, "twister-out")
-        if os.path.exists(twister_path):
-            shutil.rmtree(twister_path)
 
         with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
                 pytest.raises(SystemExit) as sys_exit:
@@ -227,12 +241,11 @@ class TestReport:
         sys.stderr.write(err)
 
         for f_name in file_name:
-            path = os.path.join(twister_path, f_name)
+            path = os.path.join(out_path, f_name)
             assert os.path.exists(path), f'file not found {f_name}'
 
         assert str(sys_exit.value) == '0'
 
-    @pytest.mark.usefixtures("clear_log")
     @pytest.mark.parametrize(
         'test_path, test_platforms, file_name, dir_name',
         TESTDATA_4,
@@ -240,8 +253,8 @@ class TestReport:
             'report_dir',
         ]
     )
-    def test_report_dir(self, capfd, test_path, test_platforms, file_name, dir_name):
-        args = ['-i', '-T', test_path, "--report-dir", dir_name] + \
+    def test_report_dir(self, capfd, out_path, test_path, test_platforms, file_name, dir_name):
+        args = ['-i', '--outdir', out_path, '-T', test_path, "--report-dir", dir_name] + \
                [val for pair in zip(
                    ['-p'] * len(test_platforms), test_platforms
                ) for val in pair]
@@ -250,21 +263,26 @@ class TestReport:
         if os.path.exists(twister_path):
             shutil.rmtree(twister_path)
 
-        with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
-                pytest.raises(SystemExit) as sys_exit:
-            self.loader.exec_module(self.twister_module)
+        try:
+            with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
+                    pytest.raises(SystemExit) as sys_exit:
+                self.loader.exec_module(self.twister_module)
 
-        out, err = capfd.readouterr()
-        sys.stdout.write(out)
-        sys.stderr.write(err)
+            out, err = capfd.readouterr()
+            sys.stdout.write(out)
+            sys.stderr.write(err)
 
-        for f_name in file_name:
-            path = os.path.join(twister_path, f_name)
-            assert os.path.exists(path), f'file not found {f_name}'
+            for f_name in file_name:
+                path = os.path.join(twister_path, f_name)
+                assert os.path.exists(path), f'file not found {f_name}'
 
-        assert str(sys_exit.value) == '0'
+            assert str(sys_exit.value) == '0'
+        finally:
+            twister_path = os.path.join(ZEPHYR_BASE, dir_name)
+            if os.path.exists(twister_path):
+                shutil.rmtree(twister_path)
 
-    @pytest.mark.usefixtures("clear_log")
+    @pytest.mark.noclearout
     @pytest.mark.parametrize(
         'test_path, test_platforms, file_name, dir_name',
         TESTDATA_5,
@@ -290,12 +308,100 @@ class TestReport:
         sys.stdout.write(out)
         sys.stderr.write(err)
 
-        for f_name in file_name:
-            path = os.path.join(twister_path, f_name)
-            assert os.path.exists(path), 'file not found {f_name}'
+        try:
+            for f_name in file_name:
+                path = os.path.join(twister_path, f_name)
+                assert os.path.exists(path), 'file not found {f_name}'
 
-        for f_platform in test_platforms:
-            platform_path = os.path.join(twister_path, f_platform)
-            assert os.path.exists(platform_path), f'file not found {f_platform}'
+            for f_platform in test_platforms:
+                platform_path = os.path.join(twister_path, f_platform)
+                assert os.path.exists(platform_path), f'file not found {f_platform}'
+
+            assert str(sys_exit.value) == '0'
+        finally:
+            twister_path = os.path.join(ZEPHYR_BASE, dir_name)
+            if os.path.exists(twister_path):
+                shutil.rmtree(twister_path)
+
+    @pytest.mark.parametrize(
+        'test_path, test_platforms, file_name',
+        TESTDATA_6,
+        ids=[
+            'log_file',
+        ]
+    )
+    def test_log_file(self, capfd, test_path, test_platforms, out_path, file_name):
+        args = ['-i','--outdir', out_path, '-T', test_path, "--log-file", file_name] + \
+               [val for pair in zip(
+                   ['-p'] * len(test_platforms), test_platforms
+               ) for val in pair]
+
+        file_path = os.path.join(ZEPHYR_BASE, file_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
+                pytest.raises(SystemExit) as sys_exit:
+            self.loader.exec_module(self.twister_module)
+
+        out, err = capfd.readouterr()
+        sys.stdout.write(out)
+        sys.stderr.write(err)
+
+        assert os.path.exists(file_path), 'file not found {f_name}'
+
+        assert str(sys_exit.value) == '0'
+
+    @pytest.mark.parametrize(
+        'test_path, test_platforms, file_name',
+        TESTDATA_7,
+        ids=[
+            'coverage',
+        ]
+    )
+    def test_coverage(self, capfd, test_path, test_platforms, out_path, file_name):
+        args = ['-i','--outdir', out_path, '-T', test_path, '--coverage', '--coverage-tool', 'gcovr'] + \
+               [val for pair in zip(
+                   ['-p'] * len(test_platforms), test_platforms
+               ) for val in pair]
+
+        with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
+                pytest.raises(SystemExit) as sys_exit:
+            self.loader.exec_module(self.twister_module)
+
+        out, err = capfd.readouterr()
+        sys.stdout.write(out)
+        sys.stderr.write(err)
+
+        for f_name in file_name:
+            path = os.path.join(out_path, f_name)
+            assert os.path.exists(path), f'file not found {f_name}'
+
+        assert str(sys_exit.value) == '0'
+
+    @pytest.mark.parametrize(
+        'test_path, test_platforms, expected',
+        TESTDATA_8,
+        ids=[
+            'enable_coverage',
+        ]
+    )
+    def test_enable_coverage(self, capfd, test_path, test_platforms, out_path, expected):
+        args = ['-i','--outdir', out_path, '-T', test_path, '--enable-coverage', '-vv'] + \
+               [val for pair in zip(
+                   ['-p'] * len(test_platforms), test_platforms
+               ) for val in pair]
+
+        with mock.patch.object(sys, 'argv', [sys.argv[0]] + args), \
+                pytest.raises(SystemExit) as sys_exit:
+            self.loader.exec_module(self.twister_module)
+
+        out, err = capfd.readouterr()
+        sys.stdout.write(out)
+        sys.stderr.write(err)
+
+        for line in expected:
+            match = re.search(line, err)
+            assert match, f'line not found: {line}'
 
         assert str(sys_exit.value) == '0'

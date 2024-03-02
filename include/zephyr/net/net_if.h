@@ -430,6 +430,11 @@ struct net_if_dhcpv4 {
 
 	/** The source address of a received DHCP message */
 	struct in_addr response_src_addr;
+
+#ifdef CONFIG_NET_DHCPV4_OPTION_NTP_SERVER
+	/** NTP server address */
+	struct in_addr ntp_addr;
+#endif
 };
 #endif /* CONFIG_NET_DHCPV4 */
 
@@ -1046,6 +1051,29 @@ static inline void net_if_stop_rs(struct net_if *iface)
 }
 #endif /* CONFIG_NET_IPV6_ND */
 
+/**
+ * @brief Provide a reachability hint for IPv6 Neighbor Discovery.
+ *
+ * This function is intended for upper-layer protocols to inform the IPv6
+ * Neighbor Discovery process about an active link to a specific neighbor.
+ * By signaling a recent "forward progress" event, such as the reception of
+ * an ACK, this function can help reduce unnecessary ND traffic as per the
+ * guidelines in RFC 4861 (section 7.3).
+ *
+ * @param iface A pointer to the network interface.
+ * @param ipv6_addr Pointer to the IPv6 address of the neighbor node.
+ */
+#if defined(CONFIG_NET_IPV6_ND) && defined(CONFIG_NET_NATIVE_IPV6)
+void net_if_nbr_reachability_hint(struct net_if *iface, const struct in6_addr *ipv6_addr);
+#else
+static inline void net_if_nbr_reachability_hint(struct net_if *iface,
+						const struct in6_addr *ipv6_addr)
+{
+	ARG_UNUSED(iface);
+	ARG_UNUSED(ipv6_addr);
+}
+#endif
+
 /** @cond INTERNAL_HIDDEN */
 
 static inline int net_if_set_link_addr_unlocked(struct net_if *iface,
@@ -1385,6 +1413,29 @@ struct net_if_mcast_addr *net_if_ipv6_maddr_add(struct net_if *iface,
 bool net_if_ipv6_maddr_rm(struct net_if *iface, const struct in6_addr *addr);
 
 /**
+ * @typedef net_if_ip_maddr_cb_t
+ * @brief Callback used while iterating over network interface multicast IP addresses
+ *
+ * @param iface Pointer to the network interface the address belongs to
+ * @param maddr Pointer to current multicast IP address
+ * @param user_data A valid pointer to user data or NULL
+ */
+typedef void (*net_if_ip_maddr_cb_t)(struct net_if *iface,
+				     struct net_if_mcast_addr *maddr,
+				     void *user_data);
+
+/**
+ * @brief Go through all IPv6 multicast addresses on a network interface and call
+ * callback for each used address.
+ *
+ * @param iface Pointer to the network interface
+ * @param cb User-supplied callback function to call
+ * @param user_data User specified data
+ */
+void net_if_ipv6_maddr_foreach(struct net_if *iface, net_if_ip_maddr_cb_t cb,
+			       void *user_data);
+
+/**
  * @brief Check if this IPv6 multicast address belongs to a specific interface
  * or one of the interfaces.
  *
@@ -1400,13 +1451,12 @@ struct net_if_mcast_addr *net_if_ipv6_maddr_lookup(const struct in6_addr *addr,
 /**
  * @typedef net_if_mcast_callback_t
 
- * @brief Define callback that is called whenever IPv6 multicast address group
- * is joined or left.
-
+ * @brief Define a callback that is called whenever a IPv6 or IPv4 multicast
+ *        address group is joined or left.
  * @param iface A pointer to a struct net_if to which the multicast address is
  *        attached.
  * @param addr IP multicast address.
- * @param is_joined True if the address is joined, false if left.
+ * @param is_joined True if the multicast group is joined, false if group is left.
  */
 typedef void (*net_if_mcast_callback_t)(struct net_if *iface,
 					const struct net_addr *addr,
@@ -1455,7 +1505,7 @@ void net_if_mcast_mon_unregister(struct net_if_mcast_monitor *mon);
  *
  * @param iface Network interface
  * @param addr Multicast address
- * @param is_joined Is this multicast address joined (true) or not (false)
+ * @param is_joined Is this multicast address group joined (true) or not (false)
  */
 void net_if_mcast_monitor(struct net_if *iface, const struct net_addr *addr,
 			  bool is_joined);
@@ -2073,6 +2123,17 @@ struct net_if_mcast_addr *net_if_ipv4_maddr_add(struct net_if *iface,
 bool net_if_ipv4_maddr_rm(struct net_if *iface, const struct in_addr *addr);
 
 /**
+ * @brief Go through all IPv4 multicast addresses on a network interface and call
+ * callback for each used address.
+ *
+ * @param iface Pointer to the network interface
+ * @param cb User-supplied callback function to call
+ * @param user_data User specified data
+ */
+void net_if_ipv4_maddr_foreach(struct net_if *iface, net_if_ip_maddr_cb_t cb,
+			       void *user_data);
+
+/**
  * @brief Check if this IPv4 multicast address belongs to a specific interface
  * or one of the interfaces.
  *
@@ -2279,6 +2340,15 @@ struct in_addr *net_if_ipv4_get_ll(struct net_if *iface,
  */
 struct in_addr *net_if_ipv4_get_global_addr(struct net_if *iface,
 					    enum net_addr_state addr_state);
+
+/**
+ * @brief Get IPv4 netmask of an interface.
+ *
+ * @param iface Interface to use.
+ *
+ * @return The netmask set on the interface, unspecified address if not found.
+ */
+struct in_addr net_if_ipv4_get_netmask(struct net_if *iface);
 
 /**
  * @brief Set IPv4 netmask for an interface.
@@ -2800,22 +2870,21 @@ struct net_if_api {
 	void (*init)(struct net_if *iface);
 };
 
-#if defined(CONFIG_NET_IP)
-#define NET_IF_IP_INIT .ip = {},
-#else
-#define NET_IF_IP_INIT
-#endif
+#define NET_IF_DHCPV4_INIT						\
+	IF_ENABLED(UTIL_AND(IS_ENABLED(CONFIG_NET_DHCPV4),		\
+			    IS_ENABLED(CONFIG_NET_NATIVE_IPV4)),	\
+		   (.dhcpv4.state = NET_DHCPV4_DISABLED,))
 
-#if defined(CONFIG_NET_DHCPV4) && defined(CONFIG_NET_NATIVE_IPV4)
-#define NET_IF_DHCPV4_INIT .dhcpv4.state = NET_DHCPV4_DISABLED,
-#else
-#define NET_IF_DHCPV4_INIT
-#endif
+#define NET_IF_DHCPV6_INIT						\
+	IF_ENABLED(UTIL_AND(IS_ENABLED(CONFIG_NET_DHCPV6),		\
+			    IS_ENABLED(CONFIG_NET_NATIVE_IPV6)),	\
+		   (.dhcpv6.state = NET_DHCPV6_DISABLED,))
 
 #define NET_IF_CONFIG_INIT				\
 	.config = {					\
-		NET_IF_IP_INIT				\
+		IF_ENABLED(CONFIG_NET_IP, (.ip = {},))  \
 		NET_IF_DHCPV4_INIT			\
+		NET_IF_DHCPV6_INIT			\
 	}
 
 #define NET_IF_GET_NAME(dev_id, sfx) __net_if_##dev_id##_##sfx

@@ -1,6 +1,6 @@
 # NXP S32K1XX MCU series
 
-# Copyright 2023 NXP
+# Copyright 2023-2024 NXP
 # SPDX-License-Identifier: Apache-2.0
 
 config SOC_SERIES_S32K1XX
@@ -16,5 +16,9 @@ config SOC_SERIES_S32K1XX
 	select HAS_MCUX_LPUART
 	select HAS_MCUX_LPI2C
 	select HAS_MCUX_LPSPI
+	select HAS_MCUX_FTM
+	select HAS_MCUX_FLEXCAN
+	select HAS_MCUX_WDOG32
+	select HAS_MCUX_RTC
 	help
 	  Enable support for NXP S32K1XX MCU series.

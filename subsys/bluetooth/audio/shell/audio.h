@@ -29,6 +29,8 @@ ssize_t audio_ad_data_add(struct bt_data *data, const size_t data_size, const bo
 ssize_t audio_pa_data_add(struct bt_data *data_array, const size_t data_array_size);
 ssize_t csis_ad_data_add(struct bt_data *data, const size_t data_size, const bool discoverable);
 size_t cap_acceptor_ad_data_add(struct bt_data data[], size_t data_size, bool discoverable);
+size_t gmap_ad_data_add(struct bt_data data[], size_t data_size);
+size_t pbp_ad_data_add(struct bt_data data[], size_t data_size);
 
 #if defined(CONFIG_BT_AUDIO)
 /* Must guard before including audio.h as audio.h uses Kconfigs guarded by
@@ -39,12 +41,22 @@ size_t cap_acceptor_ad_data_add(struct bt_data data[], size_t data_size, bool di
 #include <zephyr/bluetooth/audio/bap_lc3_preset.h>
 #include <zephyr/bluetooth/audio/cap.h>
 
+#define LOCATION BT_AUDIO_LOCATION_FRONT_LEFT | BT_AUDIO_LOCATION_FRONT_RIGHT
+#define CONTEXT                                                                                    \
+	(BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED | BT_AUDIO_CONTEXT_TYPE_CONVERSATIONAL |                \
+	 BT_AUDIO_CONTEXT_TYPE_MEDIA |                                                             \
+	 COND_CODE_1(IS_ENABLED(CONFIG_BT_GMAP), (BT_AUDIO_CONTEXT_TYPE_GAME), (0)))
+
+const struct named_lc3_preset *gmap_get_named_preset(bool is_unicast, enum bt_audio_dir dir,
+						     const char *preset_arg);
+
 struct named_lc3_preset {
 	const char *name;
 	struct bt_bap_lc3_preset preset;
 };
 
-const struct named_lc3_preset *bap_get_named_preset(bool is_unicast, const char *preset_arg);
+const struct named_lc3_preset *bap_get_named_preset(bool is_unicast, enum bt_audio_dir dir,
+						    const char *preset_arg);
 
 #if defined(CONFIG_BT_BAP_UNICAST)
 
@@ -67,6 +79,12 @@ struct shell_stream {
 	struct bt_cap_stream stream;
 	struct bt_audio_codec_cfg codec_cfg;
 	struct bt_audio_codec_qos qos;
+#if defined(CONFIG_LIBLC3)
+	uint32_t lc3_freq_hz;
+	uint32_t lc3_frame_duration_us;
+	uint16_t lc3_octets_per_frame;
+	uint8_t lc3_frames_per_sdu;
+#endif /* CONFIG_LIBLC3 */
 #if defined(CONFIG_BT_AUDIO_TX)
 	int64_t connected_at_ticks; /* The uptime tick measured when stream was connected */
 	uint16_t seq_num;
@@ -123,8 +141,8 @@ struct bap_unicast_ac_param {
 extern struct bt_bap_unicast_group *default_unicast_group;
 extern struct bt_bap_ep *snks[CONFIG_BT_MAX_CONN][CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT];
 extern struct bt_bap_ep *srcs[CONFIG_BT_MAX_CONN][CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT];
-extern const struct named_lc3_preset *default_sink_preset;
-extern const struct named_lc3_preset *default_source_preset;
+extern struct named_lc3_preset default_sink_preset;
+extern struct named_lc3_preset default_source_preset;
 
 int bap_ac_create_unicast_group(const struct bap_unicast_ac_param *param,
 				struct shell_stream *snk_uni_streams[], size_t snk_cnt,
@@ -223,6 +241,9 @@ struct bap_broadcast_ac_param {
 	size_t stream_cnt;
 	size_t chan_cnt;
 };
+
+int cap_ac_broadcast(const struct shell *sh, size_t argc, char **argv,
+		     const struct bap_broadcast_ac_param *param);
 
 extern struct shell_stream broadcast_source_streams[CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT];
 extern struct broadcast_source default_source;

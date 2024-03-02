@@ -103,7 +103,7 @@ static void update_recv_state_big_synced(const struct bt_bap_broadcast_sink *sin
 
 	mod_src_param.num_subgroups = sink->subgroup_count;
 	for (uint8_t i = 0U; i < sink->subgroup_count; i++) {
-		struct bt_bap_scan_delegator_subgroup *subgroup_param = &mod_src_param.subgroups[i];
+		struct bt_bap_bass_subgroup *subgroup_param = &mod_src_param.subgroups[i];
 		const struct bt_bap_broadcast_sink_subgroup *sink_subgroup = &sink->subgroups[i];
 
 		/* Set the bis_sync value to the indexes available per subgroup */
@@ -296,9 +296,12 @@ static void broadcast_sink_iso_connected(struct bt_iso_chan *chan)
 		return;
 	}
 
-	ops = stream->ops;
-
 	LOG_DBG("stream %p", stream);
+
+	ops = stream->ops;
+	if (ops != NULL && ops->connected != NULL) {
+		ops->connected(stream);
+	}
 
 	sink = broadcast_sink_lookup_iso_chan(chan);
 	if (sink == NULL) {
@@ -311,7 +314,7 @@ static void broadcast_sink_iso_connected(struct bt_iso_chan *chan)
 	if (ops != NULL && ops->started != NULL) {
 		ops->started(stream);
 	} else {
-		LOG_WRN("No callback for connected set");
+		LOG_WRN("No callback for started set");
 	}
 
 	all_connected = true;
@@ -349,9 +352,12 @@ static void broadcast_sink_iso_disconnected(struct bt_iso_chan *chan,
 		return;
 	}
 
-	ops = stream->ops;
-
 	LOG_DBG("stream %p ep %p reason 0x%02x", stream, ep, reason);
+
+	ops = stream->ops;
+	if (ops != NULL && ops->disconnected != NULL) {
+		ops->disconnected(stream, reason);
+	}
 
 	broadcast_sink_set_ep_state(ep, BT_BAP_EP_STATE_IDLE);
 
@@ -434,7 +440,7 @@ static void broadcast_sink_add_src(struct bt_bap_broadcast_sink *sink)
 static bool base_subgroup_meta_cb(const struct bt_bap_base_subgroup *subgroup, void *user_data)
 {
 	struct bt_bap_scan_delegator_mod_src_param *mod_src_param = user_data;
-	struct bt_bap_scan_delegator_subgroup *subgroup_param;
+	struct bt_bap_bass_subgroup *subgroup_param;
 	uint8_t *meta;
 	int ret;
 
@@ -488,6 +494,14 @@ static void update_recv_state_base(const struct bt_bap_broadcast_sink *sink,
 	mod_src_param.src_id = recv_state->src_id;
 	mod_src_param.encrypt_state = recv_state->encrypt_state;
 	mod_src_param.broadcast_id = recv_state->broadcast_id;
+	mod_src_param.num_subgroups = sink->subgroup_count;
+	for (uint8_t i = 0U; i < sink->subgroup_count; i++) {
+		struct bt_bap_bass_subgroup *subgroup_param = &mod_src_param.subgroups[i];
+		const struct bt_bap_broadcast_sink_subgroup *sink_subgroup = &sink->subgroups[i];
+
+		/* Set the bis_sync value to the indexes available per subgroup */
+		subgroup_param->bis_sync = sink_subgroup->bis_indexes & sink->indexes_bitfield;
+	}
 
 	err = bt_bap_scan_delegator_mod_src(&mod_src_param);
 	if (err != 0) {
@@ -886,7 +900,7 @@ static int bt_bap_broadcast_sink_setup_stream(struct bt_bap_broadcast_sink *sink
 	bt_bap_iso_bind_ep(iso, ep);
 
 	bt_audio_codec_qos_to_iso_qos(iso->chan.qos->rx, &sink->codec_qos);
-	bt_audio_codec_cfg_to_iso_path(iso->chan.qos->rx->path, codec_cfg);
+	bt_bap_iso_configure_data_path(ep, codec_cfg);
 
 	bt_bap_iso_unref(iso);
 
@@ -920,17 +934,6 @@ static void broadcast_sink_cleanup_streams(struct bt_bap_broadcast_sink *sink)
 
 static void broadcast_sink_cleanup(struct bt_bap_broadcast_sink *sink)
 {
-	if (atomic_test_bit(sink->flags,
-			    BT_BAP_BROADCAST_SINK_FLAG_SRC_ID_VALID)) {
-		int err;
-
-		err = bt_bap_scan_delegator_rem_src(sink->bass_src_id);
-		if (err != 0) {
-			/* This is likely due to the receive state been removed */
-			LOG_DBG("Could not remove Receive State for sink %p: %d", sink, err);
-		}
-	}
-
 	if (sink->stream_count > 0U) {
 		broadcast_sink_cleanup_streams(sink);
 	}

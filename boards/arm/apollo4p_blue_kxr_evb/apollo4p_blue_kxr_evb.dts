@@ -82,7 +82,13 @@
 	compatible = "ambiq,spi";
 	pinctrl-0 = <&spi1_default>;
 	pinctrl-names = "default";
-	clock-frequency = <1000000>;
+	clock-frequency = <DT_FREQ_M(1)>;
+	status = "okay";
+};
+
+&iom4 {
+	pinctrl-0 = <&spi4_default>;
+	pinctrl-names = "default";
 	status = "okay";
 };
 

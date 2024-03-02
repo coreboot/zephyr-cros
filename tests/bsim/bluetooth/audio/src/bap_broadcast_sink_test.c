@@ -31,15 +31,15 @@ static struct bt_le_scan_recv_info broadcaster_info;
 static bt_addr_le_t broadcaster_addr;
 static struct bt_le_per_adv_sync *pa_sync;
 static uint32_t broadcaster_broadcast_id;
-static struct bap_test_stream broadcast_sink_streams[CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT];
+static struct audio_test_stream broadcast_sink_streams[CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT];
 static struct bt_bap_stream *streams[ARRAY_SIZE(broadcast_sink_streams)];
 static uint32_t requested_bis_sync;
 static struct bt_le_ext_adv *ext_adv;
 static const struct bt_bap_scan_delegator_recv_state *req_recv_state;
 
 static const struct bt_audio_codec_cap codec_cap = BT_AUDIO_CODEC_CAP_LC3(
-	BT_AUDIO_CODEC_LC3_FREQ_ANY, BT_AUDIO_CODEC_LC3_DURATION_ANY,
-	BT_AUDIO_CODEC_LC3_CHAN_COUNT_SUPPORT(1, 2), 30, 240, 2,
+	BT_AUDIO_CODEC_CAP_FREQ_ANY, BT_AUDIO_CODEC_CAP_DURATION_ANY,
+	BT_AUDIO_CODEC_CAP_CHAN_COUNT_SUPPORT(1, 2), 30, 240, 2,
 	(BT_AUDIO_CONTEXT_TYPE_CONVERSATIONAL | BT_AUDIO_CONTEXT_TYPE_MEDIA));
 
 static K_SEM_DEFINE(sem_started, 0U, ARRAY_SIZE(streams));
@@ -237,7 +237,7 @@ static int pa_sync_term_req_cb(struct bt_conn *conn,
 
 static int bis_sync_req_cb(struct bt_conn *conn,
 			   const struct bt_bap_scan_delegator_recv_state *recv_state,
-			   const uint32_t bis_sync_req[BT_BAP_SCAN_DELEGATOR_MAX_SUBGROUPS])
+			   const uint32_t bis_sync_req[CONFIG_BT_BAP_BASS_MAX_SUBGROUPS])
 {
 	printk("BIS sync request received for %p: 0x%08x\n", recv_state, bis_sync_req[0]);
 	/* We only care about a single subgroup in this test */
@@ -274,11 +274,11 @@ static void recv_cb(struct bt_bap_stream *stream,
 		    const struct bt_iso_recv_info *info,
 		    struct net_buf *buf)
 {
-	struct bap_test_stream *test_stream = CONTAINER_OF(stream, struct bap_test_stream, stream);
+	struct audio_test_stream *test_stream = audio_test_stream_from_bap_stream(stream);
 
 	if ((test_stream->rx_cnt % 100U) == 0U) {
-		printk("Incoming audio on stream %p len %u and ts %u\n", stream, buf->len,
-		       info->ts);
+		printk("[%zu]: Incoming audio on stream %p len %u and ts %u\n", test_stream->rx_cnt,
+		       stream, buf->len, info->ts);
 	}
 
 	if (test_stream->rx_cnt > 0U && info->ts == test_stream->last_info.ts) {
@@ -313,7 +313,7 @@ static void recv_cb(struct bt_bap_stream *stream,
 			SET_FLAG(flag_received);
 		}
 	} else {
-		FAIL("Unexpected data received");
+		FAIL("Unexpected data received\n");
 	}
 }
 
@@ -363,7 +363,7 @@ static int init(void)
 	UNSET_FLAG(pa_synced);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
-		streams[i] = &broadcast_sink_streams[i].stream;
+		streams[i] = bap_stream_from_audio_test_stream(&broadcast_sink_streams[i]);
 		bt_bap_stream_cb_register(streams[i], &stream_ops);
 	}
 

@@ -286,7 +286,7 @@ class KconfigCheck(ComplianceTest):
         if full:
             self.check_no_undef_outside_kconfig(kconf)
 
-    def get_modules(self, modules_file):
+    def get_modules(self, modules_file, settings_file):
         """
         Get a list of modules and put them in a file that is parsed by
         Kconfig
@@ -304,7 +304,7 @@ class KconfigCheck(ComplianceTest):
         zephyr_module_path = os.path.join(ZEPHYR_BASE, "scripts",
                                           "zephyr_module.py")
         cmd = [sys.executable, zephyr_module_path,
-               '--kconfig-out', modules_file]
+               '--kconfig-out', modules_file, '--settings-out', settings_file]
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT)
@@ -326,7 +326,7 @@ class KconfigCheck(ComplianceTest):
                 ))
             fp_module_file.write(content)
 
-    def get_kconfig_dts(self, kconfig_dts_file):
+    def get_kconfig_dts(self, kconfig_dts_file, settings_file):
         """
         Generate the Kconfig.dts using dts/bindings as the source.
 
@@ -337,9 +337,23 @@ class KconfigCheck(ComplianceTest):
         # not a module nor a pip-installed Python utility
         zephyr_drv_kconfig_path = os.path.join(ZEPHYR_BASE, "scripts", "dts",
                                                "gen_driver_kconfig_dts.py")
-        binding_path = os.path.join(ZEPHYR_BASE, "dts", "bindings")
+        binding_paths = []
+        binding_paths.append(os.path.join(ZEPHYR_BASE, "dts", "bindings"))
+
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r') as fp_setting_file:
+                content = fp_setting_file.read()
+
+            lines = content.strip().split('\n')
+            for line in lines:
+                if line.startswith('"DTS_ROOT":'):
+                    _, dts_root_path = line.split(":", 1)
+                    binding_paths.append(os.path.join(dts_root_path.strip('"'), "dts", "bindings"))
+
         cmd = [sys.executable, zephyr_drv_kconfig_path,
-               '--kconfig-out', kconfig_dts_file, '--bindings-dirs', binding_path]
+               '--kconfig-out', kconfig_dts_file, '--bindings-dirs']
+        for binding_path in binding_paths:
+            cmd.append(binding_path)
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT)
@@ -383,9 +397,11 @@ class KconfigCheck(ComplianceTest):
         os.environ["GENERATED_DTS_BOARD_CONF"] = "dummy"
 
         # For multi repo support
-        self.get_modules(os.path.join(kconfiglib_dir, "Kconfig.modules"))
+        self.get_modules(os.path.join(kconfiglib_dir, "Kconfig.modules"),
+                         os.path.join(kconfiglib_dir, "settings_file.txt"))
         # For Kconfig.dts support
-        self.get_kconfig_dts(os.path.join(kconfiglib_dir, "Kconfig.dts"))
+        self.get_kconfig_dts(os.path.join(kconfiglib_dir, "Kconfig.dts"),
+                             os.path.join(kconfiglib_dir, "settings_file.txt"))
 
         # Tells Kconfiglib to generate warnings for all references to undefined
         # symbols within Kconfig files
@@ -513,7 +529,7 @@ check Kconfig guidelines.
             self.failure("""\
 Found pointless 'menuconfig' symbols without children. Use regular 'config'
 symbols instead. See
-https://docs.zephyrproject.org/latest/guides/kconfig/tips.html#menuconfig-symbols.
+https://docs.zephyrproject.org/latest/build/kconfig/tips.html#menuconfig-symbols.
 
 """ + "\n".join(f"{node.item.name:35} {node.filename}:{node.linenr}"
                 for node in bad_mconfs))
@@ -566,9 +582,11 @@ https://docs.zephyrproject.org/latest/guides/kconfig/tips.html#menuconfig-symbol
         # Warning: Needs to work with both --perl-regexp and the 're' module
         regex = r"\bCONFIG_[A-Z0-9_]+\b(?!\s*##|[$@{*])"
 
-        # Skip doc/releases, which often references removed symbols
+        # Skip doc/releases and doc/security/vulnerabilities.rst, which often
+        # reference removed symbols
         grep_stdout = git("grep", "--line-number", "-I", "--null",
                           "--perl-regexp", regex, "--", ":!/doc/releases",
+                          ":!/doc/security/vulnerabilities.rst",
                           cwd=Path(GIT_TOP))
 
         # splitlines() supports various line terminators
@@ -664,6 +682,7 @@ flagged.
         "FOO_LOG_LEVEL",
         "FOO_SETTING_1",
         "FOO_SETTING_2",
+        "HEAP_MEM_POOL_ADD_SIZE_", # Used as an option matching prefix
         "LSM6DSO_INT_PIN",
         "LIBGCC_RTLIB",
         "LLVM_USE_LD",   # Both LLVM_USE_* are in cmake/toolchain/llvm/Kconfig
