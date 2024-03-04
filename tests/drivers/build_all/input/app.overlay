@@ -33,6 +33,20 @@
 			status = "okay";
 		};
 
+		adc-keys {
+			compatible = "adc-keys";
+			io-channels = <&test_adc 0>;
+			keyup-threshold-mv = <0>;
+			button_0 {
+				press-thresholds-mv = <1500>, <1750>;
+				zephyr,code = <0>;
+			};
+			button_1 {
+				press-thresholds-mv = <2500>, <1750>;
+				zephyr,code = <1>;
+			};
+		};
+
 		gpio-keys {
 			compatible = "gpio-keys";
 			debounce-interval-ms = <30>;
@@ -182,6 +196,14 @@
 				touch-detect-delay-us = <10>;
 				touch-average-control = <1>;
 				tracking-index = <0>;
+			};
+
+			pat@5 {
+				compatible = "pixart,pat912x";
+				reg = <0x5>;
+				motion-gpios = <&test_gpio 0 0>;
+				zephyr,axis-x = <0>;
+				zephyr,axis-y = <1>;
 			};
 		};
 
