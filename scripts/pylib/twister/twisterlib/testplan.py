@@ -18,6 +18,7 @@ import shutil
 import random
 import snippets
 from pathlib import Path
+from argparse import Namespace
 
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
@@ -34,7 +35,7 @@ from twisterlib.config_parser import TwisterConfigParser
 from twisterlib.testinstance import TestInstance
 from twisterlib.quarantine import Quarantine
 
-
+import list_boards
 from zephyr_module import parse_modules
 
 ZEPHYR_BASE = os.getenv("ZEPHYR_BASE")
@@ -398,13 +399,25 @@ class TestPlan:
 
 
     def add_configurations(self):
-        for board_root in self.env.board_roots:
-            board_root = os.path.abspath(board_root)
-            logger.debug("Reading platform configuration files under %s..." %
-                         board_root)
+        board_dirs = set()
+        # Create a list of board roots as defined by the build system in general
+        # Note, internally in twister a board root includes the `boards` folder
+        # but in Zephyr build system, the board root is without the `boards` in folder path.
+        board_roots = [Path(os.path.dirname(root)) for root in self.env.board_roots]
+        lb_args = Namespace(arch_roots=[Path(ZEPHYR_BASE)], soc_roots=[Path(ZEPHYR_BASE),
+                            Path(ZEPHYR_BASE) / 'scripts' / 'pylib' / 'twister'],
+                            board_roots=board_roots, board=None, board_dir=None)
+        v1_boards = list_boards.find_boards(lb_args)
+        v2_boards = list_boards.find_v2_boards(lb_args)
+        for b in v1_boards:
+            board_dirs.add(b.dir)
+        for b in v2_boards:
+            board_dirs.add(b.dir)
+        logger.debug("Reading platform configuration files under %s..." % self.env.board_roots)
 
-            platform_config = self.test_config.get('platforms', {})
-            for file in glob.glob(os.path.join(board_root, "*", "*", "*.yaml")):
+        platform_config = self.test_config.get('platforms', {})
+        for folder in board_dirs:
+            for file in glob.glob(os.path.join(folder, "*.yaml")):
                 try:
                     platform = Platform()
                     platform.load(file)
@@ -447,6 +460,7 @@ class TestPlan:
                                         platform_revision = copy.deepcopy(platform)
                                         revision = revision.replace("_", ".")
                                         platform_revision.name = f"{platform.name}@{revision}"
+                                        platform_revision.normalized_name = platform_revision.name.replace("/", "_")
                                         platform_revision.default = False
                                         self.platforms.append(platform_revision)
 
@@ -506,7 +520,8 @@ class TestPlan:
                         suite = TestSuite(root, suite_path, name, data=suite_dict, detailed_test_id=self.options.detailed_test_id)
                         suite.add_subcases(suite_dict, subcases, ztest_suite_names)
                         if testsuite_filter:
-                            if suite.name and suite.name in testsuite_filter:
+                            scenario = os.path.basename(suite.name)
+                            if suite.name and (suite.name in testsuite_filter or scenario in testsuite_filter):
                                 self.testsuites[suite.name] = suite
                         else:
                             self.testsuites[suite.name] = suite
@@ -667,11 +682,19 @@ class TestPlan:
         for ts_name, ts in self.testsuites.items():
             if ts.build_on_all and not platform_filter and platform_config.get('increased_platform_scope', True):
                 platform_scope = self.platforms
-            elif ts.integration_platforms and self.options.integration:
+            elif ts.integration_platforms:
                 self.verify_platforms_existence(
                     ts.integration_platforms, f"{ts_name} - integration_platforms")
-                platform_scope = list(filter(lambda item: item.name in ts.integration_platforms, \
-                                         self.platforms))
+                integration_platforms = list(filter(lambda item: item.name in ts.integration_platforms,
+                                                    self.platforms))
+                if self.options.integration:
+                    platform_scope = integration_platforms
+                else:
+                    # if not in integration mode, still add integration platforms to the list
+                    if not platform_filter:
+                        platform_scope = platforms + integration_platforms
+                    else:
+                        platform_scope = platforms
             else:
                 platform_scope = platforms
 
@@ -739,8 +762,10 @@ class TestPlan:
                 if exclude_tag and ts.tags.intersection(exclude_tag):
                     instance.add_filter("Command line testsuite exclude filter", Filters.CMD_LINE)
 
-                if testsuite_filter and ts_name not in testsuite_filter:
-                    instance.add_filter("TestSuite name filter", Filters.CMD_LINE)
+                if testsuite_filter:
+                    normalized_f = [os.path.basename(_ts) for _ts in testsuite_filter]
+                    if ts.id not in normalized_f:
+                        instance.add_filter("Testsuite name filter", Filters.CMD_LINE)
 
                 if arch_filter and plat.arch not in arch_filter:
                     instance.add_filter("Command line testsuite arch filter", Filters.CMD_LINE)
@@ -906,7 +931,10 @@ class TestPlan:
                     else:
                         self.add_instances(instance_list)
                 else:
-                    instances = list(filter(lambda ts: ts.platform.name in self.default_platforms, instance_list))
+                    # add integration platforms to the list of default
+                    # platforms, even if we are not in integration mode
+                    _platforms = self.default_platforms + ts.integration_platforms
+                    instances = list(filter(lambda ts: ts.platform.name in _platforms, instance_list))
                     self.add_instances(instances)
             elif integration:
                 instances = list(filter(lambda item:  item.platform.name in ts.integration_platforms, instance_list))

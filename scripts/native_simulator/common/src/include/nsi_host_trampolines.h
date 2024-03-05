@@ -12,7 +12,7 @@
  * function calls, as that would break the include path isolation
  *
  * Naming convention: nsi_host_<fun>() where <func> is the name of the equivalent
- * C library call we call thru.
+ * C library function we call through
  */
 
 #ifndef NSI_COMMON_SRC_INCL_NSI_HOST_TRAMPOLINES_H
@@ -36,7 +36,7 @@ long nsi_host_read(int fd, void *buffer, unsigned long size);
 void *nsi_host_realloc(void *ptr, unsigned long size);
 void nsi_host_srandom(unsigned int seed);
 char *nsi_host_strdup(const char *s);
-long nsi_host_write(int fd, void *buffer, unsigned long size);
+long nsi_host_write(int fd, const void *buffer, unsigned long size);
 
 #ifdef __cplusplus
 }

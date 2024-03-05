@@ -118,7 +118,7 @@ zephyr_include_directories(
 
 include(${ZEPHYR_BASE}/cmake/linker_script/${ARCH}/linker.cmake OPTIONAL)
 
-zephyr_include_directories(${SOC_DIR}/${ARCH}/${SOC_PATH})
+zephyr_include_directories(${SOC_FULL_DIR})
 
 # Don't inherit compiler flags from the environment
 foreach(var AFLAGS CFLAGS CXXFLAGS CPPFLAGS LDFLAGS)
@@ -214,7 +214,7 @@ endif()
 zephyr_compile_options(${OPTIMIZATION_FLAG})
 
 if(CONFIG_LTO)
-  add_compile_options($<TARGET_PROPERTY:compiler,optimization_lto>)
+  zephyr_compile_options($<TARGET_PROPERTY:compiler,optimization_lto>)
   add_link_options($<TARGET_PROPERTY:linker,lto_arguments>)
 endif()
 

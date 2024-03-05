@@ -3113,7 +3113,8 @@ uint8_t bt_gatt_check_perm(struct bt_conn *conn, const struct bt_gatt_attr *attr
 	 * the error code “Insufficient Encryption”.
 	 */
 
-	if (mask & (BT_GATT_PERM_ENCRYPT_MASK | BT_GATT_PERM_AUTHEN_MASK)) {
+	if (mask &
+	    (BT_GATT_PERM_ENCRYPT_MASK | BT_GATT_PERM_AUTHEN_MASK | BT_GATT_PERM_LESC_MASK)) {
 #if defined(CONFIG_BT_SMP)
 		if (!conn->encrypt) {
 			if (bt_conn_ltk_present(conn)) {
@@ -3909,7 +3910,7 @@ static uint16_t parse_include(struct bt_conn *conn, const void *pdu,
 			   struct bt_gatt_discover_params *params,
 			   uint16_t length)
 {
-	const struct bt_att_read_type_rsp *rsp = pdu;
+	const struct bt_att_read_type_rsp *rsp;
 	uint16_t handle = 0U;
 	struct bt_gatt_include value;
 	union {
@@ -3917,6 +3918,13 @@ static uint16_t parse_include(struct bt_conn *conn, const void *pdu,
 		struct bt_uuid_16 u16;
 		struct bt_uuid_128 u128;
 	} u;
+
+	if (length < sizeof(*rsp)) {
+		LOG_WRN("Parse err");
+		goto done;
+	}
+
+	rsp = pdu;
 
 	/* Data can be either in UUID16 or UUID128 */
 	switch (rsp->len) {
@@ -4002,13 +4010,20 @@ static uint16_t parse_characteristic(struct bt_conn *conn, const void *pdu,
 				  struct bt_gatt_discover_params *params,
 				  uint16_t length)
 {
-	const struct bt_att_read_type_rsp *rsp = pdu;
+	const struct bt_att_read_type_rsp *rsp;
 	uint16_t handle = 0U;
 	union {
 		struct bt_uuid uuid;
 		struct bt_uuid_16 u16;
 		struct bt_uuid_128 u128;
 	} u;
+
+	if (length < sizeof(*rsp)) {
+		LOG_WRN("Parse err");
+		goto done;
+	}
+
+	rsp = pdu;
 
 	/* Data can be either in UUID16 or UUID128 */
 	switch (rsp->len) {
@@ -4083,7 +4098,7 @@ static uint16_t parse_read_std_char_desc(struct bt_conn *conn, const void *pdu,
 					 struct bt_gatt_discover_params *params,
 					 uint16_t length)
 {
-	const struct bt_att_read_type_rsp *rsp = pdu;
+	const struct bt_att_read_type_rsp *rsp;
 	uint16_t handle = 0U;
 	uint16_t uuid_val;
 
@@ -4092,6 +4107,13 @@ static uint16_t parse_read_std_char_desc(struct bt_conn *conn, const void *pdu,
 	}
 
 	uuid_val = BT_UUID_16(params->uuid)->val;
+
+	if (length < sizeof(*rsp)) {
+		LOG_WRN("Parse err");
+		goto done;
+	}
+
+	rsp = pdu;
 
 	/* Parse characteristics found */
 	for (length--, pdu = rsp->data; length >= rsp->len;
@@ -4102,8 +4124,15 @@ static uint16_t parse_read_std_char_desc(struct bt_conn *conn, const void *pdu,
 			struct bt_gatt_cep cep;
 			struct bt_gatt_scc scc;
 		} value;
-		const struct bt_att_data *data = pdu;
+		const struct bt_att_data *data;
 		struct bt_gatt_attr attr;
+
+		if (length < sizeof(*data)) {
+			LOG_WRN("Parse err dat");
+			goto done;
+		}
+
+		data = pdu;
 
 		handle = sys_le16_to_cpu(data->handle);
 		/* Handle 0 is invalid */
@@ -4113,17 +4142,39 @@ static uint16_t parse_read_std_char_desc(struct bt_conn *conn, const void *pdu,
 
 		switch (uuid_val) {
 		case BT_UUID_GATT_CEP_VAL:
+			if (length < sizeof(*data) + sizeof(uint16_t)) {
+				LOG_WRN("Parse err cep");
+				goto done;
+			}
+
 			value.cep.properties = sys_get_le16(data->value);
 			break;
 		case BT_UUID_GATT_CCC_VAL:
+			if (length < sizeof(*data) + sizeof(uint16_t)) {
+				LOG_WRN("Parse err ccc");
+				goto done;
+			}
+
 			value.ccc.flags = sys_get_le16(data->value);
 			break;
 		case BT_UUID_GATT_SCC_VAL:
+			if (length < sizeof(*data) + sizeof(uint16_t)) {
+				LOG_WRN("Parse err scc");
+				goto done;
+			}
+
 			value.scc.flags = sys_get_le16(data->value);
 			break;
 		case BT_UUID_GATT_CPF_VAL:
 		{
-			struct gatt_cpf *cpf = (struct gatt_cpf *)data->value;
+			struct gatt_cpf *cpf;
+
+			if (length < sizeof(*data) + sizeof(*cpf)) {
+				LOG_WRN("Parse err cpf");
+				goto done;
+			}
+
+			cpf = (void *)data->value;
 
 			value.cpf.format = cpf->format;
 			value.cpf.exponent = cpf->exponent;
@@ -4226,13 +4277,20 @@ static uint16_t parse_service(struct bt_conn *conn, const void *pdu,
 				  struct bt_gatt_discover_params *params,
 				  uint16_t length)
 {
-	const struct bt_att_read_group_rsp *rsp = pdu;
+	const struct bt_att_read_group_rsp *rsp;
 	uint16_t start_handle, end_handle = 0U;
 	union {
 		struct bt_uuid uuid;
 		struct bt_uuid_16 u16;
 		struct bt_uuid_128 u128;
 	} u;
+
+	if (length < sizeof(*rsp)) {
+		LOG_WRN("Parse err");
+		goto done;
+	}
+
+	rsp = pdu;
 
 	/* Data can be either in UUID16 or UUID128 */
 	switch (rsp->len) {
@@ -4364,7 +4422,7 @@ static void gatt_find_info_rsp(struct bt_conn *conn, int err,
 			       const void *pdu, uint16_t length,
 			       void *user_data)
 {
-	const struct bt_att_find_info_rsp *rsp = pdu;
+	const struct bt_att_find_info_rsp *rsp;
 	struct bt_gatt_discover_params *params = user_data;
 	uint16_t handle = 0U;
 	uint16_t len;
@@ -4385,6 +4443,13 @@ static void gatt_find_info_rsp(struct bt_conn *conn, int err,
 	if (err) {
 		goto done;
 	}
+
+	if (length < sizeof(*rsp)) {
+		LOG_WRN("Parse err");
+		goto done;
+	}
+
+	rsp = pdu;
 
 	/* Data can be either in UUID16 or UUID128 */
 	switch (rsp->format) {
@@ -4991,7 +5056,7 @@ static void gatt_prepare_write_rsp(struct bt_conn *conn, int err,
 				   void *user_data)
 {
 	struct bt_gatt_write_params *params = user_data;
-	const struct bt_att_prepare_write_rsp *rsp = pdu;
+	const struct bt_att_prepare_write_rsp *rsp;
 	size_t len;
 	bool data_valid;
 
@@ -5002,6 +5067,13 @@ static void gatt_prepare_write_rsp(struct bt_conn *conn, int err,
 		params->func(conn, att_err_from_int(err), params);
 		return;
 	}
+
+	if (length < sizeof(*rsp)) {
+		LOG_WRN("Parse err");
+		goto fail;
+	}
+
+	rsp = pdu;
 
 	len = length - sizeof(*rsp);
 	if (len > params->length) {
