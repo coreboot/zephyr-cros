@@ -18,6 +18,10 @@ the :ref:`release notes<zephyr_3.7>`.
 Build System
 ************
 
+* Completely overhauled the way SoCs and boards are defined. This requires all
+  out-of-tree SoCs and boards to be ported to the new model. See the
+  :ref:`hw_model_v2` for more detailed information.
+
 Kernel
 ******
 
@@ -35,6 +39,34 @@ zcbor
 
 Device Drivers and Devicetree
 *****************************
+
+* The :dtcompatible:`nxp,kinetis-pit` pit driver has changed it's compatible
+  to :dtcompatible:`nxp,pit` and has been updated to support multiple channels.
+  To configure the individual channels, you must add a child node with the
+  compatible :dtcompatible:`nxp,pit-channel` and configure as below.
+  The :kconfig:option:`CONFIG_COUNTER_MCUX_PIT` has also been renamed to
+  :kconfig:option:`CONFIG_COUNTER_NXP_PIT` with regards to the renaming
+  of the binding for the pit.
+  example:
+
+  .. code-block:: devicetree
+
+    / {
+        pit0: pit@40037000 {
+            /* Other Pit DT Attributes */
+            compatible = "nxp,pit";
+            status = "disabled";
+            num-channels = <1>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            pit0_channel0: pit0_channel@0 {
+                compatible = "nxp,pit-channel";
+                reg = <0>;
+                status = "disabled";
+            };
+    };
+
 
 Analog-to-Digital Converter (ADC)
 =================================
@@ -91,6 +123,12 @@ Input
 Interrupt Controller
 ====================
 
+LED Strip
+=========
+
+* The property ``in-gpios`` defined in :dtcompatible:`worldsemi,ws2812-gpio` has been
+  renamed to ``gpios``.
+
 Sensors
 =======
 
@@ -109,6 +147,14 @@ Bluetooth Mesh
 Bluetooth Audio
 ===============
 
+Bluetooth Classic
+=================
+
+* The source files of Host BR/EDR have been moved to ``subsys/bluetooth/host/classic``.
+  The Header files of Host BR/EDR have been moved to ``include/zephyr/bluetooth/classic``.
+  Removed the :kconfig:option:`CONFIG_BT_BREDR`. It is replaced by new option
+  :kconfig:option:`CONFIG_BT_CLASSIC`. (:github:`69651`)
+
 Networking
 **********
 
@@ -116,6 +162,13 @@ Networking
   and test duration (time_in_us and client_time_in_us), instead of 32 bits. This will make
   the long-duration zperf test show with correct throughput result.
   (:github:`69500`)
+
+* Each IPv4 address assigned to a network interface has an IPv4 netmask
+  tied to it instead of being set for the whole interface.
+  If there is only one IPv4 address specified for a network interface,
+  nothing changes from the user point of view. But, if there is more than
+  one IPv4 address / network interface, the netmask must be specified
+  for each IPv4 address separately. (:github:`68419`)
 
 Other Subsystems
 ****************
@@ -137,6 +190,12 @@ Userspace
 
 Architectures
 *************
+
+* x86
+
+  * Kconfigs ``CONFIG_DISABLE_SSBD`` and ``CONFIG_ENABLE_EXTENDED_IBRS``
+    are deprecated. Use :kconfig:option:`CONFIG_X86_DISABLE_SSBD` and
+    :kconfig:option:`CONFIG_X86_ENABLE_EXTENDED_IBRS` instead.
 
 Xtensa
 ======
