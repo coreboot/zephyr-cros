@@ -42,8 +42,6 @@ static struct log_backend_net_ctx {
 	.sock = -1,
 };
 
-const struct log_backend *log_backend_net_get(void);
-
 static int line_out(uint8_t *data, size_t length, void *output_ctx)
 {
 	struct log_backend_net_ctx *ctx = (struct log_backend_net_ctx *)output_ctx;
@@ -192,7 +190,7 @@ static int format_set(const struct log_backend *const backend, uint32_t log_type
 	return 0;
 }
 
-bool log_backend_net_set_addr(const char *addr)
+static bool check_net_init_done(void)
 {
 	bool ret = false;
 
@@ -217,9 +215,18 @@ bool log_backend_net_set_addr(const char *addr)
 
 		ctx->sock = -1;
 
-		if (!ret) {
-			return ret;
-		}
+		return ret;
+	}
+
+	return true;
+}
+
+bool log_backend_net_set_addr(const char *addr)
+{
+	bool ret = check_net_init_done();
+
+	if (!ret) {
+		return ret;
 	}
 
 	net_sin(&server_addr)->sin_port = htons(514);
@@ -233,6 +240,27 @@ bool log_backend_net_set_addr(const char *addr)
 	return ret;
 }
 
+bool log_backend_net_set_ip(const struct sockaddr *addr)
+{
+	bool ret = check_net_init_done();
+
+	if (!ret) {
+		return ret;
+	}
+
+	if ((IS_ENABLED(CONFIG_NET_IPV4) && addr->sa_family == AF_INET) ||
+	    (IS_ENABLED(CONFIG_NET_IPV6) && addr->sa_family == AF_INET6)) {
+		memcpy(&server_addr, addr, sizeof(server_addr));
+
+		net_port_set_default(&server_addr, 514);
+	} else {
+		LOG_ERR("Unknown address family");
+		return false;
+	}
+
+	return ret;
+}
+
 #if defined(CONFIG_NET_HOSTNAME_ENABLE)
 void log_backend_net_hostname_set(char *hostname, size_t len)
 {
@@ -240,6 +268,15 @@ void log_backend_net_hostname_set(char *hostname, size_t len)
 	log_output_hostname_set(&log_output_net, dev_hostname);
 }
 #endif
+
+void log_backend_net_start(void)
+{
+	const struct log_backend *backend = log_backend_net_get();
+
+	if (!log_backend_is_active(backend)) {
+		log_backend_activate(backend, backend->cb->ctx);
+	}
+}
 
 static void init_net(struct log_backend const *const backend)
 {
