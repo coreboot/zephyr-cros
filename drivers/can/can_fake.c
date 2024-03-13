@@ -103,9 +103,9 @@ static const struct can_driver_api fake_can_driver_api = {
 	.add_rx_filter = fake_can_add_rx_filter,
 	.remove_rx_filter = fake_can_remove_rx_filter,
 	.get_state = fake_can_get_state,
-#ifndef CONFIG_CAN_AUTO_BUS_OFF_RECOVERY
+#ifdef CONFIG_CAN_MANUAL_RECOVERY_MODE
 	.recover = fake_can_recover,
-#endif /* CONFIG_CAN_AUTO_BUS_OFF_RECOVERY */
+#endif /* CONFIG_CAN_MANUAL_RECOVERY_MODE */
 	.set_state_change_callback = fake_can_set_state_change_callback,
 	.get_core_clock = fake_can_get_core_clock,
 	.get_max_filters = fake_can_get_max_filters,
@@ -144,7 +144,7 @@ static const struct can_driver_api fake_can_driver_api = {
 
 #define FAKE_CAN_INIT(inst)						     \
 	static const struct fake_can_config fake_can_config_##inst = {	     \
-		.common = CAN_DT_DRIVER_CONFIG_INST_GET(inst, 0U),	     \
+		.common = CAN_DT_DRIVER_CONFIG_INST_GET(inst, 0, 0),	     \
 	};								     \
 									     \
 	static struct fake_can_data fake_can_data_##inst;		     \

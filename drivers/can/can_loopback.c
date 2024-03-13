@@ -340,21 +340,6 @@ static int can_loopback_get_state(const struct device *dev, enum can_state *stat
 	return 0;
 }
 
-#ifndef CONFIG_CAN_AUTO_BUS_OFF_RECOVERY
-static int can_loopback_recover(const struct device *dev, k_timeout_t timeout)
-{
-	struct can_loopback_data *data = dev->data;
-
-	ARG_UNUSED(timeout);
-
-	if (!data->common.started) {
-		return -ENETDOWN;
-	}
-
-	return 0;
-}
-#endif /* CONFIG_CAN_AUTO_BUS_OFF_RECOVERY */
-
 static void can_loopback_set_state_change_callback(const struct device *dev,
 						   can_state_change_callback_t cb,
 						   void *user_data)
@@ -388,9 +373,6 @@ static const struct can_driver_api can_loopback_driver_api = {
 	.add_rx_filter = can_loopback_add_rx_filter,
 	.remove_rx_filter = can_loopback_remove_rx_filter,
 	.get_state = can_loopback_get_state,
-#ifndef CONFIG_CAN_AUTO_BUS_OFF_RECOVERY
-	.recover = can_loopback_recover,
-#endif
 	.set_state_change_callback = can_loopback_set_state_change_callback,
 	.get_core_clock = can_loopback_get_core_clock,
 	.get_max_filters = can_loopback_get_max_filters,
@@ -458,7 +440,7 @@ static int can_loopback_init(const struct device *dev)
 
 #define CAN_LOOPBACK_INIT(inst)							\
 	static const struct can_loopback_config can_loopback_config_##inst = {	\
-		.common = CAN_DT_DRIVER_CONFIG_INST_GET(inst, 0U),		\
+		.common = CAN_DT_DRIVER_CONFIG_INST_GET(inst, 0, 0),		\
 	};									\
 										\
 	static struct can_loopback_data can_loopback_data_##inst;		\
