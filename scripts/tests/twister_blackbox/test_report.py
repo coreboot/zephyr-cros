@@ -7,15 +7,14 @@ Blackbox tests for twister's command line functions
 """
 
 import importlib
-import re
-
+import json
 import mock
 import os
-import shutil
 import pytest
+import shutil
 import sys
+
 from lxml import etree
-import json
 
 from conftest import TEST_DATA, ZEPHYR_BASE, testsuite_filename_mock
 from twisterlib.testplan import TestPlan
@@ -105,25 +104,6 @@ class TestReport:
             os.path.join(TEST_DATA, 'tests', 'dummy', 'agnostic'),
             ['qemu_x86'],
             "TEST_LOG_FILE.log"
-        ),
-    ]
-    TESTDATA_7 = [
-        (
-            os.path.join(TEST_DATA, 'tests', 'dummy', 'agnostic'),
-            ['qemu_x86'],
-            [
-                'coverage.log', 'coverage.json',
-                'coverage'
-            ],
-        ),
-    ]
-    TESTDATA_8 = [
-        (
-            os.path.join(TEST_DATA, 'tests', 'dummy', 'agnostic'),
-            ['qemu_x86'],
-            [
-                'GCOV_COVERAGE_DUMP_START', 'GCOV_COVERAGE_DUMP_END'
-            ],
         ),
     ]
 
@@ -353,14 +333,14 @@ class TestReport:
         assert str(sys_exit.value) == '0'
 
     @pytest.mark.parametrize(
-        'test_path, test_platforms, file_name',
-        TESTDATA_7,
-        ids=[
-            'coverage',
-        ]
+        'test_path, expected_testcase_count',
+        [(os.path.join(TEST_DATA, 'tests', 'dummy'), 6),],
+        ids=['dummy tests']
     )
-    def test_coverage(self, capfd, test_path, test_platforms, out_path, file_name):
-        args = ['-i','--outdir', out_path, '-T', test_path, '--coverage', '--coverage-tool', 'gcovr'] + \
+    def test_detailed_skipped_report(self, out_path, test_path, expected_testcase_count):
+        test_platforms = ['qemu_x86', 'frdm_k64f']
+        args = ['-i', '--outdir', out_path, '-T', test_path] + \
+               ['--detailed-skipped-report'] + \
                [val for pair in zip(
                    ['-p'] * len(test_platforms), test_platforms
                ) for val in pair]
@@ -369,25 +349,24 @@ class TestReport:
                 pytest.raises(SystemExit) as sys_exit:
             self.loader.exec_module(self.twister_module)
 
-        out, err = capfd.readouterr()
-        sys.stdout.write(out)
-        sys.stderr.write(err)
-
-        for f_name in file_name:
-            path = os.path.join(out_path, f_name)
-            assert os.path.exists(path), f'file not found {f_name}'
-
         assert str(sys_exit.value) == '0'
 
-    @pytest.mark.parametrize(
-        'test_path, test_platforms, expected',
-        TESTDATA_8,
-        ids=[
-            'enable_coverage',
-        ]
-    )
-    def test_enable_coverage(self, capfd, test_path, test_platforms, out_path, expected):
-        args = ['-i','--outdir', out_path, '-T', test_path, '--enable-coverage', '-vv'] + \
+        testsuite_counter = 0
+        xml_data = etree.parse(os.path.join(out_path, 'twister_report.xml')).getroot()
+        for ts in xml_data.iter('testsuite'):
+            testsuite_counter += 1
+            # Without the tested flag, filtered testcases would be missing from the report
+            assert len(list(ts.iter('testcase'))) == expected_testcase_count, \
+                   'Not all expected testcases appear in the report.'
+
+        assert testsuite_counter == len(test_platforms), \
+               'Some platforms are missing from the XML report.'
+
+    def test_enable_size_report(self, out_path):
+        test_platforms = ['qemu_x86', 'frdm_k64f']
+        path = os.path.join(TEST_DATA, 'tests', 'dummy', 'device', 'group')
+        args = ['-i', '--outdir', out_path, '-T', path] + \
+               ['--enable-size-report'] + \
                [val for pair in zip(
                    ['-p'] * len(test_platforms), test_platforms
                ) for val in pair]
@@ -396,12 +375,25 @@ class TestReport:
                 pytest.raises(SystemExit) as sys_exit:
             self.loader.exec_module(self.twister_module)
 
-        out, err = capfd.readouterr()
-        sys.stdout.write(out)
-        sys.stderr.write(err)
-
-        for line in expected:
-            match = re.search(line, err)
-            assert match, f'line not found: {line}'
-
         assert str(sys_exit.value) == '0'
+
+        with open(os.path.join(out_path, 'twister.json')) as f:
+            j = json.load(f)
+
+        expected_rel_path = os.path.relpath(os.path.join(path, 'dummy.device.group'), ZEPHYR_BASE)
+
+        # twister.json will contain [used/available]_[ram/rom] keys if the flag works
+        # except for those keys that would have values of 0.
+        # In this testcase, availables are equal to 0, so they are missing.
+        assert all(
+            [
+                'used_ram' in ts for ts in j['testsuites'] \
+                if ts['name'] == expected_rel_path and not 'reason' in ts
+            ]
+        )
+        assert all(
+            [
+                'used_rom' in ts for ts in j['testsuites'] \
+                if ts['name'] == expected_rel_path and not 'reason' in ts
+            ]
+        )

@@ -24,6 +24,7 @@
 	};
 
 	aliases {
+		rtc = &rtc;
 		watchdog0 = &wdt0;
 	};
 
@@ -133,6 +134,11 @@
 	status = "okay";
 };
 
+&rtc {
+	clocks = <&clocks RPI_PICO_CLKID_CLK_RTC>;
+	status = "okay";
+};
+
 &adc {
 	status = "okay";
 	pinctrl-0 = <&adc_default>;
@@ -157,3 +163,4 @@ zephyr_udc0: &usbd {
 pico_spi: &spi0 {};
 pico_i2c0: &i2c0 {};
 pico_i2c1: &i2c1 {};
+pico_serial: &uart0 {};

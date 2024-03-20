@@ -48,10 +48,24 @@
 /* --- General Control (GCTRL) --- */
 #define IT8XXX2_GCTRL_BASE      0x00F02000
 #define IT8XXX2_GCTRL_EIDSR     ECREG(IT8XXX2_GCTRL_BASE + 0x31)
+#define IT8XXX2_GCTRL_PMER3     ECREG(IT8XXX2_GCTRL_BASE + 0x46)
+/* RISC-V JTAG Debug Interface Enable */
+#define IT8XXX2_GCTRL_JTAGEN    BIT(1)
+/* RISC-V JTAG Debug Interface Selection */
+#define IT8XXX2_GCTRL_JTAGSEL   BIT(0)
+#define IT8XXX2_GCTRL_JTAG      (IT8XXX2_GCTRL_JTAGEN | IT8XXX2_GCTRL_JTAGSEL)
 
 /* --- External GPIO Control (EGPIO) --- */
 #define IT8XXX2_EGPIO_BASE      0x00F02100
 #define IT8XXX2_EGPIO_EGCR      ECREG(IT8XXX2_EGPIO_BASE + 0x04)
+
+#ifdef CONFIG_SOC_IT8XXX2_REG_SET_V2
+#define IT8XXX2_JTAG_PINS_BASE  ECREG(0xF01660)
+#define IT8XXX2_JTAG_VOLT_SET   ECREG(0xF01648)
+#elif CONFIG_SOC_IT8XXX2_REG_SET_V1
+#define IT8XXX2_JTAG_PINS_BASE  ECREG(0xF01610)
+#define IT8XXX2_JTAG_VOLT_SET   ECREG(0xF016e9)
+#endif
 
 /* EGPIO register fields */
 /*
@@ -1419,8 +1433,6 @@ enum chip_pll_mode {
 #define IT8XXX2_I2C_IDR_CLR           BIT(2)
 #define IT8XXX2_I2C_SLVDATAFLG        BIT(1)
 #define IT8XXX2_I2C_P_CLR             BIT(0)
-#define IT8XXX2_I2C_INT_ANY           (IT8XXX2_I2C_CNT_HOLD | IT8XXX2_I2C_IDW_CLR | \
-				       IT8XXX2_I2C_IDR_CLR | IT8XXX2_I2C_SLVDATAFLG)
 /* 0x13: Nack Status */
 #define IT8XXX2_I2C_NST_CNS           BIT(7)
 #define IT8XXX2_I2C_NST_ID_NACK       BIT(3)

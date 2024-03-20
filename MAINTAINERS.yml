@@ -150,16 +150,14 @@ ARC arch:
 ARM arch:
   status: maintained
   maintainers:
-    - microbuilder
+    - ithinuel
   collaborators:
+    - microbuilder
     - carlocaione
     - galak
     - MaureenHelm
     - stephanosio
     - bbolen
-    - povergoing
-    - ithinuel
-    - sgrrzhf
   files:
     - arch/arm/
     - arch/arm/core/offsets/
@@ -437,7 +435,6 @@ Bluetooth Audio:
     - Casper-Bonde-Bose
     - MariuszSkamra
     - sjanc
-    - szymon-czapracki
     - asbjornsabo
     - fredrikdanebjer
     - kruithofa
@@ -463,15 +460,8 @@ Bluetooth Classic:
     - jhedberg
     - sjanc
   files:
-    - subsys/bluetooth/host/a2dp*
-    - subsys/bluetooth/host/at.*
-    - subsys/bluetooth/host/avdtp*
-    - subsys/bluetooth/host/br.*
-    - subsys/bluetooth/host/hfp*
-    - subsys/bluetooth/host/l2cap_br*
-    - subsys/bluetooth/host/rfcomm*
-    - subsys/bluetooth/host/sdp*
-    - subsys/bluetooth/host/ssp*
+    - subsys/bluetooth/host/classic/
+    - include/zephyr/bluetooth/classic/
   labels:
     - "area: Bluetooth Classic"
   tests:
@@ -524,7 +514,7 @@ Board/SoC configuration:
     - "57300"
   files:
     - soc/Kconfig*
-    - boards/Kconfig
+    - boards/Kconfig*
   labels:
     - "area: Board/SoC configuration"
 
@@ -967,7 +957,6 @@ Release Notes:
     - henrikbrixandersen
   collaborators:
     - alexanderwachter
-    - karstenkoenig
     - martinjaeger
     - str4t0m
   files:
@@ -1115,9 +1104,12 @@ Release Notes:
   status: maintained
   maintainers:
     - kv2019i
+    - LaurentiuM1234
   collaborators:
     - lgirdwood
     - juimonen
+    - iuliana-prodan
+    - dbaluta
   files:
     - drivers/dai/
     - doc/hardware/peripherals/audio/dai.rst
@@ -1566,6 +1558,7 @@ Release Notes:
     - simonguinot
   collaborators:
     - soburi
+    - thedjnK
   files:
     - drivers/led_strip/
     - dts/bindings/led_strip/
@@ -2378,6 +2371,7 @@ LoRa and LoRaWAN:
     - "area: LoRa"
   tests:
     - sample.driver.lora
+    - lorawan
 
 MAINTAINERS file:
   status: maintained
@@ -2447,6 +2441,8 @@ Modem:
   status: maintained
   maintainers:
     - bjarki-trackunit
+  collaborators:
+    - tomi-font
   files:
     - subsys/modem/
     - include/zephyr/modem/
@@ -2479,6 +2475,7 @@ hawkBit:
   status: odd fixes
   collaborators:
     - ycsin
+    - maass-hamburg
   files:
     - subsys/mgmt/hawkbit/
     - include/zephyr/mgmt/hawkbit.h
@@ -2556,10 +2553,12 @@ Networking:
     - include/zephyr/net/ieee802154*.h
     - include/zephyr/net/wifi*.h
     - include/zephyr/net/buf.h
+    - include/zephyr/net/dhcpv4*.h
     - samples/net/gptp/
     - samples/net/sockets/coap_*/
     - samples/net/lwm2m_client/
     - samples/net/wifi/
+    - samples/net/dhcpv4_client/
     - subsys/net/buf*.c
     - subsys/net/l2/ethernet/gptp/
     - subsys/net/l2/ieee802154/
@@ -2568,6 +2567,8 @@ Networking:
     - subsys/net/lib/config/ieee802154*
     - subsys/net/lib/lwm2m/
     - subsys/net/lib/tls_credentials/
+    - subsys/net/lib/dhcpv4/
+    - tests/net/dhcpv4/
     - tests/net/ieee802154/
     - tests/net/wifi/
   labels:
@@ -2576,8 +2577,8 @@ Networking:
     - net
 
 "Networking: BSD sockets":
-  status: odd fixes
-  collaborators:
+  status: maintained
+  maintainers:
     - rlubos
     - jukkar
   files:
@@ -2585,6 +2586,7 @@ Networking:
     - subsys/net/lib/sockets/
     - tests/net/socket/
   labels:
+    - "area: Networking"
     - "area: Sockets"
   tests:
     - net.socket
@@ -2638,6 +2640,24 @@ Networking:
     - "area: Networking"
   tests:
     - net.coap
+
+"Networking: DHCPv4":
+  status: maintained
+  maintainers:
+    - rlubos
+    - jukkar
+  collaborators:
+    - maass-hamburg
+  files:
+    - subsys/net/lib/dhcpv4/
+    - samples/net/dhcpv4_client/
+    - tests/net/dhcpv4/
+    - include/zephyr/net/dhcpv4*.h
+  labels:
+    - "area: Networking"
+  tests:
+    - net.dhcpv4_client
+    - net.dhcpv4_server
 
 "Networking: gPTP":
   status: maintained
@@ -2866,12 +2886,14 @@ RISCV arch:
     - boards/qemu/riscv*/
     - boards/sifive/
     - boards/sparkfun/red_v_things_plus/
+    - boards/starfive/
     - dts/bindings/riscv/
     - dts/riscv/
     - include/zephyr/arch/riscv/
     - soc/common/riscv-privileged/
     - soc/sifive/
     - soc/riscv/
+    - soc/starfive/
     - tests/arch/riscv/
     - doc/hardware/arch/risc-v.rst
     - drivers/interrupt_controller/intc_plic.c
@@ -3308,9 +3330,12 @@ NXP Platforms (MCU):
     - boards/nxp/lpcxpress*/
     - boards/nxp/twr_*/
     - boards/nxp/vmu*/
+    - boards/nxp/*rw*/
     - soc/nxp/imxrt/
     - soc/nxp/kinetis/
     - soc/nxp/lpc/
+    - soc/nxp/rw/
+    - soc/nxp/mcx/
     - dts/arm/nxp/
     - samples/boards/nxp*/
   files-regex-exclude:
@@ -3348,7 +3373,7 @@ NXP Platforms (S32):
 NXP Platforms (MPU):
   status: maintained
   maintainers:
-    - dleach
+    - dleach02
   collaborators:
     - JiafeiPan
     - dbaluta
@@ -3437,6 +3462,7 @@ Renesas SmartBond Platforms:
   files:
     - boards/renesas/da14*/
     - drivers/*/*smartbond*
+    - drivers/pinctrl/renesas/smartbond/
     - dts/arm/renesas/smartbond/
     - dts/bindings/*/renesas,smartbond*
     - soc/renesas/smartbond/
@@ -3453,6 +3479,7 @@ Renesas RA Platforms:
   files:
     - boards/arduino/uno_r4_minima/
     - drivers/*/*renesas_ra*
+    - drivers/pinctrl/renesas/ra/
     - dts/arm/renesas/ra/
     - dts/bindings/*/*renesas,ra*
     - soc/renesas/ra/
@@ -3469,6 +3496,7 @@ Renesas RZ Platforms:
   files:
     - boards/renesas/rzt2m_*/
     - drivers/*/*rzt2m*
+    - drivers/pinctrl/renesas/rz/
     - dts/arm/renesas/rz/
     - dts/bindings/*/*rzt2m*
     - soc/renesas/rzt2m/
@@ -3486,10 +3514,10 @@ Renesas R-Car Platforms:
   collaborators:
     - xakep-amatop
   files:
-    - dts/arm/renesas/rcar/
     - boards/renesas/rcar_*/
     - drivers/*/*rcar*
     - drivers/clock_control/*cpg_mssr*
+    - drivers/pinctrl/renesas/rcar/
     - dts/arm/renesas/rcar/
     - dts/arm64/renesas/
     - dts/bindings/*/*rcar*
@@ -4608,6 +4636,7 @@ Xtensa arch:
     - soc/cdns/dc233c/
     - soc/cdns/dc233c/
     - soc/cdns/xtensa_sample_controller/
+    - tests/arch/xtensa/
   labels:
     - "area: Xtensa"
 

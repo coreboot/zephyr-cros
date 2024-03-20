@@ -852,10 +852,13 @@ config BT_CTLR_SYNC_ISO_PDU_LEN_MAX
 endif # BT_CTLR_ADV_EXT
 
 config BT_CTLR_SET_HOST_FEATURE
-	bool "LE Set Host Feature Command [EXPERIMENTAL]"
-	select EXPERIMENTAL
+	bool "LE Set Host Feature Command" if !BT_LL_SW_SPLIT
 	help
 	  Enables optional LE Set Host Feature Command
+
+config BT_CTLR_SET_HOST_FEATURE
+	bool "LE Set Host Feature Command (Split Link Layer) [EXPERIMENTAL]" if BT_LL_SW_SPLIT
+	select EXPERIMENTAL if BT_LL_SW_SPLIT
 
 config BT_CTLR_CENTRAL_ISO
 	bool "LE Connected Isochronous Stream Central" if !BT_LL_SW_SPLIT
@@ -991,6 +994,14 @@ config BT_CTLR_ASSERT_HANDLER
 	  application code as void \"bt_ctlr_assert_handle(char \*, int)\"
 	  and will be invoked whenever the controller code encounters
 	  an unrecoverable error.
+
+config BT_CTLR_VS_SCAN_REQ_RX
+	bool "Use scan request reporting"
+	depends on BT_HCI_VS_EXT && !BT_CTLR_ADV_EXT
+	select BT_HCI_VS_EVT
+	select BT_CTLR_SCAN_REQ_NOTIFY
+	help
+	  Enables usage of VS Scan Request Reports Command and Scan Request Received Event
 
 endif # BT_CTLR
 
