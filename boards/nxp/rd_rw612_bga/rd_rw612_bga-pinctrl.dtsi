@@ -13,4 +13,22 @@
 			slew-rate = "normal";
 		};
 	};
+
+	pinmux_flexcomm0_spi: pinmux_flexcomm0_spi {
+		group0 {
+			pinmux = <IO_MUX_FC0_SPI_SS0_IO0>,
+				<IO_MUX_FC0_SPI_SS0_IO2>,
+				<IO_MUX_FC0_SPI_SS0_IO3>,
+				<IO_MUX_FC0_SPI_SS0_IO4>;
+			slew-rate = "ultra";
+		};
+	};
+
+	pinmux_flexcomm2_i2c: pinmux_flexcomm2_i2c {
+		group0 {
+			pinmux = <IO_MUX_FC2_I2C_16_17>;
+			slew-rate = "normal";
+			bias-pull-up;
+		};
+	};
 };

@@ -86,6 +86,7 @@ uint8_t ll_big_sync_create(uint8_t big_handle, uint16_t sync_handle,
 	struct node_rx_hdr *node_rx;
 	struct ll_sync_set *sync;
 	struct lll_sync_iso *lll;
+	int8_t last_index;
 
 	sync = ull_sync_is_enabled_get(sync_handle);
 	if (!sync || sync->iso.sync_iso) {
@@ -107,11 +108,29 @@ uint8_t ll_big_sync_create(uint8_t big_handle, uint16_t sync_handle,
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
-	/* TODO: Check parameters */
+	/* TODO: Check remaining parameters */
+
+	/* Check BIS indices */
+	last_index = -1;
+	for (uint8_t i = 0U; i < num_bis; i++) {
+		/* Stream index must be in valid range and in ascending order */
+		if (!IN_RANGE(bis[i], 0x01, 0x1F) || (bis[i] <= last_index)) {
+			return BT_HCI_ERR_INVALID_PARAM;
+
+		} else if (bis[i] > sync->num_bis) {
+			return BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+		}
+		last_index = bis[i];
+	}
+
+	/* Check if requested encryption matches */
+	if (encryption != sync->enc) {
+		return BT_HCI_ERR_ENC_MODE_NOT_ACCEPTABLE;
+	}
 
 	/* Check if free BISes available */
 	if (mem_free_count_get(stream_free) < num_bis) {
-		return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
+		return BT_HCI_ERR_INSUFFICIENT_RESOURCES;
 	}
 
 	link_sync_estab = ll_rx_link_alloc();
@@ -790,16 +809,34 @@ uint32_t ull_big_sync_delay(const struct lll_sync_iso *lll_iso)
 			lll_iso->phy);
 }
 
+static void disable(uint8_t sync_idx)
+{
+	struct ll_sync_iso_set *sync_iso;
+	int err;
+
+	sync_iso = &ll_sync_iso[sync_idx];
+
+	err = ull_ticker_stop_with_mark(TICKER_ID_SCAN_SYNC_ISO_BASE +
+					sync_idx, sync_iso, &sync_iso->lll);
+	LL_ASSERT(err == 0 || err == -EALREADY);
+}
+
 static int init_reset(void)
 {
-	/* Add initializations common to power up initialization and HCI reset
-	 * initializations.
-	 */
+	uint8_t idx;
+
+	/* Disable all active BIGs (uses blocking ull_ticker_stop_with_mark) */
+	for (idx = 0U; idx < CONFIG_BT_CTLR_SCAN_SYNC_ISO_SET; idx++) {
+		disable(idx);
+	}
 
 	mem_init((void *)stream_pool, sizeof(struct lll_sync_iso_stream),
 		 CONFIG_BT_CTLR_SYNC_ISO_STREAM_COUNT, &stream_free);
 
-	return 0;
+	memset(&ll_sync_iso, 0, sizeof(ll_sync_iso));
+
+	/* Initialize LLL */
+	return lll_sync_iso_init();
 }
 
 static struct ll_sync_iso_set *sync_iso_get(uint8_t handle)

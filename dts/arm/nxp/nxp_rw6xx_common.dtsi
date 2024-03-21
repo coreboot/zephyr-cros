@@ -7,6 +7,7 @@
 #include <zephyr/dt-bindings/clock/mcux_lpc_syscon_clock.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
+#include <dt-bindings/i2c/i2c.h>
 
 / {
 	cpus {
@@ -144,6 +145,15 @@
 			<35 2>, <36 2>, <37 2>, <38 2>;
 		num-lines = <8>;
 		num-inputs = <64>;
+	};
+
+	dma0: dma-controller@104000 {
+		compatible = "nxp,lpc-dma";
+		reg = <0x104000 0x1000>;
+		interrupts = <1 0>;
+		status = "disabled";
+		#dma-cells = <1>;
+		dma-channels = <33>;
 	};
 };
 
