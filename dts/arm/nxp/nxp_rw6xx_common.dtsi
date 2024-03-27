@@ -155,6 +155,119 @@
 		#dma-cells = <1>;
 		dma-channels = <33>;
 	};
+
+	ctimer0: ctimer@28000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0x28000 0x1000>;
+		interrupts = <10 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&clkctl1 MCUX_CTIMER0_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	ctimer1: ctimer@29000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0x29000 0x1000>;
+		interrupts = <11 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&clkctl1 MCUX_CTIMER1_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	ctimer2: ctimer@2a000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0x2a000 0x1000>;
+		interrupts = <39 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&clkctl1 MCUX_CTIMER2_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	ctimer3: ctimer@2b000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0x2b000 0x1000>;
+		interrupts = <13 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&clkctl1 MCUX_CTIMER3_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	mrt0: mrt@2d000 {
+		compatible = "nxp,mrt";
+		reg = <0x2d000 0x100>;
+		interrupts = <9 0>;
+		num-channels = <4>;
+		num-bits = <24>;
+		clocks = <&clkctl1 MCUX_MRT_CLK>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		mrt0_channel0: mrt0_channel@0 {
+			compatible = "nxp,mrt-channel";
+			reg = <0>;
+			status = "disabled";
+		};
+		mrt0_channel1: mrt0_channel@1 {
+			compatible = "nxp,mrt-channel";
+			reg = <1>;
+			status = "disabled";
+		};
+		mrt0_channel2: mrt0_channel@2 {
+			compatible = "nxp,mrt-channel";
+			reg = <2>;
+			status = "disabled";
+		};
+		mrt0_channel3: mrt0_channel@3 {
+			compatible = "nxp,mrt-channel";
+			reg = <3>;
+			status = "disabled";
+		};
+	};
+
+	mrt1: mrt@3f000 {
+		compatible = "nxp,mrt";
+		reg = <0x3f000 0x100>;
+		interrupts = <23 0>;
+		num-channels = <4>;
+		num-bits = <24>;
+		clocks = <&clkctl1 MCUX_FREEMRT_CLK>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		mrt1_channel0: mrt1_channel@0 {
+			compatible = "nxp,mrt-channel";
+			reg = <0>;
+			status = "disabled";
+		};
+		mrt1_channel1: mrt1_channel@1 {
+			compatible = "nxp,mrt-channel";
+			reg = <1>;
+			status = "disabled";
+		};
+		mrt1_channel2: mrt1_channel@2 {
+			compatible = "nxp,mrt-channel";
+			reg = <2>;
+			status = "disabled";
+		};
+		mrt1_channel3: mrt1_channel@3 {
+			compatible = "nxp,mrt-channel";
+			reg = <3>;
+			status = "disabled";
+		};
+	};
+
 };
 
 &flexspi {

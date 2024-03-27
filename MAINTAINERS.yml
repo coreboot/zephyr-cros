@@ -2176,6 +2176,7 @@ Kernel:
     - dcpleung
     - cfriedt
     - npitre
+    - TaiJuWu
   files:
     - doc/kernel/
     - include/zephyr/kernel*.h
@@ -3382,6 +3383,7 @@ NXP Platforms (MPU):
     - decsny
     - yvanderv
   files:
+    - dts/arm64/nxp/
     - soc/nxp/imx/
     - soc/nxp/layerscape/
   files-regex:
