@@ -556,6 +556,7 @@ C library:
   maintainers:
     - stephanosio
   collaborators:
+    - aescolar
     - nashif
     - keith-packard
     - cfriedt
@@ -2456,6 +2457,15 @@ Modem:
   tests:
     - modem
 
+Modem Modules:
+  status: maintained
+  maintainers:
+    - bjarki-trackunit
+  files:
+    - subsys/modem/
+    - include/zephyr/modem/
+    - tests/subsys/modem/
+
 OSDP:
   status: maintained
   maintainers:
@@ -2806,8 +2816,11 @@ nRF BSIM:
     - boards/native/nrf_bsim/
     - tests/boards/nrf52_bsim/
     - tests/bsim/
-  files-exclude:
-    - tests/bsim/*/
+    - doc/develop/test/bsim.rst
+    - .github/workflows/bsim-tests*
+  files-regex-exclude:
+    - tests\/bsim\/.*\/.*\.([ch]|conf)
+    - tests\/bsim\/.*\/(CMakeLists|Kconfig).*
   labels:
     - "platform: nRF BSIM"
   tests:
@@ -2893,8 +2906,8 @@ RISCV arch:
     - include/zephyr/arch/riscv/
     - soc/common/riscv-privileged/
     - soc/sifive/
-    - soc/riscv/
     - soc/starfive/
+    - soc/qemu/virt_riscv/
     - tests/arch/riscv/
     - doc/hardware/arch/risc-v.rst
     - drivers/interrupt_controller/intc_plic.c
@@ -2959,12 +2972,13 @@ Twister:
   maintainers:
     - nashif
   collaborators:
-    - galak
     - PerMac
     - hakehuang
     - gopiotr
     - golowanow
     - gchwier
+    - LukaszMrugala
+    - KamilxPaszkiet
   files:
     - scripts/twister
     - scripts/schemas/twister/
@@ -3126,8 +3140,8 @@ Synopsys Platforms:
     - evgeniy-paltsev
     - IRISZZW
   files:
-    - soc/synopsys/
-    - boards/synopsys/
+    - soc/snps/
+    - boards/snps/
     - samples/boards/arc_secure_services/
   labels:
     - "platform: Synopsys"
@@ -3374,9 +3388,9 @@ NXP Platforms (S32):
 NXP Platforms (MPU):
   status: maintained
   maintainers:
-    - dleach02
-  collaborators:
     - JiafeiPan
+  collaborators:
+    - dleach02
     - dbaluta
     - iuliana-prodan
     - danieldegrasse
@@ -3762,6 +3776,18 @@ Task Watchdog:
     - tests/drivers/syscon/
   tests:
     - drivers.syscon
+
+TDK Sensors:
+  status: maintained
+  maintainers:
+    - teburd
+    - MaureenHelm
+  files:
+    - drivers/sensor/tdk/
+  labels:
+    - "area: Sensors"
+  tests:
+    - drivers.sensors
 
 "Drivers: Time Aware GPIO":
   status: maintained

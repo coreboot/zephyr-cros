@@ -80,8 +80,6 @@ static struct hawkbit_context {
 	int32_t action_id;
 	uint8_t *response_data;
 	int32_t json_action_id;
-	size_t url_buffer_size;
-	size_t status_buffer_size;
 	struct hawkbit_download dl;
 	struct http_request http_req;
 	struct flash_img_context flash_ctx;
@@ -645,6 +643,16 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 
 	type = enum_for_http_req_string(userdata);
 
+	if (rsp->http_status_code != 200) {
+		LOG_ERR("HTTP request denied (%s): %d", (char *)userdata, rsp->http_status_code);
+		if (rsp->http_status_code == 401 || rsp->http_status_code == 403) {
+			hb_context.code_status = HAWKBIT_PERMISSION_ERROR;
+		} else {
+			hb_context.code_status = HAWKBIT_METADATA_ERROR;
+		}
+		return;
+	}
+
 	switch (type) {
 	case HAWKBIT_PROBE:
 		if (hb_context.dl.http_content_size == 0) {
@@ -680,12 +688,6 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 				break;
 			}
 
-			if (rsp->http_status_code / 100 == 4) {
-				LOG_ERR("HTTP request denied: %d", rsp->http_status_code);
-				hb_context.code_status = HAWKBIT_PERMISSION_ERROR;
-				break;
-			}
-
 			hb_context.response_data[hb_context.dl.downloaded_size] = '\0';
 			ret = json_obj_parse(hb_context.response_data,
 					     hb_context.dl.downloaded_size, json_ctl_res_descr,
@@ -701,10 +703,6 @@ static void response_cb(struct http_response *rsp, enum http_final_call final_da
 	case HAWKBIT_CLOSE:
 	case HAWKBIT_REPORT:
 	case HAWKBIT_CONFIG_DEVICE:
-		if (strcmp(rsp->http_status, "OK") < 0) {
-			LOG_ERR("Failed to cancel the update");
-		}
-
 		break;
 
 	case HAWKBIT_PROBE_DEPLOYMENT_BASE:
@@ -853,7 +851,7 @@ static bool send_request(enum http_method method, enum hawkbit_http_request type
 
 		ret = json_obj_encode_buf(json_cfg_descr, ARRAY_SIZE(json_cfg_descr), &cfg,
 					  hb_context.status_buffer,
-					  hb_context.status_buffer_size - 1);
+					  sizeof(hb_context.status_buffer));
 		if (ret) {
 			LOG_ERR("Can't encode the JSON script (%s): %d", "HAWKBIT_CONFIG_DEVICE",
 				ret);
@@ -885,7 +883,7 @@ static bool send_request(enum http_method method, enum hawkbit_http_request type
 
 		ret = json_obj_encode_buf(json_close_descr, ARRAY_SIZE(json_close_descr), &close,
 					  hb_context.status_buffer,
-					  hb_context.status_buffer_size - 1);
+					  sizeof(hb_context.status_buffer));
 		if (ret) {
 			LOG_ERR("Can't encode the JSON script (%s): %d", "HAWKBIT_CLOSE", ret);
 			return false;
@@ -932,7 +930,7 @@ static bool send_request(enum http_method method, enum hawkbit_http_request type
 
 		ret = json_obj_encode_buf(json_dep_fbk_descr, ARRAY_SIZE(json_dep_fbk_descr),
 					  &feedback, hb_context.status_buffer,
-					  hb_context.status_buffer_size - 1);
+					  sizeof(hb_context.status_buffer));
 		if (ret) {
 			LOG_ERR("Can't encode the JSON script (%s): %d", "HAWKBIT_REPORT", ret);
 			return ret;
@@ -1013,8 +1011,7 @@ enum hawkbit_response hawkbit_probe(void)
 	memset(hb_context.url_buffer, 0, sizeof(hb_context.url_buffer));
 	hb_context.dl.http_content_size = 0;
 	hb_context.dl.downloaded_size = 0;
-	hb_context.url_buffer_size = URL_BUFFER_SIZE;
-	snprintk(hb_context.url_buffer, hb_context.url_buffer_size, "%s/%s-%s",
+	snprintk(hb_context.url_buffer, sizeof(hb_context.url_buffer), "%s/%s-%s",
 		 HAWKBIT_JSON_URL, CONFIG_BOARD, device_id);
 	memset(&hawkbit_results.base, 0, sizeof(hawkbit_results.base));
 
@@ -1025,7 +1022,8 @@ enum hawkbit_response hawkbit_probe(void)
 		goto cleanup;
 	}
 
-	if (hb_context.code_status == HAWKBIT_METADATA_ERROR) {
+	if (hb_context.code_status == HAWKBIT_METADATA_ERROR ||
+	    hb_context.code_status == HAWKBIT_PERMISSION_ERROR) {
 		goto cleanup;
 	}
 
@@ -1040,9 +1038,9 @@ enum hawkbit_response hawkbit_probe(void)
 		ret = hawkbit_find_cancelAction_base(&hawkbit_results.base, cancel_base);
 		memset(hb_context.url_buffer, 0, sizeof(hb_context.url_buffer));
 		hb_context.dl.http_content_size = 0;
-		hb_context.url_buffer_size = URL_BUFFER_SIZE;
-		snprintk(hb_context.url_buffer, hb_context.url_buffer_size, "%s/%s-%s/%s/feedback",
-			 HAWKBIT_JSON_URL, CONFIG_BOARD, device_id, cancel_base);
+		snprintk(hb_context.url_buffer, sizeof(hb_context.url_buffer),
+			 "%s/%s-%s/%s/feedback", HAWKBIT_JSON_URL, CONFIG_BOARD, device_id,
+			 cancel_base);
 		memset(&hawkbit_results.cancel, 0, sizeof(hawkbit_results.cancel));
 
 		if (!send_request(HTTP_POST, HAWKBIT_CLOSE, HAWKBIT_STATUS_FINISHED_SUCCESS,
@@ -1061,8 +1059,7 @@ enum hawkbit_response hawkbit_probe(void)
 			hawkbit_results.base._links.configData.href);
 		memset(hb_context.url_buffer, 0, sizeof(hb_context.url_buffer));
 		hb_context.dl.http_content_size = 0;
-		hb_context.url_buffer_size = URL_BUFFER_SIZE;
-		snprintk(hb_context.url_buffer, hb_context.url_buffer_size, "%s/%s-%s/%s",
+		snprintk(hb_context.url_buffer, sizeof(hb_context.url_buffer), "%s/%s-%s/%s",
 			 HAWKBIT_JSON_URL, CONFIG_BOARD, device_id, "configData");
 
 		if (!send_request(HTTP_PUT, HAWKBIT_CONFIG_DEVICE, HAWKBIT_STATUS_FINISHED_SUCCESS,
@@ -1088,9 +1085,8 @@ enum hawkbit_response hawkbit_probe(void)
 	memset(hb_context.url_buffer, 0, sizeof(hb_context.url_buffer));
 	hb_context.dl.http_content_size = 0;
 	hb_context.dl.downloaded_size = 0;
-	hb_context.url_buffer_size = URL_BUFFER_SIZE;
-	snprintk(hb_context.url_buffer, hb_context.url_buffer_size, "%s/%s-%s/%s", HAWKBIT_JSON_URL,
-		 CONFIG_BOARD, device_id, deployment_base);
+	snprintk(hb_context.url_buffer, sizeof(hb_context.url_buffer), "%s/%s-%s/%s",
+		 HAWKBIT_JSON_URL, CONFIG_BOARD, device_id, deployment_base);
 	memset(&hawkbit_results.dep, 0, sizeof(hawkbit_results.dep));
 	memset(hb_context.response_data, 0, RESPONSE_BUFFER_SIZE);
 
@@ -1121,8 +1117,7 @@ enum hawkbit_response hawkbit_probe(void)
 		LOG_INF("Preventing repeated attempt to install %d", hb_context.json_action_id);
 		hb_context.dl.http_content_size = 0;
 		memset(hb_context.url_buffer, 0, sizeof(hb_context.url_buffer));
-		hb_context.url_buffer_size = URL_BUFFER_SIZE;
-		snprintk(hb_context.url_buffer, hb_context.url_buffer_size,
+		snprintk(hb_context.url_buffer, sizeof(hb_context.url_buffer),
 			 "%s/%s-%s/%s/%d/feedback", HAWKBIT_JSON_URL, CONFIG_BOARD,
 			 device_id, "deploymentBase", hb_context.json_action_id);
 
@@ -1141,9 +1136,7 @@ enum hawkbit_response hawkbit_probe(void)
 
 	hb_context.dl.http_content_size = 0;
 	memset(hb_context.url_buffer, 0, sizeof(hb_context.url_buffer));
-	hb_context.url_buffer_size = URL_BUFFER_SIZE;
-
-	snprintk(hb_context.url_buffer, hb_context.url_buffer_size, "%s", download_http);
+	snprintk(hb_context.url_buffer, sizeof(hb_context.url_buffer), "%s", download_http);
 
 	flash_img_init(&hb_context.flash_ctx);
 

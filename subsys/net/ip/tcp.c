@@ -45,7 +45,7 @@ static int tcp_rx_window =
 #if defined(CONFIG_NET_BUF_FIXED_DATA_SIZE)
 	(CONFIG_NET_BUF_RX_COUNT * CONFIG_NET_BUF_DATA_SIZE) / 3;
 #else
-	CONFIG_NET_BUF_DATA_POOL_SIZE / 3;
+	CONFIG_NET_PKT_BUF_RX_DATA_POOL_SIZE / 3;
 #endif /* CONFIG_NET_BUF_FIXED_DATA_SIZE */
 #endif
 static int tcp_tx_window =
@@ -55,7 +55,7 @@ static int tcp_tx_window =
 #if defined(CONFIG_NET_BUF_FIXED_DATA_SIZE)
 	(CONFIG_NET_BUF_TX_COUNT * CONFIG_NET_BUF_DATA_SIZE) / 3;
 #else
-	CONFIG_NET_BUF_DATA_POOL_SIZE / 3;
+	CONFIG_NET_PKT_BUF_TX_DATA_POOL_SIZE / 3;
 #endif /* CONFIG_NET_BUF_FIXED_DATA_SIZE */
 #endif
 #ifdef CONFIG_NET_TCP_RANDOMIZED_RTO
@@ -3006,6 +3006,7 @@ next_state:
 
 			conn_ack(conn, + 1);
 			tcp_out(conn, FIN | ACK);
+			conn_seq(conn, + 1);
 			next = TCP_LAST_ACK;
 			verdict = NET_OK;
 			keep_alive_timer_stop(conn);
@@ -3032,6 +3033,7 @@ next_state:
 
 			conn_ack(conn, + len + 1);
 			tcp_out(conn, FIN | ACK);
+			conn_seq(conn, + 1);
 			next = TCP_LAST_ACK;
 			keep_alive_timer_stop(conn);
 			tcp_setup_last_ack_timer(conn);
@@ -3224,11 +3226,12 @@ next_state:
 		break;
 	case TCP_CLOSE_WAIT:
 		tcp_out(conn, FIN);
+		conn_seq(conn, + 1);
 		next = TCP_LAST_ACK;
 		tcp_setup_last_ack_timer(conn);
 		break;
 	case TCP_LAST_ACK:
-		if (th && FL(&fl, ==, ACK, th_seq(th) == conn->ack)) {
+		if (th && FL(&fl, ==, ACK, th_ack(th) == conn->seq)) {
 			tcp_send_timer_cancel(conn);
 			do_close = true;
 			verdict = NET_OK;
