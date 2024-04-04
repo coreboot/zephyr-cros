@@ -583,12 +583,6 @@ config NET_CONTEXT_RECV_PKTINFO
 	  This way user can get extra information about the received data in the
 	  socket.
 
-config NET_TEST
-	bool "Network Testing"
-	help
-	  Used for self-contained networking tests that do not require a
-	  network device.
-
 config NET_SLIP_TAP
 	bool "TAP SLIP driver"
 	depends on NET_QEMU_SLIP
@@ -605,6 +599,12 @@ config NET_SLIP_TAP
 	  https://github.com/zephyrproject-rtos/net-tools for more details.
 
 endif # NET_RAW_MODE
+
+config NET_TEST
+	bool "Network Testing"
+	help
+	  Used for self-contained networking tests that do not require a
+	  network device.
 
 config NET_PKT_RX_COUNT
 	int "How many packet receives can be pending at the same time"
@@ -668,12 +668,28 @@ config NET_BUF_DATA_SIZE
 	  This value tells what is the fixed size of each network buffer.
 
 config NET_BUF_DATA_POOL_SIZE
-	int "Size of the memory pool where buffers are allocated from"
+	int "[DEPRECATED] Size of the memory pool where buffers are allocated from"
 	default 4096 if NET_L2_ETHERNET
 	default 2048
 	depends on NET_BUF_VARIABLE_DATA_SIZE
 	help
-	  This value tell what is the size of the memory pool where each
+	  This config is deprecated, use NET_PKT_BUF_RX_DATA_POOL_SIZE and
+	  NET_PKT_BUF_TX_DATA_POOL_SIZE instead.
+
+config NET_PKT_BUF_RX_DATA_POOL_SIZE
+	int "Size of the RX memory pool where buffers are allocated from"
+	default NET_BUF_DATA_POOL_SIZE
+	depends on NET_BUF_VARIABLE_DATA_SIZE
+	help
+	  This value tell what is the size of the RX memory pool where each
+	  network buffer is allocated from.
+
+config NET_PKT_BUF_TX_DATA_POOL_SIZE
+	int "Size of the TX memory pool where buffers are allocated from"
+	default NET_BUF_DATA_POOL_SIZE
+	depends on NET_BUF_VARIABLE_DATA_SIZE
+	help
+	  This value tell what is the size of the TX memory pool where each
 	  network buffer is allocated from.
 
 config NET_PKT_BUF_USER_DATA_SIZE

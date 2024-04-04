@@ -594,7 +594,8 @@ static bool valid_broadcast_source_param(const struct bt_bap_broadcast_source_pa
 				return false;
 			}
 
-			CHECKIF(subgroup_param->codec_cfg->id == BT_HCI_CODING_FORMAT_LC3 &&
+			CHECKIF(stream_param->data != NULL &&
+				subgroup_param->codec_cfg->id == BT_HCI_CODING_FORMAT_LC3 &&
 				!bt_audio_valid_ltv(stream_param->data, stream_param->data_len)) {
 				LOG_DBG("subgroup_params[%zu].stream_params[%zu]->data not valid "
 					"LTV",
@@ -1010,6 +1011,11 @@ int bt_bap_broadcast_source_start(struct bt_bap_broadcast_source *source, struct
 	param.pto = source->pto;
 	param.iso_interval = source->iso_interval;
 #endif /* CONFIG_BT_ISO_TEST_PARAMS */
+
+	/* Set the enabling state early in case that the BIS is connected before we can manage to
+	 * set it afterwards
+	 */
+	broadcast_source_set_state(source, BT_BAP_EP_STATE_ENABLING);
 
 	/* Set the enabling state early in case that the BIS is connected before we can manage to
 	 * set it afterwards

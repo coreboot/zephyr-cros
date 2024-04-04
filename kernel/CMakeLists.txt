@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # kernel is a normal CMake library and not a zephyr_library because it
-# should not be --whole-archive'd
+# should usually not be --whole-archive'd
 
 zephyr_syscall_header(
   ${ZEPHYR_BASE}/include/zephyr/device.h
@@ -86,9 +86,16 @@ list(APPEND kernel_files
 
 if(CONFIG_SMP)
 list(APPEND kernel_files
-     smp.c)
+     smp.c
+     ipi.c)
 endif()
 
+endif()
+
+
+if(CONFIG_TIMESLICING)
+list(APPEND kernel_files
+     timeslicing.c)
 endif()
 
 if(CONFIG_SPIN_VALIDATE)
