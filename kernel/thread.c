@@ -108,6 +108,33 @@ static inline void *z_vrfy_k_thread_custom_data_get(void)
 #endif /* CONFIG_USERSPACE */
 #endif /* CONFIG_THREAD_CUSTOM_DATA */
 
+int z_impl_k_is_preempt_thread(void)
+{
+	return !arch_is_in_isr() && thread_is_preemptible(_current);
+}
+
+#ifdef CONFIG_USERSPACE
+static inline int z_vrfy_k_is_preempt_thread(void)
+{
+	return z_impl_k_is_preempt_thread();
+}
+#include <syscalls/k_is_preempt_thread_mrsh.c>
+#endif /* CONFIG_USERSPACE */
+
+int z_impl_k_thread_priority_get(k_tid_t thread)
+{
+	return thread->base.prio;
+}
+
+#ifdef CONFIG_USERSPACE
+static inline int z_vrfy_k_thread_priority_get(k_tid_t thread)
+{
+	K_OOPS(K_SYSCALL_OBJ(thread, K_OBJ_THREAD));
+	return z_impl_k_thread_priority_get(thread);
+}
+#include <syscalls/k_thread_priority_get_mrsh.c>
+#endif /* CONFIG_USERSPACE */
+
 int z_impl_k_thread_name_set(struct k_thread *thread, const char *value)
 {
 #ifdef CONFIG_THREAD_NAME
@@ -191,15 +218,6 @@ static size_t copy_bytes(char *dest, size_t dest_size, const char *src, size_t s
 
 	return bytes_to_copy;
 }
-
-#define Z_STATE_STR_DUMMY       "dummy"
-#define Z_STATE_STR_PENDING     "pending"
-#define Z_STATE_STR_PRESTART    "prestart"
-#define Z_STATE_STR_DEAD        "dead"
-#define Z_STATE_STR_SUSPENDED   "suspended"
-#define Z_STATE_STR_ABORTING    "aborting"
-#define Z_STATE_STR_SUSPENDING  "suspending"
-#define Z_STATE_STR_QUEUED      "queued"
 
 const char *k_thread_state_str(k_tid_t thread_id, char *buf, size_t buf_size)
 {

@@ -64,6 +64,8 @@ The FRDM-MCXN947 board configuration supports the following hardware features:
 +-----------+------------+-------------------------------------+
 | DMA       | on-chip    | dma                                 |
 +-----------+------------+-------------------------------------+
+| I2C       | on-chip    | i2c                                 |
++-----------+------------+-------------------------------------+
 | CLOCK     | on-chip    | clock_control                       |
 +-----------+------------+-------------------------------------+
 | FLASH     | on-chip    | soc flash                           |
@@ -71,6 +73,8 @@ The FRDM-MCXN947 board configuration supports the following hardware features:
 | FLEXSPI   | on-chip    | flash programming                   |
 +-----------+------------+-------------------------------------+
 | DAC       | on-chip    | dac                                 |
++-----------+------------+-------------------------------------+
+| ENET QOS  | on-chip    | ethernet                            |
 +-----------+------------+-------------------------------------+
 
 Targets available
