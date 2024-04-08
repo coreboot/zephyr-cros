@@ -59,11 +59,7 @@ LOG_MODULE_REGISTER(hawkbit, CONFIG_HAWKBIT_LOG_LEVEL);
 #define STORAGE_DEV FIXED_PARTITION_DEVICE(STORAGE_LABEL)
 #define STORAGE_OFFSET FIXED_PARTITION_OFFSET(STORAGE_LABEL)
 
-#if ((CONFIG_HAWKBIT_POLL_INTERVAL > 1) && (CONFIG_HAWKBIT_POLL_INTERVAL < 43200))
-static uint32_t poll_sleep = (CONFIG_HAWKBIT_POLL_INTERVAL * 60 * MSEC_PER_SEC);
-#else
-static uint32_t poll_sleep = (300 * MSEC_PER_SEC);
-#endif
+static uint32_t poll_sleep = (CONFIG_HAWKBIT_POLL_INTERVAL * SEC_PER_MIN);
 
 static struct nvs_fs fs;
 
@@ -202,16 +198,9 @@ static bool start_http_client(void)
 {
 	int ret = -1;
 	struct zsock_addrinfo *addr;
-	struct zsock_addrinfo hints;
+	struct zsock_addrinfo hints = {0};
 	int resolve_attempts = 10;
-
-#if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
-	int protocol = IPPROTO_TLS_1_2;
-#else
-	int protocol = IPPROTO_TCP;
-#endif
-
-	(void)memset(&hints, 0, sizeof(hints));
+	int protocol = IS_ENABLED(CONFIG_NET_SOCKETS_SOCKOPT_TLS) ? IPPROTO_TLS_1_2 : IPPROTO_TCP;
 
 	if (IS_ENABLED(CONFIG_NET_IPV6)) {
 		hints.ai_family = AF_INET6;
@@ -348,21 +337,21 @@ static int hawkbit_device_acid_update(int32_t new_value)
 }
 
 /*
- * Update sleep interval, based on results from hawkbit base polling
+ * Update sleep interval, based on results from hawkBit base polling
  * resource
  */
 static void hawkbit_update_sleep(struct hawkbit_ctl_res *hawkbit_res)
 {
-	uint32_t sleep_time;
+	int sleep_time;
 	const char *sleep = hawkbit_res->config.polling.sleep;
 
 	if (strlen(sleep) != HAWKBIT_SLEEP_LENGTH) {
 		LOG_ERR("Invalid poll sleep: %s", sleep);
 	} else {
 		sleep_time = hawkbit_time2sec(sleep);
-		if (sleep_time > 0 && poll_sleep != (MSEC_PER_SEC * sleep_time)) {
+		if (sleep_time > 0 && poll_sleep != sleep_time) {
 			LOG_DBG("New poll sleep %d seconds", sleep_time);
-			poll_sleep = sleep_time * MSEC_PER_SEC;
+			poll_sleep = (uint32_t)sleep_time;
 		}
 	}
 }
@@ -513,7 +502,7 @@ static int hawkbit_parse_deployment(struct hawkbit_dep_res *res, int32_t *json_a
 
 	/*
 	 * Find the download-http href. We only support the DEFAULT
-	 * tenant on the same hawkbit server.
+	 * tenant on the same hawkBit server.
 	 */
 	href = artifact->_links.download_http.href;
 	if (!href) {
@@ -963,6 +952,12 @@ static bool send_request(enum http_method method, enum hawkbit_http_request type
 	return true;
 }
 
+void hawkbit_reboot(void)
+{
+	LOG_PANIC();
+	sys_reboot(SYS_REBOOT_WARM);
+}
+
 enum hawkbit_response hawkbit_probe(void)
 {
 	int ret;
@@ -1004,7 +999,7 @@ enum hawkbit_response hawkbit_probe(void)
 	}
 
 	/*
-	 * Query the hawkbit base polling resource.
+	 * Query the hawkBit base polling resource.
 	 */
 	LOG_INF("Polling target data from hawkBit");
 
@@ -1197,8 +1192,7 @@ static void autohandler(struct k_work *work)
 		LOG_ERR("Rebooting to previous confirmed image");
 		LOG_ERR("If this image is flashed using a hardware tool");
 		LOG_ERR("Make sure that it is a confirmed image");
-		k_sleep(K_SECONDS(1));
-		sys_reboot(SYS_REBOOT_WARM);
+		hawkbit_reboot();
 		break;
 
 	case HAWKBIT_NO_UPDATE:
@@ -1214,7 +1208,8 @@ static void autohandler(struct k_work *work)
 		break;
 
 	case HAWKBIT_UPDATE_INSTALLED:
-		LOG_INF("Update installed, please reboot");
+		LOG_INF("Update installed");
+		hawkbit_reboot();
 		break;
 
 	case HAWKBIT_DOWNLOAD_ERROR:
@@ -1238,7 +1233,7 @@ static void autohandler(struct k_work *work)
 		break;
 	}
 
-	k_work_reschedule(&hawkbit_work_handle, K_MSEC(poll_sleep));
+	k_work_reschedule(&hawkbit_work_handle, K_SECONDS(poll_sleep));
 }
 
 void hawkbit_autohandler(void)
