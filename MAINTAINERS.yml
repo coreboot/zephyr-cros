@@ -3492,6 +3492,7 @@ nRF Platforms:
 Renesas SmartBond Platforms:
   status: maintained
   maintainers:
+    - ioannis-karachalios
     - andrzej-kaczmarek
     - blauret
   files:
@@ -4354,6 +4355,7 @@ West:
 "West project: hal_renesas":
   status: maintained
   maintainers:
+    - KhiemNguyenT
     - andrzej-kaczmarek
   files: []
   labels:
