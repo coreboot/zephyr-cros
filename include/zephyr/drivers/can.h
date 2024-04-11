@@ -323,6 +323,23 @@ typedef void (*can_state_change_callback_t)(const struct device *dev,
  */
 
 /**
+ * @brief Calculate Transmitter Delay Compensation Offset from data phase timing parameters.
+ *
+ * Calculates the TDC Offset in minimum time quanta (mtq) using the sample point and CAN core clock
+ * prescaler specified by a set of data phase timing parameters.
+ *
+ * The result is clamped to the minimum/maximum supported TDC Offset values provided.
+ *
+ * @param _timing_data Pointer to data phase timing parameters.
+ * @param _tdco_min    Minimum supported TDC Offset value in mtq.
+ * @param _tdco_max    Maximum supported TDC Offset value in mtq.
+ * @return             Calculated TDC Offset value in mtq.
+ */
+#define CAN_CALC_TDCO(_timing_data, _tdco_min, _tdco_max)                                          \
+	CLAMP((1U + _timing_data->prop_seg + _timing_data->phase_seg1) * _timing_data->prescaler,  \
+	      _tdco_min, _tdco_max)
+
+/**
  * @brief Common CAN controller driver configuration.
  *
  * This structure is common to all CAN controller drivers and is expected to be the first element in
@@ -717,7 +734,7 @@ struct can_device_state {
 		stats_init(&state->stats.s_hdr, STATS_SIZE_32, 8,	\
 			   STATS_NAME_INIT_PARMS(can));			\
 		stats_register(dev->name, &(state->stats.s_hdr));	\
-		if (init_fn != NULL) {					\
+		if (!is_null_no_warn(init_fn)) {			\
 			return init_fn(dev);				\
 		}							\
 									\

@@ -2144,7 +2144,7 @@ static int cmd_preset(const struct shell *sh, size_t argc, char *argv[])
 
 #if defined(CONFIG_BT_BAP_BROADCAST_SINK)
 #define INVALID_BROADCAST_ID (BT_AUDIO_BROADCAST_ID_MAX + 1)
-#define SYNC_RETRY_COUNT     6 /* similar to retries for connections */
+#define PA_SYNC_INTERVAL_TO_TIMEOUT_RATIO 20 /* Set the timeout relative to interval */
 #define PA_SYNC_SKIP         5
 
 static struct broadcast_sink_auto_scan {
@@ -2165,19 +2165,16 @@ static void clear_auto_scan(void)
 static uint16_t interval_to_sync_timeout(uint16_t interval)
 {
 	uint32_t interval_ms;
-	uint16_t timeout;
-
-	/* Ensure that the following calculation does not overflow silently */
-	__ASSERT(SYNC_RETRY_COUNT < 10, "SYNC_RETRY_COUNT shall be less than 10");
+	uint32_t timeout;
 
 	/* Add retries and convert to unit in 10's of ms */
 	interval_ms = BT_GAP_PER_ADV_INTERVAL_TO_MS(interval);
-	timeout = (interval_ms * SYNC_RETRY_COUNT) / 10;
+	timeout = (interval_ms * PA_SYNC_INTERVAL_TO_TIMEOUT_RATIO) / 10;
 
 	/* Enforce restraints */
 	timeout = CLAMP(timeout, BT_GAP_PER_ADV_MIN_TIMEOUT, BT_GAP_PER_ADV_MAX_TIMEOUT);
 
-	return timeout;
+	return (uint16_t)timeout;
 }
 
 static bool scan_check_and_sync_broadcast(struct bt_data *data, void *user_data)
@@ -2341,12 +2338,20 @@ static void audio_recv(struct bt_bap_stream *stream,
 
 	sh_stream->rx_cnt++;
 
-	if (info->ts == sh_stream->last_info.ts) {
-		sh_stream->dup_ts++;
-	}
+	if ((info->flags & BT_ISO_FLAGS_VALID) != 0) {
+		/* For valid ISO packets we check if they are invalid in other ways */
 
-	if (info->seq_num == sh_stream->last_info.seq_num) {
-		sh_stream->dup_psn++;
+		if (info->ts == sh_stream->last_info.ts) {
+			sh_stream->dup_ts++;
+		}
+
+		if (info->seq_num == sh_stream->last_info.seq_num) {
+			sh_stream->dup_psn++;
+		}
+
+		if (buf->len == 0U) {
+			sh_stream->empty_sdu_pkts++;
+		}
 	}
 
 	if (info->flags & BT_ISO_FLAGS_ERROR) {
@@ -2358,12 +2363,13 @@ static void audio_recv(struct bt_bap_stream *stream,
 	}
 
 	if ((sh_stream->rx_cnt % recv_stats_interval) == 0) {
-		shell_print(ctx_shell,
-			    "[%zu]: Incoming audio on stream %p len %u ts %u seq_num %u flags %u "
-			    "(dup ts %zu; dup psn %zu, err_pkts %zu, lost_pkts %zu)",
-			    sh_stream->rx_cnt, stream, buf->len, info->ts, info->seq_num,
-			    info->flags, sh_stream->dup_ts, sh_stream->dup_psn, sh_stream->err_pkts,
-			    sh_stream->lost_pkts);
+		shell_print(
+			ctx_shell,
+			"[%zu]: Incoming audio on stream %p len %u ts %u seq_num %u flags %u "
+			"(dup ts %zu; dup psn %zu, err_pkts %zu, lost_pkts %zu, empty SDUs %zu)",
+			sh_stream->rx_cnt, stream, buf->len, info->ts, info->seq_num, info->flags,
+			sh_stream->dup_ts, sh_stream->dup_psn, sh_stream->err_pkts,
+			sh_stream->lost_pkts, sh_stream->empty_sdu_pkts);
 	}
 
 	(void)memcpy(&sh_stream->last_info, info, sizeof(sh_stream->last_info));
@@ -2424,6 +2430,7 @@ static void stream_started_cb(struct bt_bap_stream *bap_stream)
 	printk("Stream %p started\n", bap_stream);
 
 #if defined(CONFIG_BT_AUDIO_RX)
+	sh_stream->empty_sdu_pkts = 0U;
 	sh_stream->lost_pkts = 0U;
 	sh_stream->err_pkts = 0U;
 	sh_stream->dup_psn = 0U;
@@ -3732,6 +3739,8 @@ ssize_t audio_pa_data_add(struct bt_data *data_array,
 		 */
 		NET_BUF_SIMPLE_DEFINE_STATIC(base_buf, UINT8_MAX);
 		int err;
+
+		net_buf_simple_reset(&base_buf);
 
 		err = bt_bap_broadcast_source_get_base(default_source.bap_source, &base_buf);
 		if (err != 0) {

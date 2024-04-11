@@ -71,6 +71,8 @@ struct net_if_addr {
 #if defined(CONFIG_NET_IPV6_DAD) && defined(CONFIG_NET_NATIVE_IPV6)
 	/** How many times we have done DAD */
 	uint8_t dad_count;
+	/* What interface the DAD is running */
+	uint8_t ifindex;
 #endif
 
 	/** Is the IP address valid forever */
@@ -1788,6 +1790,10 @@ static inline void net_if_ipv6_set_base_reachable_time(struct net_if *iface,
 	}
 
 	iface->config.ip.ipv6->base_reachable_time = reachable_time;
+#else
+	ARG_UNUSED(iface);
+	ARG_UNUSED(reachable_time);
+
 #endif
 }
 
@@ -1809,6 +1815,7 @@ static inline uint32_t net_if_ipv6_get_reachable_time(struct net_if *iface)
 
 	return iface->config.ip.ipv6->reachable_time;
 #else
+	ARG_UNUSED(iface);
 	return 0;
 #endif
 }
@@ -1836,6 +1843,8 @@ static inline void net_if_ipv6_set_reachable_time(struct net_if_ipv6 *ipv6)
 	}
 
 	ipv6->reachable_time = net_if_ipv6_calc_reachable_time(ipv6);
+#else
+	ARG_UNUSED(ipv6);
 #endif
 }
 
@@ -1856,6 +1865,9 @@ static inline void net_if_ipv6_set_retrans_timer(struct net_if *iface,
 	}
 
 	iface->config.ip.ipv6->retrans_timer = retrans_timer;
+#else
+	ARG_UNUSED(iface);
+	ARG_UNUSED(retrans_timer);
 #endif
 }
 
@@ -1877,6 +1889,7 @@ static inline uint32_t net_if_ipv6_get_retrans_timer(struct net_if *iface)
 
 	return iface->config.ip.ipv6->retrans_timer;
 #else
+	ARG_UNUSED(iface);
 	return 0;
 #endif
 }
@@ -2990,14 +3003,21 @@ struct net_if_api {
 
 /* Network device initialization macros */
 
-#define Z_NET_DEVICE_INIT(node_id, dev_id, name, init_fn, pm, data,	\
-			  config, prio, api, l2, l2_ctx_type, mtu)	\
+#define Z_NET_DEVICE_INIT_INSTANCE(node_id, dev_id, name, instance,	\
+				   init_fn, pm, data, config, prio,	\
+				   api, l2, l2_ctx_type, mtu)		\
 	Z_DEVICE_STATE_DEFINE(dev_id);					\
 	Z_DEVICE_DEFINE(node_id, dev_id, name, init_fn, pm, data,	\
 			config, POST_KERNEL, prio, api,			\
 			&Z_DEVICE_STATE_NAME(dev_id));			\
-	NET_L2_DATA_INIT(dev_id, 0, l2_ctx_type);			\
-	NET_IF_INIT(dev_id, 0, l2, mtu, NET_IF_MAX_CONFIGS)
+	NET_L2_DATA_INIT(dev_id, instance, l2_ctx_type);		\
+	NET_IF_INIT(dev_id, instance, l2, mtu, NET_IF_MAX_CONFIGS)
+
+#define Z_NET_DEVICE_INIT(node_id, dev_id, name, init_fn, pm, data,	\
+			  config, prio, api, l2, l2_ctx_type, mtu)	\
+	Z_NET_DEVICE_INIT_INSTANCE(node_id, dev_id, name, 0, init_fn,	\
+				   pm, data, config, prio, api, l2,	\
+				   l2_ctx_type, mtu)
 
 /**
  * @brief Create a network interface and bind it to network device.
@@ -3057,16 +3077,6 @@ struct net_if_api {
  */
 #define NET_DEVICE_DT_INST_DEFINE(inst, ...) \
 	NET_DEVICE_DT_DEFINE(DT_DRV_INST(inst), __VA_ARGS__)
-
-#define Z_NET_DEVICE_INIT_INSTANCE(node_id, dev_id, name, instance,	\
-				   init_fn, pm, data, config, prio,	\
-				   api, l2, l2_ctx_type, mtu)		\
-	Z_DEVICE_STATE_DEFINE(dev_id);					\
-	Z_DEVICE_DEFINE(node_id, dev_id, name, init_fn, pm, data,	\
-			config,	POST_KERNEL, prio, api,			\
-			&Z_DEVICE_STATE_NAME(dev_id));			\
-	NET_L2_DATA_INIT(dev_id, instance, l2_ctx_type);		\
-	NET_IF_INIT(dev_id, instance, l2, mtu, NET_IF_MAX_CONFIGS)
 
 /**
  * @brief Create multiple network interfaces and bind them to network device.

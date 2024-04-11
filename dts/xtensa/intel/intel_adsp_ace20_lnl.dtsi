@@ -62,8 +62,9 @@
 			d3: off {
 				compatible = "zephyr,power-state";
 				power-state-name = "soft-off";
-				min-residency-us = <2147483647>;
+				min-residency-us = <0>;
 				exit-latency-us = <0>;
+				status = "disabled";
 			};
 		};
 	};
@@ -426,37 +427,25 @@
 				compatible = "intel,adsp-power-domain";
 				bit-position = <15>;
 			};
-			hub_hp_domain: hub_hpp_domain {
+			ml0_domain: ml0_domain {
 				compatible = "intel,adsp-power-domain";
-				bit-position = <6>;
-			};
-			io0_domain: io0_domain {
-				compatible = "intel,adsp-power-domain";
-				bit-position = <8>;
+				bit-position = <12>;
 			};
 			io1_domain: io1_domain {
 				compatible = "intel,adsp-power-domain";
 				bit-position = <9>;
 			};
-			io2_domain: io2_domain {
+			io0_domain: io0_domain {
 				compatible = "intel,adsp-power-domain";
-				bit-position = <10>;
+				bit-position = <8>;
 			};
-			io3_domain: io3_domain {
+			hub_hp_domain: hub_hp_domain {
 				compatible = "intel,adsp-power-domain";
-				bit-position = <11>;
+				bit-position = <6>;
 			};
 			hst_domain: hst_domain {
 				compatible = "intel,adsp-power-domain";
-				bit-position = <4>;
-			};
-			ml0_domain: ml0_domain {
-				compatible = "intel,adsp-power-domain";
-				bit-position = <12>;
-			};
-			ml1_domain: ml1_domain {
-				compatible = "intel,adsp-power-domain";
-				bit-position = <13>;
+				bit-position = <5>;
 			};
 		};
 
@@ -489,7 +478,7 @@
 			dma-channels = <9>;
 			dma-buf-addr-alignment = <128>;
 			dma-buf-size-alignment = <32>;
-			dma-copy-alignment = <32>;
+			dma-copy-alignment = <16>;
 			interrupts = <13 0 0>;
 			interrupt-parent = <&ace_intc>;
 			status = "okay";
@@ -502,7 +491,7 @@
 			dma-channels = <11>;
 			dma-buf-addr-alignment = <128>;
 			dma-buf-size-alignment = <32>;
-			dma-copy-alignment = <32>;
+			dma-copy-alignment = <16>;
 			interrupts = <12 0 0>;
 			interrupt-parent = <&ace_intc>;
 			status = "okay";
@@ -523,7 +512,7 @@
 			dma-channels = <9>;
 			dma-buf-addr-alignment = <128>;
 			dma-buf-size-alignment = <32>;
-			dma-copy-alignment = <32>;
+			dma-copy-alignment = <16>;
 			status = "okay";
 		};
 
@@ -534,7 +523,7 @@
 			dma-channels = <11>;
 			dma-buf-addr-alignment = <128>;
 			dma-buf-size-alignment = <32>;
-			dma-copy-alignment = <32>;
+			dma-copy-alignment = <16>;
 			status = "okay";
 		};
 
