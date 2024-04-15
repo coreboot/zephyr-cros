@@ -585,6 +585,33 @@ static int gdb_send_exception(uint8_t *buf, size_t len, uint8_t exception)
 	return gdb_send_packet(buf, size);
 }
 
+static bool gdb_qsupported(uint8_t *buf, size_t len, enum gdb_loop_state *next_state)
+{
+	size_t n = 0;
+	const char *c_buf = (const char *) buf;
+
+	if (strstr(buf, "qSupported") != c_buf) {
+		return false;
+	}
+
+	gdb_send_packet(buf, n);
+	return true;
+}
+
+static void gdb_q_packet(uint8_t *buf, size_t len, enum gdb_loop_state *next_state)
+{
+	if (gdb_qsupported(buf, len, next_state)) {
+		return;
+	}
+
+	gdb_send_packet(NULL, 0);
+}
+
+static void gdb_v_packet(uint8_t *buf, size_t len, enum gdb_loop_state *next_state)
+{
+	gdb_send_packet(NULL, 0);
+}
+
 /**
  * Synchronously communicate with gdb on the host
  */
@@ -595,14 +622,9 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 	 * not have enough space.
 	 */
 	static uint8_t buf[GDB_PACKET_SIZE];
+	enum gdb_loop_state state;
 
-	enum loop_state {
-		RECEIVING,
-		CONTINUE,
-		ERROR,
-	} state;
-
-	state = RECEIVING;
+	state = GDB_LOOP_RECEIVING;
 
 	/* Only send exception if this is not the first
 	 * GDB break.
@@ -616,7 +638,7 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 #define CHECK_ERROR(condition)			\
 	{					\
 		if ((condition)) {		\
-			state = ERROR;		\
+			state = GDB_LOOP_ERROR;	\
 			break;			\
 		}				\
 	}
@@ -633,7 +655,7 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 		CHECK_ERROR(ptr == NULL);				\
 	}
 
-	while (state == RECEIVING) {
+	while (state == GDB_LOOP_RECEIVING) {
 		uint8_t *ptr;
 		size_t data_len, pkt_len;
 		uintptr_t addr;
@@ -718,7 +740,7 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 		 */
 		case 'c':
 			arch_gdb_continue();
-			state = CONTINUE;
+			state = GDB_LOOP_CONTINUE;
 			break;
 
 		/*
@@ -727,7 +749,7 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 		 */
 		case 's':
 			arch_gdb_step();
-			state = CONTINUE;
+			state = GDB_LOOP_CONTINUE;
 			break;
 
 		/*
@@ -800,7 +822,7 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 				/* breakpoint/watchpoint not supported */
 				gdb_send_packet(NULL, 0);
 			} else if (ret == -1) {
-				state = ERROR;
+				state = GDB_LOOP_ERROR;
 			} else {
 				gdb_send_packet("OK", 2);
 			}
@@ -812,6 +834,18 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 		case '?':
 			gdb_send_exception(buf, sizeof(buf),
 					   ctx->exception);
+			break;
+
+		/* Query packets*/
+		case 'q':
+			__fallthrough;
+		case 'Q':
+			gdb_q_packet(buf, sizeof(buf), &state);
+			break;
+
+		/* v packets */
+		case 'v':
+			gdb_v_packet(buf, sizeof(buf), &state);
 			break;
 
 		/*
@@ -826,9 +860,9 @@ int z_gdb_main_loop(struct gdb_ctx *ctx)
 		 * If this is an recoverable error, send an error message to
 		 * GDB and continue the debugging session.
 		 */
-		if (state == ERROR) {
+		if (state == GDB_LOOP_ERROR) {
 			gdb_send_packet(GDB_ERROR_GENERAL, 3);
-			state = RECEIVING;
+			state = GDB_LOOP_RECEIVING;
 		}
 	}
 

@@ -108,6 +108,15 @@
 		int-source = "pint";
 	};
 
+	usb_otg: usbotg@145000 {
+		compatible = "nxp,ehci";
+		reg = <0x145000 0x200>;
+		interrupts = <50 1>;
+		interrupt-names = "usb_otg";
+		num-bidir-endpoints = <8>;
+		status = "disabled";
+	};
+
 	flexcomm0: flexcomm@106000 {
 		compatible = "nxp,lpc-flexcomm";
 		reg = <0x106000 0x1000>;
@@ -189,6 +198,17 @@
 		status = "disabled";
 		#dma-cells = <1>;
 		dma-channels = <33>;
+	};
+
+	lcdic: lcdic@128000 {
+		compatible = "nxp,lcdic";
+		reg = <0x128000 0x52>;
+		interrupts = <61 0>;
+		status = "disabled";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&clkctl1 MCUX_LCDIC_CLK>;
+		dmas = <&dma0 0>;
 	};
 
 	ctimer0: ctimer@28000 {

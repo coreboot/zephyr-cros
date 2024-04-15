@@ -31,7 +31,7 @@ extern "C" {
  * @brief CAN Interface
  * @defgroup can_interface CAN Interface
  * @since 1.12
- * @version 1.0.0
+ * @version 1.1.0
  * @ingroup io_interfaces
  * @{
  */
@@ -47,16 +47,20 @@ extern "C" {
 #define CAN_STD_ID_MASK 0x7FFU
 /**
  * @brief Maximum value for a standard (11-bit) CAN identifier.
+ *
+ * @deprecated Use ``CAN_STD_ID_MASK`` instead.
  */
-#define CAN_MAX_STD_ID  CAN_STD_ID_MASK
+#define CAN_MAX_STD_ID  CAN_STD_ID_MASK __DEPRECATED_MACRO
 /**
  * @brief Bit mask for an extended (29-bit) CAN identifier.
  */
 #define CAN_EXT_ID_MASK 0x1FFFFFFFU
 /**
  * @brief Maximum value for an extended (29-bit) CAN identifier.
+ *
+ * @deprecated Use ``CAN_EXT_ID_MASK`` instead.
  */
-#define CAN_MAX_EXT_ID  CAN_EXT_ID_MASK
+#define CAN_MAX_EXT_ID  CAN_EXT_ID_MASK __DEPRECATED_MACRO
 /**
  * @brief Maximum data length code for CAN 2.0A/2.0B.
  */
@@ -734,7 +738,7 @@ struct can_device_state {
 		stats_init(&state->stats.s_hdr, STATS_SIZE_32, 8,	\
 			   STATS_NAME_INIT_PARMS(can));			\
 		stats_register(dev->name, &(state->stats.s_hdr));	\
-		if (init_fn != NULL) {					\
+		if (!is_null_no_warn(init_fn)) {			\
 			return init_fn(dev);				\
 		}							\
 									\
@@ -836,18 +840,33 @@ static inline int z_impl_can_get_core_clock(const struct device *dev, uint32_t *
  * Get the minimum supported bitrate for the CAN controller/transceiver combination.
  *
  * @param dev Pointer to the device structure for the driver instance.
+ * @return Minimum supported bitrate in bits/s
+ */
+__syscall uint32_t can_get_bitrate_min(const struct device *dev);
+
+static inline uint32_t z_impl_can_get_bitrate_min(const struct device *dev)
+{
+	const struct can_driver_config *common = (const struct can_driver_config *)dev->config;
+
+	return common->min_bitrate;
+}
+
+/**
+ * @brief Get minimum supported bitrate
+ *
+ * Get the minimum supported bitrate for the CAN controller/transceiver combination.
+ *
+ * @deprecated Use @a can_get_bitrate_min() instead.
+ *
+ * @param dev Pointer to the device structure for the driver instance.
  * @param[out] min_bitrate Minimum supported bitrate in bits/s
  *
  * @retval -EIO General input/output error.
  * @retval -ENOSYS If this function is not implemented by the driver.
  */
-__syscall int can_get_min_bitrate(const struct device *dev, uint32_t *min_bitrate);
-
-static inline int z_impl_can_get_min_bitrate(const struct device *dev, uint32_t *min_bitrate)
+__deprecated static inline int can_get_min_bitrate(const struct device *dev, uint32_t *min_bitrate)
 {
-	const struct can_driver_config *common = (const struct can_driver_config *)dev->config;
-
-	*min_bitrate = common->min_bitrate;
+	*min_bitrate = can_get_bitrate_min(dev);
 
 	return 0;
 }
@@ -858,23 +877,34 @@ static inline int z_impl_can_get_min_bitrate(const struct device *dev, uint32_t 
  * Get the maximum supported bitrate for the CAN controller/transceiver combination.
  *
  * @param dev Pointer to the device structure for the driver instance.
+ * @return Maximum supported bitrate in bits/s
+ */
+__syscall uint32_t can_get_bitrate_max(const struct device *dev);
+
+static inline uint32_t z_impl_can_get_bitrate_max(const struct device *dev)
+{
+	const struct can_driver_config *common = (const struct can_driver_config *)dev->config;
+
+	return common->max_bitrate;
+}
+
+/**
+ * @brief Get maximum supported bitrate
+ *
+ * Get the maximum supported bitrate for the CAN controller/transceiver combination.
+ *
+ * @deprecated Use @a can_get_bitrate_max() instead.
+ *
+ * @param dev Pointer to the device structure for the driver instance.
  * @param[out] max_bitrate Maximum supported bitrate in bits/s
  *
  * @retval 0 If successful.
  * @retval -EIO General input/output error.
  * @retval -ENOSYS If this function is not implemented by the driver.
  */
-__syscall int can_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate);
-
-static inline int z_impl_can_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
+__deprecated static inline int can_get_max_bitrate(const struct device *dev, uint32_t *max_bitrate)
 {
-	const struct can_driver_config *common = (const struct can_driver_config *)dev->config;
-
-	if (common->max_bitrate == 0U) {
-		return -ENOSYS;
-	}
-
-	*max_bitrate = common->max_bitrate;
+	*max_bitrate = can_get_bitrate_max(dev);
 
 	return 0;
 }
