@@ -352,6 +352,14 @@
 				prescaler = <0>;
 			};
 
+			pwm120: pwm@8e4000 {
+				compatible = "nordic,nrf-pwm";
+				reg = <0x8e4000 0x1000>;
+				status = "disabled";
+				interrupts = <228 NRF_DEFAULT_IRQ_PRIORITY>;
+				#pwm-cells = <3>;
+			};
+
 			spi120: spi@8e6000 {
 				compatible = "nordic,nrf-spim";
 				reg = <0x8e6000 0x1000>;
@@ -361,6 +369,8 @@
 				max-frequency = <DT_FREQ_M(32)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart120: uart@8e6000 {
@@ -379,6 +389,8 @@
 				max-frequency = <DT_FREQ_M(32)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			cpuppr_vpr: vpr@908000 {
@@ -609,6 +621,14 @@
 				prescaler = <0>;
 			};
 
+			pwm130: pwm@9a4000 {
+				compatible = "nordic,nrf-pwm";
+				reg = <0x9a4000 0x1000>;
+				status = "disabled";
+				interrupts = <420 NRF_DEFAULT_IRQ_PRIORITY>;
+				#pwm-cells = <3>;
+			};
+
 			i2c130: i2c@9a5000 {
 				compatible = "nordic,nrf-twim";
 				reg = <0x9a5000 0x1000>;
@@ -628,6 +648,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart130: uart@9a5000 {
@@ -656,6 +678,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart131: uart@9a6000 {
@@ -691,6 +715,14 @@
 				prescaler = <0>;
 			};
 
+			pwm131: pwm@9b4000 {
+				compatible = "nordic,nrf-pwm";
+				reg = <0x9b4000 0x1000>;
+				status = "disabled";
+				interrupts = <436 NRF_DEFAULT_IRQ_PRIORITY>;
+				#pwm-cells = <3>;
+			};
+
 			i2c132: i2c@9b5000 {
 				compatible = "nordic,nrf-twim";
 				reg = <0x9b5000 0x1000>;
@@ -710,6 +742,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart132: uart@9b5000 {
@@ -738,6 +772,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart133: uart@9b6000 {
@@ -773,6 +809,14 @@
 				prescaler = <0>;
 			};
 
+			pwm132: pwm@9c4000 {
+				compatible = "nordic,nrf-pwm";
+				reg = <0x9c4000 0x1000>;
+				status = "disabled";
+				interrupts = <452 NRF_DEFAULT_IRQ_PRIORITY>;
+				#pwm-cells = <3>;
+			};
+
 			i2c134: i2c@9c5000 {
 				compatible = "nordic,nrf-twim";
 				reg = <0x9c5000 0x1000>;
@@ -792,6 +836,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart134: uart@9c5000 {
@@ -820,6 +866,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart135: uart@9c6000 {
@@ -855,6 +903,14 @@
 				prescaler = <0>;
 			};
 
+			pwm133: pwm@9d4000 {
+				compatible = "nordic,nrf-pwm";
+				reg = <0x9d4000 0x1000>;
+				status = "disabled";
+				interrupts = <468 NRF_DEFAULT_IRQ_PRIORITY>;
+				#pwm-cells = <3>;
+			};
+
 			i2c136: i2c@9d5000 {
 				compatible = "nordic,nrf-twim";
 				reg = <0x9d5000 0x1000>;
@@ -874,6 +930,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart136: uart@9d5000 {
@@ -902,6 +960,8 @@
 				max-frequency = <DT_FREQ_M(8)>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				rx-delay-supported;
+				rx-delay = <1>;
 			};
 
 			uart137: uart@9d6000 {

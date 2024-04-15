@@ -1539,6 +1539,7 @@ endfunction()
 #   )
 #
 # <out-variable>:            Output variable where the build string will be returned.
+# SHORT <out-variable>:      Output variable where the shortened build string will be returned.
 # BOARD <board>:             Board name to use when creating the build string.
 # BOARD_REVISION <revision>: Board revision to use when creating the build string.
 # BUILD <type>:              Build type to use when creating the build string.
@@ -1561,11 +1562,17 @@ endfunction()
 # calling
 #   zephyr_build_string(build_string BOARD alpha BOARD_REVISION 1.0.0 BOARD_QUALIFIERS /soc/bar MERGE)
 # will return a list of the following strings
-# `alpha_soc_bar_1_0_0;alpha_soc_bar;alpha_soc_1_0_0;alpha_soc;alpha_1_0_0;alpha` in `build_string` parameter.
+# `alpha_soc_bar_1_0_0;alpha_soc_bar` in `build_string` parameter.
+#
+# calling
+#   zephyr_build_string(build_string SHORTENED short_build_string BOARD alpha BOARD_REVISION 1.0.0 BOARD_QUALIFIERS /soc/bar MERGE)
+# will return two lists of the following strings
+# `alpha_soc_bar_1_0_0;alpha_soc_bar` in `build_string` parameter.
+# `alpha_bar_1_0_0;alpha_bar` in `short_build_string` parameter.
 #
 function(zephyr_build_string outvar)
   set(options MERGE REVERSE)
-  set(single_args BOARD BOARD_QUALIFIERS BOARD_REVISION BUILD)
+  set(single_args BOARD BOARD_QUALIFIERS BOARD_REVISION BUILD SHORT)
 
   cmake_parse_arguments(BUILD_STR "${options}" "${single_args}" "" ${ARGN})
   if(BUILD_STR_UNPARSED_ARGUMENTS)
@@ -1589,34 +1596,71 @@ function(zephyr_build_string outvar)
     )
   endif()
 
-  string(REPLACE "/" ";" str_segment_list "${BUILD_STR_BOARD}${BUILD_STR_BOARD_QUALIFIERS}")
+  string(REPLACE "/" ";" str_segment_list "${BUILD_STR_BOARD_QUALIFIERS}")
   string(REPLACE "." "_" revision_string "${BUILD_STR_BOARD_REVISION}")
 
-  string(JOIN "_" ${outvar} ${str_segment_list} ${revision_string} ${BUILD_STR_BUILD})
+  string(JOIN "_" ${outvar} ${BUILD_STR_BOARD} ${str_segment_list} ${revision_string} ${BUILD_STR_BUILD})
 
   if(BUILD_STR_MERGE)
-    if(DEFINED BUILD_STR_BOARD_REVISION)
-      string(JOIN "_" variant_string ${str_segment_list} ${BUILD_STR_BUILD})
+    string(JOIN "_" variant_string ${BUILD_STR_BOARD} ${str_segment_list} ${BUILD_STR_BUILD})
+
+    if(NOT "${variant_string}" IN_LIST ${outvar})
       list(APPEND ${outvar} "${variant_string}")
     endif()
-    list(POP_BACK str_segment_list)
-    while(NOT str_segment_list STREQUAL "")
-      if(DEFINED BUILD_STR_BOARD_REVISION)
-        string(JOIN "_" variant_string ${str_segment_list} ${revision_string} ${BUILD_STR_BUILD})
-        list(APPEND ${outvar} "${variant_string}")
-      endif()
-      string(JOIN "_" variant_string ${str_segment_list} ${BUILD_STR_BUILD})
-      list(APPEND ${outvar} "${variant_string}")
-      list(POP_BACK str_segment_list)
-    endwhile()
   endif()
 
   if(BUILD_STR_REVERSE)
     list(REVERSE ${outvar})
   endif()
+  list(REMOVE_DUPLICATES ${outvar})
+
+  if(BUILD_STR_SHORT AND BUILD_STR_BOARD_QUALIFIERS)
+    string(REGEX REPLACE "^/[^/]*(.*)" "\\1" shortened_qualifiers "${BOARD_QUALIFIERS}")
+    string(REPLACE "/" ";" str_short_segment_list "${shortened_qualifiers}")
+    string(JOIN "_" ${BUILD_STR_SHORT}
+           ${BUILD_STR_BOARD} ${str_short_segment_list} ${revision_string} ${BUILD_STR_BUILD}
+    )
+    if(BUILD_STR_MERGE)
+      string(JOIN "_" variant_string ${BUILD_STR_BOARD} ${str_short_segment_list} ${BUILD_STR_BUILD})
+
+      if(NOT "${variant_string}" IN_LIST ${BUILD_STR_SHORT})
+        list(APPEND ${BUILD_STR_SHORT} "${variant_string}")
+      endif()
+    endif()
+
+    if(BUILD_STR_REVERSE)
+      list(REVERSE ${BUILD_STR_SHORT})
+    endif()
+    list(REMOVE_DUPLICATES ${BUILD_STR_SHORT})
+    set(${BUILD_STR_SHORT} ${${BUILD_STR_SHORT}} PARENT_SCOPE)
+  endif()
 
   # This updates the provided outvar in parent scope (callers scope)
   set(${outvar} ${${outvar}} PARENT_SCOPE)
+endfunction()
+
+# Function to add one or more directories to the include list passed to the syscall generator.
+function(zephyr_syscall_include_directories)
+  foreach(one_dir ${ARGV})
+    if(EXISTS ${one_dir})
+      set(include_dir ${one_dir})
+    elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${one_dir})
+      set(include_dir ${CMAKE_CURRENT_SOURCE_DIR}/${one_dir})
+    else()
+      message(FATAL_ERROR "Syscall include directory not found: ${one_dir}")
+    endif()
+
+    target_include_directories(
+      syscalls_interface INTERFACE
+      ${include_dir}
+    )
+    add_dependencies(
+      syscalls_interface
+      ${include_dir}
+    )
+
+    unset(include_dir)
+  endforeach()
 endfunction()
 
 # Function to add header file(s) to the list to be passed to syscall generator.
@@ -1631,10 +1675,6 @@ function(zephyr_syscall_header)
     endif()
 
     target_sources(
-      syscalls_interface INTERFACE
-      ${header_file}
-    )
-    target_include_directories(
       syscalls_interface INTERFACE
       ${header_file}
     )
@@ -2506,7 +2546,6 @@ endfunction()
 #                                                creating file names based on board settings.
 #                                                Only the first match found in <paths> will be
 #                                                returned in the <list>
-#
 #                     DTS <list>:    List to append DTS overlay files in <path> to
 #                     KCONF <list>:  List to append Kconfig fragment files in <path> to
 #                     DEFCONF <list>: List to append _defconfig files in <path> to
@@ -2602,32 +2641,44 @@ Relative paths are only allowed with `-D${ARGV1}=<path>`")
       set(kconf_filename_list ${ZFILE_NAMES})
     else()
       zephyr_build_string(filename_list
+                          SHORT shortened_filename_list
                           BOARD ${ZFILE_BOARD}
                           BOARD_REVISION ${ZFILE_BOARD_REVISION}
                           BOARD_QUALIFIERS ${ZFILE_BOARD_QUALIFIERS}
                           BUILD ${ZFILE_BUILD}
                           MERGE REVERSE
       )
-      list(REMOVE_DUPLICATES filename_list)
+
       set(dts_filename_list ${filename_list})
+      set(dts_shortened_filename_list ${shortened_filename_list})
       list(TRANSFORM dts_filename_list APPEND ".overlay")
+      list(TRANSFORM dts_shortened_filename_list APPEND ".overlay")
 
       set(kconf_filename_list ${filename_list})
+      set(kconf_shortened_filename_list ${shortened_filename_list})
       list(TRANSFORM kconf_filename_list APPEND ".conf")
+      list(TRANSFORM kconf_shortened_filename_list APPEND ".conf")
     endif()
 
     if(ZFILE_DTS)
       foreach(path ${ZFILE_CONF_FILES})
-        foreach(filename ${dts_filename_list})
-          if(NOT IS_ABSOLUTE ${filename})
-            set(test_file ${path}/${filename})
-          else()
-            set(test_file ${filename})
-          endif()
-          zephyr_file_suffix(test_file SUFFIX ${ZFILE_SUFFIX})
+        foreach(filename IN ZIP_LISTS dts_filename_list dts_shortened_filename_list)
+          foreach(i RANGE 1)
+            if(NOT IS_ABSOLUTE filename_${i} AND DEFINED filename_${i})
+              set(test_file_${i} ${path}/${filename_${i}})
+            else()
+              set(test_file_${i} ${filename_${i}})
+            endif()
+            zephyr_file_suffix(test_file_${i} SUFFIX ${ZFILE_SUFFIX})
 
-          if(EXISTS ${test_file})
-            list(APPEND ${ZFILE_DTS} ${test_file})
+            if(NOT EXISTS ${test_file_${i}})
+              set(test_file_${i})
+            endif()
+          endforeach()
+
+          if(test_file_0 OR test_file_1)
+            list(APPEND found_dts_files ${test_file_0})
+            list(APPEND found_dts_files ${test_file_1})
 
             if(DEFINED ZFILE_BUILD)
               set(deprecated_file_found y)
@@ -2637,29 +2688,48 @@ Relative paths are only allowed with `-D${ARGV1}=<path>`")
               break()
             endif()
           endif()
+
+          if(test_file_1 AND NOT BOARD_${ZFILE_BOARD}_SINGLE_SOC)
+            message(FATAL_ERROR "Board ${ZFILE_BOARD} defines multiple SoCs.\nShortened file name "
+                    "(${filename_1}) not allowed, use '<board>_<soc>.overlay' naming"
+            )
+          endif()
+
+          if(test_file_0 AND test_file_1)
+            message(FATAL_ERROR "Conflicting file names discovered. Cannot use both ${filename_0} "
+                    "and ${filename_1}. Please choose one naming style, "
+                    "${filename_0} is recommended."
+            )
+          endif()
         endforeach()
       endforeach()
+
+      list(APPEND ${ZFILE_DTS} ${found_dts_files})
 
       # This updates the provided list in parent scope (callers scope)
       set(${ZFILE_DTS} ${${ZFILE_DTS}} PARENT_SCOPE)
-
-      if(NOT ${ZFILE_DTS})
-        set(not_found ${dts_filename_list})
-      endif()
     endif()
 
     if(ZFILE_KCONF)
+      set(found_conf_files)
       foreach(path ${ZFILE_CONF_FILES})
-        foreach(filename ${kconf_filename_list})
-          if(NOT IS_ABSOLUTE ${filename})
-            set(test_file ${path}/${filename})
-          else()
-            set(test_file ${filename})
-          endif()
-          zephyr_file_suffix(test_file SUFFIX ${ZFILE_SUFFIX})
+        foreach(filename IN ZIP_LISTS kconf_filename_list kconf_shortened_filename_list)
+          foreach(i RANGE 1)
+            if(NOT IS_ABSOLUTE filename_${i} AND DEFINED filename_${i})
+              set(test_file_${i} ${path}/${filename_${i}})
+            else()
+              set(test_file_${i} ${filename_${i}})
+            endif()
+            zephyr_file_suffix(test_file_${i} SUFFIX ${ZFILE_SUFFIX})
 
-          if(EXISTS ${test_file})
-            list(APPEND ${ZFILE_KCONF} ${test_file})
+            if(NOT EXISTS ${test_file_${i}})
+              set(test_file_${i})
+            endif()
+          endforeach()
+
+          if(test_file_0 OR test_file_1)
+            list(APPEND found_conf_files ${test_file_0})
+            list(APPEND found_conf_files ${test_file_1})
 
             if(DEFINED ZFILE_BUILD)
               set(deprecated_file_found y)
@@ -2669,8 +2739,23 @@ Relative paths are only allowed with `-D${ARGV1}=<path>`")
               break()
             endif()
           endif()
+
+          if(test_file_1 AND NOT BOARD_${ZFILE_BOARD}_SINGLE_SOC)
+            message(FATAL_ERROR "Board ${ZFILE_BOARD} defines multiple SoCs.\nShortened file name "
+                    "(${filename_1}) not allowed, use '<board>_<soc>.conf' naming"
+            )
+          endif()
+
+          if(test_file_0 AND test_file_1)
+            message(FATAL_ERROR "Conflicting file names discovered. Cannot use both ${filename_0} "
+                    "and ${filename_1}. Please choose one naming style, "
+                    "${filename_0} is recommended."
+            )
+          endif()
         endforeach()
       endforeach()
+
+      list(APPEND ${ZFILE_KCONF} ${found_conf_files})
 
       # This updates the provided list in parent scope (callers scope)
       set(${ZFILE_KCONF} ${${ZFILE_KCONF}} PARENT_SCOPE)
@@ -2693,13 +2778,34 @@ Relative paths are only allowed with `-D${ARGV1}=<path>`")
     endif()
 
     if(ZFILE_DEFCONFIG)
+      set(found_defconf_files)
       foreach(path ${ZFILE_CONF_FILES})
-        foreach(filename ${filename_list})
-          if(EXISTS ${path}/${filename}_defconfig)
-            list(APPEND ${ZFILE_DEFCONFIG} ${path}/${filename}_defconfig)
+        foreach(filename IN ZIP_LISTS filename_list shortened_filename_list)
+          foreach(i RANGE 1)
+            set(test_file_${i} ${path}/${filename_${i}}_defconfig)
+
+            if(EXISTS ${test_file_${i}})
+              list(APPEND found_defconf_files ${test_file_${i}})
+            else()
+              set(test_file_${i})
+            endif()
+          endforeach()
+
+          if(test_file_1 AND NOT BOARD_${ZFILE_BOARD}_SINGLE_SOC)
+            message(FATAL_ERROR "Board ${ZFILE_BOARD} defines multiple SoCs.\nShortened file name "
+                    "(${filename_1}_defconfig) not allowed, use '<board>_<soc>_defconfig' naming"
+            )
+          endif()
+
+          if(test_file_0 AND test_file_1)
+            message(FATAL_ERROR "Conflicting file names discovered. Cannot use both "
+                    "${filename_0}_defconfig and ${filename_1}_defconfig. Please choose one "
+                    "naming style, ${filename_0}_defconfig is recommended."
+            )
           endif()
         endforeach()
       endforeach()
+      list(APPEND ${ZFILE_DEFCONFIG} ${found_defconf_files})
 
       # This updates the provided list in parent scope (callers scope)
       set(${ZFILE_DEFCONFIG} ${${ZFILE_DEFCONFIG}} PARENT_SCOPE)
@@ -4361,7 +4467,7 @@ function(zephyr_linker_dts_section)
 
   if(DTS_SECTION_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "zephyr_linker_dts_section(${ARGV0} ...) given unknown "
-	    "arguments: ${DTS_SECTION_UNPARSED_ARGUMENTS}"
+            "arguments: ${DTS_SECTION_UNPARSED_ARGUMENTS}"
     )
   endif()
 
@@ -5136,13 +5242,14 @@ endfunction()
 # Usage:
 #   add_llext_target(<target_name>
 #                    OUTPUT  <output_file>
-#                    SOURCES <source_file>
+#                    SOURCES <source_files>
 #   )
 #
-# Add a custom target that compiles a single source file to a .llext file.
+# Add a custom target that compiles a set of source files to a .llext file.
 #
 # Output and source files must be specified using the OUTPUT and SOURCES
-# arguments. Only one source file is currently supported.
+# arguments. Only one source file is supported when LLEXT_TYPE_ELF_OBJECT is
+# selected, since there is no linking step in that case.
 #
 # The llext code will be compiled with mostly the same C compiler flags used
 # in the Zephyr build, but with some important modifications. The list of
@@ -5179,14 +5286,14 @@ function(add_llext_target target_name)
   # Source and output files must be provided
   zephyr_check_arguments_required_all("add_llext_target" LLEXT OUTPUT SOURCES)
 
-  # Source list length must currently be 1
   list(LENGTH LLEXT_SOURCES source_count)
-  if(NOT source_count EQUAL 1)
-    message(FATAL_ERROR "add_llext_target: only one source file is supported")
+  if(CONFIG_LLEXT_TYPE_ELF_OBJECT AND NOT (source_count EQUAL 1))
+    message(FATAL_ERROR "add_llext_target: only one source file is supported "
+                        "for ELF object file builds")
   endif()
 
   set(llext_pkg_output ${LLEXT_OUTPUT})
-  set(source_file ${LLEXT_SOURCES})
+  set(source_files ${LLEXT_SOURCES})
 
   # Convert the LLEXT_REMOVE_FLAGS list to a regular expression, and use it to
   # filter out these flags from the Zephyr target settings
@@ -5203,20 +5310,38 @@ function(add_llext_target target_name)
   )
 
   # Compile the source file using current Zephyr settings but a different
-  # set of flags.
-  # This is currently arch-specific since the ARM loader for .llext files
-  # expects object file format, while the Xtensa one uses shared libraries.
+  # set of flags to obtain the desired llext object type.
   set(llext_lib_target ${target_name}_llext_lib)
-  if(CONFIG_ARM)
+  if(CONFIG_LLEXT_TYPE_ELF_OBJECT)
 
     # Create an object library to compile the source file
-    add_library(${llext_lib_target} OBJECT ${source_file})
+    add_library(${llext_lib_target} OBJECT ${source_files})
     set(llext_lib_output $<TARGET_OBJECTS:${llext_lib_target}>)
 
-  elseif(CONFIG_XTENSA)
+  elseif(CONFIG_LLEXT_TYPE_ELF_RELOCATABLE)
+
+    # CMake does not directly support a "RELOCATABLE" library target.
+    # The "SHARED" target would be similar, but that unavoidably adds
+    # a "-shared" flag to the linker command line which does firmly
+    # conflict with "-r".
+    # A workaround is to use an executable target and make the linker
+    # output a relocatable file. The output file suffix is changed so
+    # the result looks like the object file it actually is.
+    add_executable(${llext_lib_target} EXCLUDE_FROM_ALL ${source_files})
+    target_link_options(${llext_lib_target} PRIVATE -r)
+    set_target_properties(${llext_lib_target} PROPERTIES
+      SUFFIX ${CMAKE_C_OUTPUT_EXTENSION})
+    set(llext_lib_output $<TARGET_FILE:${llext_lib_target}>)
+
+    # Add the llext flags to the linking step as well
+    target_link_options(${llext_lib_target} PRIVATE
+      ${LLEXT_APPEND_FLAGS}
+    )
+
+  elseif(CONFIG_LLEXT_TYPE_ELF_SHAREDLIB)
 
     # Create a shared library
-    add_library(${llext_lib_target} SHARED ${source_file})
+    add_library(${llext_lib_target} SHARED ${source_files})
     set(llext_lib_output $<TARGET_FILE:${llext_lib_target}>)
 
     # Add the llext flags to the linking step as well
@@ -5265,8 +5390,8 @@ function(add_llext_target target_name)
     COMMAND_EXPAND_LISTS
   )
 
-  # Arch-specific packaging of the built binary file into an .llext file
-  if(CONFIG_ARM)
+  # Type-specific packaging of the built binary file into an .llext file
+  if(CONFIG_LLEXT_TYPE_ELF_OBJECT)
 
     # No packaging required, simply copy the object file
     add_custom_command(
@@ -5275,7 +5400,22 @@ function(add_llext_target target_name)
       DEPENDS ${llext_proc_target} ${llext_pkg_input}
     )
 
-  elseif(CONFIG_XTENSA)
+  elseif(CONFIG_LLEXT_TYPE_ELF_RELOCATABLE)
+
+    # Need to remove just some sections from the relocatable object
+    # (using strip in this case would remove _all_ symbols)
+    add_custom_command(
+      OUTPUT ${llext_pkg_output}
+      COMMAND $<TARGET_PROPERTY:bintools,elfconvert_command>
+              $<TARGET_PROPERTY:bintools,elfconvert_flag>
+              $<TARGET_PROPERTY:bintools,elfconvert_flag_section_remove>.xt.*
+              $<TARGET_PROPERTY:bintools,elfconvert_flag_infile>${llext_pkg_input}
+              $<TARGET_PROPERTY:bintools,elfconvert_flag_outfile>${llext_pkg_output}
+              $<TARGET_PROPERTY:bintools,elfconvert_flag_final>
+      DEPENDS ${llext_proc_target} ${llext_pkg_input}
+    )
+
+  elseif(CONFIG_LLEXT_TYPE_ELF_SHAREDLIB)
 
     # Need to strip the shared library of some sections
     add_custom_command(
@@ -5289,8 +5429,6 @@ function(add_llext_target target_name)
       DEPENDS ${llext_proc_target} ${llext_pkg_input}
     )
 
-  else()
-    message(FATAL_ERROR "add_llext_target: unsupported architecture")
   endif()
 
   # Add user-visible target and dependency, and fill in properties
@@ -5318,7 +5456,7 @@ endfunction()
 # the build. The command will be executed at the specified build step and
 # can refer to <target>'s properties for build-specific details.
 #
-# The differrent build steps are:
+# The different build steps are:
 # - PRE_BUILD:  Before the llext code is linked, if the architecture uses
 #               dynamic libraries. This step can access `lib_target` and
 #               its own properties.
