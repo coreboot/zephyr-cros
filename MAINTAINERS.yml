@@ -3886,7 +3886,7 @@ TF-M Integration:
   labels:
     - "area: TF-M"
   tests:
-    - tfm
+    - trusted-firmware-m
 
 
 "Toolchain Integration":
