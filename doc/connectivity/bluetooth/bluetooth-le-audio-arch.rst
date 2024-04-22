@@ -9,6 +9,23 @@ LE Audio Stack
 
    Bluetooth Audio Architecture
 
+Overall design
+**************
+
+The overall design of the LE Audio stack is that the implementation follows the specifications
+as closely as possible,
+both in terms of structure but also naming.
+Most API functions are prefixed by the specification acronym
+(e.g. `bt_bap` for the Basic Audio Profile (BAP) and `bt_vcp` for the Volume Control Profile (VCP)).
+The functions are then further prefixed with the specific role from each profile where applicable
+(e.g. :c:func:`bt_bap_unicast_client_discover` and :c:func:`bt_vcp_vol_rend_set_vol`).
+There are usually a function per procedure defined by the profile or service specifications,
+and additional helper or meta functions that do not correspond to procedures.
+
+The structure of the files generally also follow this,
+where BAP related files are prefixed with `bap` and VCP related files are prefixed with `vcp`.
+If the file is specific for a profile role, the role is also embedded in the file name.
+
 Generic Audio Framework (GAF)
 *****************************
 The Generic Audio Framework (GAF) is considered the middleware of the Bluetooth
@@ -494,6 +511,92 @@ The CSIP implementation supports the following roles
 The API reference for media control can be found in
 :ref:`Bluetooth Coordinated Sets <bluetooth_coordinated_sets>`.
 
+Specification correctness and data location
+-------------------------------------------
+
+The implementations are designed to ensure specification compliance as much as possible.
+When a specification introduces a requirement with e.g. a **shall** then the implementation should
+attempt to ensure that this requirement is always followed.
+Depending on the context of this,
+the implementation ensures this by rejecting invalid parameters from the application,
+or from the remote devices.
+
+Some requirements from the specifications are not or can not be handled by the stack itself for
+various reasons.
+One reason when the stack cannot handle a requirement is if the data related to the requirement is
+exclusively controlled by the application.
+An example of this is the advertising data,
+where multiple service have requirements for what to advertise and when,
+but where both the advertising state and data is exclusively controlled by the application.
+
+Oppositely there are also requirements from the specification,
+where the data related to the requirement is exclusively controlled by the stack.
+An example of this is the Volume Control Service (VCS) state,
+where the specifications mandata that the VCP Volume Renderer (VCS server) modify the values
+without a choice,
+e.g. when setting the absolutely volume.
+In cases like this the application is only notified about the change with a callback,
+but cannot reject the request (the stack will reject any invalid requests).
+
+Generally when the data is simple (like the VCS state which only take up a few bytes),
+the data is kept in and controlled by the stack,
+as this can ensure that the requirements can be handled by the stack,
+making it easier to use a profile role correctly.
+When the data is more complex (e.g. the PAC records),
+the data may be kept by the application and the stack only contains a reference to it.
+When the data is very application specific (e.g. advertising data),
+the data is kept in and controlled by the application.
+
+As a rule of thumb, the return types of the callbacks for each profile implementation indicate
+whether the data is controlled by the stack or the application.
+For example all the callbacks for the VCP Volume Renderer have the return type of `void`,
+but the return type of the BAP Unicast Server callbacks are `int`,
+indicating that the application not only controls a lot of the Unicast Server data,
+but can also reject the requests.
+The choice of what the return type of the callbacks often depend on the specifications,
+and how much control the role has in a given context.
+
+Things worth knowing or considering when using LE Audio
+=======================================================
+
+This section describes a few tings to consider when contributing to or using LE Audio in Zephyr.
+The things described by this section are not unique to Zephyr as they are defined by the
+specifications.
+
+Security requirements
+---------------------
+
+All LE Audio services require Security Level 2 but where the key must be 128-bit and derived via an
+OOB method or via LE Secure connections.
+There is no Core-spec defined way of reporting this in GATT,
+as ATT does not have a specific error code for missing OOB method or LE Secure Connections
+(although there is a way to report wrong key size).
+
+In Zephyr we do not force the device to always use these, as a device that uses LE Audio may also
+use other profiles and services that do not require such security.
+We guard all access to services using a custom security check implemented in
+:zephyr_file:`subsys/bluetooth/audio/audio.c`, where all LE Audio services must use the
+internal `BT_AUDIO_CHRC` macro for proper security verification.
+
+Access to the LTK for encrypted SIRKs in CSIS
+---------------------------------------------
+
+The Coordinated Set Identification Service (CSIS) may encrypt the SIRK (set identity resolving key).
+The process of encrypting the SIRK requires the LTK as the encryption key,
+which is typically not exposed to higher layer implementations such as CSIS.
+This does not have any effect on the security though.
+
+MTU requirements
+----------------
+
+The Basic Audio Profile (BAP) has a requirement that both sides shall support a minimum ATT_MTU of
+at least 64 on the unenhanced ATT bearer or at least one enhanced ATT bearer.
+The requirement comes from the preferred (or sometimes mandatory) use of GATT Write Without
+Response, and where support for Write Long Characterstic Value is optional in most cases.
+
+If a ASCS device supports values larger than the minimum ATT_MTU of 64 octets, then it shall supoort
+Read long Characterstic Value by setting :kconfig:option:`CONFIG_BT_ATT_PREPARE_COUNT` to a
+non-zero value.
 
 LE Audio resources
 ##################

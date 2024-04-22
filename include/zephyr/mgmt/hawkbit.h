@@ -37,6 +37,33 @@ enum hawkbit_response {
 };
 
 /**
+ * @brief Callback to provide the custom data to the hawkBit server.
+ *
+ * @details This callback is used to provide the custom data to the hawkBit server.
+ * The custom data is used to provide the hawkBit server with the device specific
+ * data.
+ *
+ * @param device_id The device ID.
+ * @param buffer The buffer to store the json.
+ * @param buffer_size The size of the buffer.
+ */
+typedef int (*hawkbit_config_device_data_cb_handler_t)(const char *device_id, uint8_t *buffer,
+						  const size_t buffer_size);
+
+/**
+ * @brief Set the custom data callback.
+ *
+ * @details This function is used to set the custom data callback.
+ * The callback is used to provide the custom data to the hawkBit server.
+ *
+ * @param cb The callback function.
+ *
+ * @return 0 on success.
+ * @return -EINVAL if the callback is NULL.
+ */
+int hawkbit_set_custom_data_cb(hawkbit_config_device_data_cb_handler_t cb);
+
+/**
  * @brief Init the flash partition
  *
  * @return 0 on success, negative on error.
@@ -67,6 +94,26 @@ enum hawkbit_response hawkbit_probe(void);
  * @brief Request system to reboot.
  */
 void hawkbit_reboot(void);
+
+/**
+ * @brief Callback to get the device identity.
+ *
+ * @param id Pointer to the buffer to store the device identity
+ * @param id_max_len The maximum length of the buffer
+ */
+typedef bool (*hawkbit_get_device_identity_cb_handler_t)(char *id, int id_max_len);
+
+/**
+ * @brief Set the device identity callback.
+ *
+ * @details This function is used to set a custom device identity callback.
+ *
+ * @param cb The callback function.
+ *
+ * @return 0 on success.
+ * @return -EINVAL if the callback is NULL.
+ */
+int hawkbit_set_device_identity_cb(hawkbit_get_device_identity_cb_handler_t cb);
 
 /**
  * @}
