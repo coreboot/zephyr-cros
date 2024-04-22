@@ -35,6 +35,10 @@ Architectures
 
 * ARM
 
+* RISC-V
+
+  * Implemented frame-pointer based stack unwinding.
+
 * Xtensa
 
 Bluetooth
@@ -126,6 +130,11 @@ Drivers and Sensors
 
 * Ethernet
 
+  * Deperecated eth_mcux driver in favor of the reworked nxp_enet driver.
+  * Driver nxp_enet is no longer experimental.
+  * All boards and SOCs with :dtcompatible:`nxp,kinetis-ethernet` compatible nodes
+    reworked to use the new :dtcompatible:`nxp,enet` binding.
+
 * Flash
 
 * GNSS
@@ -182,6 +191,9 @@ Drivers and Sensors
 
 * Wi-Fi
 
+  * Added support for configuring RTS threshold. With this, users can set the RTS threshold value or
+    disable the RTS mechanism.
+
 Networking
 **********
 
@@ -219,6 +231,16 @@ Libraries / Subsystems
 **********************
 
 * Management
+
+  * hawkBit
+
+    * The hawkBit subsystem has been reworked to use the settings subsystem to store the hawkBit
+      configuration.
+
+    * By enabling :kconfig:option:`CONFIG_HAWKBIT_SET_SETTINGS_RUNTIME`, the hawkBit settings can
+      be configured at runtime. Use the :c:func:`hawkbit_set_config` function to set the hawkBit
+      configuration. It can also be set via the hawkBit shell, by using the ``hawkbit set``
+      command.
 
 * Logging
 
