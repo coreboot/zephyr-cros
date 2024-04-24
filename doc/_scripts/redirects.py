@@ -15,6 +15,7 @@ Notes:
 REDIRECTS = [
     # zephyr-keep-sorted-start
     ('application/index', 'develop/application/index'),
+    ('boards/arduino/uno_r4_minima/doc/index', 'boards/arduino/uno_r4/doc/index'),
     ('boards/x86/ehl_crb/doc/index', 'boards/x86/intel_ehl/doc/index'),
     ('boards/x86/rpl_crb/doc/index', 'boards/x86/intel_rpl/doc/index'),
     ('connectivity/bluetooth/bluetooth-audio-arch', 'connectivity/bluetooth/bluetooth-le-audio-arch'),
@@ -180,6 +181,7 @@ REDIRECTS = [
     ('reference/usermode/overview', 'kernel/usermode/overview'),
     ('reference/usermode/syscalls', 'kernel/usermode/syscalls'),
     ('reference/util/index', 'kernel/util/index'),
+    ('samples/drivers/adc/README', 'samples/drivers/adc/adc_dt/README'),
     ('samples/drivers/kscan_touch', 'samples/subsys/input/input'),
     ('samples/drivers/led_apa102/README', 'samples/drivers/led_strip/README'),
     ('samples/drivers/led_lpd8806/README', 'samples/drivers/led_strip/README'),

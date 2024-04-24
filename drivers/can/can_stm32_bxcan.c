@@ -632,15 +632,15 @@ static int can_stm32_init(const struct device *dev)
 		return ret;
 	}
 
-	ret = can_stm32_leave_sleep_mode(can);
-	if (ret) {
-		LOG_ERR("Failed to exit sleep mode");
-		return ret;
-	}
-
 	ret = can_stm32_enter_init_mode(can);
 	if (ret) {
 		LOG_ERR("Failed to enter init mode");
+		return ret;
+	}
+
+	ret = can_stm32_leave_sleep_mode(can);
+	if (ret) {
+		LOG_ERR("Failed to exit sleep mode");
 		return ret;
 	}
 
@@ -773,9 +773,6 @@ static int can_stm32_send(const struct device *dev, const struct can_frame *fram
 		    , frame->id
 		    , (frame->flags & CAN_FRAME_IDE) != 0 ? "extended" : "standard"
 		    , (frame->flags & CAN_FRAME_RTR) != 0 ? "yes" : "no");
-
-	__ASSERT_NO_MSG(callback != NULL);
-	__ASSERT(frame->dlc == 0U || frame->data != NULL, "Dataptr is null");
 
 	if (frame->dlc > CAN_MAX_DLC) {
 		LOG_ERR("DLC of %d exceeds maximum (%d)", frame->dlc, CAN_MAX_DLC);

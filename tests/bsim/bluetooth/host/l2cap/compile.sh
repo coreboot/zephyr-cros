@@ -13,6 +13,7 @@ source ${ZEPHYR_BASE}/tests/bsim/compile.source
 app=tests/bsim/bluetooth/host/l2cap/general compile
 app=tests/bsim/bluetooth/host/l2cap/userdata compile
 app=tests/bsim/bluetooth/host/l2cap/stress compile
+app=tests/bsim/bluetooth/host/l2cap/stress conf_file=prj_nofrag.conf compile
 app=tests/bsim/bluetooth/host/l2cap/stress conf_file=prj_syswq.conf compile
 app=tests/bsim/bluetooth/host/l2cap/split/dut compile
 app=tests/bsim/bluetooth/host/l2cap/split/tester compile
@@ -20,7 +21,6 @@ app=tests/bsim/bluetooth/host/l2cap/credits compile
 app=tests/bsim/bluetooth/host/l2cap/credits conf_file=prj_ecred.conf compile
 app=tests/bsim/bluetooth/host/l2cap/credits_seg_recv compile
 app=tests/bsim/bluetooth/host/l2cap/credits_seg_recv conf_file=prj_ecred.conf compile
-app=tests/bsim/bluetooth/host/l2cap/frags compile
 app=tests/bsim/bluetooth/host/l2cap/send_on_connect compile
 app=tests/bsim/bluetooth/host/l2cap/send_on_connect conf_file=prj_ecred.conf compile
 

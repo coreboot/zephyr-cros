@@ -21,13 +21,18 @@
 # Outcome:
 # The following variables will be defined when this CMake module completes:
 #
-# - BOARD:                Board, without revision field.
-# - BOARD_REVISION:       Board revision
-# - BOARD_DIR:            Board directory with the implementation for selected board
-# - ARCH_DIR:             Arch dir for extracted from selected board
-# - BOARD_ROOT:           BOARD_ROOT with ZEPHYR_BASE appended
-# - BOARD_EXTENSION_DIRS: List of board extension directories (If
-#                         BOARD_EXTENSIONS is not explicitly disabled)
+# - BOARD:                       Board, without revision field.
+# - BOARD_REVISION:              Board revision
+# - BOARD_QUALIFIERS:            Board qualifiers
+# - NORMALIZED_BOARD_QUALIFIERS: Board qualifiers in lower-case format where slashes have been
+#                                replaced with underscores
+# - NORMALIZED_BOARD_TARGET:     Board target in lower-case format where slashes have been
+#                                replaced with underscores
+# - BOARD_DIR:                   Board directory with the implementation for selected board
+# - ARCH_DIR:                    Arch dir for extracted from selected board
+# - BOARD_ROOT:                  BOARD_ROOT with ZEPHYR_BASE appended
+# - BOARD_EXTENSION_DIRS:        List of board extension directories (If
+#                                BOARD_EXTENSIONS is not explicitly disabled)
 #
 # The following targets will be defined when this CMake module completes:
 # - board: when invoked, a list of valid boards will be printed
@@ -297,10 +302,14 @@ elseif(HWMv2)
   if(LIST_BOARD_QUALIFIERS)
     # Allow users to omit the SoC when building for a board with a single SoC.
     list(LENGTH LIST_BOARD_SOCS socs_length)
-    if(NOT DEFINED BOARD_QUALIFIERS AND socs_length EQUAL 1)
-      set(BOARD_QUALIFIERS "/${LIST_BOARD_SOCS}")
-    elseif("${BOARD_QUALIFIERS}" MATCHES "^//.*" AND socs_length EQUAL 1)
-      string(REGEX REPLACE "^//" "/${LIST_BOARD_SOCS}/" BOARD_QUALIFIERS "${BOARD_QUALIFIERS}")
+    if(socs_length EQUAL 1)
+      set(BOARD_SINGLE_SOC TRUE)
+      set(BOARD_${BOARD}_SINGLE_SOC TRUE)
+      if(NOT DEFINED BOARD_QUALIFIERS)
+        set(BOARD_QUALIFIERS "/${LIST_BOARD_SOCS}")
+      elseif("${BOARD_QUALIFIERS}" MATCHES "^//.*")
+        string(REGEX REPLACE "^//" "/${LIST_BOARD_SOCS}/" BOARD_QUALIFIERS "${BOARD_QUALIFIERS}")
+      endif()
     endif()
 
     set(board_targets ${LIST_BOARD_QUALIFIERS})
@@ -332,7 +341,12 @@ endif()
 if(DEFINED BOARD_QUALIFIERS)
   string(REGEX REPLACE "^/" "qualifiers: " board_message_qualifiers "${BOARD_QUALIFIERS}")
   set(board_message "${board_message}, ${board_message_qualifiers}")
+
+  string(REPLACE "/" "_" NORMALIZED_BOARD_QUALIFIERS "${BOARD_QUALIFIERS}")
 endif()
+
+set(NORMALIZED_BOARD_TARGET "${BOARD}${BOARD_QUALIFIERS}")
+string(REPLACE "/" "_" NORMALIZED_BOARD_TARGET "${NORMALIZED_BOARD_TARGET}")
 
 message(STATUS "${board_message}")
 

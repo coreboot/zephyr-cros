@@ -21,4 +21,6 @@ supported:
   - dac
   - i2c
   - watchdog
+  - pwm
+  - counter
 vendor: nxp

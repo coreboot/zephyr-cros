@@ -56,7 +56,7 @@ manifest:
       remote: babblesim
       repo-path: ext_2G4_phy_v1
       path: tools/bsim/components/ext_2G4_phy_v1
-      revision: 1ab9a884621d9ca719ef23536ca47d10494220c6
+      revision: d8302b8d51409b9e717a1a0ba6b443d3b5552a6c
       groups:
         - babblesim
     - name: babblesim_ext_2G4_channel_NtNcable
@@ -183,7 +183,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: fc2bab706f195c64d40016c9855b8acd7c235ded
+      revision: 827224f29e99972cd3b999dba913ae4649790671
       path: modules/hal/nordic
       groups:
         - hal
@@ -193,7 +193,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 6b252c34eef7d0fdd2dee8261ab68086522c4435
+      revision: cd046faf8a3dc879982ff6079fc48a80a0d53e7c
       path: modules/hal/nxp
       groups:
         - hal
@@ -295,7 +295,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: df94612a846b8b1da166d3e4e4273df54de02340
+      revision: 123d37db9cae528d51530c61ba0422192bc03bda
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: da78aea63159771956fe0c9263f2e6985b66e9d5
@@ -312,7 +312,7 @@ manifest:
       path: modules/lib/picolibc
       revision: 764ef4e401a8f4c6a86ab723533841f072885a5b
     - name: segger
-      revision: 9d0191285956cef43daf411edc2f1a7788346def
+      revision: b011c45b585e097d95d9cf93edf4f2e01588d3cd
       path: modules/debug/segger
       groups:
         - debug
