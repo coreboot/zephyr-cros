@@ -574,6 +574,16 @@ static int __wifi_args_to_params(const struct shell *sh, size_t argc, char *argv
 	if (params->psk && !secure_connection) {
 		PR_WARNING("Passphrase provided without security configuration\n");
 	}
+
+	if (!params->ssid) {
+		PR_ERROR("SSID not provided\n");
+		return -EINVAL;
+	}
+
+	if (iface_mode == WIFI_MODE_AP && params->channel == WIFI_CHANNEL_ANY) {
+		PR_ERROR("Channel not provided\n");
+		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -582,6 +592,7 @@ static int cmd_wifi_connect(const struct shell *sh, size_t argc,
 {
 	struct net_if *iface = net_if_get_first_wifi();
 	struct wifi_connect_req_params cnx_params = { 0 };
+	int ret;
 
 	context.sh = sh;
 	if (__wifi_args_to_params(sh, argc, argv, &cnx_params, WIFI_MODE_INFRA)) {
@@ -590,12 +601,11 @@ static int cmd_wifi_connect(const struct shell *sh, size_t argc,
 	}
 
 	context.connecting = true;
-
-	if (net_mgmt(NET_REQUEST_WIFI_CONNECT, iface,
-		     &cnx_params, sizeof(struct wifi_connect_req_params))) {
-		PR_WARNING("Connection request failed\n");
+	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface,
+		       &cnx_params, sizeof(struct wifi_connect_req_params));
+	if (ret) {
+		printk("Connection request failed with error: %d\n", ret);
 		context.connecting = false;
-
 		return -ENOEXEC;
 	}
 
@@ -621,7 +631,7 @@ static int cmd_wifi_disconnect(const struct shell *sh, size_t argc,
 		if (status == -EALREADY) {
 			PR_INFO("Already disconnected\n");
 		} else {
-			PR_WARNING("Disconnect request failed\n");
+			PR_WARNING("Disconnect request failed: %d\n", status);
 			return -ENOEXEC;
 		}
 	} else {
@@ -1902,8 +1912,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(wifi_commands,
 		  "[-c --channel]: Channel that needs to be scanned for connection. 0:any channel.\n"
 		  "[-b, --band] 0: any band (2:2.4GHz, 5:5GHz, 6:6GHz]\n"
 		  "[-p, --psk]: Passphrase (valid only for secure SSIDs)\n"
-		  "[-k, --key-mgmt]: Key Management type\n"
-		  "0:None, 1:WPA2-PSK, 2:WPA2-PSK-256, 3:SAE, 4:WAPI, 5:EAP, 6:WEP, 7: WPA-PSK\n"
+		  "[-k, --key-mgmt]: Key Management type (valid only for secure SSIDs)\n"
+		  "0:None, 1:WPA2-PSK, 2:WPA2-PSK-256, 3:SAE, 4:WAPI, 5:EAP, 6:WEP,"
+		  " 7: WPA-PSK, 8: WPA-Auto-Personal\n"
 		  "[-w, --ieee-80211w]: MFP (optional: needs security type to be specified)\n"
 		  ": 0:Disable, 1:Optional, 2:Required.\n"
 		  "[-m, --bssid]: MAC address of the AP (BSSID).\n"

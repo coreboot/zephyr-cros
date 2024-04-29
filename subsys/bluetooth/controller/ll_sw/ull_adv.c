@@ -315,6 +315,17 @@ uint8_t ll_adv_params_set(uint16_t interval, uint8_t adv_type,
 			adv_type = 0x05; /* index of PDU_ADV_TYPE_EXT_IND in */
 					 /* pdu_adv_type[] */
 
+			/* Fallback to 1M if upper layer did not check HCI
+			 * parameters for Coded PHY support.
+			 * This fallback allows *testing* extended advertising
+			 * using 1M using a upper layer that is requesting Coded
+			 * PHY on Controllers without Coded PHY support.
+			 */
+			if (!IS_ENABLED(CONFIG_BT_CTLR_PHY_CODED) &&
+			    (phy_p == PHY_CODED)) {
+				phy_p = PHY_1M;
+			}
+
 			adv->lll.phy_p = phy_p;
 			adv->lll.phy_flags = PHY_FLAGS_S8;
 		}
@@ -581,15 +592,28 @@ uint8_t ll_adv_params_set(uint16_t interval, uint8_t adv_type,
 		/* No SyncInfo in primary channel PDU */
 
 #if (CONFIG_BT_CTLR_ADV_AUX_SET > 0)
+		/* Fallback to 1M if upper layer did not check HCI
+		 * parameters for Coded PHY support.
+		 * This fallback allows *testing* extended advertising
+		 * using 1M using a upper layer that is requesting Coded
+		 * PHY on Controllers without Coded PHY support.
+		 */
+		if (!IS_ENABLED(CONFIG_BT_CTLR_PHY_CODED) &&
+		    (phy_s == PHY_CODED)) {
+			phy_s = PHY_1M;
+		}
+
+		adv->lll.phy_s = phy_s;
+
 		/* AuxPtr */
 		if (pri_hdr_prev.aux_ptr) {
 			pri_dptr_prev -= sizeof(struct pdu_adv_aux_ptr);
 		}
 		if (pri_hdr->aux_ptr) {
 			pri_dptr -= sizeof(struct pdu_adv_aux_ptr);
-			ull_adv_aux_ptr_fill((void *)pri_dptr, 0U, phy_s);
+			ull_adv_aux_ptr_fill((void *)pri_dptr, 0U,
+					     adv->lll.phy_s);
 		}
-		adv->lll.phy_s = phy_s;
 #endif /* (CONFIG_BT_CTLR_ADV_AUX_SET > 0) */
 
 		/* ADI */
@@ -1012,17 +1036,18 @@ uint8_t ll_adv_enable(uint8_t enable)
 		conn_lll->empty = 0;
 
 #if defined(CONFIG_BT_CTLR_PHY)
-		conn_lll->phy_flags = 0;
 		if (0) {
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 		} else if (pdu_adv->type == PDU_ADV_TYPE_EXT_IND) {
 			conn_lll->phy_tx = lll->phy_s;
 			conn_lll->phy_tx_time = lll->phy_s;
+			conn_lll->phy_flags = lll->phy_flags;
 			conn_lll->phy_rx = lll->phy_s;
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 		} else {
 			conn_lll->phy_tx = PHY_1M;
 			conn_lll->phy_tx_time = PHY_1M;
+			conn_lll->phy_flags = PHY_FLAGS_S8;
 			conn_lll->phy_rx = PHY_1M;
 		}
 #endif /* CONFIG_BT_CTLR_PHY */
@@ -2371,6 +2396,25 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 				     TICKER_USER_ID_LLL, 0, &mfy);
 		LL_ASSERT(!ret);
 
+#if defined(CONFIG_BT_CTLR_JIT_SCHEDULING) || \
+	(defined(CONFIG_BT_CTLR_ADV_EXT) && \
+	 (CONFIG_BT_CTLR_ADV_AUX_SET > 0) && \
+	 !defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO))
+		/* Remember the ticks_at_expire, will be used by JIT scheduling
+		 * and for checking latency calculating the aux offset for
+		 * extended advertising.
+		 */
+		adv->ticks_at_expire = ticks_at_expire;
+
+#if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
+		adv->delay_at_expire = adv->delay;
+#endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
+#endif /* CONFIG_BT_CTLR_JIT_SCHEDULING ||
+	* (CONFIG_BT_CTLR_ADV_EXT &&
+	*  (CONFIG_BT_CTLR_ADV_AUX_SET > 0) &&
+	*  !CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
+	*/
+
 #if defined(CONFIG_BT_CTLR_ADV_EXT) && (CONFIG_BT_CTLR_ADV_AUX_SET > 0) && \
 	!defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
 		if (adv->lll.aux) {
@@ -2379,11 +2423,6 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 #endif /* CONFIG_BT_CTLR_ADV_EXT && (CONFIG_BT_CTLR_ADV_AUX_SET > 0)
 	* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO
 	*/
-
-#if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
-		adv->ticks_at_expire = ticks_at_expire;
-		adv->delay_at_expire = adv->delay;
-#endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
 	}
 
 	/* Apply adv random delay */

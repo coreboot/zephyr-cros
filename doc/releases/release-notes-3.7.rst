@@ -28,12 +28,39 @@ https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 * CVE-2024-3077 `Zephyr project bug tracker GHSA-gmfv-4vfh-2mh8
   <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-gmfv-4vfh-2mh8>`_
 
+API Changes
+***********
+
+Deprecated in this release
+==========================
+
+ * Bluetooth advertiser options :code:`BT_LE_ADV_OPT_USE_NAME` and
+   :code:`BT_LE_ADV_OPT_FORCE_NAME_IN_AD` are now deprecated. That means the following macro are
+   deprecated:
+
+    * :c:macro:`BT_LE_ADV_CONN_NAME`
+    * :c:macro:`BT_LE_ADV_CONN_NAME_AD`
+    * :c:macro:`BT_LE_ADV_NCONN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_CONN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_SCAN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_NCONN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_CODED_NCONN_NAME`
+
+   Application developer will now need to set the advertised name themselves by updating the advertising data
+   or the scan response data.
+
 Architectures
 *************
 
 * ARC
 
 * ARM
+
+* RISC-V
+
+  * Implemented frame-pointer based stack unwinding.
+
+  * The fatal error message triggered from a fault now contains the callee-saved-registers states.
 
 * Xtensa
 
@@ -65,6 +92,14 @@ Boards & SoC Support
 
 Build system and Infrastructure
 *******************************
+
+* CI-enabled blackbox tests were added in order to verify correctness of the vast majority of Twister flags.
+
+* Compiler
+
+  * Deprecated the global CSTD cmake property in favor of the :kconfig:option:`CONFIG_STD_C`
+    choice to select the C Standard version. Additionally subsystems can select a minimum
+    required C Standard version, with for example :kconfig:option:`CONFIG_REQUIRES_STD_C11`.
 
 Drivers and Sensors
 *******************
@@ -227,6 +262,27 @@ Libraries / Subsystems
 **********************
 
 * Management
+
+  * hawkBit
+
+    * The hawkBit subsystem has been reworked to use the settings subsystem to store the hawkBit
+      configuration.
+
+    * By enabling :kconfig:option:`CONFIG_HAWKBIT_SET_SETTINGS_RUNTIME`, the hawkBit settings can
+      be configured at runtime. Use the :c:func:`hawkbit_set_config` function to set the hawkBit
+      configuration. It can also be set via the hawkBit shell, by using the ``hawkbit set``
+      command.
+
+    * When using the hawkBit autohandler and an update is installed, the device will now
+      automatically reboot after the installation is complete.
+
+    * By enabling :kconfig:option:`CONFIG_HAWKBIT_CUSTOM_DEVICE_ID`, a callback function can be
+      registered to set the device ID. Use the :c:func:`hawkbit_set_device_identity_cb` function to
+      register the callback.
+
+    * By enabling :kconfig:option:`CONFIG_HAWKBIT_CUSTOM_ATTRIBUTES`, a callback function can be
+      registered to set the device attributes that are sent to the hawkBit server. Use the
+      :c:func:`hawkbit_set_custom_data_cb` function to register the callback.
 
 * Logging
 
