@@ -190,14 +190,18 @@ ARM64 arch:
     - arch.arm64
 
 ARM Platforms:
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - ithinuel
   files:
     - boards/arm/mps*/
     - boards/arm/v2m_*/
+    - boards/arm/fvp_base*/
     - soc/arm/mps*/
     - soc/arm/musca/
     - soc/arm/beetle/
-    - soc/arm/fvp_aemv8r/aarch32/
+    - soc/arm/designstart/
+    - soc/arm/fvp_aemv8*/
     - dts/arm/armv*.dtsi
   labels:
     - "platform: ARM"
@@ -237,12 +241,8 @@ MIPS arch:
     - arch.mips
 
 Ambiq Platforms:
-  status: maintained
-  maintainers:
-    - fkokosinski
+  status: odd fixes
   collaborators:
-    - tgorochowik
-    - msobkowski
     - aaronyegx
     - RichardSWheatley
   files:
@@ -2410,6 +2410,8 @@ Mbed TLS:
   maintainers:
     - d3zd3z
     - ceolin
+  collaborators:
+    - ithinuel
   files:
     - tests/crypto/mbedtls/
     - doc/services/crypto/
@@ -3044,11 +3046,11 @@ Shell:
 Shields:
   status: maintained
   maintainers:
-    - erwango
+    - kartben
   collaborators:
     - avisconti
     - jfischer-no
-    - kartben
+    - erwango
   files:
     - boards/shields/
     - doc/hardware/porting/shields.rst
@@ -3471,14 +3473,22 @@ nRF Platforms:
   status: maintained
   maintainers:
     - anangl
+  collaborators:
+    - jaz1-nordic
+    - kl-cruz
+    - magp-nordic
+    - masz-nordic
+    - nika-nordic
   files:
     - boards/nordic/
-    - drivers/*/*nrfx*.c
+    - drivers/*/*nrf*.c
+    - drivers/*/*nordic*/
     - soc/nordic/
     - samples/boards/nrf/
     - dts/*/nordic/
     - dts/bindings/*/nordic,*
-    - tests/drivers/timer/nrf_rtc_timer/
+    - tests/drivers/*/*nrf*/
+    - snippets/nordic*/
   labels:
     - "platform: nRF"
 
@@ -3568,7 +3578,6 @@ STM32 Platforms:
     - GeorgeCGV
   files:
     - boards/st/
-    - drivers/*/*stm32*/
     - drivers/*/*stm32*.c
     - drivers/*/*stm32*.h
     - drivers/*/*/*stm32*
@@ -3656,6 +3665,7 @@ TI K3 Platforms:
     - dnltz
   files:
     - boards/phytec/phyboard_lyra/
+    - boards/phytec/phyboard_electra/
     - boards/ti/*am62*/
     - drivers/*/*ti_k3*
     - dts/bindings/*/ti,k3*
@@ -3696,8 +3706,7 @@ Infineon Platforms:
     - boards/cypress/
     - boards/infineon/
     - drivers/*/*ifx_cat1*
-    - drivers/*/*xmc*/
-    - drivers/*/*xmc*.c
+    - drivers/*/*xmc*
     - drivers/sensor/infineon/
     - dts/arm/infineon/
     - dts/arm/cypress/
@@ -3821,6 +3830,7 @@ TF-M Integration:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files:
     - samples/tfm_integration/
     - modules/trusted-firmware-m/
@@ -4152,7 +4162,7 @@ West:
   files:
     - modules/cmsis-dsp/
   labels:
-    - "area: ARM"
+    - "area: CMSIS-DSP"
 
 "West project: cmsis-nn":
   status: maintained
@@ -4163,7 +4173,7 @@ West:
   files:
     - modules/cmsis-nn/
   labels:
-    - "area: ARM"
+    - "area: CMSIS-NN"
 
 "West project: edtt":
   status: maintained
@@ -4195,12 +4205,8 @@ West:
     - "platform: Altera"
 
 "West project: hal_ambiq":
-  status: maintained
-  maintainers:
-    - fkokosinski
+  status: odd fixes
   collaborators:
-    - tgorochowik
-    - msobkowski
     - aaronyegx
     - RichardSWheatley
   files:
@@ -4513,6 +4519,8 @@ West:
   maintainers:
     - d3zd3z
     - ceolin
+  collaborators:
+    - ithinuel
   files:
     - modules/mbedtls/
   labels:
@@ -4679,6 +4687,7 @@ West:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files:
     - modules/trusted-firmware-m/
   labels:
@@ -4690,6 +4699,7 @@ West:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files: []
   labels:
     - "area: TF-M"
@@ -4701,6 +4711,7 @@ West:
     - sgrrzhf
   collaborators:
     - carlocaione
+    - ithinuel
   files:
     - modules/trusted-firmware-a/
   labels:
@@ -4712,6 +4723,7 @@ West:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files: []
   labels:
     - "area: TF-M"
