@@ -138,6 +138,10 @@
 #define MBEDTLS_KEY_EXCHANGE_ECJPAKE_ENABLED
 #endif
 
+#if defined(CONFIG_MBEDTLS_HKDF_C)
+#define MBEDTLS_HKDF_C
+#endif
+
 /* Supported cipher modes */
 
 #if defined(CONFIG_MBEDTLS_CIPHER_AES_ENABLED)
@@ -425,11 +429,11 @@
 #define MBEDTLS_PK_C
 #endif
 
-#if defined(MBEDTLS_X509_USE_C) || defined(MBEDTLS_ECDSA_C)
+#if defined(MBEDTLS_ECDSA_C) || defined(MBEDTLS_RSA_C) || defined(MBEDTLS_X509_USE_C)
 #define MBEDTLS_ASN1_PARSE_C
 #endif
 
-#if defined(MBEDTLS_ECDSA_C) || defined(MBEDTLS_PK_WRITE_C)
+#if defined(MBEDTLS_ECDSA_C) || defined(MBEDTLS_RSA_C) || defined(MBEDTLS_PK_WRITE_C)
 #define MBEDTLS_ASN1_WRITE_C
 #endif
 
@@ -490,5 +494,10 @@
 #if defined(CONFIG_MBEDTLS_USER_CONFIG_FILE)
 #include CONFIG_MBEDTLS_USER_CONFIG_FILE
 #endif
+
+#if defined(CONFIG_BUILD_WITH_TFM)
+#define MBEDTLS_PSA_CRYPTO_CLIENT
+#undef MBEDTLS_PSA_CRYPTO_C
+#endif /* CONFIG_BUILD_WITH_TFM */
 
 #endif /* MBEDTLS_CONFIG_H */

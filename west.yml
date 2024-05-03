@@ -152,7 +152,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: dddb7cf318d931c25623c34ecde20f3150d7f987
+      revision: c49581173bab8625d1f08d5c41d5a186afc240b3
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -183,17 +183,17 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: f8e4d73a78316ea9ef85f09f24a3a229e40c1a80
+      revision: bdef8b66d5f59d95c09889918a04ddaecce322c8
       path: modules/hal/nordic
       groups:
         - hal
     - name: hal_nuvoton
-      revision: 34efb92e37bd07043a2cab7fff847d8443d930f9
+      revision: ab342e6915bf7bff2203a20985754f6dbdb5343d
       path: modules/hal/nuvoton
       groups:
         - hal
     - name: hal_nxp
-      revision: cd046faf8a3dc879982ff6079fc48a80a0d53e7c
+      revision: 8c354a918c1272b40ad9b4ffecac1d89125efbe6
       path: modules/hal/nxp
       groups:
         - hal
@@ -210,7 +210,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: 991e060b6825f0f6830f4dbccbed8252598f2a6d
+      revision: e3560c79db1a002014f061c611cd84a99e4f33de
       groups:
         - hal
     - name: hal_rpi_pico
@@ -271,18 +271,18 @@ manifest:
         - fs
       revision: 408c16a909dd6cf128874a76f21c793798c9e423
     - name: loramac-node
-      revision: 1bf2120cffcedae174ae35d695a28a46caefcb23
+      revision: fb00b383072518c918e2258b0916c996f2d4eebe
       path: modules/lib/loramac-node
     - name: lvgl
       revision: 2b498e6f36d6b82ae1da12c8b7742e318624ecf5
       path: modules/lib/gui/lvgl
     - name: mbedtls
-      revision: 6ec4abdcda78dfc47315af568f93e5ad4398dea0
+      revision: 3217c450180fd5e817601c6f479116de69e57461
       path: modules/crypto/mbedtls
       groups:
         - crypto
     - name: mcuboot
-      revision: 24ac8cc2be9384288829aac7477f522a7a71f3d4
+      revision: d4394c2f9b76e0a7b758441cea3a8ceb896f66c8
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -322,7 +322,7 @@ manifest:
       groups:
         - crypto
     - name: trusted-firmware-m
-      revision: 0b898c9b72171b0a260c0bb64a92ea4713f9e931
+      revision: 785d87492490069b62170159fcf21c385f90f4eb
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee

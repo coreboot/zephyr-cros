@@ -764,6 +764,12 @@ void ll_reset(void)
 	 */
 
 #if defined(CONFIG_BT_BROADCASTER)
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+	/* Reset adv iso sets */
+	err = ull_adv_iso_reset();
+	LL_ASSERT(!err);
+#endif /* CONFIG_BT_CTLR_ADV_ISO */
+
 	/* Reset adv state */
 	err = ull_adv_reset();
 	LL_ASSERT(!err);
@@ -772,7 +778,7 @@ void ll_reset(void)
 #if defined(CONFIG_BT_OBSERVER)
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 #if defined(CONFIG_BT_CTLR_SYNC_ISO)
-	/* Reset periodic sync sets */
+	/* Reset sync iso sets */
 	err = ull_sync_iso_reset();
 	LL_ASSERT(!err);
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
@@ -787,16 +793,6 @@ void ll_reset(void)
 	LL_ASSERT(!err);
 #endif /* CONFIG_BT_OBSERVER */
 
-#if defined(CONFIG_BT_CTLR_CONN_ISO)
-	err = ull_conn_iso_reset();
-	LL_ASSERT(!err);
-#endif /* CONFIG_BT_CTLR_CONN_ISO */
-
-#if defined(CONFIG_BT_CTLR_ISO)
-	err = ull_iso_reset();
-	LL_ASSERT(!err);
-#endif /* CONFIG_BT_CTLR_ISO */
-
 #if defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
 	err = ull_peripheral_iso_reset();
 	LL_ASSERT(!err);
@@ -807,11 +803,15 @@ void ll_reset(void)
 	LL_ASSERT(!err);
 #endif /* CONFIG_BT_CTLR_CENTRAL_ISO */
 
-#if defined(CONFIG_BT_CTLR_ADV_ISO)
-	/* Reset periodic sync sets */
-	err = ull_adv_iso_reset();
+#if defined(CONFIG_BT_CTLR_CONN_ISO)
+	err = ull_conn_iso_reset();
 	LL_ASSERT(!err);
-#endif /* CONFIG_BT_CTLR_ADV_ISO */
+#endif /* CONFIG_BT_CTLR_CONN_ISO */
+
+#if defined(CONFIG_BT_CTLR_ISO)
+	err = ull_iso_reset();
+	LL_ASSERT(!err);
+#endif /* CONFIG_BT_CTLR_ISO */
 
 #if defined(CONFIG_BT_CONN)
 	/* Reset conn role */
@@ -2072,12 +2072,45 @@ void ull_prepare_dequeue(uint8_t caller_id)
 	void *param_resume_head = NULL;
 	void *param_resume_next = NULL;
 	struct lll_event *next;
+	uint8_t loop;
+
+	/* Development assertion check to ensure the below loop processing
+	 * has a limit.
+	 *
+	 * Only 2 scanner and 1 advertiser (directed adv) gets enqueue back:
+	 *
+	 * Already in queue max 7 (EVENT_PIPELINE_MAX):
+	 *  - 2 continuous scan prepare in queue (1M and Coded PHY)
+	 *  - 2 continuous scan resume in queue (1M and Coded PHY)
+	 *  - 1 directed adv prepare
+	 *  - 1 directed adv resume
+	 *  - 1 any other role with time reservation
+	 *
+	 * The loop removes the duplicates (scan and advertiser) with is_aborted
+	 * flag set in 7 iterations:
+	 *  - 1 scan prepare (1M)
+	 *  - 1 scan prepare (Coded PHY)
+	 *  - 1 directed adv prepare
+	 *
+	 * and has enqueue the following in these 7 iterations:
+	 *  - 1 scan resume (1M)
+	 *  - 1 scan resume (Coded PHY)
+	 *  - 1 directed adv resume
+	 *
+	 * Hence, it should be (EVENT_PIPELINE_MAX + 3U) iterations max.
+	 */
+	loop = (EVENT_PIPELINE_MAX + 3U);
 
 	next = ull_prepare_dequeue_get();
 	while (next) {
 		void *param = next->prepare_param.param;
 		uint8_t is_aborted = next->is_aborted;
 		uint8_t is_resume = next->is_resume;
+
+		/* Assert if we exceed iterations processing the prepare queue
+		 */
+		LL_ASSERT(loop);
+		loop--;
 
 		/* Let LLL invoke the `prepare` interface if radio not in active
 		 * use. Otherwise, enqueue at end of the prepare pipeline queue.

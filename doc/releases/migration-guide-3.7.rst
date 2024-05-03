@@ -30,6 +30,11 @@ Boards
 
 * Reordered D1 and D0 in the `pro_micro` connector gpio-map for SparkFun Pro Micro RP2040 to match
   original Pro Micro definition. Out-of-tree shields must be updated to reflect this change.
+* ITE: Rename all SoC variant Kconfig options, e.g., ``CONFIG_SOC_IT82202_AX`` is renamed to
+  ``CONFIG_SOC_IT82202AX``.
+  All symbols are renamed as follows: ``SOC_IT81202BX``, ``SOC_IT81202CX``, ``SOC_IT81302BX``,
+  ``SOC_IT81302CX``, ``SOC_IT82002AW``, ``SOC_IT82202AX``, ``SOC_IT82302AX``.
+  And, rename the ``SOC_SERIES_ITE_IT8XXX2`` to ``SOC_SERIES_IT8XXX2``.
 
 Modules
 *******
@@ -153,11 +158,30 @@ Controller Area Network (CAN)
 Display
 =======
 
+Enhanced Serial Peripheral Interface (eSPI)
+===========================================
+  * The macros ``ESPI_SLAVE_TO_MASTER`` and ``ESPI_MASTER_TO_SLAVE`` were renamed to
+    ``ESPI_TARGET_TO_CONTROLLER`` and ``ESPI_CONTROLLER_TO_TARGET`` respectively to reflect
+    the new terminology in eSPI 1.5 specification.
+  * The enum values ``ESPI_VWIRE_SIGNAL_SLV_BOOT_STS``, ``ESPI_VWIRE_SIGNAL_SLV_BOOT_DONE`` and
+    all ``ESPI_VWIRE_SIGNAL_SLV_GPIO_<NUMBER>`` signals were renamed to
+    ``ESPI_VWIRE_SIGNAL_TARGET_BOOT_STS``, ``ESPI_VWIRE_SIGNAL_TARGET_BOOT_DONE`` and
+    ``ESPI_VWIRE_SIGNAL_TARGET_GPIO_<NUMBER>`` respectively to reflect the new terminology
+    in eSPI 1.5 specification.
+
 Flash
 =====
 
 General Purpose I/O (GPIO)
 ==========================
+
+GNSS
+====
+
+* Basic power management support has been added to the ``gnss-nmea-generic`` driver.
+  If ``CONFIG_PM_DEVICE=y`` the driver is now initialized in suspended mode and the
+  application needs to call :c:func:`pm_device_action_run` with :c:macro:`PM_DEVICE_ACTION_RESUME`
+  to start up the driver.
 
 Input
 =====
@@ -197,8 +221,21 @@ Bluetooth Mesh
   got ``const`` qualifier too. The model's metadata structure and metadata raw value
   can be declared as permanent constants in the non-volatile memory. (:github:`69679`)
 
+* The model metadata pointer declaration of :c:struct:`bt_mesh_model` has been changed
+  to a single ``const *`` and redundant metadata pointer from :c:struct:`bt_mesh_health_srv`
+  is removed. Consequently, :code:`BT_MESH_MODEL_HEALTH_SRV` definition is changed
+  to use variable argument notation. (:github:`71281`). Now, when your implementation
+  supports :kconfig:option:`CONFIG_BT_MESH_LARGE_COMP_DATA_SRV` and when you need to
+  specify metadata for Health Server model, simply pass metadata as the last argument
+  to the :code:`BT_MESH_MODEL_HEALTH_SRV` macro, otherwise omit the last argument.
+
 Bluetooth Audio
 ===============
+
+* :kconfig:option:`CONFIG_BT_ASCS`, :kconfig:option:`CONFIG_BT_PERIPHERAL` and
+  :kconfig:option:`CONFIG_BT_ISO_PERIPHERAL` are not longer `select`ed automatically when
+  enabling :kconfig:option:`CONFIG_BT_BAP_UNICAST_SERVER`, and these must now be set explicitly
+  in the project configuration file. (:github:`71993`)
 
 Bluetooth Classic
 =================
@@ -207,6 +244,20 @@ Bluetooth Classic
   The Header files of Host BR/EDR have been moved to ``include/zephyr/bluetooth/classic``.
   Removed the :kconfig:option:`CONFIG_BT_BREDR`. It is replaced by new option
   :kconfig:option:`CONFIG_BT_CLASSIC`. (:github:`69651`)
+
+Bluetooth Host
+==============
+
+* The advertiser options :code:`BT_LE_ADV_OPT_USE_NAME` and :code:`BT_LE_ADV_OPT_FORCE_NAME_IN_AD`
+  are deprecated in this release. The application need to include the device name explicitly. One
+  way to do it is by adding the following to the advertising data or scan response data passed to
+  the host:
+
+  .. code-block:: c
+
+   BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1)
+
+  (:github:`71686`)
 
 Networking
 **********
@@ -302,6 +353,12 @@ Architectures
   * Kconfigs ``CONFIG_DISABLE_SSBD`` and ``CONFIG_ENABLE_EXTENDED_IBRS``
     are deprecated. Use :kconfig:option:`CONFIG_X86_DISABLE_SSBD` and
     :kconfig:option:`CONFIG_X86_ENABLE_EXTENDED_IBRS` instead.
+
+* POSIX arch:
+
+  * LLVM fuzzing support has been refactored. A test application now needs to provide its own
+    ``LLVMFuzzerTestOneInput()`` hook instead of relying on a board provided one. Check
+    ``samples/subsys/debug/fuzz/`` for an example.
 
 Xtensa
 ======

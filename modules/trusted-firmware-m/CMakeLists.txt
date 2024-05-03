@@ -264,6 +264,7 @@ if (CONFIG_BUILD_WITH_TFM)
       -DCMAKE_BUILD_TYPE=${TFM_CMAKE_BUILD_TYPE}
       -DTFM_PLATFORM=${CONFIG_TFM_BOARD}
       -DCONFIG_TFM_BUILD_LOG_QUIET=ON
+      -DSILENCE_TFM_VERSION_WARNING=ON
       -DCONFIG_TFM_MEMORY_USAGE_QUIET=OFF
       -DPython3_EXECUTABLE=${Python3_EXECUTABLE}
       ${TFM_CMAKE_ARGS}
@@ -362,9 +363,14 @@ if (CONFIG_BUILD_WITH_TFM)
     zephyr_library_sources_ifdef(CONFIG_TFM_PARTITION_PLATFORM               ${TFM_INTERFACE_SOURCE_DIR}/tfm_ioctl_core_ns_api.c)
   endif()
 
-  target_include_directories(tfm_api PRIVATE
+  target_include_directories(tfm_api PUBLIC
     ${TFM_INTERFACE_INCLUDE_DIR}
     ${TFM_INTERFACE_INCLUDE_DIR}/crypto_keys
+    ${ZEPHYR_BASE}/modules/mbedtls/configs
+    )
+  # Pass down the MbedTLS configuration file to use.
+  target_compile_definitions(tfm_api PUBLIC
+    MBEDTLS_CONFIG_FILE="${CONFIG_MBEDTLS_CFG_FILE}"
     )
 
   zephyr_library_link_libraries(
