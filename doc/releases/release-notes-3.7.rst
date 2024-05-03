@@ -25,12 +25,42 @@ The following CVEs are addressed by this release:
 More detailed information can be found in:
 https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
+* CVE-2024-3077 `Zephyr project bug tracker GHSA-gmfv-4vfh-2mh8
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-gmfv-4vfh-2mh8>`_
+
+API Changes
+***********
+
+Deprecated in this release
+==========================
+
+ * Bluetooth advertiser options :code:`BT_LE_ADV_OPT_USE_NAME` and
+   :code:`BT_LE_ADV_OPT_FORCE_NAME_IN_AD` are now deprecated. That means the following macro are
+   deprecated:
+
+    * :c:macro:`BT_LE_ADV_CONN_NAME`
+    * :c:macro:`BT_LE_ADV_CONN_NAME_AD`
+    * :c:macro:`BT_LE_ADV_NCONN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_CONN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_SCAN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_NCONN_NAME`
+    * :c:macro:`BT_LE_EXT_ADV_CODED_NCONN_NAME`
+
+   Application developer will now need to set the advertised name themselves by updating the advertising data
+   or the scan response data.
+
 Architectures
 *************
 
 * ARC
 
 * ARM
+
+* RISC-V
+
+  * Implemented frame-pointer based stack unwinding.
+
+  * The fatal error message triggered from a fault now contains the callee-saved-registers states.
 
 * Xtensa
 
@@ -48,6 +78,8 @@ Boards & SoC Support
 
 * Made these changes in other SoC series:
 
+  * ITE: Rename the Kconfig symbol for all ITE SoC variants.
+
 * Added support for these ARM boards:
 
 * Added support for these Xtensa boards:
@@ -62,6 +94,18 @@ Boards & SoC Support
 
 Build system and Infrastructure
 *******************************
+
+  * CI-enabled blackbox tests were added in order to verify correctness of the vast majority of Twister flags.
+
+  * A ``socs`` folder for applications has been introduced that allows for Kconfig fragments and
+    devicetree overlays that should apply to any board target using a particular SoC and board
+    qualifier.
+
+  * :ref:`Board/SoC flashing configuration<flashing-soc-board-config>` settings have been added.
+
+  * Deprecated the global CSTD cmake property in favor of the :kconfig:option:`CONFIG_STD_C`
+    choice to select the C Standard version. Additionally subsystems can select a minimum
+    required C Standard version, with for example :kconfig:option:`CONFIG_REQUIRES_STD_C11`.
 
 Drivers and Sensors
 *******************
@@ -84,6 +128,10 @@ Drivers and Sensors
   * Deprecated the :c:func:`can_calc_prescaler` API function, as it allows for bitrate
     errors. Bitrate errors between nodes on the same network leads to them drifting apart after the
     start-of-frame (SOF) synchronization has taken place, leading to bus errors.
+  * Added :c:func:`can_get_bitrate_min` and :c:func:`can_get_bitrate_max` for retrieving the minimum
+    and maximum supported bitrate for a given CAN controller/CAN transceiver combination, reflecting
+    that retrieving the bitrate limits can no longer fail. Deprecated the existing
+    :c:func:`can_get_min_bitrate` and :c:func:`can_get_max_bitrate` API functions.
   * Extended support for automatic sample point location to also cover :c:func:`can_calc_timing` and
     :c:func:`can_calc_timing_data`.
   * Added optional ``min-bitrate`` devicetree property for CAN transceivers.
@@ -118,6 +166,11 @@ Drivers and Sensors
 * Entropy
 
 * Ethernet
+
+  * Deperecated eth_mcux driver in favor of the reworked nxp_enet driver.
+  * Driver nxp_enet is no longer experimental.
+  * All boards and SOCs with :dtcompatible:`nxp,kinetis-ethernet` compatible nodes
+    reworked to use the new :dtcompatible:`nxp,enet` binding.
 
 * Flash
 
@@ -161,6 +214,8 @@ Drivers and Sensors
 
 * Sensor
 
+  * Added TMP114 driver
+
 * Serial
 
   * Added driver to support UART over Bluetooth LE using NUS (Nordic UART Service). This driver
@@ -174,6 +229,9 @@ Drivers and Sensors
 * W1
 
 * Wi-Fi
+
+  * Added support for configuring RTS threshold. With this, users can set the RTS threshold value or
+    disable the RTS mechanism.
 
 Networking
 **********
@@ -198,6 +256,10 @@ Networking
 
     * :c:func:`lwm2m_set_bulk`
 
+* IPSP:
+
+  * Removed IPSP support. ``CONFIG_NET_L2_BT`` does not exist anymore.
+
 USB
 ***
 
@@ -208,6 +270,27 @@ Libraries / Subsystems
 **********************
 
 * Management
+
+  * hawkBit
+
+    * The hawkBit subsystem has been reworked to use the settings subsystem to store the hawkBit
+      configuration.
+
+    * By enabling :kconfig:option:`CONFIG_HAWKBIT_SET_SETTINGS_RUNTIME`, the hawkBit settings can
+      be configured at runtime. Use the :c:func:`hawkbit_set_config` function to set the hawkBit
+      configuration. It can also be set via the hawkBit shell, by using the ``hawkbit set``
+      command.
+
+    * When using the hawkBit autohandler and an update is installed, the device will now
+      automatically reboot after the installation is complete.
+
+    * By enabling :kconfig:option:`CONFIG_HAWKBIT_CUSTOM_DEVICE_ID`, a callback function can be
+      registered to set the device ID. Use the :c:func:`hawkbit_set_device_identity_cb` function to
+      register the callback.
+
+    * By enabling :kconfig:option:`CONFIG_HAWKBIT_CUSTOM_ATTRIBUTES`, a callback function can be
+      registered to set the device attributes that are sent to the hawkBit server. Use the
+      :c:func:`hawkbit_set_custom_data_cb` function to register the callback.
 
 * Logging
 
@@ -221,6 +304,12 @@ Libraries / Subsystems
 * Power management
 
 * Crypto
+
+* Random
+
+  * Besides the existing :c:func:`sys_rand32_get` function, :c:func:`sys_rand8_get`,
+    :c:func:`sys_rand16_get` and :c:func:`sys_rand64_get` are now also available.
+    These functions are all implemented on top of :c:func:`sys_rand_get`.
 
 * Retention
 

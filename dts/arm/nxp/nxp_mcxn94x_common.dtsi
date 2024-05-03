@@ -219,6 +219,9 @@
 			compatible = "nxp,kinetis-lpuart";
 			reg = <0x93000 0x1000>;
 			clocks = <&syscon MCUX_FLEXCOMM1_CLK>;
+			/* DMA channels 0 and 1, muxed to LPUART1 RX and TX */
+			dmas = <&edma0 0 71>, <&edma0 1 72>;
+			dma-names = "rx", "tx";
 			status = "disabled";
 		};
 		flexcomm1_lpspi1: lpspi@93000 {
@@ -256,6 +259,9 @@
 			compatible = "nxp,kinetis-lpuart";
 			reg = <0x94000 0x1000>;
 			clocks = <&syscon MCUX_FLEXCOMM2_CLK>;
+			/* DMA channels 4 and 5, muxed to LPUART2 RX and TX */
+			dmas = <&edma0 4 73>, <&edma0 5 74>;
+			dma-names = "rx", "tx";
 			status = "disabled";
 		};
 		flexcomm2_lpspi2: lpspi@94000 {
@@ -264,6 +270,9 @@
 			clocks = <&syscon MCUX_FLEXCOMM2_CLK>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			/* DMA channels 4 and 5, muxed to LPSPI2 RX and TX */
+			dmas = <&edma0 4 73>, <&edma0 5 74>;
+			dma-names = "rx", "tx";
 			status = "disabled";
 		};
 		flexcomm2_lpi2c2: lpi2c@94800 {
@@ -324,6 +333,9 @@
 			compatible = "nxp,kinetis-lpuart";
 			reg = <0xb4000 0x1000>;
 			clocks = <&syscon MCUX_FLEXCOMM4_CLK>;
+			/* DMA channels 2 and 3, muxed to LPUART4 RX and TX */
+			dmas = <&edma0 2 77>, <&edma0 3 78>;
+			dma-names = "rx", "tx";
 			status = "disabled";
 		};
 		flexcomm4_lpspi4: lpspi@b4000 {
@@ -332,6 +344,9 @@
 			clocks = <&syscon MCUX_FLEXCOMM4_CLK>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			/* DMA channels 2 and 3, muxed to LPSPI4 RX and TX */
+			dmas = <&edma0 2 77>, <&edma0 3 78>;
+			dma-names = "rx", "tx";
 			status = "disabled";
 		};
 		flexcomm4_lpi2c4: lpi2c@b4800 {
@@ -602,6 +617,174 @@
 			compatible = "nxp,enet-qos-mdio";
 			status = "disabled";
 		};
+	};
+
+	wwdt0: watchdog@16000 {
+		compatible = "nxp,lpc-wwdt";
+		reg = <0x16000 0x1000>;
+		interrupts = <152 0>;
+		status = "disabled";
+		clk-divider = <1>;
+	};
+
+	flexpwm0: flexpwm@ce000 {
+		compatible = "nxp,flexpwm";
+		reg = <0xce000 0x1000>;
+		interrupt-names = "RELOAD-ERROR", "FAULT";
+		interrupts = <112 0>, <113 0>;
+		flexpwm0_pwm0: pwm0 {
+			compatible = "nxp,imx-pwm";
+			index = <0>;
+			interrupts = <114 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+
+		flexpwm0_pwm1: pwm1 {
+			compatible = "nxp,imx-pwm";
+			index = <1>;
+			interrupts = <115 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+
+		flexpwm0_pwm2: pwm2 {
+			compatible = "nxp,imx-pwm";
+			index = <2>;
+			interrupts = <116 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+
+		flexpwm0_pwm3: pwm3 {
+			compatible = "nxp,imx-pwm";
+			index = <3>;
+			interrupts = <117 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+	};
+
+	flexpwm1: flexpwm@d0000 {
+		compatible = "nxp,flexpwm";
+		reg = <0xd0000 0x1000>;
+		interrupt-names = "RELOAD-ERROR", "FAULT";
+		interrupts = <118 0>, <119 0>;
+		flexpwm1_pwm0: pwm0 {
+			compatible = "nxp,imx-pwm";
+			index = <0>;
+			interrupts = <120 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+
+		flexpwm1_pwm1: pwm1 {
+			compatible = "nxp,imx-pwm";
+			index = <1>;
+			interrupts = <121 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+
+		flexpwm1_pwm2: pwm2 {
+			compatible = "nxp,imx-pwm";
+			index = <2>;
+			interrupts = <122 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+
+		flexpwm1_pwm3: pwm3 {
+			compatible = "nxp,imx-pwm";
+			index = <3>;
+			interrupts = <123 0>;
+			#pwm-cells = <3>;
+			clocks = <&syscon MCUX_BUS_CLK>;
+			nxp,prescaler = <128>;
+			status = "disabled";
+			run-in-wait;
+		};
+	};
+
+	ctimer0: ctimer@c000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0xc000 0x1000>;
+		interrupts = <31 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&syscon MCUX_CTIMER0_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	ctimer1: ctimer@d000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0xd000 0x1000>;
+		interrupts = <32 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&syscon MCUX_CTIMER1_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	ctimer2: ctimer@e000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0xe000 0x1000>;
+		interrupts = <34 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&syscon MCUX_CTIMER2_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	ctimer3: ctimer@f000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0xf000 0x1000>;
+		interrupts = <55 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&syscon MCUX_CTIMER3_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
+	};
+
+	ctimer4: ctimer@10000 {
+		compatible = "nxp,lpc-ctimer";
+		reg = <0x10000 0x1000>;
+		interrupts = <56 0>;
+		status = "disabled";
+		clk-source = <1>;
+		clocks = <&syscon MCUX_CTIMER4_CLK>;
+		mode = <0>;
+		input = <0>;
+		prescale = <0>;
 	};
 };
 

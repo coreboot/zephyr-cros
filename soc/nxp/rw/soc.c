@@ -218,6 +218,11 @@ __ramfunc void clock_init(void)
 	CLOCK_SetClkDiv(kCLOCK_DivDmicClk, 4);
 #endif
 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(lcdic), okay) && CONFIG_MIPI_DBI_NXP_LCDIC
+	CLOCK_AttachClk(kMAIN_CLK_to_LCD_CLK);
+	RESET_PeripheralReset(kLCDIC_RST_SHIFT_RSTn);
+#endif
+
 #ifdef CONFIG_COUNTER_MCUX_CTIMER
 #if (DT_NODE_HAS_COMPAT_STATUS(DT_NODELABEL(ctimer0), nxp_lpc_ctimer, okay))
 	CLOCK_AttachClk(kSFRO_to_CTIMER0);
@@ -238,6 +243,17 @@ __ramfunc void clock_init(void)
 	RESET_PeripheralReset(kFREEMRT_RST_SHIFT_RSTn);
 #endif
 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(usb_otg), okay) && CONFIG_USB_DC_NXP_EHCI
+	/* Enable system xtal from Analog */
+	SYSCTL2->ANA_GRP_CTRL |= SYSCTL2_ANA_GRP_CTRL_PU_AG_MASK;
+	/* reset USB */
+	RESET_PeripheralReset(kUSB_RST_SHIFT_RSTn);
+	/* enable usb clock */
+	CLOCK_EnableClock(kCLOCK_Usb);
+	/* enable usb phy clock */
+	CLOCK_EnableUsbhsPhyClock();
+#endif
+
 }
 
 /**
@@ -256,6 +272,7 @@ static int nxp_rw600_init(void)
 	POWER_EnableResetSource(kPOWER_ResetSourceWdt);
 #endif
 
+#if DT_NODE_HAS_PROP(DT_NODELABEL(pmu), reset_causes_en)
 #define PMU_RESET_CAUSES_ \
 	DT_FOREACH_PROP_ELEM_SEP(DT_NODELABEL(pmu), reset_causes_en, DT_PROP_BY_IDX, (|))
 #define PMU_RESET_CAUSES \
@@ -264,6 +281,9 @@ static int nxp_rw600_init(void)
 	COND_CODE_1(DT_NODE_HAS_STATUS_OKAY(wwdt), (kPOWER_ResetSourceWdt), (0))
 #define RESET_CAUSES \
 	(PMU_RESET_CAUSES | WDT_RESET)
+#else
+#define RESET_CAUSES 0
+#endif
 
 	POWER_EnableResetSource(RESET_CAUSES);
 

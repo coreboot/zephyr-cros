@@ -171,6 +171,16 @@ struct _thread_stack_info {
 	 * is the initial stack pointer for a thread. May be 0.
 	 */
 	size_t delta;
+
+#if defined(CONFIG_THREAD_STACK_MEM_MAPPED)
+	struct {
+		/** Base address of the memory mapped thread stack */
+		k_thread_stack_t *addr;
+
+		/** Size of whole mapped stack object */
+		size_t sz;
+	} mapped;
+#endif /* CONFIG_THREAD_STACK_MEM_MAPPED */
 };
 
 typedef struct _thread_stack_info _thread_stack_info_t;
@@ -196,13 +206,12 @@ struct _thread_userspace_local_data {
 
 typedef struct k_thread_runtime_stats {
 #ifdef CONFIG_SCHED_THREAD_USAGE
-	uint64_t execution_cycles;
-	uint64_t total_cycles;        /* total # of non-idle cycles */
 	/*
-	 * In the context of thread statistics, [execution_cycles] is the same
-	 * as the total # of non-idle cycles. In the context of CPU statistics,
-	 * it refers to the sum of non-idle + idle cycles.
+	 * For CPU stats, execution_cycles is the sum of non-idle + idle cycles.
+	 * For thread stats, execution_cycles = total_cycles.
 	 */
+	uint64_t execution_cycles;    /* total # of cycles (cpu: non-idle + idle) */
+	uint64_t total_cycles;        /* total # of non-idle cycles */
 #endif /* CONFIG_SCHED_THREAD_USAGE */
 
 #ifdef CONFIG_SCHED_THREAD_USAGE_ANALYSIS
@@ -311,8 +320,15 @@ struct k_thread {
 #if defined(CONFIG_USERSPACE)
 	/** memory domain info of the thread */
 	struct _mem_domain_info mem_domain_info;
-	/** Base address of thread stack */
+
+	/**
+	 * Base address of thread stack.
+	 *
+	 * If memory mapped stack (CONFIG_THREAD_STACK_MEM_MAPPED)
+	 * is enabled, this is the physical address of the stack.
+	 */
 	k_thread_stack_t *stack_obj;
+
 	/** current syscall frame pointer */
 	void *syscall_frame;
 #endif /* CONFIG_USERSPACE */

@@ -56,7 +56,7 @@ manifest:
       remote: babblesim
       repo-path: ext_2G4_phy_v1
       path: tools/bsim/components/ext_2G4_phy_v1
-      revision: 1ab9a884621d9ca719ef23536ca47d10494220c6
+      revision: d8302b8d51409b9e717a1a0ba6b443d3b5552a6c
       groups:
         - babblesim
     - name: babblesim_ext_2G4_channel_NtNcable
@@ -152,7 +152,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: e705cc16c4b63b5b3cad5c395297a4c2b49651fd
+      revision: c49581173bab8625d1f08d5c41d5a186afc240b3
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -183,17 +183,17 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 13ac55b5b52c905642e9c54f069109d188aa5840
+      revision: bdef8b66d5f59d95c09889918a04ddaecce322c8
       path: modules/hal/nordic
       groups:
         - hal
     - name: hal_nuvoton
-      revision: 34efb92e37bd07043a2cab7fff847d8443d930f9
+      revision: ab342e6915bf7bff2203a20985754f6dbdb5343d
       path: modules/hal/nuvoton
       groups:
         - hal
     - name: hal_nxp
-      revision: 874ed3b297ba1f21bc6422aed85c3fdba3219de2
+      revision: 8c354a918c1272b40ad9b4ffecac1d89125efbe6
       path: modules/hal/nxp
       groups:
         - hal
@@ -210,7 +210,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: 991e060b6825f0f6830f4dbccbed8252598f2a6d
+      revision: e3560c79db1a002014f061c611cd84a99e4f33de
       groups:
         - hal
     - name: hal_rpi_pico
@@ -224,7 +224,7 @@ manifest:
       groups:
         - hal
     - name: hal_st
-      revision: 0643d20ae85b32c658ad11036f7c964a860ddefe
+      revision: b77157f6bc4395e398d90ab02a7d2cbc01ab2ce7
       path: modules/hal/st
       groups:
         - hal
@@ -256,7 +256,7 @@ manifest:
     - name: hostap
       repo-path: hostap
       path: modules/lib/hostap
-      revision: 9ad92f5249a6743f55787bb783d3398113b136c0
+      revision: 81bdd8343347a2e36c67253a8aeb22ea7cb41132
     - name: libmetal
       revision: 243eed541b9c211a2ce8841c788e62ddce84425e
       path: modules/hal/libmetal
@@ -282,7 +282,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 24ac8cc2be9384288829aac7477f522a7a71f3d4
+      revision: 78bfe750cde0f8dfcf81bb4c0a68243d45906def
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -290,12 +290,12 @@ manifest:
         - debug
       revision: a819419603a2dfcb47f7f39092e1bc112e45d1ef
     - name: net-tools
-      revision: 3a677d355cc7f73e444801a6280d0ccec80a1957
+      revision: cd2eb1858a1570b49241e18fc1e1cd849a450af2
       path: tools/net-tools
       groups:
         - tools
     - name: nrf_hw_models
-      revision: df94612a846b8b1da166d3e4e4273df54de02340
+      revision: 123d37db9cae528d51530c61ba0422192bc03bda
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: da78aea63159771956fe0c9263f2e6985b66e9d5
@@ -312,7 +312,7 @@ manifest:
       path: modules/lib/picolibc
       revision: 764ef4e401a8f4c6a86ab723533841f072885a5b
     - name: segger
-      revision: 9d0191285956cef43daf411edc2f1a7788346def
+      revision: b011c45b585e097d95d9cf93edf4f2e01588d3cd
       path: modules/debug/segger
       groups:
         - debug

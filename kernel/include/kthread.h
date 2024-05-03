@@ -43,7 +43,6 @@ void z_thread_monitor_exit(struct k_thread *thread);
 #endif /* CONFIG_THREAD_MONITOR */
 
 
-#ifdef CONFIG_MULTITHREADING
 static inline void thread_schedule_new(struct k_thread *thread, k_timeout_t delay)
 {
 #ifdef CONFIG_SYS_CLOCK_EXISTS
@@ -57,7 +56,6 @@ static inline void thread_schedule_new(struct k_thread *thread, k_timeout_t dela
 	k_thread_start(thread);
 #endif /* CONFIG_SYS_CLOCK_EXISTS */
 }
-#endif /* CONFIG_MULTITHREADING */
 
 static inline int thread_is_preemptible(struct k_thread *thread)
 {
@@ -77,7 +75,7 @@ static inline int thread_is_metairq(struct k_thread *thread)
 #endif /* CONFIG_NUM_METAIRQ_PRIORITIES */
 }
 
-#if CONFIG_ASSERT
+#ifdef CONFIG_ASSERT
 static inline bool is_thread_dummy(struct k_thread *thread)
 {
 	return (thread->base.thread_state & _THREAD_DUMMY) != 0U;

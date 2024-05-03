@@ -589,9 +589,6 @@ struct net_if *net_if_get_default(void)
 #if defined(CONFIG_NET_DEFAULT_IF_IEEE802154)
 	iface = net_if_get_first_by_type(&NET_L2_GET_NAME(IEEE802154));
 #endif
-#if defined(CONFIG_NET_DEFAULT_IF_BLUETOOTH)
-	iface = net_if_get_first_by_type(&NET_L2_GET_NAME(BLUETOOTH));
-#endif
 #if defined(CONFIG_NET_DEFAULT_IF_DUMMY)
 	iface = net_if_get_first_by_type(&NET_L2_GET_NAME(DUMMY));
 #endif
@@ -1104,7 +1101,7 @@ static void join_mcast_allnodes(struct net_if *iface)
 	net_ipv6_addr_create_ll_allnodes_mcast(&addr);
 
 	ret = net_ipv6_mld_join(iface, &addr);
-	if (ret < 0 && ret != -EALREADY) {
+	if (ret < 0 && ret != -EALREADY && ret != -ENETDOWN) {
 		NET_ERR("Cannot join all nodes address %s for %d (%d)",
 			net_sprint_ipv6_addr(&addr),
 			net_if_get_by_iface(iface), ret);
@@ -1121,10 +1118,12 @@ static void join_mcast_solicit_node(struct net_if *iface,
 	net_ipv6_addr_create_solicited_node(my_addr, &addr);
 
 	ret = net_ipv6_mld_join(iface, &addr);
-	if (ret < 0 && ret != -EALREADY) {
-		NET_ERR("Cannot join solicit node address %s for %d (%d)",
-			net_sprint_ipv6_addr(&addr),
-			net_if_get_by_iface(iface), ret);
+	if (ret < 0) {
+		if (ret != -EALREADY && ret != -ENETDOWN) {
+			NET_ERR("Cannot join solicit node address %s for %d (%d)",
+				net_sprint_ipv6_addr(&addr),
+				net_if_get_by_iface(iface), ret);
+		}
 	} else {
 		NET_DBG("Join solicit node address %s (ifindex %d)",
 			net_sprint_ipv6_addr(&addr),
@@ -1728,6 +1727,12 @@ void net_address_lifetime_timeout(void)
 
 static void address_start_timer(struct net_if_addr *ifaddr, uint32_t vlifetime)
 {
+	/* Make sure that we do not insert the address twice to
+	 * the lifetime timer list.
+	 */
+	sys_slist_find_and_remove(&active_address_lifetime_timers,
+				  &ifaddr->lifetime.node);
+
 	sys_slist_append(&active_address_lifetime_timers,
 			 &ifaddr->lifetime.node);
 

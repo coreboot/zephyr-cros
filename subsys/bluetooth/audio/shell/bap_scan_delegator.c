@@ -36,6 +36,20 @@ struct sync_state {
 
 static bool past_preference = true;
 
+size_t bap_scan_delegator_ad_data_add(struct bt_data data[], size_t data_size)
+{
+	static uint8_t ad_bap_scan_delegator[2] = {
+		BT_UUID_16_ENCODE(BT_UUID_BASS_VAL),
+	};
+
+	__ASSERT(data_size > 0, "No space for ad_bap_scan_delegator");
+	data[0].type = BT_DATA_SVC_DATA16;
+	data[0].data_len = ARRAY_SIZE(ad_bap_scan_delegator);
+	data[0].data = &ad_bap_scan_delegator[0];
+
+	return 1U;
+}
+
 static struct sync_state *sync_state_get(const struct bt_bap_scan_delegator_recv_state *recv_state)
 {
 	for (size_t i = 0U; i < ARRAY_SIZE(sync_states); i++) {
@@ -70,6 +84,21 @@ static struct sync_state *sync_state_get_by_pa(struct bt_le_per_adv_sync *sync)
 {
 	for (size_t i = 0U; i < ARRAY_SIZE(sync_states); i++) {
 		if (sync_states[i].pa_sync == sync) {
+			return &sync_states[i];
+		}
+	}
+
+	return NULL;
+}
+
+static struct sync_state *
+sync_state_get_by_sync_info(const struct bt_le_per_adv_sync_synced_info *info)
+{
+	for (size_t i = 0U; i < ARRAY_SIZE(sync_states); i++) {
+		if (sync_states[i].recv_state != NULL &&
+		    bt_addr_le_eq(info->addr, &sync_states[i].recv_state->addr) &&
+		    info->sid == sync_states[i].recv_state->adv_sid) {
+
 			return &sync_states[i];
 		}
 	}
@@ -337,7 +366,13 @@ static void pa_synced_cb(struct bt_le_per_adv_sync *sync,
 
 	shell_info(ctx_shell, "PA %p synced", sync);
 
-	state = sync_state_get_by_pa(sync);
+	if (info->conn == NULL) {
+		state = sync_state_get_by_pa(sync);
+	} else {
+		/* In case of PAST we need to use the addr instead */
+		state = sync_state_get_by_sync_info(info);
+	}
+
 	if (state == NULL) {
 		shell_info(ctx_shell,
 			   "Could not get sync state from PA sync %p",
@@ -451,7 +486,7 @@ static int cmd_bap_scan_delegator_sync_pa(const struct shell *sh, size_t argc,
 		shell_info(sh, "Syncing with PAST");
 
 		err = pa_sync_past(state->conn, state, state->pa_interval);
-		if (err != 0) {
+		if (err == 0) {
 			err = bt_bap_scan_delegator_set_pa_state(src_id,
 								 BT_BAP_PA_STATE_INFO_REQ);
 			if (err != 0) {

@@ -36,11 +36,13 @@
 #include <zephyr/timing/timing.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/pm/device_runtime.h>
+#include <zephyr/internal/syscall_handler.h>
+
 /*
  * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
  * #line marks the *next* line, so it is off by one.
  */
-#line 44
+#line 46
 
 LOG_MODULE_REGISTER(os, CONFIG_KERNEL_LOG_LEVEL);
 
@@ -307,6 +309,37 @@ extern volatile uintptr_t __stack_chk_guard;
 __pinned_bss
 bool z_sys_post_kernel;
 
+static int do_device_init(const struct init_entry *entry)
+{
+	const struct device *dev = entry->dev;
+	int rc = 0;
+
+	if (entry->init_fn.dev != NULL) {
+		rc = entry->init_fn.dev(dev);
+		/* Mark device initialized. If initialization
+		 * failed, record the error condition.
+		 */
+		if (rc != 0) {
+			if (rc < 0) {
+				rc = -rc;
+			}
+			if (rc > UINT8_MAX) {
+				rc = UINT8_MAX;
+			}
+			dev->state->init_res = rc;
+		}
+	}
+
+	dev->state->initialized = true;
+
+	if (rc == 0) {
+		/* Run automatic device runtime enablement */
+		(void)pm_device_runtime_auto_enable(dev);
+	}
+
+	return rc;
+}
+
 /**
  * @brief Execute all the init entry initialization functions at a given level
  *
@@ -338,35 +371,38 @@ static void z_sys_init_run_level(enum init_level level)
 		const struct device *dev = entry->dev;
 
 		if (dev != NULL) {
-			int rc = 0;
-
-			if (entry->init_fn.dev != NULL) {
-				rc = entry->init_fn.dev(dev);
-				/* Mark device initialized. If initialization
-				 * failed, record the error condition.
-				 */
-				if (rc != 0) {
-					if (rc < 0) {
-						rc = -rc;
-					}
-					if (rc > UINT8_MAX) {
-						rc = UINT8_MAX;
-					}
-					dev->state->init_res = rc;
-				}
-			}
-
-			dev->state->initialized = true;
-
-			if (rc == 0) {
-				/* Run automatic device runtime enablement */
-				(void)pm_device_runtime_auto_enable(dev);
-			}
+			do_device_init(entry);
 		} else {
 			(void)entry->init_fn.sys();
 		}
 	}
 }
+
+
+int z_impl_device_init(const struct device *dev)
+{
+	if (dev == NULL) {
+		return -ENOENT;
+	}
+
+	STRUCT_SECTION_FOREACH_ALTERNATE(_deferred_init, init_entry, entry) {
+		if (entry->dev == dev) {
+			return do_device_init(entry);
+		}
+	}
+
+	return -ENOENT;
+}
+
+#ifdef CONFIG_USERSPACE
+static inline int z_vrfy_device_init(const struct device *dev)
+{
+	K_OOPS(K_SYSCALL_OBJ_INIT(dev, K_OBJ_ANY));
+
+	return z_impl_device_init(dev);
+}
+#include <syscalls/device_init_mrsh.c>
+#endif
 
 extern void boot_banner(void);
 
@@ -395,7 +431,7 @@ static void bg_thread_main(void *unused1, void *unused2, void *unused3)
 	z_sys_post_kernel = true;
 
 	z_sys_init_run_level(INIT_LEVEL_POST_KERNEL);
-#if CONFIG_STACK_POINTER_RANDOM
+#if defined(CONFIG_STACK_POINTER_RANDOM) && (CONFIG_STACK_POINTER_RANDOM != 0)
 	z_stack_adjust_initialized = 1;
 #endif /* CONFIG_STACK_POINTER_RANDOM */
 	boot_banner();
