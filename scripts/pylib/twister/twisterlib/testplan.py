@@ -349,13 +349,13 @@ class TestPlan:
             print("- {}".format(t))
 
     def report_test_tree(self):
-        all_tests = self.get_all_tests()
+        tests_list = self.get_tests_list()
 
         testsuite = Node("Testsuite")
         samples = Node("Samples", parent=testsuite)
         tests = Node("Tests", parent=testsuite)
 
-        for test in sorted(all_tests):
+        for test in sorted(tests_list):
             if test.startswith("sample."):
                 sec = test.split(".")
                 area = find(samples, lambda node: node.name == sec[1] and node.parent == samples)
@@ -379,13 +379,12 @@ class TestPlan:
             print("%s%s" % (pre, node.name))
 
     def report_test_list(self):
-        cnt = 0
-        all_tests = self.get_all_tests()
+        tests_list = self.get_tests_list()
 
-        for test in sorted(all_tests):
+        cnt = 0
+        for test in sorted(tests_list):
             cnt = cnt + 1
             print(" - {}".format(test))
-
         print("{} total.".format(cnt))
 
     def config(self):
@@ -397,7 +396,6 @@ class TestPlan:
         sys.stdout.write(what + "\n")
         sys.stdout.flush()
 
-
     def add_configurations(self):
         board_dirs = set()
         # Create a list of board roots as defined by the build system in general
@@ -408,16 +406,27 @@ class TestPlan:
                             Path(ZEPHYR_BASE) / 'subsys' / 'testsuite'],
                             board_roots=board_roots, board=None, board_dir=None)
         v1_boards = list_boards.find_boards(lb_args)
-        v2_boards = list_boards.find_v2_boards(lb_args)
+        v2_dirs = list_boards.find_v2_board_dirs(lb_args)
         for b in v1_boards:
             board_dirs.add(b.dir)
-        for b in v2_boards:
-            board_dirs.add(b.dir)
+        board_dirs.update(v2_dirs)
         logger.debug("Reading platform configuration files under %s..." % self.env.board_roots)
 
         platform_config = self.test_config.get('platforms', {})
         for folder in board_dirs:
             for file in glob.glob(os.path.join(folder, "*.yaml")):
+                # If the user set a platform filter, we can, if no other option would increase
+                # the allowed platform pool, save on time by not loading YAMLs of any boards
+                # that do not start with the required names.
+                if self.options.platform and \
+                    not self.options.all and \
+                    not self.options.integration and \
+                    not any([
+                        os.path.basename(file).startswith(
+                            re.split('[/@]', p)[0]
+                        ) for p in self.options.platform
+                    ]):
+                    continue
                 try:
                     platform = Platform()
                     platform.load(file)
@@ -449,7 +458,7 @@ class TestPlan:
                             # cmake/modules/extensions.cmake.
                             revision_patterns = ["[A-Z]",
                                                     "[0-9]+",
-                                                    "(0|[1-9][0-9]*)(_[0-9]+)*(_[0-9]+)*"]
+                                                    "(0|[1-9][0-9]*)(_[0-9]+){0,2}"]
 
                             for pattern in revision_patterns:
                                 result = re.match(f"{platform.name}_(?P<revision>{pattern})\\.conf", item)
@@ -479,6 +488,26 @@ class TestPlan:
             for case in ts.testcases:
                 testcases.append(case.name)
 
+        return testcases
+
+    def get_tests_list(self):
+        testcases = []
+        if tag_filter := self.options.tag:
+            for _, ts in self.testsuites.items():
+                if ts.tags.intersection(tag_filter):
+                    for case in ts.testcases:
+                        testcases.append(case.name)
+        else:
+            for _, ts in self.testsuites.items():
+                for case in ts.testcases:
+                    testcases.append(case.name)
+
+        if exclude_tag := self.options.exclude_tag:
+            for _, ts in self.testsuites.items():
+                if ts.tags.intersection(exclude_tag):
+                    for case in ts.testcases:
+                        if case.name in testcases:
+                            testcases.remove(case.name)
         return testcases
 
     def add_testsuites(self, testsuite_filter=[]):
@@ -683,15 +712,17 @@ class TestPlan:
             if ts.build_on_all and not platform_filter and platform_config.get('increased_platform_scope', True):
                 platform_scope = self.platforms
             elif ts.integration_platforms:
-                self.verify_platforms_existence(
-                    ts.integration_platforms, f"{ts_name} - integration_platforms")
                 integration_platforms = list(filter(lambda item: item.name in ts.integration_platforms,
                                                     self.platforms))
                 if self.options.integration:
+                    self.verify_platforms_existence(
+                        ts.integration_platforms, f"{ts_name} - integration_platforms")
                     platform_scope = integration_platforms
                 else:
                     # if not in integration mode, still add integration platforms to the list
                     if not platform_filter:
+                        self.verify_platforms_existence(
+                            ts.integration_platforms, f"{ts_name} - integration_platforms")
                         platform_scope = platforms + integration_platforms
                     else:
                         platform_scope = platforms

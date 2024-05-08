@@ -12,6 +12,7 @@ Major enhancements with this release include:
 * A new, completely overhauled hardware model has been introduced. This changes
   the way both SoCs and boards are named, defined and constructed in Zephyr.
   Additional information can be found in the :ref:`board_porting_guide`.
+* Zephyr now requires Python 3.10 or higher
 
 An overview of the changes required or recommended when migrating your application from Zephyr
 v3.6.0 to Zephyr v3.7.0 can be found in the separate :ref:`migration guide<migration_3.7>`.
@@ -30,6 +31,12 @@ https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
 API Changes
 ***********
+
+Removed APIs in this release
+============================
+
+ * The Bluetooth subsystem specific debug symbols are removed. They have been replaced with the
+   Zephyr logging ones.
 
 Deprecated in this release
 ==========================
@@ -78,6 +85,8 @@ Boards & SoC Support
 
 * Made these changes in other SoC series:
 
+  * ITE: Rename the Kconfig symbol for all ITE SoC variants.
+
 * Added support for these ARM boards:
 
 * Added support for these Xtensa boards:
@@ -88,14 +97,20 @@ Boards & SoC Support
 
 * Made these changes for native/POSIX boards:
 
+  * LLVM fuzzing support has been refactored while adding support for it in native_sim.
+
 * Added support for these following shields:
 
 Build system and Infrastructure
 *******************************
 
-* CI-enabled blackbox tests were added in order to verify correctness of the vast majority of Twister flags.
+  * CI-enabled blackbox tests were added in order to verify correctness of the vast majority of Twister flags.
 
-* Compiler
+  * A ``socs`` folder for applications has been introduced that allows for Kconfig fragments and
+    devicetree overlays that should apply to any board target using a particular SoC and board
+    qualifier.
+
+  * :ref:`Board/SoC flashing configuration<flashing-soc-board-config>` settings have been added.
 
   * Deprecated the global CSTD cmake property in favor of the :kconfig:option:`CONFIG_STD_C`
     choice to select the C Standard version. Additionally subsystems can select a minimum
@@ -159,6 +174,11 @@ Drivers and Sensors
 
 * Entropy
 
+* eSPI
+
+  * Renamed eSPI virtual wire direction macros and enum values to match the new terminology in
+    eSPI 1.5 specification.
+
 * Ethernet
 
   * Deperecated eth_mcux driver in favor of the reworked nxp_enet driver.
@@ -207,6 +227,8 @@ Drivers and Sensors
 * SDHC
 
 * Sensor
+
+  * Added TMP114 driver
 
 * Serial
 

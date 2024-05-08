@@ -450,6 +450,8 @@ static inline void assert_addr_aligned(uintptr_t addr)
 #if __ASSERT_ON
 	__ASSERT((addr & (CONFIG_MMU_PAGE_SIZE - 1)) == 0U,
 		 "unaligned address 0x%" PRIxPTR, addr);
+#else
+	ARG_UNUSED(addr);
 #endif
 }
 
@@ -481,6 +483,8 @@ static inline void assert_size_aligned(size_t size)
 #if __ASSERT_ON
 	__ASSERT((size & (CONFIG_MMU_PAGE_SIZE - 1)) == 0U,
 		 "unaligned size %zu", size);
+#else
+	ARG_UNUSED(size);
 #endif
 }
 
@@ -828,6 +832,9 @@ static inline pentry_t pte_finalize_value(pentry_t val, bool user_table,
 	    get_entry_phys(val, level) != shared_phys_addr) {
 		val = ~val;
 	}
+#else
+	ARG_UNUSED(user_table);
+	ARG_UNUSED(level);
 #endif
 	return val;
 }
@@ -1355,7 +1362,7 @@ void z_x86_mmu_init(void)
 #endif
 }
 
-#if CONFIG_X86_STACK_PROTECTION
+#ifdef CONFIG_X86_STACK_PROTECTION
 __pinned_func
 void z_x86_set_stack_guard(k_thread_stack_t *stack)
 {
@@ -1433,8 +1440,8 @@ int arch_buffer_validate(void *addr, size_t size, int write)
 	int ret = 0;
 
 	/* addr/size arbitrary, fix this up into an aligned region */
-	k_mem_region_align((uintptr_t *)&virt, &aligned_size,
-			   (uintptr_t)addr, size, CONFIG_MMU_PAGE_SIZE);
+	(void)k_mem_region_align((uintptr_t *)&virt, &aligned_size,
+				 (uintptr_t)addr, size, CONFIG_MMU_PAGE_SIZE);
 
 	for (size_t offset = 0; offset < aligned_size;
 	     offset += CONFIG_MMU_PAGE_SIZE) {

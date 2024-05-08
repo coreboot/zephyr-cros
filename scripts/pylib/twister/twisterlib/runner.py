@@ -46,6 +46,11 @@ from twisterlib.platform import Platform
 from twisterlib.testplan import change_skip_to_error_if_integration
 from twisterlib.harness import HarnessImporter, Pytest
 
+try:
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    from yaml import SafeLoader
+
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
 import expr_parser
@@ -299,7 +304,7 @@ class CMake:
                     log.write(log_msg)
 
             if log_msg:
-                overflow_found = re.findall("region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|dram0_1_seg)' overflowed by", log_msg)
+                overflow_found = re.findall("region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|dram\\d_\\d_seg)' overflowed by", log_msg)
                 imgtool_overflow_found = re.findall(r"Error: Image size \(.*\) \+ trailer \(.*\) exceeds requested size", log_msg)
                 if overflow_found and not self.options.overflow_as_errors:
                     logger.debug("Test skipped due to {} Overflow".format(overflow_found[0]))
@@ -861,7 +866,7 @@ class ProjectBuilder(FilterBuilder):
             return []
 
         with open(runners_file_path, 'r') as file:
-            runners_content: dict = yaml.safe_load(file)
+            runners_content: dict = yaml.load(file, Loader=SafeLoader)
 
         if 'config' not in runners_content:
             return []
@@ -901,7 +906,7 @@ class ProjectBuilder(FilterBuilder):
 
         with open(runners_file_path, 'rt') as file:
             runners_content_text = file.read()
-            runners_content_yaml: dict = yaml.safe_load(runners_content_text)
+            runners_content_yaml: dict = yaml.load(runners_content_text, Loader=SafeLoader)
 
         if 'config' not in runners_content_yaml:
             return

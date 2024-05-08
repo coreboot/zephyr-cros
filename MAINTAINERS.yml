@@ -190,14 +190,18 @@ ARM64 arch:
     - arch.arm64
 
 ARM Platforms:
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - ithinuel
   files:
     - boards/arm/mps*/
     - boards/arm/v2m_*/
+    - boards/arm/fvp_base*/
     - soc/arm/mps*/
     - soc/arm/musca/
     - soc/arm/beetle/
-    - soc/arm/fvp_aemv8r/aarch32/
+    - soc/arm/designstart/
+    - soc/arm/fvp_aemv8*/
     - dts/arm/armv*.dtsi
   labels:
     - "platform: ARM"
@@ -237,12 +241,8 @@ MIPS arch:
     - arch.mips
 
 Ambiq Platforms:
-  status: maintained
-  maintainers:
-    - fkokosinski
+  status: odd fixes
   collaborators:
-    - tgorochowik
-    - msobkowski
     - aaronyegx
     - RichardSWheatley
   files:
@@ -446,11 +446,7 @@ Bluetooth Audio:
     - tests/bluetooth/audio/
     - tests/bsim/bluetooth/audio/
     - tests/bluetooth/shell/audio.conf
-    - doc/connectivity/bluetooth/img/ble_audio_arch.svg
-    - doc/connectivity/bluetooth/img/cap_proc.svg
-    - doc/connectivity/bluetooth/img/gaf.svg
-    - doc/connectivity/bluetooth/img/zephyr_gaf.svg
-    - doc/connectivity/bluetooth/bluetooth-le-audio-arch.rst
+    - doc/connectivity/bluetooth/api/audio/
     - samples/bluetooth/broadcast_audio*/
     - samples/bluetooth/hap*/
     - samples/bluetooth/public_broadcast*/
@@ -1237,6 +1233,7 @@ Release Notes:
   status: odd fixes
   collaborators:
     - decsny
+    - lmajewski
   files:
     - drivers/ethernet/
     - include/zephyr/dt-bindings/ethernet/
@@ -1375,6 +1372,7 @@ Release Notes:
     - include/zephyr/dt-bindings/i2c/
     - tests/boards/*/i2c/
     - tests/drivers/*/i2c/
+    - samples/drivers/i2c/
   labels:
     - "area: I2C"
   tests:
@@ -2410,6 +2408,8 @@ Mbed TLS:
   maintainers:
     - d3zd3z
     - ceolin
+  collaborators:
+    - ithinuel
   files:
     - tests/crypto/mbedtls/
     - doc/services/crypto/
@@ -3493,6 +3493,7 @@ nRF Platforms:
 Renesas SmartBond Platforms:
   status: maintained
   maintainers:
+    - ioannis-karachalios
     - andrzej-kaczmarek
     - blauret
   files:
@@ -3576,7 +3577,6 @@ STM32 Platforms:
     - GeorgeCGV
   files:
     - boards/st/
-    - drivers/*/*stm32*/
     - drivers/*/*stm32*.c
     - drivers/*/*stm32*.h
     - drivers/*/*/*stm32*
@@ -3705,8 +3705,7 @@ Infineon Platforms:
     - boards/cypress/
     - boards/infineon/
     - drivers/*/*ifx_cat1*
-    - drivers/*/*xmc*/
-    - drivers/*/*xmc*.c
+    - drivers/*/*xmc*
     - drivers/sensor/infineon/
     - dts/arm/infineon/
     - dts/arm/cypress/
@@ -3830,6 +3829,7 @@ TF-M Integration:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files:
     - samples/tfm_integration/
     - modules/trusted-firmware-m/
@@ -4204,12 +4204,8 @@ West:
     - "platform: Altera"
 
 "West project: hal_ambiq":
-  status: maintained
-  maintainers:
-    - fkokosinski
+  status: odd fixes
   collaborators:
-    - tgorochowik
-    - msobkowski
     - aaronyegx
     - RichardSWheatley
   files:
@@ -4360,6 +4356,7 @@ West:
 "West project: hal_renesas":
   status: maintained
   maintainers:
+    - KhiemNguyenT
     - andrzej-kaczmarek
   files: []
   labels:
@@ -4522,6 +4519,8 @@ West:
   maintainers:
     - d3zd3z
     - ceolin
+  collaborators:
+    - ithinuel
   files:
     - modules/mbedtls/
   labels:
@@ -4688,6 +4687,7 @@ West:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files:
     - modules/trusted-firmware-m/
   labels:
@@ -4699,6 +4699,7 @@ West:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files: []
   labels:
     - "area: TF-M"
@@ -4710,6 +4711,7 @@ West:
     - sgrrzhf
   collaborators:
     - carlocaione
+    - ithinuel
   files:
     - modules/trusted-firmware-a/
   labels:
@@ -4721,6 +4723,7 @@ West:
     - d3zd3z
   collaborators:
     - SebastianBoe
+    - ithinuel
   files: []
   labels:
     - "area: TF-M"
