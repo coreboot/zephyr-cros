@@ -30,7 +30,7 @@ void z_pm_save_idle_exit(void)
 #endif	/* CONFIG_PM */
 #ifdef CONFIG_SYS_CLOCK_EXISTS
 	sys_clock_idle_exit();
-#endif
+#endif /* CONFIG_SYS_CLOCK_EXISTS */
 }
 
 void idle(void *unused1, void *unused2, void *unused3)
@@ -75,7 +75,7 @@ void idle(void *unused1, void *unused2, void *unused3)
 		 *
 		 * This function is entered with interrupts disabled.
 		 * If a low power state was entered, then the hook
-		 * function should enable inerrupts before exiting.
+		 * function should enable interrupts before exiting.
 		 * This is because the kernel does not do its own idle
 		 * processing in those cases i.e. skips k_cpu_idle().
 		 * The kernel's idle processing re-enables interrupts
@@ -87,7 +87,7 @@ void idle(void *unused1, void *unused2, void *unused3)
 		}
 #else
 		k_cpu_idle();
-#endif
+#endif /* CONFIG_PM */
 
 #if !defined(CONFIG_PREEMPT_ENABLED)
 # if !defined(CONFIG_USE_SWITCH) || defined(CONFIG_SPARC)
@@ -103,8 +103,8 @@ void idle(void *unused1, void *unused2, void *unused3)
 		if (_kernel.ready_q.cache != _current) {
 			z_swap_unlocked();
 		}
-# endif
-#endif
+# endif /* !defined(CONFIG_USE_SWITCH) || defined(CONFIG_SPARC) */
+#endif /* !defined(CONFIG_PREEMPT_ENABLED) */
 	}
 }
 

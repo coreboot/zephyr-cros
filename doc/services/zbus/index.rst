@@ -98,18 +98,17 @@ notifications from channels ``C3`` and ``C5`` to ``Subscriber 1``.
 
 
 Suppose a usual sensor-based solution is in the figure below for illustration purposes. When
-triggered, the timer pushes an action to a work queue that publishes to the ``Trigger`` channel. As
-the sensor thread subscribed to the ``Trigger`` channel, it receives the sensor data. Notice the
-VDED executes the ``Blink`` because it also listens to the ``Trigger`` channel. When the sensor data
-is ready, the sensor thread publishes it to the ``Sensor data`` channel. The core thread receives
-the message as a ``Sensor data`` channel message subscriber, processes the sensor data, and stores
-it in an internal sample buffer. It repeats until the sample buffer is full; when it happens, the
-core thread aggregates the sample buffer information, prepares a package, and publishes that to the
-``Payload`` channel. The Lora thread receives that because it is a ``Payload`` channel message
-subscriber and sends the payload to the cloud. When it completes the transmission, the Lora thread
-publishes to the ``Transmission done`` channel. The VDED executes the ``Blink`` again since it
-listens to the ``Transmission done`` channel.
-
+triggered, the timer publishes to the ``Trigger`` channel. As the sensor thread subscribed to the
+``Trigger`` channel, it receives the sensor data. Notice the VDED executes the ``Blink`` because it
+also listens to the ``Trigger`` channel. When the sensor data is ready, the sensor thread publishes
+it to the ``Sensor data`` channel. The core thread receives the message as a ``Sensor data`` channel
+message subscriber, processes the sensor data, and stores it in an internal sample buffer. It
+repeats until the sample buffer is full; when it happens, the core thread aggregates the sample
+buffer information, prepares a package, and publishes that to the ``Payload`` channel. The Lora
+thread receives that because it is a ``Payload`` channel message subscriber and sends the payload to
+the cloud. When it completes the transmission, the Lora thread publishes to the ``Transmission
+done`` channel. The VDED executes the ``Blink`` again since it listens to the ``Transmission done``
+channel.
 
 .. figure:: images/zbus_operations.svg
     :alt: ZBus sensor-based application
@@ -392,7 +391,7 @@ message reading depends on the subscriber's implementation. It is possible to in
 rate by following design tips:
 
 * Keep the listeners quick-as-possible (deal with them as ISRs). If some processing is needed,
-  consider submitting a work to a work-queue;
+  consider submitting a work item to a work-queue;
 * Try to give producers a high priority to avoid losses;
 * Leave spare CPU for observers to consume data produced;
 * Consider using message queues or pipes for intensive byte transfers.

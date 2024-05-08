@@ -4,45 +4,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* State Machine Framework */
+/**
+ * @file
+ *
+ * @brief State Machine Framework header file
+ */
 
 #ifndef ZEPHYR_INCLUDE_SMF_H_
 #define ZEPHYR_INCLUDE_SMF_H_
 
-#ifdef CONFIG_SMF_ANCESTOR_SUPPORT
+#include <zephyr/sys/util.h>
+
+/**
+ * @brief State Machine Framework API
+ * @defgroup smf State Machine Framework API
+ * @ingroup os_services
+ * @{
+ */
+
 /**
  * @brief Macro to create a hierarchical state.
  *
- * @param _entry  State entry function
- * @param _run    State run function
- * @param _exit   State exit function
- * @param _parent State parent object or NULL
+ * @param _entry   State entry function
+ * @param _run     State run function
+ * @param _exit    State exit function
+ * @param _parent  State parent object or NULL
+ * @param _initial State initial transition object or NULL
  */
-#define SMF_CREATE_STATE(_entry, _run, _exit, _parent) \
-{ \
-	.entry  = _entry, \
-	.run    = _run,   \
-	.exit   = _exit,  \
-	.parent = _parent \
+#define SMF_CREATE_STATE(_entry, _run, _exit, _parent, _initial)               \
+{                                                                              \
+	.entry = _entry,                                                       \
+	.run   = _run,                                                         \
+	.exit  = _exit,                                                        \
+	IF_ENABLED(CONFIG_SMF_ANCESTOR_SUPPORT, (.parent = _parent,))          \
+	IF_ENABLED(CONFIG_SMF_INITIAL_TRANSITION, (.initial = _initial,))      \
 }
-
-#else
-
-/**
- * @brief Macro to create a flat state.
- *
- * @param _entry  State entry function
- * @param _run  State run function
- * @param _exit  State exit function
- */
-#define SMF_CREATE_STATE(_entry, _run, _exit) \
-{ \
-	.entry = _entry, \
-	.run   = _run,   \
-	.exit  = _exit   \
-}
-
-#endif /* CONFIG_SMF_ANCESTOR_SUPPORT */
 
 /**
  * @brief Macro to cast user defined object to state machine
@@ -87,6 +83,13 @@ struct smf_state {
 	 *	that parent's exit and entry functions do not execute.
 	 */
 	const struct smf_state *parent;
+
+#ifdef CONFIG_SMF_INITIAL_TRANSITION
+	/**
+	 * Optional initial transition state. NULL for leaf states.
+	 */
+	const struct smf_state *initial;
+#endif
 };
 
 /** Defines the current context of the state machine. */
@@ -137,6 +140,15 @@ void smf_set_state(struct smf_ctx *ctx, const struct smf_state *new_state);
 void smf_set_terminate(struct smf_ctx *ctx, int32_t val);
 
 /**
+ * @brief Tell the SMF to stop propagating the event to ancestors. This allows
+ *        HSMs to implement 'programming by difference' where substates can
+ *        handle events on their own or propagate up to a common handler.
+ *
+ * @param ctx  State machine context
+ */
+void smf_set_handled(struct smf_ctx *ctx);
+
+/**
  * @brief Runs one iteration of a state machine (including any parent states)
  *
  * @param ctx  State machine context
@@ -150,5 +162,9 @@ int32_t smf_run_state(struct smf_ctx *ctx);
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ * @}
+ */
 
 #endif /* ZEPHYR_INCLUDE_SMF_H_ */

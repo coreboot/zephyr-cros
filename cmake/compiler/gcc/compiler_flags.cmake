@@ -21,8 +21,10 @@ endif()
 set_compiler_property(PROPERTY optimization_speed -O2)
 set_compiler_property(PROPERTY optimization_size  -Os)
 
-set_compiler_property(PROPERTY optimization_lto -flto)
-set_compiler_property(PROPERTY prohibit_lto -fno-lto)
+if(CMAKE_C_COMPILER_VERSION GREATER_EQUAL "4.5.0")
+  set_compiler_property(PROPERTY optimization_lto -flto)
+  set_compiler_property(PROPERTY prohibit_lto -fno-lto)
+endif()
 
 #######################################################
 # This section covers flags related to warning levels #
@@ -119,7 +121,7 @@ endif()
 
 set_compiler_property(PROPERTY no_printf_return_value -fno-printf-return-value)
 
-set_compiler_property(TARGET compiler-cpp PROPERTY nostdincxx "-nostdinc++")
+set_property(TARGET compiler-cpp PROPERTY nostdincxx "-nostdinc++")
 
 # Required C++ flags when using gcc
 set_property(TARGET compiler-cpp PROPERTY required "-fcheck-new")

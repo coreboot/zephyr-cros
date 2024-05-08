@@ -49,7 +49,6 @@ class Harness:
         self.regex = []
         self.matches = OrderedDict()
         self.ordered = True
-        self.repeat = 1
         self.id = None
         self.fail_on_fault = True
         self.fault = False
@@ -78,7 +77,6 @@ class Harness:
         if config:
             self.type = config.get('type', None)
             self.regex = config.get('regex', [])
-            self.repeat = config.get('repeat', 1)
             self.ordered = config.get('ordered', True)
             self.record = config.get('record', {})
             if self.record:
@@ -348,7 +346,7 @@ class Pytest(Harness):
         elif handler.type_str == 'build':
             command.append('--device-type=custom')
         else:
-            raise PytestHarnessException(f'Handling of handler {handler.type_str} not implemented yet')
+            raise PytestHarnessException(f'Support for handler {handler.type_str} not implemented yet')
 
         if handler.options.pytest_args:
             command.extend(handler.options.pytest_args)
@@ -366,6 +364,8 @@ class Pytest(Harness):
         hardware = handler.get_hardware()
         if not hardware:
             raise PytestHarnessException('Hardware is not available')
+        # update the instance with the device id to have it in the summary report
+        self.instance.dut = hardware.id
 
         self.reserved_serial = hardware.serial_pty or hardware.serial
         if hardware.serial_pty:
@@ -379,6 +379,10 @@ class Pytest(Harness):
         options = handler.options
         if runner := hardware.runner or options.west_runner:
             command.append(f'--runner={runner}')
+
+        if hardware.runner_params:
+            for param in hardware.runner_params:
+                command.append(f'--runner-params={param}')
 
         if options.west_flash and options.west_flash != []:
             command.append(f'--west-flash-extra-args={options.west_flash}')
@@ -511,6 +515,7 @@ class Gtest(Harness):
     ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     TEST_START_PATTERN = r".*\[ RUN      \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
     TEST_PASS_PATTERN = r".*\[       OK \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
+    TEST_SKIP_PATTERN = r".*\[ DISABLED \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
     TEST_FAIL_PATTERN = r".*\[  FAILED  \] (?P<suite_name>.*)\.(?P<test_name>.*)$"
     FINISHED_PATTERN = r".*\[==========\] Done running all tests\.$"
 
@@ -592,6 +597,9 @@ class Gtest(Harness):
         test_pass_match = re.search(self.TEST_PASS_PATTERN, line)
         if test_pass_match:
             return "passed", "{}.{}.{}".format(self.id, test_pass_match.group("suite_name"), test_pass_match.group("test_name"))
+        test_skip_match = re.search(self.TEST_SKIP_PATTERN, line)
+        if test_skip_match:
+            return "skipped", "{}.{}.{}".format(self.id, test_skip_match.group("suite_name"), test_skip_match.group("test_name"))
         test_fail_match = re.search(self.TEST_FAIL_PATTERN, line)
         if test_fail_match:
             return "failed", "{}.{}.{}".format(self.id, test_fail_match.group("suite_name"), test_fail_match.group("test_name"))
@@ -602,7 +610,7 @@ class Test(Harness):
     RUN_PASSED = "PROJECT EXECUTION SUCCESSFUL"
     RUN_FAILED = "PROJECT EXECUTION FAILED"
     test_suite_start_pattern = r"Running TESTSUITE (?P<suite_name>.*)"
-    ZTEST_START_PATTERN = r"START - (test_)?(.*)"
+    ZTEST_START_PATTERN = r"START - (test_)?([a-zA-Z0-9_-]+)"
 
     def handle(self, line):
         test_suite_match = re.search(self.test_suite_start_pattern, line)
@@ -700,8 +708,9 @@ class Bsim(Harness):
             new_exe_name = f'bs_{self.instance.platform.name}_{new_exe_name}'
         else:
             new_exe_name = self.instance.name
-            new_exe_name = new_exe_name.replace(os.path.sep, '_').replace('.', '_')
             new_exe_name = f'bs_{new_exe_name}'
+
+        new_exe_name = new_exe_name.replace(os.path.sep, '_').replace('.', '_').replace('@', '_')
 
         new_exe_path: str = os.path.join(bsim_out_path, 'bin', new_exe_name)
         logger.debug(f'Copying executable from {original_exe_path} to {new_exe_path}')

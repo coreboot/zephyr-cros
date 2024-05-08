@@ -24,14 +24,6 @@
 		pinmux = <UART1_RX_GPIO33>;
 	};
 
-	uart2_rx_gpio13: uart2_rx_gpio13 {
-		pinmux = <UART2_RX_GPIO13>;
-	};
-
-	uart2_tx_gpio14: uart2_rx_gpio14 {
-		pinmux = <UART2_TX_GPIO14>;
-	};
-
 	uart1_tx_gpio32: uart1_tx_gpio32 {
 		pinmux = <UART1_TX_GPIO32>;
 	};
@@ -39,10 +31,23 @@
 	spim3_default: spim3_default {
 		group1 {
 			pinmux = <SPIM3_MISO_GPIO38>,
-				 <SPIM3_SCLK_GPIO18>;
+				 <SPIM3_SCLK_GPIO18>,
+				 <SPIM3_CSEL_GPIO5>;
 		};
 		group2 {
 			pinmux = <SPIM3_MOSI_GPIO23>;
+			output-low;
+		};
+	};
+
+	spim2_default: spim2_default {
+		group1 {
+			pinmux = <SPIM2_SCLK_GPIO6>,
+				 <SPIM2_MISO_GPIO7>,
+				 <SPIM2_CSEL_GPIO11>;
+		};
+		group2 {
+			pinmux = <SPIM2_MOSI_GPIO8>;
 			output-low;
 		};
 	};

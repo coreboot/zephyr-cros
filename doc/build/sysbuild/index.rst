@@ -65,7 +65,7 @@ The following are some key sysbuild features indicated in this figure:
 
 - Sysbuild itself is also configured using Kconfig. For example, you can
   instruct sysbuild to build the MCUboot bootloader, as well as to build and
-  link your main Zephyr application as an MCUboot child image, using sysbuild's
+  link your main Zephyr application as an MCUboot-bootable image, using sysbuild's
   Kconfig files.
 
 - Sysbuild integrates with west's :ref:`west-build-flash-debug` commands. It
@@ -170,7 +170,7 @@ applying to both images debug optimizations:
          :board: reel_board
          :goals: build
          :west-args: --sysbuild
-         :gen-args: -DSB_CONFIG_BOOTLOADER_MCUBOOT=y -DCONFIG_DEBUG_OPTIMIZATIONS=y -Dmcuboot_DEBUG_OPTIMIZATIONS=y
+         :gen-args: -DSB_CONFIG_BOOTLOADER_MCUBOOT=y -DCONFIG_DEBUG_OPTIMIZATIONS=y -Dmcuboot_CONFIG_DEBUG_OPTIMIZATIONS=y
          :compact:
 
    .. group-tab:: ``cmake``
@@ -180,7 +180,7 @@ applying to both images debug optimizations:
          :app: share/sysbuild
          :board: reel_board
          :goals: build
-         :gen-args: -DAPP_DIR=samples/hello_world -DSB_CONFIG_BOOTLOADER_MCUBOOT=y -DCONFIG_DEBUG_OPTIMIZATIONS=y -Dmcuboot_DEBUG_OPTIMIZATIONS=y
+         :gen-args: -DAPP_DIR=samples/hello_world -DSB_CONFIG_BOOTLOADER_MCUBOOT=y -DCONFIG_DEBUG_OPTIMIZATIONS=y -Dmcuboot_CONFIG_DEBUG_OPTIMIZATIONS=y
          :compact:
 
 See the following subsections for more information.

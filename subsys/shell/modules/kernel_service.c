@@ -10,6 +10,7 @@
  * #line marks the *next* line, so it is off by one.
  */
 #line 13
+#include <version.h>
 
 #include <zephyr/sys/printk.h>
 #include <zephyr/shell/shell.h>
@@ -38,15 +39,10 @@
 static int cmd_kernel_version(const struct shell *sh,
 			      size_t argc, char **argv)
 {
-	uint32_t version = sys_kernel_version_get();
-
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	shell_print(sh, "Zephyr version %d.%d.%d",
-		      SYS_KERNEL_VER_MAJOR(version),
-		      SYS_KERNEL_VER_MINOR(version),
-		      SYS_KERNEL_VER_PATCHLEVEL(version));
+	shell_print(sh, "Zephyr version %s", KERNEL_VERSION_STRING);
 	return 0;
 }
 
@@ -266,7 +262,7 @@ static int cmd_kernel_stacks(const struct shell *sh,
 
 	for (int i = 0; i < num_cpus; i++) {
 		size_t unused;
-		const uint8_t *buf = Z_KERNEL_STACK_BUFFER(z_interrupt_stacks[i]);
+		const uint8_t *buf = K_KERNEL_STACK_BUFFER(z_interrupt_stacks[i]);
 		size_t size = K_KERNEL_STACK_SIZEOF(z_interrupt_stacks[i]);
 		int err = z_stack_space_get(buf, size, &unused);
 

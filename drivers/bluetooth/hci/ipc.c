@@ -18,12 +18,6 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(bt_hci_driver);
 
-#define IPC_CMD 0x01
-#define IPC_ACL 0x02
-#define IPC_SCO 0x03
-#define IPC_EVT 0x04
-#define IPC_ISO 0x05
-
 #define IPC_BOUND_TIMEOUT_IN_MS K_MSEC(1000)
 
 static struct ipc_ept hci_ept;
@@ -34,7 +28,7 @@ static bool is_hci_event_discardable(const uint8_t *evt_data)
 	uint8_t evt_type = evt_data[0];
 
 	switch (evt_type) {
-#if defined(CONFIG_BT_BREDR)
+#if defined(CONFIG_BT_CLASSIC)
 	case BT_HCI_EVT_INQUIRY_RESULT_WITH_RSSI:
 	case BT_HCI_EVT_EXTENDED_INQUIRY_RESULT:
 		return true;
@@ -159,6 +153,7 @@ static struct net_buf *bt_ipc_acl_recv(const uint8_t *data, size_t remaining)
 static struct net_buf *bt_ipc_iso_recv(const uint8_t *data, size_t remaining)
 {
 	struct bt_hci_iso_hdr hdr;
+	static size_t fail_cnt;
 	struct net_buf *buf;
 	size_t buf_tailroom;
 
@@ -174,8 +169,15 @@ static struct net_buf *bt_ipc_iso_recv(const uint8_t *data, size_t remaining)
 		remaining -= sizeof(hdr);
 
 		net_buf_add_mem(buf, &hdr, sizeof(hdr));
+
+		fail_cnt = 0U;
 	} else {
-		LOG_ERR("No available ISO buffers!");
+		if ((fail_cnt % 100U) == 0U) {
+			LOG_ERR("No available ISO buffers (%zu)!", fail_cnt);
+		}
+
+		fail_cnt++;
+
 		return NULL;
 	}
 
@@ -210,15 +212,15 @@ static void bt_ipc_rx(const uint8_t *data, size_t len)
 	remaining -= sizeof(pkt_indicator);
 
 	switch (pkt_indicator) {
-	case IPC_EVT:
+	case BT_HCI_H4_EVT:
 		buf = bt_ipc_evt_recv(data, remaining);
 		break;
 
-	case IPC_ACL:
+	case BT_HCI_H4_ACL:
 		buf = bt_ipc_acl_recv(data, remaining);
 		break;
 
-	case IPC_ISO:
+	case BT_HCI_H4_ISO:
 		buf = bt_ipc_iso_recv(data, remaining);
 		break;
 
@@ -229,19 +231,7 @@ static void bt_ipc_rx(const uint8_t *data, size_t len)
 
 	if (buf) {
 		LOG_DBG("Calling bt_recv(%p)", buf);
-
-		/* The IPC service does not guarantee that the handler thread
-		 * is cooperative. In particular, the OpenAMP implementation is
-		 * preemtible by default. OTOH, the HCI driver interface requires
-		 * that the bt_recv() function is called from a cooperative
-		 * thread.
-		 *
-		 * Calling `k_sched lock()` has the effect of making the current
-		 * thread cooperative.
-		 */
-		k_sched_lock();
 		bt_recv(buf);
-		k_sched_unlock();
 
 		LOG_HEXDUMP_DBG(buf->data, buf->len, "RX buf payload:");
 	}
@@ -256,13 +246,13 @@ static int bt_ipc_send(struct net_buf *buf)
 
 	switch (bt_buf_get_type(buf)) {
 	case BT_BUF_ACL_OUT:
-		pkt_indicator = IPC_ACL;
+		pkt_indicator = BT_HCI_H4_ACL;
 		break;
 	case BT_BUF_CMD:
-		pkt_indicator = IPC_CMD;
+		pkt_indicator = BT_HCI_H4_CMD;
 		break;
 	case BT_BUF_ISO_OUT:
-		pkt_indicator = IPC_ISO;
+		pkt_indicator = BT_HCI_H4_ISO;
 		break;
 	default:
 		LOG_ERR("Unknown type %u", bt_buf_get_type(buf));

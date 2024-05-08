@@ -23,8 +23,7 @@
  * Broadcast ISO radio events.
  */
 #define BT_LE_EXT_ADV_CUSTOM \
-		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_EXT_ADV | \
-				BT_LE_ADV_OPT_USE_NAME, \
+		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_EXT_ADV, \
 				0x0080, 0x0080, NULL)
 
 #define BT_LE_PER_ADV_CUSTOM \
@@ -188,7 +187,7 @@ static void stream_sent_cb(struct bt_bap_stream *bap_stream)
 
 	net_buf_reserve(buf, BT_ISO_CHAN_SEND_RESERVE);
 	net_buf_add_mem(buf, mock_iso_data, test_stream->tx_sdu_size);
-	ret = bt_cap_stream_send(cap_stream, buf, test_stream->seq_num++, BT_ISO_TIMESTAMP_NONE);
+	ret = bt_cap_stream_send(cap_stream, buf, test_stream->seq_num++);
 	if (ret < 0) {
 		/* This will end broadcasting on this stream. */
 		net_buf_unref(buf);

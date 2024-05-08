@@ -71,6 +71,9 @@ struct rtc_stm32_config {
 	uint32_t async_prescaler;
 	uint32_t sync_prescaler;
 	const struct stm32_pclken *pclken;
+#if DT_INST_NODE_HAS_PROP(0, calib_out_freq)
+	uint32_t cal_out_freq;
+#endif
 };
 
 struct rtc_stm32_data {
@@ -107,6 +110,12 @@ static int rtc_stm32_configure(const struct device *dev)
 
 		LL_RTC_DisableInitMode(RTC);
 	}
+
+#if DT_INST_NODE_HAS_PROP(0, calib_out_freq)
+	LL_RTC_CAL_SetOutputFreq(RTC, cfg->cal_out_freq);
+#else
+	LL_RTC_CAL_SetOutputFreq(RTC, LL_RTC_CALIB_OUTPUT_NONE);
+#endif
 
 #ifdef RTC_CR_BYPSHAD
 	LL_RTC_EnableShadowRegBypass(RTC);
@@ -187,7 +196,7 @@ static int rtc_stm32_set_time(const struct device *dev, const struct rtc_time *t
 		return err;
 	}
 
-	LOG_INF("Setting clock");
+	LOG_DBG("Setting clock");
 
 #if defined(PWR_CR_DBP) || defined(PWR_CR1_DBP) || defined(PWR_DBPCR_DBP) || defined(PWR_DBPR_DBP)
 	LL_PWR_EnableBkUpAccess();
@@ -244,7 +253,12 @@ static int rtc_stm32_get_time(const struct device *dev, struct rtc_time *timeptr
 #if HW_SUBSECOND_SUPPORT
 	const struct rtc_stm32_config *cfg = dev->config;
 	uint32_t rtc_subsecond;
-#endif
+#endif /* HW_SUBSECOND_SUPPORT */
+
+	if (timeptr == NULL) {
+		LOG_ERR("NULL rtc_time pointer");
+		return -EINVAL;
+	}
 
 	int err = k_mutex_lock(&data->lock, K_NO_WAIT);
 
@@ -273,7 +287,7 @@ static int rtc_stm32_get_time(const struct device *dev, struct rtc_time *timeptr
 			rtc_time      = LL_RTC_TIME_Get(RTC);
 #if HW_SUBSECOND_SUPPORT
 			rtc_subsecond = LL_RTC_TIME_GetSubSecond(RTC);
-#endif
+#endif /* HW_SUBSECOND_SUPPORT */
 		} while (rtc_time != LL_RTC_TIME_Get(RTC));
 	} while (rtc_date != LL_RTC_DATE_Get(RTC));
 
@@ -422,6 +436,9 @@ static const struct rtc_stm32_config rtc_config = {
 	.sync_prescaler = 0x00FF,
 #endif
 	.pclken = rtc_clk,
+#if DT_INST_NODE_HAS_PROP(0, calib_out_freq)
+	.cal_out_freq = _CONCAT(_CONCAT(LL_RTC_CALIB_OUTPUT_, DT_INST_PROP(0, calib_out_freq)), HZ),
+#endif
 };
 
 static struct rtc_stm32_data rtc_data;

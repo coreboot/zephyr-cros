@@ -17,6 +17,11 @@ jobs:
         ref: ${{ github.event.pull_request.head.sha }}
         fetch-depth: 0
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11
+
     - name: cache-pip
       uses: actions/cache@v4
       with:
@@ -57,6 +62,8 @@ jobs:
         # debug
         ls -la
         git log  --pretty=oneline | head -n 10
+        # Increase rename limit to allow for large PRs
+        git config diff.renameLimit 10000
         ./scripts/ci/check_compliance.py --annotate -e KconfigBasic \
         -c origin/${BASE_REF}..
 

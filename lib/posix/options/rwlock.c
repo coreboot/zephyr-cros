@@ -21,6 +21,11 @@ struct posix_rwlock {
 	k_tid_t wr_owner;
 };
 
+struct posix_rwlockattr {
+	bool initialized: 1;
+	bool pshared: 1;
+};
+
 int64_t timespec_to_timeoutms(const struct timespec *abstime);
 static uint32_t read_lock_acquire(struct posix_rwlock *rwl, int32_t timeout);
 static uint32_t write_lock_acquire(struct posix_rwlock *rwl, int32_t timeout);
@@ -57,19 +62,19 @@ static struct posix_rwlock *get_posix_rwlock(pthread_rwlock_t rwlock)
 
 	/* if the provided rwlock does not claim to be initialized, its invalid */
 	if (!is_pthread_obj_initialized(rwlock)) {
-		LOG_ERR("RWlock is uninitialized (%x)", rwlock);
+		LOG_DBG("RWlock is uninitialized (%x)", rwlock);
 		return NULL;
 	}
 
 	/* Mask off the MSB to get the actual bit index */
 	if (sys_bitarray_test_bit(&posix_rwlock_bitarray, bit, &actually_initialized) < 0) {
-		LOG_ERR("RWlock is invalid (%x)", rwlock);
+		LOG_DBG("RWlock is invalid (%x)", rwlock);
 		return NULL;
 	}
 
 	if (actually_initialized == 0) {
 		/* The rwlock claims to be initialized but is actually not */
-		LOG_ERR("RWlock claims to be initialized (%x)", rwlock);
+		LOG_DBG("RWlock claims to be initialized (%x)", rwlock);
 		return NULL;
 	}
 
@@ -87,7 +92,7 @@ struct posix_rwlock *to_posix_rwlock(pthread_rwlock_t *rwlock)
 
 	/* Try and automatically associate a posix_rwlock */
 	if (sys_bitarray_alloc(&posix_rwlock_bitarray, 1, &bit) < 0) {
-		LOG_ERR("Unable to allocate pthread_rwlock_t");
+		LOG_DBG("Unable to allocate pthread_rwlock_t");
 		return NULL;
 	}
 
@@ -383,4 +388,64 @@ static uint32_t write_lock_acquire(struct posix_rwlock *rwl, int32_t timeout)
 		ret = EBUSY;
 	}
 	return ret;
+}
+
+int pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *ZRESTRICT attr,
+				  int *ZRESTRICT pshared)
+{
+	struct posix_rwlockattr *const a = (struct posix_rwlockattr *)attr;
+
+	if (a == NULL || !a->initialized) {
+		return EINVAL;
+	}
+
+	*pshared = a->pshared;
+
+	return 0;
+}
+
+int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *attr, int pshared)
+{
+	struct posix_rwlockattr *const a = (struct posix_rwlockattr *)attr;
+
+	if (a == NULL || !a->initialized) {
+		return EINVAL;
+	}
+
+	if (!(pshared == PTHREAD_PROCESS_PRIVATE || pshared == PTHREAD_PROCESS_SHARED)) {
+		return EINVAL;
+	}
+
+	a->pshared = pshared;
+
+	return 0;
+}
+
+int pthread_rwlockattr_init(pthread_rwlockattr_t *attr)
+{
+	struct posix_rwlockattr *const a = (struct posix_rwlockattr *)attr;
+
+	if (a == NULL) {
+		return EINVAL;
+	}
+
+	*a = (struct posix_rwlockattr){
+		.initialized = true,
+		.pshared = PTHREAD_PROCESS_PRIVATE,
+	};
+
+	return 0;
+}
+
+int pthread_rwlockattr_destroy(pthread_rwlockattr_t *attr)
+{
+	struct posix_rwlockattr *const a = (struct posix_rwlockattr *)attr;
+
+	if (a == NULL || !a->initialized) {
+		return EINVAL;
+	}
+
+	*a = (struct posix_rwlockattr){0};
+
+	return 0;
 }

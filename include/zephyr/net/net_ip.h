@@ -410,7 +410,11 @@ enum net_ip_mtu {
 	/** IPv6 MTU length. We must be able to receive this size IPv6 packet
 	 * without fragmentation.
 	 */
+#if defined(CONFIG_NET_NATIVE_IPV6)
+	NET_IPV6_MTU = CONFIG_NET_IPV6_MTU,
+#else
 	NET_IPV6_MTU = 1280,
+#endif
 
 	/** IPv4 MTU length. We must be able to receive this size IPv4 packet
 	 * without fragmentation.
@@ -737,6 +741,34 @@ static inline bool net_ipv4_is_ll_addr(const struct in_addr *addr)
 }
 
 /**
+ * @brief Check if the given IPv4 address is from a private address range.
+ *
+ * See https://en.wikipedia.org/wiki/Reserved_IP_addresses for details.
+ *
+ * @param addr A valid pointer on an IPv4 address
+ *
+ * @return True if it is, false otherwise.
+ */
+static inline bool net_ipv4_is_private_addr(const struct in_addr *addr)
+{
+	uint32_t masked_24, masked_16, masked_12, masked_10, masked_8;
+
+	masked_24 = ntohl(UNALIGNED_GET(&addr->s_addr)) & 0xFFFFFF00;
+	masked_16 = masked_24 & 0xFFFF0000;
+	masked_12 = masked_24 & 0xFFF00000;
+	masked_10 = masked_24 & 0xFFC00000;
+	masked_8 = masked_24 & 0xFF000000;
+
+	return masked_8  == 0x0A000000 || /* 10.0.0.0/8      */
+	       masked_10 == 0x64400000 || /* 100.64.0.0/10   */
+	       masked_12 == 0xAC100000 || /* 172.16.0.0/12   */
+	       masked_16 == 0xC0A80000 || /* 192.168.0.0/16  */
+	       masked_24 == 0xC0000200 || /* 192.0.2.0/24    */
+	       masked_24 == 0xC0336400 || /* 192.51.100.0/24 */
+	       masked_24 == 0xCB007100;   /* 203.0.113.0/24  */
+}
+
+/**
  *  @brief Copy an IPv4 or IPv6 address
  *
  *  @param dest Destination IP address.
@@ -876,6 +908,26 @@ static inline bool net_ipv6_is_ula_addr(const struct in6_addr *addr)
 static inline bool net_ipv6_is_global_addr(const struct in6_addr *addr)
 {
 	return (addr->s6_addr[0] & 0xE0) == 0x20;
+}
+
+/**
+ * @brief Check if the given IPv6 address is from a private/local address range.
+ *
+ * See https://en.wikipedia.org/wiki/Reserved_IP_addresses for details.
+ *
+ * @param addr A valid pointer on an IPv6 address
+ *
+ * @return True if it is, false otherwise.
+ */
+static inline bool net_ipv6_is_private_addr(const struct in6_addr *addr)
+{
+	uint32_t masked_32, masked_7;
+
+	masked_32 = ntohl(UNALIGNED_GET(&addr->s6_addr32[0]));
+	masked_7 = masked_32 & 0xfc000000;
+
+	return masked_32 == 0x20010db8 || /* 2001:db8::/32 */
+	       masked_7  == 0xfc000000;   /* fc00::/7      */
 }
 
 /**
@@ -1333,15 +1385,6 @@ static inline void net_ipv6_addr_create_iid(struct in6_addr *addr,
 		addr->s6_addr[12] = 0xfe;
 		memcpy(&addr->s6_addr[13], lladdr->addr + 3, 3);
 
-#if defined(CONFIG_NET_L2_BT_ZEP1656)
-		/* Workaround against older Linux kernel BT IPSP code.
-		 * This will be removed eventually.
-		 */
-		if (lladdr->type == NET_LINK_BLUETOOTH) {
-			addr->s6_addr[8] ^= 0x02;
-		}
-#endif
-
 		if (lladdr->type == NET_LINK_ETHERNET) {
 			addr->s6_addr[8] ^= 0x02;
 		}
@@ -1385,20 +1428,6 @@ static inline bool net_ipv6_addr_based_on_ll(const struct in6_addr *addr,
 			    addr->s6_addr[11] == 0xff &&
 			    addr->s6_addr[12] == 0xfe &&
 			    (addr->s6_addr[8] ^ 0x02) == lladdr->addr[0]) {
-				return true;
-			}
-		} else if (lladdr->type == NET_LINK_BLUETOOTH) {
-			if (!memcmp(&addr->s6_addr[9], &lladdr->addr[1], 2) &&
-			    !memcmp(&addr->s6_addr[13], &lladdr->addr[3], 3) &&
-			    addr->s6_addr[11] == 0xff &&
-			    addr->s6_addr[12] == 0xfe
-#if defined(CONFIG_NET_L2_BT_ZEP1656)
-			    /* Workaround against older Linux kernel BT IPSP
-			     * code. This will be removed eventually.
-			     */
-			    && (addr->s6_addr[8] ^ 0x02) == lladdr->addr[0]
-#endif
-			    ) {
 				return true;
 			}
 		}
@@ -1553,6 +1582,17 @@ bool net_ipaddr_parse(const char *str, size_t str_len,
 		      struct sockaddr *addr);
 
 /**
+ * @brief Set the default port in the sockaddr structure.
+ * If the port is already set, then do nothing.
+ *
+ * @param addr Pointer to user supplied struct sockaddr.
+ * @param default_port Default port number to set.
+ *
+ * @return 0 if ok, <0 if error
+ */
+int net_port_set_default(struct sockaddr *addr, uint16_t default_port);
+
+/**
  * @brief Compare TCP sequence numbers.
  *
  * @details This function compares TCP sequence numbers,
@@ -1668,6 +1708,47 @@ static inline uint8_t net_priority2vlan(enum net_priority priority)
  * @return Network address family as a string, or NULL if family is unknown.
  */
 const char *net_family2str(sa_family_t family);
+
+/**
+ * @brief Add IPv6 prefix as a privacy extension filter.
+ *
+ * @details Note that the filters can either allow or deny listing.
+ *
+ * @param addr IPv6 prefix
+ * @param is_denylist Tells if this filter is for allowing or denying listing.
+ *
+ * @return 0 if ok, <0 if error
+ */
+#if defined(CONFIG_NET_IPV6_PE)
+int net_ipv6_pe_add_filter(struct in6_addr *addr, bool is_denylist);
+#else
+static inline int net_ipv6_pe_add_filter(struct in6_addr *addr,
+					 bool is_denylist)
+{
+	ARG_UNUSED(addr);
+	ARG_UNUSED(is_denylist);
+
+	return -ENOTSUP;
+}
+#endif /* CONFIG_NET_IPV6_PE */
+
+/**
+ * @brief Delete IPv6 prefix from privacy extension filter list.
+ *
+ * @param addr IPv6 prefix
+ *
+ * @return 0 if ok, <0 if error
+ */
+#if defined(CONFIG_NET_IPV6_PE)
+int net_ipv6_pe_del_filter(struct in6_addr *addr);
+#else
+static inline int net_ipv6_pe_del_filter(struct in6_addr *addr)
+{
+	ARG_UNUSED(addr);
+
+	return -ENOTSUP;
+}
+#endif /* CONFIG_NET_IPV6_PE */
 
 #ifdef __cplusplus
 }

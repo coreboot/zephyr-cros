@@ -18,6 +18,8 @@
 /**
  * @brief USB-C VBUS API
  * @defgroup usbc_vbus_api USB-C VBUS API
+ * @since 3.3
+ * @version 0.1.0
  * @ingroup io_interfaces
  * @{
  */
@@ -30,7 +32,7 @@
 extern "C" {
 #endif
 
-struct usbc_vbus_driver_api {
+__subsystem struct usbc_vbus_driver_api {
 	bool (*check_level)(const struct device *dev, enum tc_vbus_level level);
 	int (*measure)(const struct device *dev, int *vbus_meas);
 	int (*discharge)(const struct device *dev, bool enable);

@@ -589,6 +589,7 @@ embeded||embedded
 enabledi||enabled
 enbale||enable
 enble||enable
+enabeld||enabled
 enchanced||enhanced
 encorporating||incorporating
 encrupted||encrypted
@@ -772,6 +773,7 @@ hypervior||hypervisor
 hypter||hyper
 idel||idle
 identidier||identifier
+iff||if and only if
 iligal||illegal
 illigal||illegal
 illgal||illegal

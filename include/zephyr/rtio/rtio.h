@@ -46,6 +46,8 @@ extern "C" {
 /**
  * @brief RTIO
  * @defgroup rtio RTIO
+ * @since 3.2
+ * @version 0.1.0
  * @ingroup os_services
  * @{
  */
@@ -193,17 +195,17 @@ extern "C" {
 /**
  * @brief Equivalent to the I2C_MSG_STOP flag
  */
-#define RTIO_IODEV_I2C_STOP BIT(0)
+#define RTIO_IODEV_I2C_STOP BIT(1)
 
 /**
  * @brief Equivalent to the I2C_MSG_RESTART flag
  */
-#define RTIO_IODEV_I2C_RESTART BIT(1)
+#define RTIO_IODEV_I2C_RESTART BIT(2)
 
 /**
  * @brief Equivalent to the I2C_MSG_ADDR_10_BITS
  */
-#define RTIO_IODEV_I2C_10_BITS BIT(2)
+#define RTIO_IODEV_I2C_10_BITS BIT(3)
 
 /** @cond ignore */
 struct rtio;
@@ -276,6 +278,8 @@ struct rtio_sqe {
 			uint8_t *rx_buf;
 		};
 
+		/** OP_I2C_CONFIGURE */
+		uint32_t i2c_config;
 	};
 };
 
@@ -470,6 +474,11 @@ struct rtio_iodev {
 /** An operation that transceives (reads and writes simultaneously) */
 #define RTIO_OP_TXRX (RTIO_OP_CALLBACK+1)
 
+/** An operation to recover I2C buses */
+#define RTIO_OP_I2C_RECOVER (RTIO_OP_TXRX+1)
+
+/** An operation to configure I2C buses */
+#define RTIO_OP_I2C_CONFIGURE (RTIO_OP_I2C_RECOVER+1)
 
 /**
  * @brief Prepare a nop (no op) submission
@@ -728,22 +737,22 @@ static inline void rtio_block_pool_free(struct rtio *r, void *buf, uint32_t buf_
 	}
 
 #define Z_RTIO_SQE_POOL_DEFINE(name, sz)			\
-	static struct rtio_iodev_sqe _sqe_pool_##name[sz];	\
+	static struct rtio_iodev_sqe CONCAT(_sqe_pool_, name)[sz];	\
 	STRUCT_SECTION_ITERABLE(rtio_sqe_pool, name) = {	\
 		.free_q = RTIO_MPSC_INIT((name.free_q)),	\
 		.pool_size = sz,				\
 		.pool_free = sz,				\
-		.pool = _sqe_pool_##name,			\
+		.pool = CONCAT(_sqe_pool_, name),		\
 	}
 
 
 #define Z_RTIO_CQE_POOL_DEFINE(name, sz)			\
-	static struct rtio_cqe _cqe_pool_##name[sz];		\
+	static struct rtio_cqe CONCAT(_cqe_pool_, name)[sz];	\
 	STRUCT_SECTION_ITERABLE(rtio_cqe_pool, name) = {	\
 		.free_q = RTIO_MPSC_INIT((name.free_q)),	\
 		.pool_size = sz,				\
 		.pool_free = sz,				\
-		.pool = _cqe_pool_##name,			\
+		.pool = CONCAT(_cqe_pool_, name),		\
 	}
 
 /**
@@ -770,19 +779,19 @@ static inline void rtio_block_pool_free(struct rtio *r, void *buf, uint32_t buf_
 
 #define Z_RTIO_BLOCK_POOL_DEFINE(name, blk_sz, blk_cnt, blk_align)                                 \
 	RTIO_BMEM uint8_t __aligned(WB_UP(blk_align))                                              \
-	_block_pool_##name[blk_cnt*WB_UP(blk_sz)];                                                 \
-	_SYS_MEM_BLOCKS_DEFINE_WITH_EXT_BUF(name, WB_UP(blk_sz), blk_cnt, _block_pool_##name,      \
-					    RTIO_DMEM)
+	CONCAT(_block_pool_, name)[blk_cnt*WB_UP(blk_sz)];                                         \
+	_SYS_MEM_BLOCKS_DEFINE_WITH_EXT_BUF(name, WB_UP(blk_sz), blk_cnt,                          \
+					    CONCAT(_block_pool_, name),	RTIO_DMEM)
 
 #define Z_RTIO_DEFINE(name, _sqe_pool, _cqe_pool, _block_pool)                                     \
 	IF_ENABLED(CONFIG_RTIO_SUBMIT_SEM,                                                         \
-		   (static K_SEM_DEFINE(_submit_sem_##name, 0, K_SEM_MAX_LIMIT)))                  \
+		   (static K_SEM_DEFINE(CONCAT(_submit_sem_, name), 0, K_SEM_MAX_LIMIT)))          \
 	IF_ENABLED(CONFIG_RTIO_CONSUME_SEM,                                                        \
-		   (static K_SEM_DEFINE(_consume_sem_##name, 0, K_SEM_MAX_LIMIT)))                 \
+		   (static K_SEM_DEFINE(CONCAT(_consume_sem_, name), 0, K_SEM_MAX_LIMIT)))         \
 	STRUCT_SECTION_ITERABLE(rtio, name) = {                                                    \
-		IF_ENABLED(CONFIG_RTIO_SUBMIT_SEM, (.submit_sem = &_submit_sem_##name,))           \
+		IF_ENABLED(CONFIG_RTIO_SUBMIT_SEM, (.submit_sem = &CONCAT(_submit_sem_, name),))   \
 		IF_ENABLED(CONFIG_RTIO_SUBMIT_SEM, (.submit_count = 0,))                           \
-		IF_ENABLED(CONFIG_RTIO_CONSUME_SEM, (.consume_sem = &_consume_sem_##name,))        \
+		IF_ENABLED(CONFIG_RTIO_CONSUME_SEM, (.consume_sem = &CONCAT(_consume_sem_, name),))\
 		.cq_count = ATOMIC_INIT(0),                                                        \
 		.xcqcnt = ATOMIC_INIT(0),                                                          \
 		.sqe_pool = _sqe_pool,                                                             \
@@ -799,10 +808,11 @@ static inline void rtio_block_pool_free(struct rtio *r, void *buf, uint32_t buf_
  * @param sq_sz Size of the submission queue entry pool
  * @param cq_sz Size of the completion queue entry pool
  */
-#define RTIO_DEFINE(name, sq_sz, cq_sz)					\
-	Z_RTIO_SQE_POOL_DEFINE(name##_sqe_pool, sq_sz);			\
-	Z_RTIO_CQE_POOL_DEFINE(name##_cqe_pool, cq_sz);			\
-	Z_RTIO_DEFINE(name, &name##_sqe_pool, &name##_cqe_pool, NULL)	\
+#define RTIO_DEFINE(name, sq_sz, cq_sz)						\
+	Z_RTIO_SQE_POOL_DEFINE(CONCAT(name, _sqe_pool), sq_sz);			\
+	Z_RTIO_CQE_POOL_DEFINE(CONCAT(name, _cqe_pool), cq_sz);			\
+	Z_RTIO_DEFINE(name, &CONCAT(name, _sqe_pool),				\
+		      &CONCAT(name, _cqe_pool), NULL)
 
 /* clang-format on */
 

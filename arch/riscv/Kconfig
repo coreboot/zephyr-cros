@@ -6,8 +6,7 @@ menu "RISCV Options"
 
 config ARCH
 	string
-	default "riscv64" if 64BIT
-	default "riscv32"
+	default "riscv"
 
 config FLOAT_HARD
 	bool "Hard-float calling convention"
@@ -38,6 +37,24 @@ config RISCV_ALWAYS_SWITCH_THROUGH_ECALL
 	  balanced with an ecall. This is not required by the RISC-V spec
 	  and most people should say n here to minimize context switching
 	  overhead.
+
+config RISCV_ENABLE_FRAME_POINTER
+	bool
+	default y
+	depends on OVERRIDE_FRAME_POINTER_DEFAULT && !OMIT_FRAME_POINTER
+	help
+	  Hidden option to simplify access to OVERRIDE_FRAME_POINTER_DEFAULT
+	  and OMIT_FRAME_POINTER. It is automatically enabled when the frame
+	  pointer unwinding is enabled.
+
+config RISCV_EXCEPTION_STACK_TRACE
+	bool
+	default y
+	depends on RISCV_ENABLE_FRAME_POINTER
+	depends on EXCEPTION_STACK_TRACE
+	imply THREAD_STACK_INFO
+	help
+	  Internal config to enable runtime stack traces on fatal exceptions.
 
 menu "RISCV Processor Options"
 
@@ -230,6 +247,15 @@ config RV_BOOT_HART
 	  For RISC-V systems such as MPFS and FU540 this would be set to 1 to
 	  skip the E51 HART 0 as it is not usable in SMP configurations.
 
+config RISCV_HART_MASK
+	int
+	default -1
+	help
+	  Configures the mask for the HART ID.
+	  For RISC-V systems with HART ID starting from non-zero value,
+	  i.e. 128, 129, ..(0x80, 8x81, ..), this can be configured to 63 (0x7f)
+	  such that we can extract the bits that start from 0.
+
 config RISCV_PMP
 	bool "RISC-V PMP Support"
 	select THREAD_STACK_INFO
@@ -366,6 +392,5 @@ config ARCH_HAS_SINGLE_THREAD_SUPPORT
 	default y if !SMP
 
 rsource "Kconfig.isa"
-rsource "Kconfig.core"
 
 endmenu

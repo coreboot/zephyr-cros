@@ -46,7 +46,7 @@ There are four severity levels available in the system: error, warning, info
 and debug. For each severity level the logging API (:zephyr_file:`include/zephyr/logging/log.h`)
 has set of dedicated macros. Logger API also has macros for logging data.
 
-For each level following set of macros are available:
+For each level the following set of macros are available:
 
 - ``LOG_X`` for standard printf-like messages, e.g. :c:macro:`LOG_ERR`.
 - ``LOG_HEXDUMP_X`` for dumping data, e.g. :c:macro:`LOG_HEXDUMP_WRN`.
@@ -54,6 +54,10 @@ For each level following set of macros are available:
   particular instance, e.g. :c:macro:`LOG_INST_INF`.
 - ``LOG_INST_HEXDUMP_X`` for dumping data associated with the particular
   instance, e.g. :c:macro:`LOG_HEXDUMP_INST_DBG`
+
+The warning level also exposes the following additional macro:
+
+- :c:macro:`LOG_WRN_ONCE` for warnings where only the first occurrence is of interest.
 
 There are two configuration categories: configurations per module and global
 configuration. When logging is enabled globally, it works for modules. However,
@@ -318,7 +322,7 @@ The following snippet shows how logging can be processed in simple forever loop.
 
 .. code-block:: c
 
-   #include <zephyr/log_ctrl.h>
+   #include <zephyr/logging/log_ctrl.h>
 
    int main(void)
    {
@@ -660,7 +664,7 @@ not supported.  Occasionally, logging may inform backend about number of dropped
 messages with :c:func:`log_backend_dropped`. Message processing API is version
 specific.
 
-:c:func:`log_backend_msg2_process` is used for processing message. It is common for
+:c:func:`log_backend_msg_process` is used for processing message. It is common for
 standard and hexdump messages because log message hold string with arguments
 and data. It is also common for deferred and immediate logging.
 
@@ -670,7 +674,7 @@ Message formatting
 Logging provides set of function that can be used by the backend to format a
 message. Helper functions are available in :zephyr_file:`include/zephyr/logging/log_output.h`.
 
-Example message formatted using :c:func:`log_output_msg2_process`.
+Example message formatted using :c:func:`log_output_msg_process`.
 
 .. code-block:: console
 

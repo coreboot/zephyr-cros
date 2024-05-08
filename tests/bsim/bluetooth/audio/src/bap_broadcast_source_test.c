@@ -39,6 +39,40 @@ static K_SEM_DEFINE(sem_stopped, 0U, ARRAY_SIZE(broadcast_source_streams));
 
 static void started_cb(struct bt_bap_stream *stream)
 {
+	struct bt_bap_ep_info info;
+	int err;
+
+	err = bt_bap_ep_get_info(stream->ep, &info);
+	if (err != 0) {
+		FAIL("Failed to get EP info: %d\n", err);
+		return;
+	}
+
+	if (info.state != BT_BAP_EP_STATE_STREAMING) {
+		FAIL("Unexpected EP state: %d\n", info.state);
+		return;
+	}
+
+	if (info.dir != BT_AUDIO_DIR_SOURCE) {
+		FAIL("Unexpected info.dir: %d\n", info.dir);
+		return;
+	}
+
+	if (!info.can_send) {
+		FAIL("info.can_send is false\n");
+		return;
+	}
+
+	if (info.can_recv) {
+		FAIL("info.can_recv is true\n");
+		return;
+	}
+
+	if (info.paired_ep != NULL) {
+		FAIL("Unexpected info.paired_ep: %p\n", info.paired_ep);
+		return;
+	}
+
 	printk("Stream %p started\n", stream);
 	k_sem_give(&sem_started);
 }
@@ -72,7 +106,7 @@ static void stream_sent_cb(struct bt_bap_stream *stream)
 
 	net_buf_reserve(buf, BT_ISO_CHAN_SEND_RESERVE);
 	net_buf_add_mem(buf, mock_iso_data, test_stream->tx_sdu_size);
-	ret = bt_bap_stream_send(stream, buf, test_stream->seq_num++, BT_ISO_TIMESTAMP_NONE);
+	ret = bt_bap_stream_send(stream, buf, test_stream->seq_num++);
 	if (ret < 0) {
 		/* This will end broadcasting on this stream. */
 		net_buf_unref(buf);
@@ -97,8 +131,8 @@ static struct bt_bap_stream_ops stream_ops = {
 static int setup_broadcast_source(struct bt_bap_broadcast_source **source)
 {
 	uint8_t bis_codec_data[] = {
-		BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CFG_FREQ,
-				    BT_BYTES_LIST_LE16(BT_AUDIO_CODEC_CFG_FREQ_16KHZ)),
+		BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CFG_CHAN_ALLOC,
+				    BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_LEFT)),
 	};
 	struct bt_bap_broadcast_source_stream_param
 		stream_params[ARRAY_SIZE(broadcast_source_streams)];
@@ -180,7 +214,7 @@ static int setup_extended_adv(struct bt_bap_broadcast_source *source, struct bt_
 	NET_BUF_SIMPLE_DEFINE(ad_buf,
 			      BT_UUID_SIZE_16 + BT_AUDIO_BROADCAST_ID_SIZE);
 	struct bt_le_adv_param adv_param = BT_LE_ADV_PARAM_INIT(
-		BT_LE_ADV_OPT_EXT_ADV | BT_LE_ADV_OPT_USE_NAME, 0x80, 0x80, NULL);
+		BT_LE_ADV_OPT_EXT_ADV, 0x80, 0x80, NULL);
 	NET_BUF_SIMPLE_DEFINE(base_buf, 128);
 	struct bt_data ext_ad;
 	struct bt_data per_ad;

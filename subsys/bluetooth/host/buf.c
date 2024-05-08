@@ -28,13 +28,17 @@
 #define NUM_COMLETE_EVENT_SIZE BT_BUF_EVT_SIZE(                        \
 	sizeof(struct bt_hci_cp_host_num_completed_packets) +          \
 	MAX_EVENT_COUNT * sizeof(struct bt_hci_handle_count))
-/* Dedicated pool for HCI_Number_of_Completed_Packets. This event is always
- * consumed synchronously by bt_recv_prio() so a single buffer is enough.
- * Having a dedicated pool for it ensures that exhaustion of the RX pool
- * cannot block the delivery of this priority event.
+
+/* Pool for RX HCI buffers that are always freed by `bt_recv`
+ * before it returns.
+ *
+ * A singleton buffer shall be sufficient for correct operation.
+ * The buffer count may be increased as an optimization to allow
+ * the HCI transport to fill buffers in parallel with `bt_recv`
+ * consuming them.
  */
-NET_BUF_POOL_FIXED_DEFINE(num_complete_pool, 1, NUM_COMLETE_EVENT_SIZE,
-			  sizeof(struct bt_buf_data), NULL);
+#define SYNC_EVT_SIZE NUM_COMLETE_EVENT_SIZE
+NET_BUF_POOL_FIXED_DEFINE(sync_evt_pool, 1, SYNC_EVT_SIZE, sizeof(struct bt_buf_data), NULL);
 #endif /* CONFIG_BT_CONN || CONFIG_BT_ISO */
 
 NET_BUF_POOL_FIXED_DEFINE(discardable_pool, CONFIG_BT_BUF_EVT_DISCARDABLE_COUNT,
@@ -62,9 +66,7 @@ struct net_buf *bt_buf_get_rx(enum bt_buf_type type, k_timeout_t timeout)
 	__ASSERT(type == BT_BUF_EVT || type == BT_BUF_ACL_IN ||
 		 type == BT_BUF_ISO_IN, "Invalid buffer type requested");
 
-	if ((IS_ENABLED(CONFIG_BT_ISO_UNICAST) ||
-	     IS_ENABLED(CONFIG_BT_ISO_SYNC_RECEIVER)) &&
-	     type == BT_BUF_ISO_IN) {
+	if (IS_ENABLED(CONFIG_BT_ISO_RX) && type == BT_BUF_ISO_IN) {
 		return bt_iso_get_rx(timeout);
 	}
 
@@ -94,7 +96,7 @@ struct net_buf *bt_buf_get_evt(uint8_t evt, bool discardable,
 	switch (evt) {
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_ISO)
 	case BT_HCI_EVT_NUM_COMPLETED_PACKETS:
-		buf = net_buf_alloc(&num_complete_pool, timeout);
+		buf = net_buf_alloc(&sync_evt_pool, timeout);
 		break;
 #endif /* CONFIG_BT_CONN || CONFIG_BT_ISO */
 	default:
@@ -141,7 +143,7 @@ struct net_buf_pool *bt_buf_get_discardable_pool(void)
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_ISO)
 struct net_buf_pool *bt_buf_get_num_complete_pool(void)
 {
-	return &num_complete_pool;
+	return &sync_evt_pool;
 }
 #endif /* CONFIG_BT_CONN || CONFIG_BT_ISO */
 #endif /* ZTEST_UNITTEST */

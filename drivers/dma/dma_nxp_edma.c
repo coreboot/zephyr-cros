@@ -573,6 +573,23 @@ static int edma_get_attribute(const struct device *dev, uint32_t type, uint32_t 
 	return 0;
 }
 
+static bool edma_channel_filter(const struct device *dev, int chan_id, void *param)
+{
+	int *requested_channel;
+
+	if (!param) {
+		return false;
+	}
+
+	requested_channel = param;
+
+	if (*requested_channel == chan_id && lookup_channel(dev, chan_id)) {
+		return true;
+	}
+
+	return false;
+}
+
 static const struct dma_driver_api edma_api = {
 	.reload = edma_reload,
 	.config = edma_config,
@@ -582,6 +599,7 @@ static const struct dma_driver_api edma_api = {
 	.resume = edma_start,
 	.get_status = edma_get_status,
 	.get_attribute = edma_get_attribute,
+	.chan_filter = edma_channel_filter,
 };
 
 static int edma_init(const struct device *dev)
@@ -610,6 +628,7 @@ static int edma_init(const struct device *dev)
 	 */
 	data->channel_flags = ATOMIC_INIT(0);
 	data->ctx.atomic = &data->channel_flags;
+	data->ctx.dma_channels = data->hal_cfg->channels;
 
 	return 0;
 }
@@ -656,7 +675,6 @@ static struct edma_config edma_config_##inst = {				\
 										\
 static struct edma_data edma_data_##inst = {					\
 	.channels = channels_##inst,						\
-	.ctx.dma_channels = ARRAY_SIZE(channels_##inst),			\
 	.ctx.magic = DMA_MAGIC,							\
 	.hal_cfg = &EDMA_HAL_CFG_GET(inst),					\
 };										\

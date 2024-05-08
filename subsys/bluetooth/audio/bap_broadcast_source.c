@@ -168,6 +168,11 @@ static void broadcast_source_iso_connected(struct bt_iso_chan *chan)
 
 	LOG_DBG("stream %p ep %p", stream, ep);
 
+#if defined(CONFIG_BT_BAP_DEBUG_STREAM_SEQ_NUM)
+	/* reset sequence number */
+	stream->_prev_seq_num = 0U;
+#endif /* CONFIG_BT_BAP_DEBUG_STREAM_SEQ_NUM */
+
 	ops = stream->ops;
 	if (ops != NULL && ops->connected != NULL) {
 		ops->connected(stream);
@@ -573,6 +578,7 @@ static bool valid_broadcast_source_param(const struct bt_bap_broadcast_source_pa
 				return false;
 			}
 
+#if CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE > 0
 			CHECKIF(stream_param->data == NULL && stream_param->data_len != 0) {
 				LOG_DBG("subgroup_params[%zu].stream_params[%zu]->data is "
 					"NULL with len %zu",
@@ -580,12 +586,20 @@ static bool valid_broadcast_source_param(const struct bt_bap_broadcast_source_pa
 				return false;
 			}
 
-#if CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE > 0
 			CHECKIF(stream_param->data_len > CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE) {
 				LOG_DBG("subgroup_params[%zu].stream_params[%zu]->data_len too "
 					"large: %zu > %d",
 					i, j, stream_param->data_len,
 					CONFIG_BT_AUDIO_CODEC_CFG_MAX_DATA_SIZE);
+				return false;
+			}
+
+			CHECKIF(stream_param->data != NULL &&
+				subgroup_param->codec_cfg->id == BT_HCI_CODING_FORMAT_LC3 &&
+				!bt_audio_valid_ltv(stream_param->data, stream_param->data_len)) {
+				LOG_DBG("subgroup_params[%zu].stream_params[%zu]->data not valid "
+					"LTV",
+					i, j);
 				return false;
 			}
 		}
@@ -880,9 +894,6 @@ int bt_bap_broadcast_source_reconfig(struct bt_bap_broadcast_source *source,
 		 * params
 		 */
 		SYS_SLIST_FOR_EACH_CONTAINER(&subgroup->streams, stream, _node) {
-			struct bt_iso_chan_io_qos *iso_qos;
-
-			iso_qos = stream->ep->iso->chan.qos->tx;
 			bt_bap_stream_attach(NULL, stream, stream->ep, codec_cfg);
 			bt_bap_iso_configure_data_path(stream->ep, codec_cfg);
 		}
@@ -1000,6 +1011,11 @@ int bt_bap_broadcast_source_start(struct bt_bap_broadcast_source *source, struct
 	param.pto = source->pto;
 	param.iso_interval = source->iso_interval;
 #endif /* CONFIG_BT_ISO_TEST_PARAMS */
+
+	/* Set the enabling state early in case that the BIS is connected before we can manage to
+	 * set it afterwards
+	 */
+	broadcast_source_set_state(source, BT_BAP_EP_STATE_ENABLING);
 
 	/* Set the enabling state early in case that the BIS is connected before we can manage to
 	 * set it afterwards

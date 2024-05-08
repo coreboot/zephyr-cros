@@ -103,7 +103,7 @@
 #define FUNC_ALIAS(real_func, new_alias, return_type) \
 	return_type new_alias() ALIAS_OF(real_func)
 
-#if defined(CONFIG_ARCH_POSIX)
+#if defined(CONFIG_ARCH_POSIX) && !defined(_ASMLANGUAGE)
 #include <zephyr/arch/posix/posix_trace.h>
 
 /*let's not segfault if this were to happen for some reason*/
@@ -641,6 +641,12 @@ do {                                                                    \
 #define __noasan __attribute__((no_sanitize("address")))
 #else
 #define __noasan /**/
+#endif
+
+#if defined(CONFIG_UBSAN)
+#define __noubsan __attribute__((no_sanitize("undefined")))
+#else
+#define __noubsan
 #endif
 
 /**

@@ -63,7 +63,7 @@ config BT_LLL_VENDOR_NORDIC
 
 config BT_LLL_VENDOR_OPENISA
 	bool "Use OpenISA LLL"
-	depends on SOC_OPENISA_RV32M1_RISCV32
+	depends on SOC_OPENISA_RV32M1
 	select BT_CTLR_PHY_UPDATE_SUPPORT
 	select BT_CTLR_EXT_REJ_IND_SUPPORT
 	select BT_HAS_HCI_VS
@@ -99,9 +99,14 @@ config BT_CTLR_ULL_LLL_PRIO_SUPPORT
 	bool
 
 config BT_CTLR_RX_PRIO_STACK_SIZE
-	# Controller's Co-Operative high priority Rx thread stack size.
-	int "High priority Rx thread stack size"
+	# Hidden, Controller's Co-Operative high priority Rx thread stack size.
+	int
 	default 448
+
+config BT_CTLR_RX_STACK_SIZE
+	# Hidden, Controller's Co-Operative Rx thread stack size.
+	int
+	default 768
 
 config BT_CTLR_SETTINGS
 	bool "Settings System"
@@ -336,9 +341,9 @@ config BT_CTLR_ADV_DATA_CHAIN
 	bool "Advertising Data chaining [EXPERIMENTAL]"
 	select EXPERIMENTAL
 	help
-	  Enable support for Advertising Data chaining in Extended and
-	  Periodic Advertising. This will allow to have Advertising Data Length
-	  upto 1650 bytes.
+	  Enable support for Advertising Data chaining in Extended
+	  (non-connectable) and Periodic Advertising. This will allow to have
+	  Advertising Data Length up to 1650 bytes.
 
 	  This is experimental and work in progress, does not implement
 	  recombining the AD Data and could return BT_HCI_ERR_PACKET_TOO_LONG
@@ -535,6 +540,16 @@ config BT_CTLR_SCAN_ENABLE_STRICT
 	help
 	  Enforce returning HCI Error Command Disallowed on enabling/disabling
 	  already enabled/disabled scanning.
+
+config BT_CTLR_CIS_ACCEPT_MIN_OFFSET_STRICT
+	bool "Enforce Strict CIS Minimum Offset Check"
+	depends on BT_CTLR_PERIPHERAL_ISO
+	help
+	  Enforce strict check of CIS minimum offset accepted by the peripheral
+	  considering that there will be no overlap of ACL connection with the
+	  CIG events. Radio and CPU overheads for an ACL connection event is
+	  considered and checks the CIS minimum offset is greater than the time
+	  reservation for the ACL connection.
 
 config BT_CTLR_ISOAL_SN_STRICT
 	bool "Enforce Strict Tx ISO Data Sequence Number use"
@@ -1076,7 +1091,7 @@ config BT_TICKER_EXT
 config BT_TICKER_EXT_SLOT_WINDOW_YIELD
 	bool "Tickers with slot window always yields"
 	depends on BT_TICKER_EXT
-	default y if BT_CTLR_ADV_ISO
+	default y if BT_MESH || BT_CTLR_ADV_ISO
 	help
 	  This options forces tickers with slot window extensions to yield to
 	  normal tickers and be placed at the end of their slot window.
@@ -1209,7 +1224,7 @@ config BT_CTLR_PROFILE_ISR
 
 config BT_CTLR_DEBUG_PINS
 	bool "Bluetooth Controller Debug Pins"
-	depends on BOARD_NRF51DK_NRF51422 || BOARD_NRF52DK_NRF52832 || BOARD_NRF52DK_NRF52810 || BOARD_NRF52840DK_NRF52840 || BOARD_NRF52833DK_NRF52833 || BOARD_NRF5340DK_NRF5340_CPUNET || BOARD_RV32M1_VEGA
+	depends on BOARD_NRF51DK_NRF51822 || BOARD_NRF52DK_NRF52832 || BOARD_NRF52DK_NRF52810 || BOARD_NRF52840DK_NRF52840 || BOARD_NRF52833DK_NRF52833 || BOARD_NRF5340DK_NRF5340_CPUNET || BOARD_RV32M1_VEGA
 	help
 	  Turn on debug GPIO toggling for the BLE Controller. This is useful
 	  when debugging with a logic analyzer or profiling certain sections of

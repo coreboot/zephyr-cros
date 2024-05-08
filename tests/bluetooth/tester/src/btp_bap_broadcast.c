@@ -30,10 +30,10 @@ static struct btp_bap_broadcast_remote_source *broadcast_source_to_sync;
 /* A mask for the maximum BIS we can sync to. +1 since the BIS indexes start from 1. */
 static const uint32_t bis_index_mask = BIT_MASK(CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT + 1);
 #define INVALID_BROADCAST_ID      (BT_AUDIO_BROADCAST_ID_MAX + 1)
-#define SYNC_RETRY_COUNT          6 /* similar to retries for connections */
+#define PA_SYNC_INTERVAL_TO_TIMEOUT_RATIO 20 /* Set the timeout relative to interval */
 #define PA_SYNC_SKIP              5
-static struct bt_bap_scan_delegator_subgroup
-	delegator_subgroups[BT_BAP_SCAN_DELEGATOR_MAX_SUBGROUPS];
+static struct bt_bap_bass_subgroup
+	delegator_subgroups[CONFIG_BT_BAP_BASS_MAX_SUBGROUPS];
 
 static inline struct btp_bap_broadcast_stream *stream_bap_to_broadcast(struct bt_bap_stream *stream)
 {
@@ -295,7 +295,7 @@ uint8_t btp_bap_broadcast_source_setup(const void *cmd, uint16_t cmd_len,
 	struct bt_audio_codec_cfg codec_cfg;
 	const struct btp_bap_broadcast_source_setup_cmd *cp = cmd;
 	struct btp_bap_broadcast_source_setup_rp *rp = rsp;
-	struct bt_le_adv_param *param = BT_LE_EXT_ADV_NCONN_NAME;
+	struct bt_le_adv_param *param = BT_LE_EXT_ADV_NCONN;
 
 	/* Only one local source/BIG supported for now */
 	struct btp_bap_broadcast_local_source *source = &local_source;
@@ -307,7 +307,7 @@ uint8_t btp_bap_broadcast_source_setup(const void *cmd, uint16_t cmd_len,
 	NET_BUF_SIMPLE_DEFINE(base_buf, 128);
 
 	/* Broadcast Audio Streaming Endpoint advertising data */
-	struct bt_data base_ad;
+	struct bt_data base_ad[2];
 	struct bt_data per_ad;
 
 	LOG_DBG("");
@@ -344,11 +344,14 @@ uint8_t btp_bap_broadcast_source_setup(const void *cmd, uint16_t cmd_len,
 	/* Setup extended advertising data */
 	net_buf_simple_add_le16(&ad_buf, BT_UUID_BROADCAST_AUDIO_VAL);
 	net_buf_simple_add_le24(&ad_buf, source->broadcast_id);
-	base_ad.type = BT_DATA_SVC_DATA16;
-	base_ad.data_len = ad_buf.len;
-	base_ad.data = ad_buf.data;
-	err = tester_gap_create_adv_instance(param, BTP_GAP_ADDR_TYPE_IDENTITY, &base_ad, 1, NULL,
-					     0, &gap_settings);
+	base_ad[0].type = BT_DATA_SVC_DATA16;
+	base_ad[0].data_len = ad_buf.len;
+	base_ad[0].data = ad_buf.data;
+	base_ad[1].type = BT_DATA_NAME_COMPLETE;
+	base_ad[1].data_len = sizeof(CONFIG_BT_DEVICE_NAME) - 1;
+	base_ad[1].data = CONFIG_BT_DEVICE_NAME;
+	err = tester_gap_create_adv_instance(param, BTP_GAP_ADDR_TYPE_IDENTITY, base_ad, 2,
+					     NULL, 0, &gap_settings);
 	if (err != 0) {
 		LOG_DBG("Failed to create extended advertising instance: %d", err);
 
@@ -680,7 +683,7 @@ static void base_recv_cb(struct bt_bap_broadcast_sink *sink, const struct bt_bap
 	LOG_DBG("bis_index_bitfield 0x%08x", broadcaster->bis_index_bitfield);
 }
 
-static void syncable_cb(struct bt_bap_broadcast_sink *sink, bool encrypted)
+static void syncable_cb(struct bt_bap_broadcast_sink *sink, const struct bt_iso_biginfo *biginfo)
 {
 	int err;
 	uint32_t index_bitfield;
@@ -692,10 +695,10 @@ static void syncable_cb(struct bt_bap_broadcast_sink *sink, bool encrypted)
 		return;
 	}
 
-	LOG_DBG("Broadcaster PA found, encrypted %d, requested_bis_sync %d", encrypted,
+	LOG_DBG("Broadcaster PA found, encrypted %d, requested_bis_sync %d", biginfo->encryption,
 		broadcaster->requested_bis_sync);
 
-	if (encrypted) {
+	if (biginfo->encryption) {
 		/* Wait for Set Broadcast Code and start sync at broadcast_code_cb */
 		return;
 	}
@@ -810,8 +813,8 @@ static void btp_send_broadcast_receive_state_ev(struct bt_conn *conn,
 	uint8_t *ptr;
 
 	tester_rsp_buffer_lock();
-	tester_rsp_buffer_allocate(sizeof(*ev) + BT_BAP_SCAN_DELEGATOR_MAX_SUBGROUPS *
-		sizeof(struct bt_bap_scan_delegator_subgroup), (uint8_t **)&ev);
+	tester_rsp_buffer_allocate(sizeof(*ev) + CONFIG_BT_BAP_BASS_MAX_SUBGROUPS *
+		sizeof(struct bt_bap_bass_subgroup), (uint8_t **)&ev);
 
 	if (conn) {
 		bt_addr_le_copy(&ev->address, bt_conn_get_dst(conn));
@@ -829,7 +832,7 @@ static void btp_send_broadcast_receive_state_ev(struct bt_conn *conn,
 
 	ptr = ev->subgroups;
 	for (uint8_t i = 0; i < ev->num_subgroups; i++) {
-		const struct bt_bap_scan_delegator_subgroup *subgroup = &state->subgroups[i];
+		const struct bt_bap_bass_subgroup *subgroup = &state->subgroups[i];
 
 		sys_put_le32(subgroup->bis_sync >> 1, ptr);
 		ptr += sizeof(subgroup->bis_sync);
@@ -954,7 +957,7 @@ static void broadcast_code_cb(struct bt_conn *conn,
 
 static int bis_sync_req_cb(struct bt_conn *conn,
 			   const struct bt_bap_scan_delegator_recv_state *recv_state,
-			   const uint32_t bis_sync_req[BT_BAP_SCAN_DELEGATOR_MAX_SUBGROUPS])
+			   const uint32_t bis_sync_req[CONFIG_BT_BAP_BASS_MAX_SUBGROUPS])
 {
 	struct btp_bap_broadcast_remote_source *broadcaster;
 	bool bis_synced = false;
@@ -1391,12 +1394,12 @@ uint8_t btp_bap_broadcast_assistant_add_src(const void *cmd, uint16_t cmd_len,
 	param.pa_sync = cp->padv_sync > 0 ? true : false;
 	param.broadcast_id = sys_get_le24(cp->broadcast_id);
 	param.pa_interval = sys_le16_to_cpu(cp->padv_interval);
-	param.num_subgroups = MIN(cp->num_subgroups, BT_BAP_SCAN_DELEGATOR_MAX_SUBGROUPS);
+	param.num_subgroups = MIN(cp->num_subgroups, CONFIG_BT_BAP_BASS_MAX_SUBGROUPS);
 	param.subgroups = delegator_subgroups;
 
 	ptr = cp->subgroups;
 	for (uint8_t i = 0; i < param.num_subgroups; i++) {
-		struct bt_bap_scan_delegator_subgroup *subgroup = &delegator_subgroups[i];
+		struct bt_bap_bass_subgroup *subgroup = &delegator_subgroups[i];
 
 		subgroup->bis_sync = sys_get_le32(ptr);
 		if (subgroup->bis_sync != BT_BAP_BIS_SYNC_NO_PREF) {
@@ -1462,12 +1465,12 @@ uint8_t btp_bap_broadcast_assistant_modify_src(const void *cmd, uint16_t cmd_len
 	param.src_id = cp->src_id;
 	param.pa_sync = cp->padv_sync > 0 ? true : false;
 	param.pa_interval = sys_le16_to_cpu(cp->padv_interval);
-	param.num_subgroups = MIN(cp->num_subgroups, BT_BAP_SCAN_DELEGATOR_MAX_SUBGROUPS);
+	param.num_subgroups = MIN(cp->num_subgroups, CONFIG_BT_BAP_BASS_MAX_SUBGROUPS);
 	param.subgroups = delegator_subgroups;
 
 	ptr = cp->subgroups;
 	for (uint8_t i = 0; i < param.num_subgroups; i++) {
-		struct bt_bap_scan_delegator_subgroup *subgroup = &delegator_subgroups[i];
+		struct bt_bap_bass_subgroup *subgroup = &delegator_subgroups[i];
 
 		subgroup->bis_sync = sys_get_le32(ptr);
 		if (subgroup->bis_sync != BT_BAP_BIS_SYNC_NO_PREF) {

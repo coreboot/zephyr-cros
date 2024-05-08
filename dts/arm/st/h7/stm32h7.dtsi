@@ -45,10 +45,10 @@
 		};
 	};
 
-	quadspi_memory: memory@90000000 {
-		compatible = "zephyr,memory-region", "mmio-sram";
-		reg = <0x90000000 DT_SIZE_M(256)>;
-		zephyr,memory-region = "QSPI";
+	ext_memory: memory@90000000 {
+		compatible = "zephyr,memory-region";
+		reg = <0x90000000 DT_SIZE_M(256)>; /* max addressable area */
+		zephyr,memory-region = "EXTMEM";
 		zephyr,memory-attr = <( DT_MEM_ARM(ATTR_MPU_EXTMEM) )>;
 	};
 
@@ -516,8 +516,6 @@
 			interrupts = <19 0>, <21 0>, <63 0>;
 			interrupt-names = "int0", "int1", "calib";
 			bosch,mram-cfg = <0x0 28 8 3 3 0 3 3>;
-			sample-point = <875>;
-			sample-point-data = <875>;
 			status = "disabled";
 		};
 
@@ -529,8 +527,6 @@
 			interrupts = <20 0>, <22 0>, <63 0>;
 			interrupt-names = "int0", "int1", "calib";
 			bosch,mram-cfg = <0x350 28 8 3 3 0 3 3>;
-			sample-point = <875>;
-			sample-point-data = <875>;
 			status = "disabled";
 		};
 
@@ -1019,6 +1015,13 @@
 				 <&rcc STM32_CLOCK_BUS_AHB1 0x00010000>,
 				 <&rcc STM32_CLOCK_BUS_AHB1 0x00020000>;
 			status = "disabled";
+
+			mdio: mdio {
+				compatible = "st,stm32-mdio";
+				#address-cells = <1>;
+				#size-cells = <0>;
+				status = "disabled";
+			};
 		};
 
 		fmc: memory-controller@52004000 {
@@ -1050,6 +1053,15 @@
 			reg = <0x52005000 0x34>;
 			interrupts = <92 0>;
 			clocks = <&rcc STM32_CLOCK_BUS_AHB3 0x00004000>;
+			status = "disabled";
+		};
+
+		dcmi: dcmi@48020000 {
+			compatible = "st,stm32-dcmi";
+			reg = <0x48020000 0x400>;
+			interrupts = <78 0>;
+			interrupt-names = "dcmi";
+			clocks = <&rcc STM32_CLOCK_BUS_AHB2 0x00000001>;
 			status = "disabled";
 		};
 	};

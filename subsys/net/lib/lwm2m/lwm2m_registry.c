@@ -2010,6 +2010,10 @@ struct lwm2m_engine_res_inst *lwm2m_engine_get_res_inst(const struct lwm2m_obj_p
 
 bool lwm2m_engine_shall_report_obj_version(const struct lwm2m_engine_obj *obj)
 {
+	if (IS_ENABLED(CONFIG_LWM2M_ENGINE_ALWAYS_REPORT_OBJ_VERSION)) {
+		return true;
+	}
+
 	/* For non-core objects, report version other than 1.0 */
 	if (!obj->is_core) {
 		return obj->version_major != 1 || obj->version_minor != 0;
@@ -2331,4 +2335,23 @@ size_t lwm2m_cache_size(const struct lwm2m_time_series_resource *cache_entry)
 #else
 	return 0;
 #endif
+}
+
+int lwm2m_set_bulk(const struct lwm2m_res_item res_list[], size_t res_list_size)
+{
+	int ret;
+
+	k_mutex_lock(&registry_lock, K_FOREVER);
+	for (int i = 0; i < res_list_size; i++) {
+
+		ret = lwm2m_engine_set(res_list[i].path, res_list[i].value, res_list[i].size);
+
+		if (ret) {
+			k_mutex_unlock(&registry_lock);
+			return ret;
+		}
+	}
+	k_mutex_unlock(&registry_lock);
+
+	return 0;
 }

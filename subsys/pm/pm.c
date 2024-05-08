@@ -66,7 +66,6 @@ static int pm_suspend_devices(void)
 		 * devices with runtime PM enabled.
 		 */
 		if (!device_is_ready(dev) || pm_device_is_busy(dev) ||
-		    pm_device_state_is_locked(dev) ||
 		    pm_device_wakeup_is_enabled(dev) ||
 		    pm_device_runtime_is_enabled(dev)) {
 			continue;
@@ -183,6 +182,8 @@ bool pm_system_suspend(int32_t ticks)
 		info = pm_policy_next_state(id, ticks);
 		if (info != NULL) {
 			z_cpus_pm_state[id] = *info;
+		} else {
+			z_cpus_pm_state[id].state = PM_STATE_ACTIVE;
 		}
 	}
 	k_spin_unlock(&pm_forced_state_lock, key);
@@ -209,7 +210,8 @@ bool pm_system_suspend(int32_t ticks)
 	}
 #endif
 
-	if (ticks != K_TICKS_FOREVER) {
+	if ((z_cpus_pm_state[id].exit_latency_us != 0) &&
+	    (ticks != K_TICKS_FOREVER)) {
 		/*
 		 * We need to set the timer to interrupt a little bit early to
 		 * accommodate the time required by the CPU to fully wake up.

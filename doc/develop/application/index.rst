@@ -494,13 +494,11 @@ Make sure to follow these steps in order.
      as described in this step, this value will be used.
 
 #. If your application uses a configuration file or files other than
-   the usual :file:`prj.conf` (or :file:`prj_YOUR_BOARD.conf`, where
-   ``YOUR_BOARD`` is a board name), add lines setting the
-   :makevar:`CONF_FILE` variable to these files appropriately.
-   If multiple filenames are given, separate them by a single space or
-   semicolon.  CMake lists can be used to build up configuration fragment
-   files in a modular way when you want to avoid setting :makevar:`CONF_FILE`
-   in a single place. For example:
+   the usual :file:`prj.conf`, add lines setting the :makevar:`CONF_FILE`
+   variable to these files appropriately. If multiple filenames are given,
+   separate them by a single space or semicolon.  CMake lists can be used to
+   build up configuration fragment files in a modular way when you want to
+   avoid setting :makevar:`CONF_FILE` in a single place. For example:
 
    .. code-block:: cmake
 
@@ -706,20 +704,20 @@ Given the following example project layout:
    ├── prj.conf
    ├── prj_mouse.conf
    ├── boards
-   │   ├── native_posix.overlay
+   │   ├── native_sim.overlay
    │   └── qemu_cortex_m3_mouse.overlay
    └── src
        └── main.c
 
-* If this is built normally without ``FILE_SUFFIX`` being defined for ``native_posix`` then
-  ``prj.conf`` and ``boards/native_posix.overlay`` will be used.
+* If this is built normally without ``FILE_SUFFIX`` being defined for ``native_sim`` then
+  ``prj.conf`` and ``boards/native_sim.overlay`` will be used.
 
 * If this is build normally without ``FILE_SUFFIX`` being defined for ``qemu_cortex_m3`` then
   ``prj.conf`` will be used, no application devicetree overlay will be used.
 
-* If this is built with ``FILE_SUFFIX`` set to ``mouse`` for ``native_posix`` then
-  ``prj_mouse.conf`` and ``boards/native_posix.overlay`` will be used (there is no
-  ``native_posix_mouse.overlay`` file so it falls back to ``native_posix.overlay``).
+* If this is built with ``FILE_SUFFIX`` set to ``mouse`` for ``native_sim`` then
+  ``prj_mouse.conf`` and ``boards/native_sim.overlay`` will be used (there is no
+  ``native_sim_mouse.overlay`` file so it falls back to ``native_sim.overlay``).
 
 * If this is build with ``FILE_SUFFIX`` set to ``mouse`` for ``qemu_cortex_m3`` then
   ``prj_mouse.conf`` will be used and ``boards/qemu_cortex_m3_mouse.overlay`` will be used.
@@ -1144,7 +1142,7 @@ where the ``boards`` directory hosts the board you are building for:
 
    .
    ├── boards
-   │   └── x86
+   │   └── vendor
    │       └── my_custom_board
    │           ├── doc
    │           │   └── img
@@ -1157,9 +1155,9 @@ supported by a SOC that is available in the Zephyr tree.
 Boards
 ======
 
-Use the proper architecture folder name (e.g., ``x86``, ``arm``, etc.)
-under ``boards`` for ``my_custom_board``.  (See  :ref:`boards` for a
-list of board architectures.)
+Use the vendor name as the folder name (which must match the vendor prefix in
+:zephyr_file:`dts/bindings/vendor-prefixes.txt` if submitting upstream to Zephyr, or be
+``others`` if it is not a vendor board) under ``boards`` for ``my_custom_board``.
 
 Documentation (under ``doc/``) and support files (under ``support/``) are optional, but
 will be needed when submitting to Zephyr.
@@ -1174,9 +1172,8 @@ Zephyr board, and provide the following files::
     board.h
     CMakeLists.txt
     doc/
-    Kconfig.board
+    Kconfig.my_custom_board
     Kconfig.defconfig
-    pinmux.c
     support/
 
 
@@ -1215,11 +1212,10 @@ the Zephyr tree, for example:
 .. code-block:: none
 
         soc
-        └── arm
-            └── st_stm32
-                    ├── common
-                    └── stm32l0
-
+        └── st
+            └── stm32
+                ├── common
+                └── stm32l0x
 
 
 The file :zephyr_file:`soc/Kconfig` will create the top-level
@@ -1235,8 +1231,9 @@ more SoCs into the menu.
 .. code-block:: none
 
         soc
-        └── arm
-            └── st_stm32
+        └── st
+            └── stm32
+                └── stm32l0x
                     ├── Kconfig
                     ├── Kconfig.soc
                     └── Kconfig.defconfig
@@ -1248,17 +1245,17 @@ An example of loading ``stm31l0`` specific Kconfig files in this structure:
 .. code-block:: none
 
         soc
-        └── arm
-            └── st_stm32
-                    ├── Kconfig.soc
-                    └── stm32l0
-                        └── Kconfig.series
+        └── st
+            └── stm32
+                ├── Kconfig.soc
+                └── stm32l0x
+                    └── Kconfig.soc
 
-can be done with the following content in ``st_stm32/Kconfig.soc``:
+can be done with the following content in ``st/stm32/Kconfig.soc``:
 
 .. code-block:: none
 
-   rsource "*/Kconfig.series"
+   rsource "*/Kconfig.soc"
 
 Once the SOC structure is in place, you can build your application
 targeting this platform by specifying the location of your custom platform

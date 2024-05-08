@@ -45,9 +45,6 @@ static K_SEM_DEFINE(sem_iso_data, CONFIG_BT_ISO_TX_BUF_COUNT,
 				   CONFIG_BT_ISO_TX_BUF_COUNT);
 static bt_addr_le_t peer_addr;
 
-#define SCAN_INTERVAL        0x0010
-#define SCAN_WINDOW          0x0010
-
 #define CREATE_CONN_INTERVAL 0x0010
 #define CREATE_CONN_WINDOW   0x0010
 
@@ -69,12 +66,6 @@ static bt_addr_le_t peer_addr;
 #define ADV_INTERVAL_MIN     0x0020
 #define ADV_INTERVAL_MAX     0x0020
 
-#define BT_LE_SCAN_CUSTOM \
-	BT_LE_SCAN_PARAM(BT_LE_SCAN_TYPE_PASSIVE, \
-			 BT_LE_SCAN_OPT_NONE, \
-			 SCAN_INTERVAL, \
-			 SCAN_WINDOW)
-
 #define BT_CONN_LE_CREATE_CONN_CUSTOM  \
 	BT_CONN_LE_CREATE_PARAM(BT_CONN_LE_OPT_NONE, \
 				CREATE_CONN_INTERVAL, \
@@ -85,16 +76,14 @@ static bt_addr_le_t peer_addr;
 
 #if defined(CONFIG_TEST_USE_LEGACY_ADVERTISING)
 #define BT_LE_ADV_CONN_CUSTOM BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE | \
-					      BT_LE_ADV_OPT_ONE_TIME | \
-					      BT_LE_ADV_OPT_USE_NAME, \
+					      BT_LE_ADV_OPT_ONE_TIME, \
 					      ADV_INTERVAL_MIN, \
 					      ADV_INTERVAL_MAX, \
 					      NULL)
 #else /* !CONFIG_TEST_USE_LEGACY_ADVERTISING */
 #define BT_LE_ADV_CONN_CUSTOM BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE | \
 					      BT_LE_ADV_OPT_EXT_ADV | \
-					      BT_LE_ADV_OPT_ONE_TIME | \
-					      BT_LE_ADV_OPT_USE_NAME, \
+					      BT_LE_ADV_OPT_ONE_TIME, \
 					      ADV_INTERVAL_MIN, \
 					      ADV_INTERVAL_MAX, \
 					      NULL)
@@ -451,7 +440,7 @@ static void test_cis_central(void)
 		int chan;
 
 		printk("Start scanning (%d)...", i);
-		err = bt_le_scan_start(BT_LE_SCAN_CUSTOM, NULL);
+		err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, NULL);
 		if (err) {
 			FAIL("Could not start scan: %d\n", err);
 			return;
@@ -553,8 +542,7 @@ static void test_cis_central(void)
 				}
 
 				printk("ISO send: seq_num %u, chan %d\n", seq_num, chan);
-				ret = bt_iso_chan_send(&iso_chan[chan], buf,
-						       seq_num, BT_ISO_TIMESTAMP_NONE);
+				ret = bt_iso_chan_send(&iso_chan[chan], buf, seq_num);
 				if (ret < 0) {
 					FAIL("Unable to send data on channel %d : %d\n", chan, ret);
 					net_buf_unref(buf);
@@ -781,8 +769,7 @@ static void test_cis_peripheral(void)
 				}
 
 				printk("ISO send: seq_num %u, chan %d\n", seq_num, chan);
-				ret = bt_iso_chan_send(&iso_chan_p[chan], buf, seq_num,
-						       BT_ISO_TIMESTAMP_NONE);
+				ret = bt_iso_chan_send(&iso_chan_p[chan], buf, seq_num);
 				if (ret < 0) {
 					FAIL("Unable to send data on channel %d : %d\n", chan, ret);
 					net_buf_unref(buf);

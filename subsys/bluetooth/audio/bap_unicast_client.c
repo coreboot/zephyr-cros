@@ -315,6 +315,11 @@ static void unicast_client_ep_iso_connected(struct bt_bap_ep *ep)
 	LOG_DBG("stream %p ep %p dir %s receiver_ready %u",
 		stream, ep, bt_audio_dir_str(ep->dir), ep->receiver_ready);
 
+#if defined(CONFIG_BT_BAP_DEBUG_STREAM_SEQ_NUM)
+	/* reset sequence number */
+	stream->_prev_seq_num = 0U;
+#endif /* CONFIG_BT_BAP_DEBUG_STREAM_SEQ_NUM */
+
 	stream_ops = stream->ops;
 	if (stream_ops != NULL && stream_ops->connected != NULL) {
 		stream_ops->connected(stream);
@@ -1559,7 +1564,7 @@ static uint8_t unicast_client_ep_notify(struct bt_conn *conn,
 	struct net_buf_simple buf;
 	struct bt_bap_unicast_client_ep *client_ep;
 	const uint8_t att_ntf_header_size = 3; /* opcode (1) + handle (2) */
-	const uint16_t max_ntf_size = bt_gatt_get_mtu(conn) - att_ntf_header_size;
+	uint16_t max_ntf_size;
 	struct bt_bap_ep *ep;
 
 	client_ep = CONTAINER_OF(params, struct bt_bap_unicast_client_ep, subscribe);
@@ -1575,6 +1580,8 @@ static uint8_t unicast_client_ep_notify(struct bt_conn *conn,
 		params->value_handle = 0x0000;
 		return BT_GATT_ITER_STOP;
 	}
+
+	max_ntf_size = bt_gatt_get_mtu(conn) - att_ntf_header_size;
 
 	if (length == max_ntf_size) {
 		struct unicast_client *client = &uni_cli_insts[bt_conn_index(conn)];
@@ -2522,24 +2529,24 @@ static int stream_param_check(const struct bt_bap_unicast_group_stream_param *pa
 {
 	CHECKIF(param->stream == NULL)
 	{
-		LOG_ERR("param->stream is NULL");
+		LOG_DBG("param->stream is NULL");
 		return -EINVAL;
 	}
 
 	CHECKIF(param->qos == NULL)
 	{
-		LOG_ERR("param->qos is NULL");
+		LOG_DBG("param->qos is NULL");
 		return -EINVAL;
 	}
 
 	if (param->stream != NULL && param->stream->group != NULL) {
-		LOG_WRN("stream %p already part of group %p", param->stream, param->stream->group);
+		LOG_DBG("stream %p already part of group %p", param->stream, param->stream->group);
 		return -EALREADY;
 	}
 
 	CHECKIF(bt_audio_verify_qos(param->qos) != BT_BAP_ASCS_REASON_NONE)
 	{
-		LOG_ERR("Invalid QoS");
+		LOG_DBG("Invalid QoS");
 		return -EINVAL;
 	}
 
@@ -3991,7 +3998,7 @@ static uint8_t unicast_client_pac_discover_cb(struct bt_conn *conn,
 	int err;
 
 	if (attr == NULL) {
-		LOG_ERR("Unable to find %s PAC", bt_audio_dir_str(client->dir));
+		LOG_DBG("Unable to find %s PAC", bt_audio_dir_str(client->dir));
 
 		discover_cb(conn, BT_ATT_ERR_ATTRIBUTE_NOT_FOUND);
 

@@ -24,6 +24,7 @@
 
 #ifndef _ASMLANGUAGE
 
+#include <zephyr/sys/__assert.h>
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -37,6 +38,8 @@ extern "C" {
 
 /**
  * @defgroup sys-util Utility Functions
+ * @since 2.4
+ * @version 0.1.0
  * @ingroup utilities
  * @{
  */
@@ -283,6 +286,11 @@ extern "C" {
 	UTIL_CAT(_CONCAT_, NUM_VA_ARGS_LESS_1(__VA_ARGS__))(__VA_ARGS__)
 
 /**
+ * @brief Check if @p ptr is aligned to @p align alignment
+ */
+#define IS_ALIGNED(ptr, align) (((uintptr_t)(ptr)) % (align) == 0)
+
+/**
  * @brief Value of @p x rounded up to the next multiple of @p align.
  */
 #define ROUND_UP(x, align)                                   \
@@ -411,6 +419,30 @@ extern "C" {
 static inline bool is_power_of_two(unsigned int x)
 {
 	return IS_POWER_OF_TWO(x);
+}
+
+/**
+ * @brief Is @p p equal to ``NULL``?
+ *
+ * Some macros may need to check their arguments against NULL to support
+ * multiple use-cases, but NULL checks can generate warnings if such a macro
+ * is used in contexts where that particular argument can never be NULL.
+ *
+ * The warnings can be triggered if:
+ * a) all macros are expanded (e.g. when using CONFIG_COMPILER_SAVE_TEMPS=y)
+ * or
+ * b) tracking of macro expansions are turned off (-ftrack-macro-expansion=0)
+ *
+ * The warnings can be circumvented by using this inline function for doing
+ * the NULL check within the macro. The compiler is still able to optimize the
+ * NULL check out at a later stage.
+ *
+ * @param p Pointer to check
+ * @return true if @p p is equal to ``NULL``, false otherwise
+ */
+static ALWAYS_INLINE bool is_null_no_warn(void *p)
+{
+	return p == NULL;
 }
 
 /**
@@ -561,6 +593,36 @@ static inline uint8_t bin2bcd(uint8_t bin)
  *             any), or 0 if an error occurred.
  */
 uint8_t u8_to_dec(char *buf, uint8_t buflen, uint8_t value);
+
+/**
+ * @brief Sign extend an 8, 16 or 32 bit value using the index bit as sign bit.
+ *
+ * @param value The value to sign expand.
+ * @param index 0 based bit index to sign bit (0 to 31)
+ */
+static inline int32_t sign_extend(uint32_t value, uint8_t index)
+{
+	__ASSERT_NO_MSG(index <= 31);
+
+	uint8_t shift = 31 - index;
+
+	return (int32_t)(value << shift) >> shift;
+}
+
+/**
+ * @brief Sign extend a 64 bit value using the index bit as sign bit.
+ *
+ * @param value The value to sign expand.
+ * @param index 0 based bit index to sign bit (0 to 63)
+ */
+static inline int64_t sign_extend_64(uint64_t value, uint8_t index)
+{
+	__ASSERT_NO_MSG(index <= 63);
+
+	uint8_t shift = 63 - index;
+
+	return (int64_t)(value << shift) >> shift;
+}
 
 /**
  * @brief Properly truncate a NULL-terminated UTF-8 string

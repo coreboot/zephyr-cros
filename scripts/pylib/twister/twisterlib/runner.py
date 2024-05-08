@@ -46,6 +46,11 @@ from twisterlib.platform import Platform
 from twisterlib.testplan import change_skip_to_error_if_integration
 from twisterlib.harness import HarnessImporter, Pytest
 
+try:
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    from yaml import SafeLoader
+
 logger = logging.getLogger('twister')
 logger.setLevel(logging.DEBUG)
 import expr_parser
@@ -268,7 +273,7 @@ class CMake:
             p = self.jobserver.popen(cmd, **kwargs)
         else:
             p = subprocess.Popen(cmd, **kwargs)
-        logger.debug(f'Running {"".join(cmd)}')
+        logger.debug(f'Running {" ".join(cmd)}')
 
         out, _ = p.communicate()
 
@@ -299,7 +304,7 @@ class CMake:
                     log.write(log_msg)
 
             if log_msg:
-                overflow_found = re.findall("region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|dram0_1_seg)' overflowed by", log_msg)
+                overflow_found = re.findall("region `(FLASH|ROM|RAM|ICCM|DCCM|SRAM|dram\\d_\\d_seg)' overflowed by", log_msg)
                 imgtool_overflow_found = re.findall(r"Error: Image size \(.*\) \+ trailer \(.*\) exceeds requested size", log_msg)
                 if overflow_found and not self.options.overflow_as_errors:
                     logger.debug("Test skipped due to {} Overflow".format(overflow_found[0]))
@@ -329,11 +334,15 @@ class CMake:
             warnings_as_errors = 'n'
             gen_defines_args = ""
 
+        warning_command = 'CONFIG_COMPILER_WARNINGS_AS_ERRORS'
+        if self.testsuite.sysbuild:
+            warning_command = 'SB_' + warning_command
+
         logger.debug("Running cmake on %s for %s" % (self.source_dir, self.platform.name))
         cmake_args = [
             f'-B{self.build_dir}',
             f'-DTC_RUNID={self.instance.run_id}',
-            f'-DCONFIG_COMPILER_WARNINGS_AS_ERRORS={warnings_as_errors}',
+            f'-D{warning_command}={warnings_as_errors}',
             f'-DEXTRA_GEN_DEFINES_ARGS={gen_defines_args}',
             f'-G{self.env.generator}'
         ]
@@ -658,8 +667,12 @@ class ProjectBuilder(FilterBuilder):
                         pipeline.put({"op": "report", "test": self.instance})
 
         elif op == "gather_metrics":
-            self.gather_metrics(self.instance)
-            if self.instance.run and self.instance.handler.ready:
+            ret = self.gather_metrics(self.instance)
+            if not ret or ret.get('returncode', 1) > 0:
+                self.instance.status = "error"
+                self.instance.reason = "Build Failure at gather_metrics."
+                pipeline.put({"op": "report", "test": self.instance})
+            elif self.instance.run and self.instance.handler.ready:
                 pipeline.put({"op": "run", "test": self.instance})
             else:
                 pipeline.put({"op": "report", "test": self.instance})
@@ -727,7 +740,7 @@ class ProjectBuilder(FilterBuilder):
                     if matches:
                         for m in matches:
                             # new_ztest_suite = m[0] # not used for now
-                            test_func_name = m[1].replace("test_", "")
+                            test_func_name = m[1].replace("test_", "", 1)
                             testcase_id = f"{yaml_testsuite_name}.{test_func_name}"
                             detected_cases.append(testcase_id)
 
@@ -745,7 +758,7 @@ class ProjectBuilder(FilterBuilder):
                 self.instance.testsuite.add_testcase(name=testcase_id)
 
 
-    def cleanup_artifacts(self, additional_keep=[]):
+    def cleanup_artifacts(self, additional_keep: List[str] = []):
         logger.debug("Cleaning up {}".format(self.instance.build_dir))
         allow = [
             os.path.join('zephyr', '.config'),
@@ -786,9 +799,28 @@ class ProjectBuilder(FilterBuilder):
         files_to_keep = self._get_binaries()
         files_to_keep.append(os.path.join('zephyr', 'runners.yaml'))
 
+        if self.testsuite.sysbuild:
+            files_to_keep.append('domains.yaml')
+            for domain in self.instance.domains.get_domains():
+                files_to_keep += self._get_artifact_allow_list_for_domain(domain.name)
+
         self.cleanup_artifacts(files_to_keep)
 
         self._sanitize_files()
+
+    def _get_artifact_allow_list_for_domain(self, domain: str) -> List[str]:
+        """
+        Return a list of files needed to test a given domain.
+        """
+        allow = [
+            os.path.join(domain, 'build.ninja'),
+            os.path.join(domain, 'CMakeCache.txt'),
+            os.path.join(domain, 'CMakeFiles', 'rules.ninja'),
+            os.path.join(domain, 'Makefile'),
+            os.path.join(domain, 'zephyr', '.config'),
+            os.path.join(domain, 'zephyr', 'runners.yaml')
+            ]
+        return allow
 
     def _get_binaries(self) -> List[str]:
         """
@@ -804,7 +836,12 @@ class ProjectBuilder(FilterBuilder):
             for binary in platform.binaries:
                 binaries.append(os.path.join('zephyr', binary))
 
+        # Get binaries for a single-domain build
         binaries += self._get_binaries_from_runners()
+        # Get binaries in the case of a multiple-domain build
+        if self.testsuite.sysbuild:
+            for domain in self.instance.domains.get_domains():
+                binaries += self._get_binaries_from_runners(domain.name)
 
         # if binaries was not found in platform.binaries and runners.yaml take default ones
         if len(binaries) == 0:
@@ -816,17 +853,20 @@ class ProjectBuilder(FilterBuilder):
             ]
         return binaries
 
-    def _get_binaries_from_runners(self) -> List[str]:
+    def _get_binaries_from_runners(self, domain='') -> List[str]:
         """
         Get list of binaries paths (absolute or relative to the
-        self.instance.build_dir) from runners.yaml file.
+        self.instance.build_dir) from runners.yaml file. May be used for
+        multiple-domain builds by passing in one domain at a time.
         """
-        runners_file_path: str = os.path.join(self.instance.build_dir, 'zephyr', 'runners.yaml')
+
+        runners_file_path: str = os.path.join(self.instance.build_dir,
+                                              domain, 'zephyr', 'runners.yaml')
         if not os.path.exists(runners_file_path):
             return []
 
         with open(runners_file_path, 'r') as file:
-            runners_content: dict = yaml.safe_load(file)
+            runners_content: dict = yaml.load(file, Loader=SafeLoader)
 
         if 'config' not in runners_content:
             return []
@@ -842,7 +882,7 @@ class ProjectBuilder(FilterBuilder):
             if os.path.isabs(binary_path):
                 binaries.append(binary_path)
             else:
-                binaries.append(os.path.join('zephyr', binary_path))
+                binaries.append(os.path.join(domain, 'zephyr', binary_path))
 
         return binaries
 
@@ -866,7 +906,7 @@ class ProjectBuilder(FilterBuilder):
 
         with open(runners_file_path, 'rt') as file:
             runners_content_text = file.read()
-            runners_content_yaml: dict = yaml.safe_load(runners_content_text)
+            runners_content_yaml: dict = yaml.load(runners_content_text, Loader=SafeLoader)
 
         if 'config' not in runners_content_yaml:
             return
@@ -1102,8 +1142,9 @@ class ProjectBuilder(FilterBuilder):
         sys.stdout.flush()
 
     def gather_metrics(self, instance: TestInstance):
+        build_result = {"returncode": 0}
         if self.options.create_rom_ram_report:
-            self.run_build(['--build', self.build_dir, "--target", "footprint"])
+            build_result = self.run_build(['--build', self.build_dir, "--target", "footprint"])
         if self.options.enable_size_report and not self.options.cmake_only:
             self.calc_size(instance=instance, from_buildlog=self.options.footprint_from_buildlog)
         else:
@@ -1112,6 +1153,7 @@ class ProjectBuilder(FilterBuilder):
             instance.metrics["available_rom"] = 0
             instance.metrics["available_ram"] = 0
             instance.metrics["unrecognized"] = []
+        return build_result
 
     @staticmethod
     def calc_size(instance: TestInstance, from_buildlog: bool):

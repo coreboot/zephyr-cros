@@ -10,11 +10,7 @@
 static void regulator_delay(uint32_t delay_us)
 {
 	if (delay_us > 0U) {
-#ifdef CONFIG_MULTITHREADING
 		k_sleep(K_USEC(delay_us));
-#else
-		k_busy_wait(delay_us);
-#endif
 	}
 }
 
@@ -90,6 +86,9 @@ int regulator_common_init(const struct device *dev, bool is_enabled)
 
 	if (is_enabled) {
 		data->refcnt++;
+		if ((config->flags & REGULATOR_BOOT_OFF) != 0U) {
+			return regulator_disable(dev);
+		}
 	} else if ((config->flags & REGULATOR_INIT_ENABLED) != 0U) {
 		ret = api->enable(dev);
 		if (ret < 0) {

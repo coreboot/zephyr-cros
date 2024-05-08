@@ -2352,7 +2352,7 @@ INCLUDE_FILE_PATTERNS  =
 PREDEFINED             = __DOXYGEN__ \
                          CONFIG_ARCH_HAS_CUSTOM_BUSY_WAIT \
                          CONFIG_ARCH_HAS_CUSTOM_SWAP_TO_MAIN \
-                         CONFIG_BT_BREDR \
+                         CONFIG_BT_CLASSIC \
                          CONFIG_BT_EATT \
                          CONFIG_BT_L2CAP_SEG_RECV \
                          CONFIG_BT_MESH_MODEL_EXTENSIONS \
@@ -2408,7 +2408,11 @@ PREDEFINED             = __DOXYGEN__ \
                          __syscall= \
                          __syscall_always_inline= \
                          __must_check= \
-                         "ATOMIC_DEFINE(x, y)=atomic_t x[ATOMIC_BITMAP_SIZE(y)]"
+                         "ATOMIC_DEFINE(x, y)=atomic_t x[ATOMIC_BITMAP_SIZE(y)]" \
+                         "ZTEST(suite, fn)=void fn(void)" \
+                         "ZTEST_USER(suite, fn)=void fn(void)" \
+                         "ZTEST_USER_F(suite, fn)=void fn(void)" \
+                         "ZTEST_F(suite, fn)=void fn(void)"
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The

@@ -158,7 +158,24 @@ struct bt_cap_stream {
 void bt_cap_stream_ops_register(struct bt_cap_stream *stream, struct bt_bap_stream_ops *ops);
 
 /**
- * @brief Send data to Common Audio Profile stream
+ * @brief Send data to Common Audio Profile stream without timestamp
+ *
+ * See bt_bap_stream_send() for more information
+ *
+ * @note Support for sending must be supported, determined by @kconfig{CONFIG_BT_AUDIO_TX}.
+ *
+ * @param stream   Stream object.
+ * @param buf      Buffer containing data to be sent.
+ * @param seq_num  Packet Sequence number. This value shall be incremented for each call to this
+ *                 function and at least once per SDU interval for a specific channel.
+ *
+ * @retval -EINVAL if stream object is NULL
+ * @retval Any return value from bt_bap_stream_send()
+ */
+int bt_cap_stream_send(struct bt_cap_stream *stream, struct net_buf *buf, uint16_t seq_num);
+
+/**
+ * @brief Send data to Common Audio Profile stream with timestamp
  *
  * See bt_bap_stream_send() for more information
  *
@@ -169,15 +186,13 @@ void bt_cap_stream_ops_register(struct bt_cap_stream *stream, struct bt_bap_stre
  * @param seq_num  Packet Sequence number. This value shall be incremented for each call to this
  *                 function and at least once per SDU interval for a specific channel.
  * @param ts       Timestamp of the SDU in microseconds (us). This value can be used to transmit
- *                 multiple SDUs in the same SDU interval in a CIG or BIG. Can be omitted by using
- *                 @ref BT_ISO_TIMESTAMP_NONE which will simply enqueue the ISO SDU in a FIFO
- *                 manner.
+ *                 multiple SDUs in the same SDU interval in a CIG or BIG.
  *
  * @retval -EINVAL if stream object is NULL
  * @retval Any return value from bt_bap_stream_send()
  */
-int bt_cap_stream_send(struct bt_cap_stream *stream, struct net_buf *buf, uint16_t seq_num,
-		       uint32_t ts);
+int bt_cap_stream_send_ts(struct bt_cap_stream *stream, struct net_buf *buf, uint16_t seq_num,
+			  uint32_t ts);
 
 /**
  * @brief Get ISO transmission timing info for a Common Audio Profile stream
@@ -211,6 +226,9 @@ struct bt_cap_unicast_audio_start_stream_param {
 	 * The @p codec_cfg.meta shall include a list of CCIDs
 	 * (@ref BT_AUDIO_METADATA_TYPE_CCID_LIST) as well as a non-0
 	 * stream context (@ref BT_AUDIO_METADATA_TYPE_STREAM_CONTEXT) bitfield.
+	 *
+	 * This value is assigned to the @p stream, and shall remain valid while the stream is
+	 * non-idle.
 	 */
 	struct bt_audio_codec_cfg *codec_cfg;
 };
@@ -680,20 +698,72 @@ struct bt_cap_commander_cb {
 	 */
 	void (*volume_changed)(struct bt_conn *conn, int err);
 
+	/**
+	 * @brief Callback for bt_cap_commander_change_volume_mute_state().
+	 *
+	 * @param conn           Pointer to the connection where the error
+	 *                       occurred. NULL if @p err is 0 or if cancelled by
+	 *                       bt_cap_commander_cancel()
+	 * @param err            0 on success, BT_GATT_ERR() with a
+	 *                       specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
+	 *                       by bt_cap_commander_cancel().
+	 */
+	void (*volume_mute_changed)(struct bt_conn *conn, int err);
+
 #if defined(CONFIG_BT_VCP_VOL_CTLR_VOCS)
 	/**
 	 * @brief Callback for bt_cap_commander_change_volume_offset().
 	 *
 	 * @param conn           Pointer to the connection where the error
 	 *                       occurred. NULL if @p err is 0 or if cancelled by
-	 *                       bt_cap_initiator_unicast_audio_cancel()
+	 *                       bt_cap_commander_cancel()
 	 * @param err            0 on success, BT_GATT_ERR() with a
 	 *                       specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
-	 *                       by bt_cap_initiator_unicast_audio_cancel().
+	 *                       by bt_cap_commander_cancel().
 	 */
 	void (*volume_offset_changed)(struct bt_conn *conn, int err);
 #endif /* CONFIG_BT_VCP_VOL_CTLR_VOCS */
 #endif /* CONFIG_BT_VCP_VOL_CTLR */
+#if defined(CONFIG_BT_MICP_MIC_CTLR)
+	/**
+	 * @brief Callback for bt_cap_commander_change_microphone_mute_state().
+	 *
+	 * @param conn           Pointer to the connection where the error
+	 *                       occurred. NULL if @p err is 0 or if cancelled by
+	 *                       bt_cap_commander_cancel()
+	 * @param err            0 on success, BT_GATT_ERR() with a
+	 *                       specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
+	 *                       by bt_cap_commander_cancel().
+	 */
+	void (*microphone_mute_changed)(struct bt_conn *conn, int err);
+#if defined(CONFIG_BT_MICP_MIC_CTLR_AICS)
+	/**
+	 * @brief Callback for bt_cap_commander_change_microphone_gain_setting().
+	 *
+	 * @param conn           Pointer to the connection where the error
+	 *                       occurred. NULL if @p err is 0 or if cancelled by
+	 *                       bt_cap_commander_cancel()
+	 * @param err            0 on success, BT_GATT_ERR() with a
+	 *                       specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
+	 *                       by bt_cap_commander_cancel().
+	 */
+	void (*microphone_gain_changed)(struct bt_conn *conn, int err);
+#endif /* CONFIG_BT_MICP_MIC_CTLR_AICS */
+#endif /* CONFIG_BT_MICP_MIC_CTLR */
+
+#if defined(CONFIG_BT_BAP_BROADCAST_ASSISTANT)
+	/**
+	 * @brief Callback for bt_cap_commander_broadcast_reception_start().
+	 *
+	 * @param conn		Pointer to the connection where the error
+	 *			occurred. NULL if @p err is 0 or if cancelled by
+	 *			bt_cap_commander_cancel()
+	 * @param err		0 on success, BT_GATT_ERR() with a
+	 *			specific ATT (BT_ATT_ERR_*) error code or -ECANCELED if cancelled
+	 *			by bt_cap_commander_cancel().
+	 */
+	void (*broadcast_reception_start)(struct bt_conn *conn, int err);
+#endif /* CONFIG_BT_BAP_BROADCAST_ASSISTANT */
 };
 
 /**
@@ -745,13 +815,13 @@ int bt_cap_commander_discover(struct bt_conn *conn);
  * It is recommended to do this if any existing procedure takes longer time than expected, which
  * could indicate a missing response from the Common Audio Profile Acceptor.
  *
- * This does not send any requests to any Common Audio Profile Acceptors involved with the current
- * procedure, and thus notifications from the Common Audio Profile Acceptors may arrive after this
- * has been called. It is thus recommended to either only use this if a procedure has stalled, or
- * wait a short while before starting any new Common Audio Profile procedure after this has been
- * called to avoid getting notifications from the cancelled procedure. The wait time depends on
- * the connection interval, the number of devices in the previous procedure and the behavior of the
- * Common Audio Profile Acceptors.
+ * This does not send any requests to any Common Audio Profile Acceptors involved with the
+ * current procedure, and thus notifications from the Common Audio Profile Acceptors may
+ * arrive after this has been called. It is thus recommended to either only use this if a
+ * procedure has stalled, or wait a short while before starting any new Common Audio Profile
+ * procedure after this has been called to avoid getting notifications from the cancelled
+ * procedure. The wait time depends on the connection interval, the number of devices in the
+ * previous procedure and the behavior of the Common Audio Profile Acceptors.
  *
  * The respective callbacks of the procedure will be called as part of this with the connection
  * pointer set to NULL and the err value set to -ECANCELED.
@@ -786,7 +856,7 @@ struct bt_cap_commander_broadcast_reception_start_member_param {
 	 *
 	 * At least one bit in one of the subgroups bis_sync parameters shall be set.
 	 */
-	struct bt_bap_scan_delegator_subgroup *subgroups;
+	struct bt_bap_bass_subgroup subgroups[CONFIG_BT_BAP_BASS_MAX_SUBGROUPS];
 
 	/** Number of subgroups */
 	size_t num_subgroups;

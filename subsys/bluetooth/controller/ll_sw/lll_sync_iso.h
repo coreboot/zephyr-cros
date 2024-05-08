@@ -7,6 +7,7 @@
 struct lll_sync_iso_stream {
 	uint8_t big_handle;
 	uint8_t bis_index;
+	struct ll_iso_rx_test_mode *test_mode;
 	struct ll_iso_datapath *dp;
 };
 
@@ -54,6 +55,8 @@ struct lll_sync_iso {
 
 	uint8_t stream_curr:5;
 
+	uint8_t establish_events:3;
+
 	uint8_t next_chan_use;
 
 	/* Encryption */
@@ -65,7 +68,6 @@ struct lll_sync_iso {
 
 	uint8_t term_reason;
 
-	uint8_t ctrl_chan_use;
 	uint16_t ctrl_instant;
 
 	uint8_t stream_count;

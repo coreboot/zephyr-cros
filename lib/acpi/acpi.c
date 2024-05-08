@@ -457,11 +457,10 @@ int acpi_device_irq_get(struct acpi_dev *child_dev, struct acpi_irq_resource *ir
 			return -ENODEV;
 		}
 
-		if (res->Data.ExtendedIrq.InterruptCount > CONFIG_ACPI_IRQ_VECTOR_MAX) {
+		if (res->Data.ExtendedIrq.InterruptCount > irq_res->irq_vector_max) {
 			return -ENOMEM;
 		}
 
-		memset(irq_res, 0, sizeof(struct acpi_irq_resource));
 		irq_res->irq_vector_max = res->Data.ExtendedIrq.InterruptCount;
 		for (int i = 0; i < irq_res->irq_vector_max; i++) {
 			irq_res->irqs[i] = (uint16_t)res->Data.ExtendedIrq.Interrupts[i];
@@ -470,7 +469,7 @@ int acpi_device_irq_get(struct acpi_dev *child_dev, struct acpi_irq_resource *ir
 		irq_res->flags = arch_acpi_encode_irq_flags(res->Data.ExtendedIrq.Polarity,
 							    res->Data.ExtendedIrq.Triggering);
 	} else {
-		if (res->Data.Irq.InterruptCount > CONFIG_ACPI_IRQ_VECTOR_MAX) {
+		if (res->Data.Irq.InterruptCount > irq_res->irq_vector_max) {
 			return -ENOMEM;
 		}
 
@@ -531,7 +530,7 @@ int acpi_device_mmio_get(struct acpi_dev *child_dev, struct acpi_mmio_resource *
 		}
 
 		res = ACPI_NEXT_RESOURCE(res);
-		if (mmio_cnt >= CONFIG_ACPI_MMIO_ENTRIES_MAX &&
+		if (mmio_cnt >= mmio_res->mmio_max &&
 			 res->Type != ACPI_RESOURCE_TYPE_END_TAG) {
 			return -ENOMEM;
 		}
@@ -747,10 +746,13 @@ void acpi_dmar_foreach_subtable(ACPI_TABLE_DMAR *dmar,
 	uint16_t length = dmar->Header.Length;
 	uintptr_t offset = sizeof(ACPI_TABLE_DMAR);
 
+	__ASSERT_NO_MSG(length >= offset);
+
 	while (offset < length) {
 		ACPI_DMAR_HEADER *subtable = ACPI_ADD_PTR(ACPI_DMAR_HEADER, dmar, offset);
 
-		__ASSERT_NO_MSG(subtable->Length > sizeof(*subtable));
+		__ASSERT_NO_MSG(subtable->Length >= sizeof(*subtable));
+		__ASSERT_NO_MSG(subtable->Length <= length - offset);
 
 		func(subtable, arg);
 
@@ -764,11 +766,14 @@ void acpi_dmar_foreach_devscope(ACPI_DMAR_HARDWARE_UNIT *hu,
 	uint16_t length = hu->Header.Length;
 	uintptr_t offset = sizeof(ACPI_DMAR_HARDWARE_UNIT);
 
+	__ASSERT_NO_MSG(length >= offset);
+
 	while (offset < length) {
 		ACPI_DMAR_DEVICE_SCOPE *devscope = ACPI_ADD_PTR(ACPI_DMAR_DEVICE_SCOPE,
 								hu, offset);
 
-		__ASSERT_NO_MSG(devscope->Length > sizeof(*devscope));
+		__ASSERT_NO_MSG(devscope->Length >= sizeof(*devscope));
+		__ASSERT_NO_MSG(devscope->Length <= length - offset);
 
 		func(devscope, arg);
 

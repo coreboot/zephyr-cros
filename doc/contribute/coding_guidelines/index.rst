@@ -1212,8 +1212,8 @@ Related GitHub Issues and Pull Requests are tagged with the `Inclusive Language 
      -
 
    * - eSPI
-     - * ``master / slave`` => TBD
-     -
+     - * ``master / slave`` => ``controller / target``
+     - Refer to `eSPI Specification`_ for new terminology
 
    * - gPTP
      - * ``master / slave`` => TBD
@@ -1254,6 +1254,7 @@ Related GitHub Issues and Pull Requests are tagged with the `Inclusive Language 
 .. _OSHWA Resolution to Redefine SPI Signal Names: https://www.oshwa.org/a-resolution-to-redefine-spi-signal-names/
 .. _CAN in Automation Inclusive Language news post: https://www.can-cia.org/news/archive/view/?tx_news_pi1%5Bnews%5D=699&tx_news_pi1%5Bday%5D=6&tx_news_pi1%5Bmonth%5D=12&tx_news_pi1%5Byear%5D=2020&cHash=784e79eb438141179386cf7c29ed9438
 .. _CAN in Automation Inclusive Language: https://can-newsletter.org/canopen/categories/
+.. _eSPI Specification: https://downloadmirror.intel.com/27055/327432%20espi_base_specification%20R1-5.pdf
 
 
 Rule A.3: Macro name collisions
@@ -1456,6 +1457,7 @@ Zephyr codebase:
    :header: Function,Source
    :widths: auto
 
+   `gmtime_r()`_,POSIX.1-2001
    `strnlen()`_,POSIX.1-2008
    `strtok_r()`_,POSIX.1-2001
 
@@ -1482,5 +1484,6 @@ these functions can lead to compatibility issues with the third-party
 toolchains that come with their own C standard libraries.
 
 .. _main Zephyr repository: https://github.com/zephyrproject-rtos/zephyr
+.. _gmtime_r(): https://pubs.opengroup.org/onlinepubs/9699919799/functions/gmtime_r.html
 .. _strnlen(): https://pubs.opengroup.org/onlinepubs/9699919799/functions/strlen.html
 .. _strtok_r(): https://pubs.opengroup.org/onlinepubs/9699919799/functions/strtok.html

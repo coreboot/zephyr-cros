@@ -31,9 +31,9 @@ tests:
     extra_configs:
       - CONFIG_SPI_RTIO=y
     platform_allow:
-      - tdk_robokit1
-      - mimxrt1170_evk_cm7
-      - vmu_rt1170
+      - robokit1
+      - mimxrt1170_evk/mimxrt1176/cm7
+      - vmu_rt1170/mimxrt1176/cm7
   drivers.spi.mcux_dspi_dma.loopback:
     extra_args:
       - OVERLAY_CONFIG="overlay-mcux-dspi-dma.conf"
@@ -44,15 +44,16 @@ tests:
       - OVERLAY_CONFIG="overlay-sam-spi-dma.conf"
       - DTC_OVERLAY_FILE="overlay-sam-spi-dma.overlay"
     platform_allow:
-      - sam_e70_xplained
-      - sam_v71_xult
-      - tdk_robokit1
+      - sam_e70_xplained/same70q21
+      - sam_v71_xult/samv71q21
+      - robokit1
     integration_platforms:
-      - sam_e70_xplained
+      - sam_e70_xplained/same70q21
   drivers.spi.stm32_spi_16bits_frames.loopback:
     extra_args:
       - OVERLAY_CONFIG="overlay-stm32-spi-16bits.conf"
       - DTC_OVERLAY_FILE="overlay-stm32-spi-16bits.overlay"
+    filter: CONFIG_SOC_FAMILY_STM32
     platform_allow:
       - nucleo_h743zi
       - nucleo_h753zi
@@ -64,6 +65,7 @@ tests:
       - nucleo_f207zg
       - nucleo_f429zi
       - nucleo_f746zg
+      - nucleo_f767zi
       - nucleo_wb55rg
       - nucleo_l152re
       - nucleo_wl55jc
@@ -72,10 +74,12 @@ tests:
       - stm32h573i_dk
     integration_platforms:
       - nucleo_g474re
-  drivers.spi.stm32_spi_dma_no_nocache.loopback:
+  drivers.spi.stm32_spi_dma_dt_nocache_mem.loopback:
+    # this test case is for when nocache memory region is defined in DT
+    # using `zephyr,memory-attr = < DT_MEM_ARM_MPU_RAM_NOCACHE)>`
     extra_args:
-      - OVERLAY_CONFIG="overlay-stm32-spi-dma-no-nocache.conf"
-    filter: CONFIG_SOC_FAMILY_STM32
+      - OVERLAY_CONFIG="overlay-stm32-spi-dma-dt-nocache-mem.conf"
+    filter: CONFIG_SOC_FAMILY_STM32 and CONFIG_CPU_HAS_DCACHE
     platform_allow:
       - nucleo_h743zi
       - nucleo_h753zi
@@ -87,11 +91,11 @@ tests:
     platform_allow:
       - nucleo_h743zi
       - nucleo_h753zi
-  drivers.spi.stm32_spi_16bits_frames_dma_no_nocache.loopback:
+  drivers.spi.stm32_spi_16bits_frames_dma_dt_nocache_mem.loopback:
     extra_args:
-      - OVERLAY_CONFIG="overlay-stm32-spi-16bits-dma-no-nocache.conf"
+      - OVERLAY_CONFIG="overlay-stm32-spi-16bits-dma-dt-nocache-mem.conf"
       - DTC_OVERLAY_FILE="overlay-stm32-spi-16bits.overlay"
-    filter: CONFIG_SOC_FAMILY_STM32
+    filter: CONFIG_SOC_FAMILY_STM32 and CONFIG_CPU_HAS_DCACHE
     platform_allow:
       - nucleo_h743zi
       - nucleo_h753zi
@@ -99,6 +103,8 @@ tests:
     extra_args: OVERLAY_CONFIG="overlay-stm32-spi-interrupt.conf"
     filter: CONFIG_SOC_FAMILY_STM32
     platform_allow:
+      - nucleo_f746zg
+      - nucleo_f767zi
       - nucleo_h743zi
       - nucleo_h753zi
   drivers.spi.gd32_spi_interrupt.loopback:
@@ -113,7 +119,7 @@ tests:
       - gd32vf103c_starter
       - gd32vf103v_eval
       - longan_nano
-      - longan_nano_lite
+      - longan_nano/gd32vf103/lite
   drivers.spi.gd32_spi_dma.loopback:
     extra_args: OVERLAY_CONFIG="overlay-gd32-spi-dma.conf"
     platform_allow:
@@ -126,7 +132,7 @@ tests:
       - gd32vf103c_starter
       - gd32vf103v_eval
       - longan_nano
-      - longan_nano_lite
+      - longan_nano/gd32vf103/lite
   drivers.spi.pl022_spi_interrupt.loopback:
     extra_configs:
       - CONFIG_SPI_PL022_INTERRUPT=y
@@ -158,3 +164,8 @@ tests:
       - CONFIG_SPI_PL022_DMA=y
       - CONFIG_DMA=y
     platform_allow: rpi_pico
+  drivers.spi.mcux_flexio_spi.loopback:
+    extra_args: DTC_OVERLAY_FILE="overlay-mcux-flexio-spi.overlay"
+    filter: CONFIG_DT_HAS_NXP_FLEXIO_ENABLED and
+            CONFIG_DT_HAS_NXP_FLEXIO_SPI_ENABLED
+    platform_allow: mimxrt1064_evk

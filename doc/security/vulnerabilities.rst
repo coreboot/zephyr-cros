@@ -1601,14 +1601,115 @@ This has been fixed in main for v3.5.0
 CVE-2023-5779
 -------------
 
-Under embargo until 2024-01-23
+Out of bounds issue in remove_rx_filter in multiple can drivers.
+
+- `Zephyr project bug tracker GHSA-7cmj-963q-jj47
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-7cmj-963q-jj47>`_
+
+This has been fixed in main for v3.6.0
+
+- `PR 64399 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/64399>`_
+
+- `PR 64416 fix for 3.5
+  <https://github.com/zephyrproject-rtos/zephyr/pull/64416>`_
+
+- `PR 64415 fix for 3.4
+  <https://github.com/zephyrproject-rtos/zephyr/pull/64415>`_
+
+- `PR 64427 fix for 3.3
+  <https://github.com/zephyrproject-rtos/zephyr/pull/64427>`_
+
+- `PR 64431 fix for 2.7
+  <https://github.com/zephyrproject-rtos/zephyr/pull/64431>`_
 
 CVE-2023-6249
 -------------
 
-Under embargo until 2024-02-18
+Signed to unsigned conversion problem in esp32_ipm_send may lead to buffer overflow
+
+- `Zephyr project bug tracker GHSA-32f5-3p9h-2rqc
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-32f5-3p9h-2rqc>`_
+
+This has been fixed in main for v3.6.0
+
+- `PR 65546 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/65546>`_
 
 CVE-2023-6749
 -------------
 
-Under embargo until 2024-02-18
+Potential buffer overflow due unchecked data coming from user input in settings shell.
+
+- `Zephyr project bug tracker GHSA-757h-rw37-66hw
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-757h-rw37-66hw>`_
+
+This has been fixed in main for v3.6.0
+
+- `PR 66451 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/66451>`_
+
+- `PR 66584 fix for 3.5
+  <https://github.com/zephyrproject-rtos/zephyr/pull/66584>`_
+
+CVE-2023-6881
+-------------
+
+Potential buffer overflow vulnerability in Zephyr fuse file system.
+
+- `Zephyr project bug tracker GHSA-mh67-4h3q-p437
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-mh67-4h3q-p437>`_
+
+This has been fixed in main for v3.6.0
+
+- `PR 66592 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/66592>`_
+
+CVE-2023-7060
+-------------
+
+Missing Security Control in Zephyr OS IP Packet Handling
+
+- `Zephyr project bug tracker GHSA-fjc8-223c-qgqr
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-fjc8-223c-qgqr>`_
+
+This has been fixed in main for v3.6.0
+
+- `PR 66645 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/66645>`_
+
+- `PR 66739 fix for 3.5
+  <https://github.com/zephyrproject-rtos/zephyr/pull/66739>`_
+
+- `PR 66738 fix for 3.4
+  <https://github.com/zephyrproject-rtos/zephyr/pull/66738>`_
+
+- `PR 66887 fix for 2.7
+  <https://github.com/zephyrproject-rtos/zephyr/pull/66887>`_
+
+CVE-2024-1638
+-------------
+
+Bluetooth characteristic LESC security requirement not enforced without additional flags
+
+- `Zephyr project bug tracker GHSA-p6f3-f63q-5mc2
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-p6f3-f63q-5mc2>`_
+
+This has been fixed in main for v3.6.0
+
+- `PR 69170 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/69170>`_
+
+CVE-2024-3077
+-------------
+
+Bluetooth: Integer underflow in gatt_find_info_rsp. A malicious BLE
+device can crash BLE victim device by sending malformed gatt packet.
+
+- `Zephyr project bug tracker GHSA-gmfv-4vfh-2mh8
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-gmfv-4vfh-2mh8>`_
+
+This has been fixed in main for v3.7.0
+
+- `PR 69396 fix for main
+  <https://github.com/zephyrproject-rtos/zephyr/pull/69396>`_
