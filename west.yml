@@ -142,7 +142,7 @@ manifest:
       groups:
         - hal
     - name: hal_ambiq
-      revision: ff4ca358d730536addf336c40c3faa4ebf1df00a
+      revision: f6858cb3fe3d44945a23d114b7feeeac22ce71cf
       path: modules/hal/ambiq
       groups:
         - hal
@@ -219,7 +219,7 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: 442d0fb1d02cc4b2bb159fbff378029998b89049
+      revision: 0c39ee28be31c59a98ed490c3811f68caa1fcbd3
       path: modules/hal/silabs
       groups:
         - hal
@@ -256,7 +256,7 @@ manifest:
     - name: hostap
       repo-path: hostap
       path: modules/lib/hostap
-      revision: 81bdd8343347a2e36c67253a8aeb22ea7cb41132
+      revision: 83574f533fb5c6808af0d9872741d72d48be2f98
     - name: libmetal
       revision: 243eed541b9c211a2ce8841c788e62ddce84425e
       path: modules/hal/libmetal

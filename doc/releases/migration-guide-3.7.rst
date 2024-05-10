@@ -106,6 +106,44 @@ Device Drivers and Devicetree
         };
     };
 
+* Some of the driver API structs have been rename to have the required ``_driver_api`` suffix.
+  The following types have been renamed:
+
+  * ``emul_sensor_backend_api`` to :c:struct:`emul_sensor_driver_api`
+  * ``emul_bbram_backend_api`` to :c:struct:`emul_bbram_driver_api`
+  * ``usbc_ppc_drv`` to :c:struct:`usbc_ppc_driver_api`
+
+* The driver for :dtcompatible:`maxim,max31790` got split up into a MFD and an
+  actual PWM driver. Previously, an instance of this device could have been
+  defined like this:
+
+  .. code-block:: devicetree
+
+    max31790_max31790: max31790@20 {
+        compatible = "maxim,max31790";
+        status = "okay";
+        reg = <0x20>;
+        pwm-controller;
+        #pwm-cells = <2>;
+    };
+
+  This can be converted to:
+
+  .. code-block:: devicetree
+
+    max31790_max31790: max31790@20 {
+        compatible = "maxim,max31790";
+        status = "okay";
+        reg = <0x20>;
+
+        max31790_max31790_pwm: max31790_max31790_pwm {
+            compatible = "maxim,max31790-pwm";
+            status = "okay";
+            pwm-controller;
+            #pwm-cells = <2>;
+        };
+    };
+
 Analog-to-Digital Converter (ADC)
 =================================
 
@@ -191,6 +229,10 @@ Input
   and properties have been renamed to reflect that (from ``out-deadzone`` to
   ``in-deadzone``) and when migrating to the new definition the value should be
   scaled accordingly.
+
+* The ``holtek,ht16k33-keyscan`` driver has been converted to use the
+  :ref:`input` subsystem, callbacks have to be migrated to use the input APIs,
+  :dtcompatible:`zephyr,kscan-input` can be used for backward compatibility.
 
 Interrupt Controller
 ====================
@@ -336,6 +378,14 @@ Modem
 
 Shell
 =====
+
+State Machine Framework
+=======================
+
+* The :c:macro:`SMF_CREATE_STATE` macro now always takes 5 arguments. The amount of arguments is
+  now independent of the values of :kconfig:option:`CONFIG_SMF_ANCESTOR_SUPPORT` and
+  :kconfig:option:`CONFIG_SMF_INITIAL_TRANSITION`. If the additional arguments are not used, they
+  have to be set to ``NULL``. (:github:`71250`)
 
 ZBus
 ====

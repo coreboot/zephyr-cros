@@ -12,6 +12,7 @@ Major enhancements with this release include:
 * A new, completely overhauled hardware model has been introduced. This changes
   the way both SoCs and boards are named, defined and constructed in Zephyr.
   Additional information can be found in the :ref:`board_porting_guide`.
+* Zephyr now requires Python 3.10 or higher
 
 An overview of the changes required or recommended when migrating your application from Zephyr
 v3.6.0 to Zephyr v3.7.0 can be found in the separate :ref:`migration guide<migration_3.7>`.
@@ -30,6 +31,12 @@ https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
 API Changes
 ***********
+
+Removed APIs in this release
+============================
+
+ * The Bluetooth subsystem specific debug symbols are removed. They have been replaced with the
+   Zephyr logging ones.
 
 Deprecated in this release
 ==========================
@@ -321,6 +328,10 @@ Libraries / Subsystems
 * Retention
 
 * SD
+
+* State Machine Framework
+
+  * The :c:macro:`SMF_CREATE_STATE` macro now always takes 5 arguments.
 
 * Storage
 

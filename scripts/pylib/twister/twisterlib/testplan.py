@@ -396,7 +396,6 @@ class TestPlan:
         sys.stdout.write(what + "\n")
         sys.stdout.flush()
 
-
     def add_configurations(self):
         board_dirs = set()
         # Create a list of board roots as defined by the build system in general
@@ -407,16 +406,27 @@ class TestPlan:
                             Path(ZEPHYR_BASE) / 'subsys' / 'testsuite'],
                             board_roots=board_roots, board=None, board_dir=None)
         v1_boards = list_boards.find_boards(lb_args)
-        v2_boards = list_boards.find_v2_boards(lb_args)
+        v2_dirs = list_boards.find_v2_board_dirs(lb_args)
         for b in v1_boards:
             board_dirs.add(b.dir)
-        for b in v2_boards:
-            board_dirs.add(b.dir)
+        board_dirs.update(v2_dirs)
         logger.debug("Reading platform configuration files under %s..." % self.env.board_roots)
 
         platform_config = self.test_config.get('platforms', {})
         for folder in board_dirs:
             for file in glob.glob(os.path.join(folder, "*.yaml")):
+                # If the user set a platform filter, we can, if no other option would increase
+                # the allowed platform pool, save on time by not loading YAMLs of any boards
+                # that do not start with the required names.
+                if self.options.platform and \
+                    not self.options.all and \
+                    not self.options.integration and \
+                    not any([
+                        os.path.basename(file).startswith(
+                            re.split('[/@]', p)[0]
+                        ) for p in self.options.platform
+                    ]):
+                    continue
                 try:
                     platform = Platform()
                     platform.load(file)
@@ -448,7 +458,7 @@ class TestPlan:
                             # cmake/modules/extensions.cmake.
                             revision_patterns = ["[A-Z]",
                                                     "[0-9]+",
-                                                    "(0|[1-9][0-9]*)(_[0-9]+)*(_[0-9]+)*"]
+                                                    "(0|[1-9][0-9]*)(_[0-9]+){0,2}"]
 
                             for pattern in revision_patterns:
                                 result = re.match(f"{platform.name}_(?P<revision>{pattern})\\.conf", item)
@@ -561,6 +571,17 @@ class TestPlan:
                 break
         return selected_platform
 
+    def handle_quarantined_tests(self, instance: TestInstance, plat: Platform):
+        if self.quarantine:
+            matched_quarantine = self.quarantine.get_matched_quarantine(
+                instance.testsuite.id, plat.name, plat.arch, plat.simulation
+            )
+            if matched_quarantine and not self.options.quarantine_verify:
+                instance.add_filter("Quarantine: " + matched_quarantine, Filters.QUARANTINE)
+                return
+            if not matched_quarantine and self.options.quarantine_verify:
+                instance.add_filter("Not under quarantine", Filters.QUARANTINE)
+
     def load_from_file(self, file, filter_platform=[]):
         with open(file, "r") as json_test_plan:
             jtp = json.load(json_test_plan)
@@ -607,6 +628,8 @@ class TestPlan:
                 else:
                     instance.status = status
                     instance.reason = reason
+
+                self.handle_quarantined_tests(instance, platform)
 
                 for tc in ts.get('testcases', []):
                     identifier = tc['identifier']
@@ -702,15 +725,17 @@ class TestPlan:
             if ts.build_on_all and not platform_filter and platform_config.get('increased_platform_scope', True):
                 platform_scope = self.platforms
             elif ts.integration_platforms:
-                self.verify_platforms_existence(
-                    ts.integration_platforms, f"{ts_name} - integration_platforms")
                 integration_platforms = list(filter(lambda item: item.name in ts.integration_platforms,
                                                     self.platforms))
                 if self.options.integration:
+                    self.verify_platforms_existence(
+                        ts.integration_platforms, f"{ts_name} - integration_platforms")
                     platform_scope = integration_platforms
                 else:
                     # if not in integration mode, still add integration platforms to the list
                     if not platform_filter:
+                        self.verify_platforms_existence(
+                            ts.integration_platforms, f"{ts_name} - integration_platforms")
                         platform_scope = platforms + integration_platforms
                     else:
                         platform_scope = platforms
@@ -891,15 +916,7 @@ class TestPlan:
                                 break
 
                 # handle quarantined tests
-                if self.quarantine:
-                    matched_quarantine = self.quarantine.get_matched_quarantine(
-                        instance.testsuite.id, plat.name, plat.arch, plat.simulation
-                    )
-                    if matched_quarantine and not self.options.quarantine_verify:
-                        instance.add_filter("Quarantine: " + matched_quarantine, Filters.QUARANTINE)
-                    if not matched_quarantine and self.options.quarantine_verify:
-                        instance.add_filter("Not under quarantine", Filters.QUARANTINE)
-
+                self.handle_quarantined_tests(instance, plat)
 
                 # platform_key is a list of unique platform attributes that form a unique key a test
                 # will match against to determine if it should be scheduled to run. A key containing a
