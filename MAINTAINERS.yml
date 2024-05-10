@@ -3476,11 +3476,11 @@ nRF Platforms:
   status: maintained
   maintainers:
     - anangl
+    - masz-nordic
   collaborators:
     - jaz1-nordic
     - kl-cruz
     - magp-nordic
-    - masz-nordic
     - nika-nordic
   files:
     - boards/nordic/
