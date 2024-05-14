@@ -244,6 +244,7 @@ Ambiq Platforms:
   status: odd fixes
   collaborators:
     - aaronyegx
+    - AlessandroLuo
     - RichardSWheatley
   files:
     - soc/ambiq/
@@ -446,11 +447,8 @@ Bluetooth Audio:
     - tests/bluetooth/audio/
     - tests/bsim/bluetooth/audio/
     - tests/bluetooth/shell/audio.conf
-    - doc/connectivity/bluetooth/img/ble_audio_arch.svg
-    - doc/connectivity/bluetooth/img/cap_proc.svg
-    - doc/connectivity/bluetooth/img/gaf.svg
-    - doc/connectivity/bluetooth/img/zephyr_gaf.svg
-    - doc/connectivity/bluetooth/bluetooth-le-audio-arch.rst
+    - tests/bluetooth/tester/overlay-le-audio.conf
+    - doc/connectivity/bluetooth/api/audio/
     - samples/bluetooth/broadcast_audio*/
     - samples/bluetooth/hap*/
     - samples/bluetooth/public_broadcast*/
@@ -1237,6 +1235,7 @@ Release Notes:
   status: odd fixes
   collaborators:
     - decsny
+    - lmajewski
   files:
     - drivers/ethernet/
     - include/zephyr/dt-bindings/ethernet/
@@ -1325,6 +1324,9 @@ Release Notes:
   status: maintained
   maintainers:
     - bjarki-trackunit
+  collaborators:
+    - tomi-font
+    - fabiobaltieri
   files:
     - doc/hardware/peripherals/gnss.rst
     - drivers/gnss/
@@ -1375,6 +1377,7 @@ Release Notes:
     - include/zephyr/dt-bindings/i2c/
     - tests/boards/*/i2c/
     - tests/drivers/*/i2c/
+    - samples/drivers/i2c/
   labels:
     - "area: I2C"
   tests:
@@ -3473,11 +3476,11 @@ nRF Platforms:
   status: maintained
   maintainers:
     - anangl
+    - masz-nordic
   collaborators:
     - jaz1-nordic
     - kl-cruz
     - magp-nordic
-    - masz-nordic
     - nika-nordic
   files:
     - boards/nordic/
@@ -3495,6 +3498,7 @@ nRF Platforms:
 Renesas SmartBond Platforms:
   status: maintained
   maintainers:
+    - ioannis-karachalios
     - andrzej-kaczmarek
     - blauret
   files:
@@ -3766,12 +3770,12 @@ Sysbuild:
     - "57300"
   files:
     - share/sysbuild/
-    - samples/application_development/sysbuild/
+    - samples/sysbuild/
     - doc/build/sysbuild/
   labels:
     - "area: Sysbuild"
   tests:
-    - sample.application_development.sysbuild
+    - sample.sysbuild
 
 Task Watchdog:
   status: maintained
@@ -3829,7 +3833,7 @@ TF-M Integration:
   maintainers:
     - d3zd3z
   collaborators:
-    - SebastianBoe
+    - Vge0rge
     - ithinuel
   files:
     - samples/tfm_integration/
@@ -4208,6 +4212,7 @@ West:
   status: odd fixes
   collaborators:
     - aaronyegx
+    - AlessandroLuo
     - RichardSWheatley
   files:
     - modules/hal_ambiq/
@@ -4357,6 +4362,7 @@ West:
 "West project: hal_renesas":
   status: maintained
   maintainers:
+    - KhiemNguyenT
     - andrzej-kaczmarek
   files: []
   labels:
@@ -4686,7 +4692,7 @@ West:
   maintainers:
     - d3zd3z
   collaborators:
-    - SebastianBoe
+    - Vge0rge
     - ithinuel
   files:
     - modules/trusted-firmware-m/
@@ -4698,7 +4704,7 @@ West:
   maintainers:
     - d3zd3z
   collaborators:
-    - SebastianBoe
+    - Vge0rge
     - ithinuel
   files: []
   labels:
@@ -4722,7 +4728,7 @@ West:
   maintainers:
     - d3zd3z
   collaborators:
-    - SebastianBoe
+    - Vge0rge
     - ithinuel
   files: []
   labels:

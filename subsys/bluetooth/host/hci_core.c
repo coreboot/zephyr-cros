@@ -253,8 +253,12 @@ struct net_buf *bt_hci_cmd_create(uint16_t opcode, uint8_t param_len)
 
 	LOG_DBG("opcode 0x%04x param_len %u", opcode, param_len);
 
+	/* net_buf_alloc(K_FOREVER) can fail when run from the syswq */
 	buf = net_buf_alloc(&hci_cmd_pool, K_FOREVER);
-	__ASSERT_NO_MSG(buf);
+	if (!buf) {
+		LOG_DBG("Unable to allocate a command buffer");
+		return NULL;
+	}
 
 	LOG_DBG("buf %p", buf);
 
@@ -340,6 +344,8 @@ int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf,
 			return -ENOMEM;
 		case BT_HCI_ERR_INVALID_PARAM:
 			return -EINVAL;
+		case BT_HCI_ERR_CMD_DISALLOWED:
+			return -EACCES;
 		default:
 			return -EIO;
 		}

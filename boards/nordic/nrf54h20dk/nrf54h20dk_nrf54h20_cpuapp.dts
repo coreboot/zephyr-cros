@@ -24,7 +24,9 @@
 		zephyr,flash = &mram1x;
 		zephyr,sram = &cpuapp_data;
 		zephyr,shell-uart = &uart136;
+		zephyr,ieee802154 = &cpuapp_ieee802154;
 		zephyr,bt-hci-ipc = &ipc0;
+		nordic,802154-spinel-ipc = &ipc0;
 	};
 
 	aliases {
@@ -194,4 +196,37 @@ ipc0: &cpuapp_cpurad_ipc {
 	pinctrl-1 = <&uart136_sleep>;
 	pinctrl-names = "default", "sleep";
 	hw-flow-control;
+};
+
+&gpio6 {
+	status = "okay";
+};
+
+&exmif {
+	cs-gpios = <&gpio6 3 GPIO_ACTIVE_LOW>;
+	pinctrl-0 = <&exmif_default>;
+	pinctrl-names = "default";
+	status = "okay";
+	mx25uw63: mx25uw6345g@0 {
+		compatible = "jedec,spi-nor";
+		status = "disabled";
+		reg = <0>;
+		spi-max-frequency = <DT_FREQ_M(48)>;
+		jedec-id = [c2 84 37];
+		sfdp-bfp = [
+			e5 20 8a ff  ff ff ff 03  00 ff 00 ff  00 ff 00 ff
+			ee ff ff ff  ff ff 00 ff  ff ff 00 ff  0c 20 10 d8
+			00 ff 00 ff  87 79 01 00  84 12 00 c4  cc 04 67 46
+			30 b0 30 b0  f4 bd d5 5c  00 00 00 ff  10 10 00 20
+			00 00 00 00  00 00 7c 23  48 00 00 00  00 00 88 88
+		];
+		size = <67108864>;
+		has-dpd;
+		t-enter-dpd = <10000>;
+		t-exit-dpd = <30000>;
+	};
+};
+
+&cpuapp_ieee802154 {
+	status = "okay";
 };
