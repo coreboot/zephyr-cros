@@ -24,7 +24,9 @@
 		zephyr,flash = &mram1x;
 		zephyr,sram = &cpuapp_data;
 		zephyr,shell-uart = &uart136;
+		zephyr,ieee802154 = &cpuapp_ieee802154;
 		zephyr,bt-hci-ipc = &ipc0;
+		nordic,802154-spinel-ipc = &ipc0;
 	};
 
 	aliases {
@@ -223,4 +225,8 @@ ipc0: &cpuapp_cpurad_ipc {
 		t-enter-dpd = <10000>;
 		t-exit-dpd = <30000>;
 	};
+};
+
+&cpuapp_ieee802154 {
+	status = "okay";
 };
