@@ -156,6 +156,15 @@ Analog-to-Digital Converter (ADC)
 Bluetooth HCI
 =============
 
+ * The ``BT_HCI_VS_EXT`` Kconfig option was deleted and the feature is now included in the
+   :kconfig:option:`BT_HCI_VS` Kconfig option.
+ * The ``BT_HCI_VS_EVT`` Kconfig option was removed, since vendor event support is implicit if
+   the :kconfig:option:`BT_HCI_VS` option is enabled.
+ * The bt_read_static_addr() API was removed. This wasn't really a completely public API, but
+   since it was exposed by the public hci_driver.h header file the removal is mentioned here.
+   Enable the :kconfig:option:`BT_HCI_VS` Kconfig option instead, and use vendor specific HCI
+   commands API to get the Controller's Bluetooth static address when available.
+
 Charger
 =======
 
@@ -269,6 +278,24 @@ Serial
 Timer
 =====
 
+regulator
+=========
+
+* The :dtcompatible:`nxp,vref` driver no longer supports the ground selection function,
+  as this setting should not be modified by the user. The DT property ``nxp,ground-select``
+  has been removed, users should remove this property from their devicetree if it is present.
+  (:github:`70642`)
+
+Watchdog
+========
+
+* The ``nuvoton,npcx-watchdog`` driver has been changed to extend the max timeout period.
+  The time of one watchdog count varies with the different pre-scalar settings.
+  Removed :kconfig:option:`CONFIG_WDT_NPCX_DELAY_CYCLES` because it is no longer suitable to
+  set the leading warning time.
+  Instead, added the :kconfig:option:`CONFIG_WDT_NPCX_WARNING_LEADING_TIME_MS` to set
+  the leading warning time in milliseconds.
+
 Bluetooth
 *********
 
@@ -295,6 +322,11 @@ Bluetooth Audio
   :kconfig:option:`CONFIG_BT_ISO_PERIPHERAL` are not longer `select`ed automatically when
   enabling :kconfig:option:`CONFIG_BT_BAP_UNICAST_SERVER`, and these must now be set explicitly
   in the project configuration file. (:github:`71993`)
+* The discover callback functions :code:`bt_cap_initiator_cb.unicast_discovery_complete`` and
+  :code:`bt_cap_commander_cb.discovery_complete`` for CAP now contain an additional parameter for
+  the set member.
+  This needs to be added to all instances of CAP discovery callback functions defined.
+  (:github:`72797`)
 
 Bluetooth Classic
 =================
@@ -368,6 +400,13 @@ Networking
   redundant and confusing. Use ``CONFIG_NET_TCP_INIT_RETRANSMISSION_TIMEOUT`` and
   ``CONFIG_NET_TCP_RETRY_COUNT`` instead to control the total timeout at the
   TCP level. (:github:`70731`)
+
+* In LwM2M API, the callback type :c:type:`lwm2m_engine_set_data_cb_t` has now an additional
+  parameter ``offset``. This parameter is used to indicate the offset of the data
+  during a Coap Block-wise transfer. Any post write, validate or some firmware callbacks
+  should be updated to include this parameter. (:github:`72590`)
+
+
 
 Other Subsystems
 ****************

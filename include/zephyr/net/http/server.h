@@ -28,9 +28,17 @@ extern "C" {
 
 /** @cond INTERNAL_HIDDEN */
 
-#define HTTP_SERVER_CLIENT_BUFFER_SIZE CONFIG_HTTP_SERVER_CLIENT_BUFFER_SIZE
-#define HTTP_SERVER_MAX_STREAMS        CONFIG_HTTP_SERVER_MAX_STREAMS
+#if defined(CONFIG_HTTP_SERVER)
+#define HTTP_SERVER_CLIENT_BUFFER_SIZE   CONFIG_HTTP_SERVER_CLIENT_BUFFER_SIZE
+#define HTTP_SERVER_MAX_STREAMS          CONFIG_HTTP_SERVER_MAX_STREAMS
 #define HTTP_SERVER_MAX_CONTENT_TYPE_LEN CONFIG_HTTP_SERVER_MAX_CONTENT_TYPE_LENGTH
+#define HTTP_SERVER_MAX_URL_LENGTH       CONFIG_HTTP_SERVER_MAX_URL_LENGTH
+#else
+#define HTTP_SERVER_CLIENT_BUFFER_SIZE   0
+#define HTTP_SERVER_MAX_STREAMS          0
+#define HTTP_SERVER_MAX_CONTENT_TYPE_LEN 0
+#define HTTP_SERVER_MAX_URL_LENGTH       0
+#endif
 
 /* Maximum header field name / value length. This is only used to detect Upgrade and
  * websocket header fields and values in the http1 server so the value is quite short.
@@ -74,6 +82,9 @@ struct http_resource_detail {
 
 	/** Content encoding of the resource. */
 	const char *content_encoding;
+
+	/** Content type of the resource. */
+	const char *content_type;
 };
 
 /** @cond INTERNAL_HIDDEN */
@@ -297,10 +308,10 @@ struct http_client_ctx {
 	struct http_parser parser;
 
 	/** Request URL. */
-	unsigned char url_buffer[CONFIG_HTTP_SERVER_MAX_URL_LENGTH];
+	unsigned char url_buffer[HTTP_SERVER_MAX_URL_LENGTH];
 
 	/** Request content type. */
-	unsigned char content_type[CONFIG_HTTP_SERVER_MAX_CONTENT_TYPE_LENGTH];
+	unsigned char content_type[HTTP_SERVER_MAX_CONTENT_TYPE_LEN];
 
 	/** Temp buffer for currently processed header (HTTP/1 only). */
 	unsigned char header_buffer[HTTP_SERVER_MAX_HEADER_LEN];
