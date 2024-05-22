@@ -2526,7 +2526,7 @@ static void hci_vendor_event(struct net_buf *buf)
 	}
 #endif /* CONFIG_BT_HCI_VS_EVT_USER */
 
-	if (IS_ENABLED(CONFIG_BT_HCI_VS_EVT) && !handled) {
+	if (IS_ENABLED(CONFIG_BT_HCI_VS) && !handled) {
 		struct bt_hci_evt_vs *evt;
 
 		evt = net_buf_pull_mem(buf, sizeof(*evt));
@@ -3665,7 +3665,7 @@ static void bt_dev_show_info(void)
 		bt_dev.lmp_version, bt_dev.lmp_subversion);
 }
 
-#if defined(CONFIG_BT_HCI_VS_EXT)
+#if defined(CONFIG_BT_HCI_VS)
 static const char *vs_hw_platform(uint16_t platform)
 {
 	static const char * const plat_str[] = {
@@ -3803,7 +3803,7 @@ static void hci_vs_init(void)
 		net_buf_unref(rsp);
 	}
 }
-#endif /* CONFIG_BT_HCI_VS_EXT */
+#endif /* CONFIG_BT_HCI_VS */
 
 static int hci_init(void)
 {
@@ -3858,7 +3858,7 @@ static int hci_init(void)
 		return err;
 	}
 
-#if defined(CONFIG_BT_HCI_VS_EXT)
+#if defined(CONFIG_BT_HCI_VS)
 	hci_vs_init();
 #endif
 	err = bt_id_init();
@@ -4263,6 +4263,10 @@ int bt_disable(void)
 	/* Abort RX thread */
 	k_thread_abort(&bt_workq.thread);
 #endif
+
+	if (IS_ENABLED(CONFIG_BT_ISO)) {
+		bt_iso_reset();
+	}
 
 	bt_monitor_send(BT_MONITOR_CLOSE_INDEX, NULL, 0);
 

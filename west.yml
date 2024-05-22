@@ -142,7 +142,7 @@ manifest:
       groups:
         - hal
     - name: hal_ambiq
-      revision: f6858cb3fe3d44945a23d114b7feeeac22ce71cf
+      revision: 94dd874cd726ba8185a301e78337c5c39685123f
       path: modules/hal/ambiq
       groups:
         - hal
@@ -178,7 +178,7 @@ manifest:
       groups:
         - hal
     - name: hal_microchip
-      revision: 68575aa28cd33c68b3b8d66f510d15746c57fdb5
+      revision: 1279561ea9b71c5f572d3d52708b7b445a383662
       path: modules/hal/microchip
       groups:
         - hal
@@ -193,7 +193,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 8c354a918c1272b40ad9b4ffecac1d89125efbe6
+      revision: abc66979c77421fb3a140ce2e4e6ea7165cdbe8f
       path: modules/hal/nxp
       groups:
         - hal
@@ -210,7 +210,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: e3560c79db1a002014f061c611cd84a99e4f33de
+      revision: b4fe8925d95bddc27e6d1666890f560d30cf9166
       groups:
         - hal
     - name: hal_rpi_pico
@@ -282,7 +282,7 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: d4394c2f9b76e0a7b758441cea3a8ceb896f66c8
+      revision: 018dc01d484358d81f889c36471d9ce5590965b6
       path: bootloader/mcuboot
     - name: mipi-sys-t
       path: modules/debug/mipi-sys-t
@@ -295,7 +295,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: 123d37db9cae528d51530c61ba0422192bc03bda
+      revision: 5d638052c9fe1ef3bd7638067354eba4d3f2fa78
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: da78aea63159771956fe0c9263f2e6985b66e9d5
