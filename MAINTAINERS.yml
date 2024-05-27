@@ -4612,7 +4612,7 @@ West:
     - nordicjm
   files:
     - modules/Kconfig.mcuboot
-    - tests/boot/test_mcuboot/
+    - tests/boot/
   labels:
     - "area: MCUBoot"
 
