@@ -70,7 +70,7 @@ static void bt_ready(int err)
 		return;
 	}
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad), NULL, 0);
+	err = bt_le_adv_start(BT_LE_ADV_CONN_ONE_TIME, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err != 0) {
 		FAIL("Advertising failed to start (err %d)\n", err);
 	}
@@ -238,28 +238,28 @@ static void test_args(int argc, char *argv[])
 static const struct bst_test_instance test_connect[] = {
 	{
 		.test_id = "csip_set_member",
-		.test_post_init_f = test_init,
+		.test_pre_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_main,
 		.test_args_f = test_args,
 	},
 	{
 		.test_id = "csip_set_member_release",
-		.test_post_init_f = test_init,
+		.test_pre_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_force_release,
 		.test_args_f = test_args,
 	},
 	{
 		.test_id = "csip_set_member_enc",
-		.test_post_init_f = test_init,
+		.test_pre_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_csip_enc,
 		.test_args_f = test_args,
 	},
 	{
 		.test_id = "csip_set_member_new_sirk",
-		.test_post_init_f = test_init,
+		.test_pre_init_f = test_init,
 		.test_tick_f = test_tick,
 		.test_main_f = test_new_sirk,
 		.test_args_f = test_args,

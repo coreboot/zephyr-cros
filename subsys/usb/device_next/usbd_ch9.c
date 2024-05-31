@@ -563,6 +563,7 @@ static void string_ascii7_to_utf16le(struct usbd_desc_node *const dn,
 	};
 	uint8_t *ascii7_str;
 	size_t len;
+	size_t i;
 
 	if (dn->str.utype == USBD_DUT_STRING_SERIAL_NUMBER && dn->str.use_hwinfo) {
 		ssize_t hwid_len = get_sn_from_hwid(hwid_sn);
@@ -575,7 +576,7 @@ static void string_ascii7_to_utf16le(struct usbd_desc_node *const dn,
 		head.bLength = sizeof(head) + hwid_len * 2;
 		ascii7_str = hwid_sn;
 	} else {
-		head.bLength = dn->bLength,
+		head.bLength = dn->bLength;
 		ascii7_str = (uint8_t *)dn->ptr;
 	}
 
@@ -588,11 +589,15 @@ static void string_ascii7_to_utf16le(struct usbd_desc_node *const dn,
 	net_buf_add_mem(buf, &head, MIN(len, sizeof(head)));
 	len -= MIN(len, sizeof(head));
 
-	for (size_t i = 0; i < len; i++) {
+	for (i = 0; i < len / 2; i++) {
 		__ASSERT(ascii7_str[i] > 0x1F && ascii7_str[i] < 0x7F,
 			 "Only printable ascii-7 characters are allowed in USB "
 			 "string descriptors");
 		net_buf_add_le16(buf, ascii7_str[i]);
+	}
+
+	if (len & 1) {
+		net_buf_add_u8(buf, ascii7_str[i]);
 	}
 }
 
@@ -703,7 +708,7 @@ static void desc_fill_bos_root(struct usbd_contex *const uds_ctx,
 	SYS_DLIST_FOR_EACH_CONTAINER(&uds_ctx->descriptors, desc_nd, node) {
 		if (desc_nd->bDescriptorType == USB_DESC_BOS) {
 			root->wTotalLength += desc_nd->bLength;
-			root->bNumDeviceCaps += desc_nd->bLength;
+			root->bNumDeviceCaps++;
 		}
 	}
 }
@@ -712,9 +717,27 @@ static int sreq_get_desc_bos(struct usbd_contex *const uds_ctx,
 			     struct net_buf *const buf)
 {
 	struct usb_setup_packet *setup = usbd_get_setup_pkt(uds_ctx);
+	struct usb_device_descriptor *dev_dsc;
 	struct usb_bos_descriptor bos;
 	struct usbd_desc_node *desc_nd;
 	size_t len;
+
+	switch (usbd_bus_speed(uds_ctx)) {
+	case USBD_SPEED_FS:
+		dev_dsc = uds_ctx->fs_desc;
+		break;
+	case USBD_SPEED_HS:
+		dev_dsc = uds_ctx->hs_desc;
+		break;
+	default:
+		errno = -ENOTSUP;
+		return 0;
+	}
+
+	if (sys_le16_to_cpu(dev_dsc->bcdUSB) < 0x0201U) {
+		errno = -ENOTSUP;
+		return 0;
+	}
 
 	desc_fill_bos_root(uds_ctx, &bos);
 	len = MIN(net_buf_tailroom(buf), MIN(setup->wLength, bos.wTotalLength));

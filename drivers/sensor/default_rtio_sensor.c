@@ -304,6 +304,9 @@ static int get_frame_count(const uint8_t *buffer, struct sensor_chan_spec channe
 	case SENSOR_CHAN_MAGN_XYZ:
 		channel.chan_type = SENSOR_CHAN_MAGN_X;
 		break;
+	case SENSOR_CHAN_POS_DXYZ:
+		channel.chan_type = SENSOR_CHAN_POS_DX;
+		break;
 	default:
 		break;
 	}
@@ -323,6 +326,10 @@ int sensor_natively_supported_channel_size_info(struct sensor_chan_spec channel,
 	__ASSERT_NO_MSG(base_size != NULL);
 	__ASSERT_NO_MSG(frame_size != NULL);
 
+	if (((int)channel.chan_type < 0) || channel.chan_type >= (SENSOR_CHAN_ALL)) {
+		return -ENOTSUP;
+	}
+
 	switch (channel.chan_type) {
 	case SENSOR_CHAN_ACCEL_X:
 	case SENSOR_CHAN_ACCEL_Y:
@@ -339,51 +346,9 @@ int sensor_natively_supported_channel_size_info(struct sensor_chan_spec channel,
 	case SENSOR_CHAN_POS_DX:
 	case SENSOR_CHAN_POS_DY:
 	case SENSOR_CHAN_POS_DZ:
+	case SENSOR_CHAN_POS_DXYZ:
 		*base_size = sizeof(struct sensor_three_axis_data);
 		*frame_size = sizeof(struct sensor_three_axis_sample_data);
-		return 0;
-	case SENSOR_CHAN_DIE_TEMP:
-	case SENSOR_CHAN_AMBIENT_TEMP:
-	case SENSOR_CHAN_PRESS:
-	case SENSOR_CHAN_HUMIDITY:
-	case SENSOR_CHAN_LIGHT:
-	case SENSOR_CHAN_IR:
-	case SENSOR_CHAN_RED:
-	case SENSOR_CHAN_GREEN:
-	case SENSOR_CHAN_BLUE:
-	case SENSOR_CHAN_ALTITUDE:
-	case SENSOR_CHAN_PM_1_0:
-	case SENSOR_CHAN_PM_2_5:
-	case SENSOR_CHAN_PM_10:
-	case SENSOR_CHAN_DISTANCE:
-	case SENSOR_CHAN_CO2:
-	case SENSOR_CHAN_VOC:
-	case SENSOR_CHAN_GAS_RES:
-	case SENSOR_CHAN_VOLTAGE:
-	case SENSOR_CHAN_CURRENT:
-	case SENSOR_CHAN_POWER:
-	case SENSOR_CHAN_RESISTANCE:
-	case SENSOR_CHAN_ROTATION:
-	case SENSOR_CHAN_RPM:
-	case SENSOR_CHAN_GAUGE_VOLTAGE:
-	case SENSOR_CHAN_GAUGE_AVG_CURRENT:
-	case SENSOR_CHAN_GAUGE_STDBY_CURRENT:
-	case SENSOR_CHAN_GAUGE_MAX_LOAD_CURRENT:
-	case SENSOR_CHAN_GAUGE_TEMP:
-	case SENSOR_CHAN_GAUGE_STATE_OF_CHARGE:
-	case SENSOR_CHAN_GAUGE_FULL_CHARGE_CAPACITY:
-	case SENSOR_CHAN_GAUGE_REMAINING_CHARGE_CAPACITY:
-	case SENSOR_CHAN_GAUGE_NOM_AVAIL_CAPACITY:
-	case SENSOR_CHAN_GAUGE_FULL_AVAIL_CAPACITY:
-	case SENSOR_CHAN_GAUGE_AVG_POWER:
-	case SENSOR_CHAN_GAUGE_STATE_OF_HEALTH:
-	case SENSOR_CHAN_GAUGE_TIME_TO_EMPTY:
-	case SENSOR_CHAN_GAUGE_TIME_TO_FULL:
-	case SENSOR_CHAN_GAUGE_DESIGN_VOLTAGE:
-	case SENSOR_CHAN_GAUGE_DESIRED_VOLTAGE:
-	case SENSOR_CHAN_GAUGE_DESIRED_CHARGING_CURRENT:
-		*base_size = sizeof(struct sensor_q31_data);
-		*frame_size = sizeof(struct sensor_q31_sample_data);
 		return 0;
 	case SENSOR_CHAN_PROX:
 		*base_size = sizeof(struct sensor_byte_data);
@@ -394,7 +359,9 @@ int sensor_natively_supported_channel_size_info(struct sensor_chan_spec channel,
 		*frame_size = sizeof(struct sensor_uint64_sample_data);
 		return 0;
 	default:
-		return -ENOTSUP;
+		*base_size = sizeof(struct sensor_q31_data);
+		*frame_size = sizeof(struct sensor_q31_sample_data);
+		return 0;
 	}
 }
 
@@ -485,6 +452,10 @@ static int decode(const uint8_t *buffer, struct sensor_chan_spec chan_spec,
 		return -EINVAL;
 	}
 
+	if (((int)chan_spec.chan_type < 0) || chan_spec.chan_type >= (SENSOR_CHAN_ALL)) {
+		return 0;
+	}
+
 	/* Check for 3d channel mappings */
 	switch (chan_spec.chan_type) {
 	case SENSOR_CHAN_ACCEL_X:
@@ -514,53 +485,13 @@ static int decode(const uint8_t *buffer, struct sensor_chan_spec chan_spec,
 	case SENSOR_CHAN_POS_DX:
 	case SENSOR_CHAN_POS_DY:
 	case SENSOR_CHAN_POS_DZ:
+	case SENSOR_CHAN_POS_DXYZ:
 		count = decode_three_axis(header, q, data_out, SENSOR_CHAN_POS_DX,
 					  SENSOR_CHAN_POS_DY, SENSOR_CHAN_POS_DZ,
 					  chan_spec.chan_idx);
 		break;
-	case SENSOR_CHAN_DIE_TEMP:
-	case SENSOR_CHAN_AMBIENT_TEMP:
-	case SENSOR_CHAN_PRESS:
-	case SENSOR_CHAN_HUMIDITY:
-	case SENSOR_CHAN_LIGHT:
-	case SENSOR_CHAN_IR:
-	case SENSOR_CHAN_RED:
-	case SENSOR_CHAN_GREEN:
-	case SENSOR_CHAN_BLUE:
-	case SENSOR_CHAN_ALTITUDE:
-	case SENSOR_CHAN_PM_1_0:
-	case SENSOR_CHAN_PM_2_5:
-	case SENSOR_CHAN_PM_10:
-	case SENSOR_CHAN_DISTANCE:
-	case SENSOR_CHAN_CO2:
-	case SENSOR_CHAN_VOC:
-	case SENSOR_CHAN_GAS_RES:
-	case SENSOR_CHAN_VOLTAGE:
-	case SENSOR_CHAN_CURRENT:
-	case SENSOR_CHAN_POWER:
-	case SENSOR_CHAN_RESISTANCE:
-	case SENSOR_CHAN_ROTATION:
-	case SENSOR_CHAN_RPM:
-	case SENSOR_CHAN_GAUGE_VOLTAGE:
-	case SENSOR_CHAN_GAUGE_AVG_CURRENT:
-	case SENSOR_CHAN_GAUGE_STDBY_CURRENT:
-	case SENSOR_CHAN_GAUGE_MAX_LOAD_CURRENT:
-	case SENSOR_CHAN_GAUGE_TEMP:
-	case SENSOR_CHAN_GAUGE_STATE_OF_CHARGE:
-	case SENSOR_CHAN_GAUGE_FULL_CHARGE_CAPACITY:
-	case SENSOR_CHAN_GAUGE_REMAINING_CHARGE_CAPACITY:
-	case SENSOR_CHAN_GAUGE_NOM_AVAIL_CAPACITY:
-	case SENSOR_CHAN_GAUGE_FULL_AVAIL_CAPACITY:
-	case SENSOR_CHAN_GAUGE_AVG_POWER:
-	case SENSOR_CHAN_GAUGE_STATE_OF_HEALTH:
-	case SENSOR_CHAN_GAUGE_TIME_TO_EMPTY:
-	case SENSOR_CHAN_GAUGE_TIME_TO_FULL:
-	case SENSOR_CHAN_GAUGE_DESIGN_VOLTAGE:
-	case SENSOR_CHAN_GAUGE_DESIRED_VOLTAGE:
-	case SENSOR_CHAN_GAUGE_DESIRED_CHARGING_CURRENT:
-		count = decode_q31(header, q, data_out, chan_spec);
-		break;
 	default:
+		count = decode_q31(header, q, data_out, chan_spec);
 		break;
 	}
 	if (count > 0) {

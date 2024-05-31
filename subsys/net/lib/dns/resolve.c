@@ -780,11 +780,8 @@ quit:
 
 static int recv_data(struct net_socket_service_event *pev)
 {
-	COND_CODE_1(IS_ENABLED(CONFIG_NET_IPV6),
-		    (struct sockaddr_in6), (struct sockaddr_in)) addr;
 	struct dns_resolve_context *ctx = pev->user_data;
 	socklen_t optlen = sizeof(int);
-	size_t addrlen = sizeof(addr);
 	struct net_buf *dns_cname = NULL;
 	struct net_buf *dns_data = NULL;
 	uint16_t query_hash = 0U;
@@ -824,7 +821,7 @@ static int recv_data(struct net_socket_service_event *pev)
 
 	ret = zsock_recvfrom(pev->event.fd, dns_data->data,
 			     net_buf_max_len(dns_data), 0,
-			     (struct sockaddr *)&addr, &addrlen);
+			     NULL, NULL);
 	if (ret < 0) {
 		ret = -errno;
 		NET_ERR("recv failed on IPv%d socket (%d)",
@@ -910,7 +907,7 @@ static void svc_handler(struct k_work *work)
 	int ret;
 
 	ret = recv_data(pev);
-	if (ret < 0) {
+	if (ret < 0 && ret != DNS_EAI_ALLDONE) {
 		NET_ERR("DNS recv error (%d)", ret);
 	}
 }
@@ -1076,8 +1073,8 @@ static int dns_resolve_cancel_with_hash(struct dns_resolve_context *ctx,
 	}
 
 	NET_DBG("Cancelling DNS req %u (name %s type %d hash %u)", dns_id,
-		query_name, ctx->queries[i].query_type,
-		query_hash);
+		query_name == NULL ? "<unknown>" : query_name,
+		ctx->queries[i].query_type, query_hash);
 
 	dns_resolve_cancel_slot(ctx, i);
 

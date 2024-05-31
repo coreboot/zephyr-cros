@@ -12,6 +12,17 @@ LOG_MODULE_REGISTER(net_sock_svc, CONFIG_NET_SOCKETS_LOG_LEVEL);
 #include <zephyr/net/socket_service.h>
 #include <zephyr/posix/sys/eventfd.h>
 
+/* Next checks makes sure that we are not trying to use this library
+ * with eventfd if CONFIG_POSIX_API is not set and if using native_sim
+ * based board. The reason is that we should always use zephyr libc based
+ * eventfd implementation instead of host libc one.
+ */
+#if defined(CONFIG_NATIVE_LIBC) && defined(CONFIG_EVENTFD)
+#error "The eventfd support CONFIG_EVENTFD will not work with host libc "
+	"so you need to enable CONFIG_POSIX_API in this case which will turn "
+	"off the host libc usage."
+#endif
+
 static int init_socket_service(void);
 static bool init_done;
 
@@ -180,7 +191,6 @@ static int trigger_work(struct zsock_pollfd *pev)
 static void socket_service_thread(void)
 {
 	int ret, i, fd, count = 0;
-	int error_count = 0;
 	eventfd_t value;
 
 	STRUCT_SECTION_COUNT(net_socket_service_desc, &ret);
@@ -254,24 +264,10 @@ restart:
 		}
 
 		if (ret > 0 && ctx.events[0].revents) {
-			if ((ctx.events[0].revents & ZSOCK_POLLNVAL) ||
-			    (ctx.events[0].revents & ZSOCK_POLLERR)) {
-				/* Ignore eventfd errors and turn eventfd
-				 * support off if we get too many errors
-				 */
-				if (++error_count > 2) {
-					ctx.events[0].fd = -1;
-				}
-
-				continue;
-			}
-
 			eventfd_read(ctx.events[0].fd, &value);
 			NET_DBG("Received restart event.");
 			goto restart;
 		}
-
-		error_count = 0;
 
 		for (i = 1; i < (count + 1); i++) {
 			if (ctx.events[i].fd < 0) {

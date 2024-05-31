@@ -90,9 +90,13 @@ enum dns_query_type {
  * Address info struct is passed to callback that gets all the results.
  */
 struct dns_addrinfo {
+	/** IP address information */
 	struct sockaddr ai_addr;
+	/** Length of the ai_addr field */
 	socklen_t       ai_addrlen;
-	uint8_t            ai_family;
+	/** Address family of the address information */
+	uint8_t         ai_family;
+	/** Canonical name of the address */
 	char            ai_canonname[DNS_MAX_NAME_SIZE + 1];
 };
 
@@ -159,16 +163,21 @@ typedef void (*dns_resolve_cb_t)(enum dns_resolve_status status,
 				 struct dns_addrinfo *info,
 				 void *user_data);
 
+/** @cond INTERNAL_HIDDEN */
+
 enum dns_resolve_context_state {
 	DNS_RESOLVE_CONTEXT_ACTIVE,
 	DNS_RESOLVE_CONTEXT_DEACTIVATING,
 	DNS_RESOLVE_CONTEXT_INACTIVE,
 };
 
+/** @endcond */
+
 /**
  * DNS resolve context structure.
  */
 struct dns_resolve_context {
+	/** List of configured DNS servers */
 	struct {
 		/** DNS server information */
 		struct sockaddr dns_server;
@@ -184,11 +193,7 @@ struct dns_resolve_context {
 	} servers[CONFIG_DNS_RESOLVER_MAX_SERVERS + DNS_MAX_MCAST_SERVERS];
 
 /** @cond INTERNAL_HIDDEN */
-#if (IS_ENABLED(CONFIG_NET_IPV6) && IS_ENABLED(CONFIG_NET_IPV4))
-#define DNS_RESOLVER_MAX_POLL (2 * (CONFIG_DNS_RESOLVER_MAX_SERVERS + DNS_MAX_MCAST_SERVERS))
-#else
-#define DNS_RESOLVER_MAX_POLL (1 * (CONFIG_DNS_RESOLVER_MAX_SERVERS + DNS_MAX_MCAST_SERVERS))
-#endif
+#define DNS_RESOLVER_MAX_POLL (CONFIG_DNS_RESOLVER_MAX_SERVERS + DNS_MAX_MCAST_SERVERS)
 	/** Socket polling for each server connection */
 	struct zsock_pollfd fds[DNS_RESOLVER_MAX_POLL];
 /** @endcond */

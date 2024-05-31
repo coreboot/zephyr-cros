@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/debug/symtab.h>
 #include <zephyr/kernel.h>
 #include <zephyr/kernel_structs.h>
 #include <kernel_internal.h>
@@ -79,7 +80,14 @@ FUNC_NORETURN void z_riscv_fatal_error_csf(unsigned int reason, const z_arch_esf
 #endif /* CONFIG_RISCV_ISA_RV32E */
 		LOG_ERR("     sp: " PR_REG, z_riscv_get_sp_before_exc(esf));
 		LOG_ERR("     ra: " PR_REG, esf->ra);
+#ifndef CONFIG_SYMTAB
 		LOG_ERR("   mepc: " PR_REG, esf->mepc);
+#else
+		uint32_t offset = 0;
+		const char *name = symtab_find_symbol_name(esf->mepc, &offset);
+
+		LOG_ERR("   mepc: " PR_REG " [%s+0x%x]", esf->mepc, name, offset);
+#endif
 		LOG_ERR("mstatus: " PR_REG, esf->mstatus);
 		LOG_ERR("");
 	}
@@ -99,7 +107,7 @@ FUNC_NORETURN void z_riscv_fatal_error_csf(unsigned int reason, const z_arch_esf
 		LOG_ERR("");
 	}
 
-	if (IS_ENABLED(CONFIG_RISCV_EXCEPTION_STACK_TRACE)) {
+	if (IS_ENABLED(CONFIG_RISCV_EXCEPTION_STACK_TRACE) && (esf != NULL)) {
 		z_riscv_unwind_stack(esf);
 	}
 
@@ -255,6 +263,6 @@ static void z_vrfy_user_fault(unsigned int reason)
 	z_impl_user_fault(reason);
 }
 
-#include <syscalls/user_fault_mrsh.c>
+#include <zephyr/syscalls/user_fault_mrsh.c>
 
 #endif /* CONFIG_USERSPACE */
