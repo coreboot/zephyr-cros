@@ -116,6 +116,14 @@ Bluetooth
     Gateway is cellular phone. It controls the device (Hands-free Unit), that is the remote
     audio input and output mechanism.
 
+  * Implemented Advanced Audio Distribution Profile (A2DP) and Audio/Video Distribution Transport
+    Protocol (AVDTP), A2DP is enabled by :kconfig:option:`CONFIG_BT_A2DP`, AVDTP is enabled
+    by :kconfig:option:`CONFIG_BT_AVDTP`. They implement the protocols and procedures that
+    realize distribution of audio content of high quality in mono, stereo, or multi-channel modes.
+    A typical use case is the streaming of music content from a stereo music player to headphones
+    or speakers. The audio data is compressed in a proper format for efficient use of the limited
+    bandwidth.
+
 Boards & SoC Support
 ********************
 
@@ -431,6 +439,9 @@ Libraries / Subsystems
     enabling automatic formatting on mount failure by setting the
     :kconfig:option:`CONFIG_FS_FATFS_MKFS` Kconfig option. This option is enabled by default if
     :kconfig:option:`CONFIG_FILE_SYSTEM_MKFS` is set.
+
+  * FS: It is now possible to truncate a file while opening using :c:func:`fs_open`
+    and by passing ``FS_O_TRUNC`` flag.
 
 * POSIX API
 
