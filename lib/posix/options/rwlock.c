@@ -12,7 +12,7 @@
 #include <zephyr/posix/pthread.h>
 #include <zephyr/sys/bitarray.h>
 
-#define CONCURRENT_READER_LIMIT  (CONFIG_MAX_PTHREAD_COUNT + 1)
+#define CONCURRENT_READER_LIMIT  (CONFIG_POSIX_THREAD_THREADS_MAX + 1)
 
 struct posix_rwlock {
 	struct k_sem rd_sem;
@@ -86,7 +86,7 @@ struct posix_rwlock *to_posix_rwlock(pthread_rwlock_t *rwlock)
 	size_t bit;
 	struct posix_rwlock *rwl;
 
-	if (*rwlock != PTHREAD_RWLOCK_INITIALIZER) {
+	if (*rwlock != POSIX_RWLOCK_INITIALIZER) {
 		return get_posix_rwlock(*rwlock);
 	}
 
@@ -116,7 +116,7 @@ int pthread_rwlock_init(pthread_rwlock_t *rwlock,
 	struct posix_rwlock *rwl;
 
 	ARG_UNUSED(attr);
-	*rwlock = PTHREAD_RWLOCK_INITIALIZER;
+	*rwlock = POSIX_RWLOCK_INITIALIZER;
 
 	rwl = to_posix_rwlock(rwlock);
 	if (rwl == NULL) {

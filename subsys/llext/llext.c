@@ -24,6 +24,12 @@ LOG_MODULE_REGISTER(llext, CONFIG_LLEXT_LOG_LEVEL);
 #define LLEXT_PAGE_SIZE 32
 #endif
 
+#ifdef CONFIG_LLEXT_EXPORT_BUILTINS_BY_SLID
+#define SYM_NAME_OR_SLID(name, slid) ((const char *)slid)
+#else
+#define SYM_NAME_OR_SLID(name, slid) name
+#endif
+
 K_HEAP_DEFINE(llext_heap, CONFIG_LLEXT_HEAP_SIZE * 1024);
 
 static const char ELF_MAGIC[] = {0x7f, 'E', 'L', 'F'};
@@ -118,11 +124,27 @@ const void *llext_find_sym(const struct llext_symtable *sym_table, const char *s
 {
 	if (sym_table == NULL) {
 		/* Built-in symbol table */
+#ifdef CONFIG_LLEXT_EXPORT_BUILTINS_BY_SLID
+		/* 'sym_name' is actually a SLID to search for */
+		uintptr_t slid = (uintptr_t)sym_name;
+
+		/* TODO: perform a binary search instead of linear.
+		 * Note that - as of writing - the llext_const_symbol_area
+		 * section is sorted in ascending SLID order.
+		 * (see scripts/build/llext_prepare_exptab.py)
+		 */
+		STRUCT_SECTION_FOREACH(llext_const_symbol, sym) {
+			if (slid == sym->slid) {
+				return sym->addr;
+			}
+		}
+#else
 		STRUCT_SECTION_FOREACH(llext_const_symbol, sym) {
 			if (strcmp(sym->name, sym_name) == 0) {
 				return sym->addr;
 			}
 		}
+#endif
 	} else {
 		/* find symbols in module */
 		for (size_t i = 0; i < sym_table->sym_cnt; i++) {
@@ -164,12 +186,13 @@ static int llext_find_tables(struct llext_loader *ldr)
 			return ret;
 		}
 
-		LOG_DBG("section %d at %zx: name %d, type %d, flags %zx, addr %zx, size %zd",
-			i,
-			(size_t)ldr->hdr.e_shoff + i * ldr->hdr.e_shentsize,
+		LOG_DBG("section %d at %zx: name %d, type %d, flags %zx, "
+			"ofs %zx, addr %zx, size %zd",
+			i, pos,
 			shdr.sh_name,
 			shdr.sh_type,
 			(size_t)shdr.sh_flags,
+			(size_t)shdr.sh_offset,
 			(size_t)shdr.sh_addr,
 			(size_t)shdr.sh_size);
 
@@ -219,13 +242,10 @@ static const char *llext_string(struct llext_loader *ldr, struct llext *ext,
  */
 static int llext_map_sections(struct llext_loader *ldr, struct llext *ext)
 {
-	int i, ret;
+	int i, j, ret;
 	size_t pos;
-	elf_shdr_t shdr, rodata = {.sh_addr = ~0},
-		high_shdr = {.sh_offset = 0}, low_shdr = {.sh_offset = ~0};
+	elf_shdr_t shdr;
 	const char *name;
-
-	ldr->sects[LLEXT_MEM_RODATA].sh_size = 0;
 
 	for (i = 0, pos = ldr->hdr.e_shoff;
 	     i < ldr->hdr.e_shnum;
@@ -240,62 +260,145 @@ static int llext_map_sections(struct llext_loader *ldr, struct llext *ext)
 			return ret;
 		}
 
-		/* Identify the lowest and the highest data sections */
-		if (!(shdr.sh_flags & SHF_EXECINSTR) &&
-		    shdr.sh_type == SHT_PROGBITS) {
-			if (shdr.sh_offset > high_shdr.sh_offset) {
-				high_shdr = shdr;
-			}
-			if (shdr.sh_offset < low_shdr.sh_offset) {
-				low_shdr = shdr;
-			}
+		if ((shdr.sh_type != SHT_PROGBITS && shdr.sh_type != SHT_NOBITS) ||
+		    !(shdr.sh_flags & SHF_ALLOC) ||
+		    shdr.sh_size == 0) {
+			continue;
 		}
 
 		name = llext_string(ldr, ext, LLEXT_MEM_SHSTRTAB, shdr.sh_name);
 
-		LOG_DBG("section %d name %s", i, name);
-
+		/* Identify the section type by its flags */
 		enum llext_mem mem_idx;
 
-		/*
-		 * .rodata section is optional. If there isn't one, use the
-		 * first read-only data section
-		 */
-		if (shdr.sh_addr && !(shdr.sh_flags & (SHF_WRITE | SHF_EXECINSTR)) &&
-		    shdr.sh_addr < rodata.sh_addr) {
-			rodata = shdr;
-			LOG_DBG("rodata: select %#zx name %s", (size_t)shdr.sh_addr, name);
-		}
-
-		/*
-		 * Keep in mind, that when using relocatable (partially linked)
-		 * objects, ELF segments aren't created, so ldr->sect_map[] and
-		 * ldr->sects[] don't contain all the sections
-		 */
-		if (strcmp(name, ".text") == 0) {
-			mem_idx = LLEXT_MEM_TEXT;
-		} else if (strcmp(name, ".data") == 0) {
-			mem_idx = LLEXT_MEM_DATA;
-		} else if (strcmp(name, ".rodata") == 0) {
-			mem_idx = LLEXT_MEM_RODATA;
-		} else if (strcmp(name, ".bss") == 0) {
+		switch (shdr.sh_type) {
+		case SHT_NOBITS:
 			mem_idx = LLEXT_MEM_BSS;
-		} else if (strcmp(name, ".exported_sym") == 0) {
-			mem_idx = LLEXT_MEM_EXPORT;
-		} else {
+			break;
+		case SHT_PROGBITS:
+			if (shdr.sh_flags & SHF_EXECINSTR) {
+				mem_idx = LLEXT_MEM_TEXT;
+			} else if (shdr.sh_flags & SHF_WRITE) {
+				mem_idx = LLEXT_MEM_DATA;
+			} else {
+				mem_idx = LLEXT_MEM_RODATA;
+			}
+			break;
+		default:
 			LOG_DBG("Not copied section %s", name);
 			continue;
 		}
 
-		ldr->sects[mem_idx] = shdr;
+		/* Special exception for .exported_sym */
+		if (strcmp(name, ".exported_sym") == 0) {
+			mem_idx = LLEXT_MEM_EXPORT;
+		}
+
+		LOG_DBG("section %d name %s maps to idx %d", i, name, mem_idx);
+
 		ldr->sect_map[i] = mem_idx;
+		elf_shdr_t *sect = ldr->sects + mem_idx;
+
+		if (sect->sh_type == SHT_NULL) {
+			/* First section of this type, copy all info */
+			*sect = shdr;
+		} else {
+			/* Make sure the sections are compatible before merging */
+			if (shdr.sh_flags != sect->sh_flags) {
+				LOG_ERR("Unsupported section flags for %s (mem %d)",
+					name, mem_idx);
+				return -ENOEXEC;
+			}
+
+			if (mem_idx == LLEXT_MEM_BSS) {
+				/* SHT_NOBITS sections cannot be merged properly:
+				 * as they use no space in the file, the logic
+				 * below does not work; they must be treated as
+				 * independent entities.
+				 */
+				LOG_ERR("Multiple SHT_NOBITS sections are not supported");
+				return -ENOEXEC;
+			}
+
+			if (ldr->hdr.e_type == ET_DYN) {
+				/* In shared objects, sh_addr is the VMA. Before
+				 * merging these sections, make sure the delta
+				 * in VMAs matches that of file offsets.
+				 */
+				if (shdr.sh_addr - sect->sh_addr !=
+				    shdr.sh_offset - sect->sh_offset) {
+					LOG_ERR("Incompatible section addresses "
+						"for %s (mem %d)", name, mem_idx);
+					return -ENOEXEC;
+				}
+			}
+
+			/*
+			 * Extend the current section to include the new one
+			 * (overlaps are detected later)
+			 */
+			size_t address = MIN(sect->sh_addr, shdr.sh_addr);
+			size_t bot_ofs = MIN(sect->sh_offset, shdr.sh_offset);
+			size_t top_ofs = MAX(sect->sh_offset + sect->sh_size,
+					     shdr.sh_offset + shdr.sh_size);
+
+			sect->sh_addr = address;
+			sect->sh_offset = bot_ofs;
+			sect->sh_size = top_ofs - bot_ofs;
+		}
 	}
 
-	ldr->prog_data_size = high_shdr.sh_size + high_shdr.sh_offset - low_shdr.sh_offset;
+	/*
+	 * Test that no computed range overlaps. This can happen if sections of
+	 * different llext_mem type are interleaved in the ELF file or in VMAs.
+	 */
+	for (i = 0; i < LLEXT_MEM_COUNT; i++) {
+		for (j = i+1; j < LLEXT_MEM_COUNT; j++) {
+			elf_shdr_t *x = ldr->sects + i;
+			elf_shdr_t *y = ldr->sects + j;
 
-	/* No verbatim .rodata, use an automatically selected one */
-	if (!ldr->sects[LLEXT_MEM_RODATA].sh_size) {
-		ldr->sects[LLEXT_MEM_RODATA] = rodata;
+			if (x->sh_type == SHT_NULL || x->sh_size == 0 ||
+			    y->sh_type == SHT_NULL || y->sh_size == 0) {
+				/* Skip empty sections */
+				continue;
+			}
+
+			if (ldr->hdr.e_type == ET_DYN) {
+				/*
+				 * Test all merged VMA ranges for overlaps
+				 */
+				if ((x->sh_addr <= y->sh_addr &&
+				     x->sh_addr + x->sh_size > y->sh_addr) ||
+				    (y->sh_addr <= x->sh_addr &&
+				     y->sh_addr + y->sh_size > x->sh_addr)) {
+					LOG_ERR("VMA range %d (0x%zx +%zd) "
+						"overlaps with %d (0x%zx +%zd)",
+						i, (size_t)x->sh_addr, (size_t)x->sh_size,
+						j, (size_t)y->sh_addr, (size_t)y->sh_size);
+					return -ENOEXEC;
+				}
+			}
+
+			/*
+			 * Test file offsets. BSS sections store no
+			 * data in the file and must not be included
+			 * in checks to avoid false positives.
+			 */
+			if (i == LLEXT_MEM_BSS || j == LLEXT_MEM_BSS) {
+				continue;
+			}
+
+			if ((x->sh_offset <= y->sh_offset &&
+			     x->sh_offset + x->sh_size > y->sh_offset) ||
+			    (y->sh_offset <= x->sh_offset &&
+			     y->sh_offset + y->sh_size > x->sh_offset)) {
+				LOG_ERR("ELF file range %d (0x%zx +%zd) "
+					"overlaps with %d (0x%zx +%zd)",
+					i, (size_t)x->sh_offset, (size_t)x->sh_size,
+					j, (size_t)y->sh_offset, (size_t)y->sh_size);
+				return -ENOEXEC;
+			}
+		}
 	}
 
 	return 0;
@@ -331,6 +434,8 @@ static void llext_init_mem_part(struct llext *ext, enum llext_mem mem_idx,
 			ext->mem_parts[mem_idx].size);
 	}
 #endif
+
+	LOG_DBG("mem idx %d: start 0x%zx, size %zd", mem_idx, (size_t)start, len);
 }
 
 static int llext_copy_section(struct llext_loader *ldr, struct llext *ext,
@@ -530,7 +635,8 @@ static int llext_export_symbols(struct llext_loader *ldr, struct llext *ext)
 	return 0;
 }
 
-static int llext_copy_symbols(struct llext_loader *ldr, struct llext *ext)
+static int llext_copy_symbols(struct llext_loader *ldr, struct llext *ext,
+			      bool pre_located)
 {
 	size_t ent_size = ldr->sects[LLEXT_MEM_SYMTAB].sh_entsize;
 	size_t syms_size = ldr->sects[LLEXT_MEM_SYMTAB].sh_size;
@@ -564,16 +670,58 @@ static int llext_copy_symbols(struct llext_loader *ldr, struct llext *ext)
 
 		if ((stt == STT_FUNC || stt == STT_OBJECT) &&
 		    stb == STB_GLOBAL && sect != SHN_UNDEF) {
-			enum llext_mem mem_idx = ldr->sect_map[sect];
 			const char *name = llext_string(ldr, ext, LLEXT_MEM_STRTAB, sym.st_name);
 
 			__ASSERT(j <= sym_tab->sym_cnt, "Miscalculated symbol number %u\n", j);
 
 			sym_tab->syms[j].name = name;
-			sym_tab->syms[j].addr = (void *)((uintptr_t)ext->mem[mem_idx] +
-							 sym.st_value -
-							 (ldr->hdr.e_type == ET_REL ? 0 :
-							  ldr->sects[mem_idx].sh_addr));
+
+			uintptr_t section_addr;
+			void *base;
+
+			if (sect < LLEXT_MEM_BSS) {
+				/*
+				 * This is just a slight optimisation for cached
+				 * sections, we could use the generic path below
+				 * for all of them
+				 */
+				base = ext->mem[ldr->sect_map[sect]];
+				section_addr = ldr->sects[ldr->sect_map[sect]].sh_addr;
+			} else {
+				/* Section header isn't stored, have to read it */
+				size_t shdr_pos = ldr->hdr.e_shoff + sect * ldr->hdr.e_shentsize;
+				elf_shdr_t shdr;
+
+				ret = llext_seek(ldr, shdr_pos);
+				if (ret != 0) {
+					LOG_ERR("failed seeking to position %zu\n", shdr_pos);
+					return ret;
+				}
+
+				ret = llext_read(ldr, &shdr, sizeof(elf_shdr_t));
+				if (ret != 0) {
+					LOG_ERR("failed reading section header at position %zu\n",
+						shdr_pos);
+					return ret;
+				}
+
+				base = llext_peek(ldr, shdr.sh_offset);
+				if (!base) {
+					LOG_ERR("cannot handle arbitrary sections without .peek\n");
+					return -EOPNOTSUPP;
+				}
+
+				section_addr = shdr.sh_addr;
+			}
+
+			if (pre_located) {
+				sym_tab->syms[j].addr = (uint8_t *)sym.st_value +
+					(ldr->hdr.e_type == ET_REL ? section_addr : 0);
+			} else {
+				sym_tab->syms[j].addr = (uint8_t *)base + sym.st_value -
+					(ldr->hdr.e_type == ET_REL ? 0 : section_addr);
+			}
+
 			LOG_DBG("function symbol %d name %s addr %p",
 				j, name, sym_tab->syms[j].addr);
 			j++;
@@ -686,18 +834,14 @@ static void llext_link_plt(struct llext_loader *ldr, struct llext *ext,
 
 		switch (stb) {
 		case STB_GLOBAL:
-			link_addr = llext_find_sym(NULL, name);
+			link_addr = llext_find_sym(NULL,
+				SYM_NAME_OR_SLID(name, sym_tbl.st_value));
 
 			if (!link_addr)
 				link_addr = llext_find_sym(&ext->sym_tab, name);
 
 			if (!link_addr) {
 				LOG_WRN("PLT: cannot find idx %u name %s", j, name);
-				continue;
-			}
-
-			if (!rela.r_offset) {
-				LOG_WRN("PLT: zero offset idx %u name %s", j, name);
 				continue;
 			}
 
@@ -827,7 +971,8 @@ static int llext_link(struct llext_loader *ldr, struct llext *ext, bool do_local
 				link_addr = 0;
 			} else if (sym.st_shndx == SHN_UNDEF) {
 				/* If symbol is undefined, then we need to look it up */
-				link_addr = (uintptr_t)llext_find_sym(NULL, name);
+				link_addr = (uintptr_t)llext_find_sym(NULL,
+					SYM_NAME_OR_SLID(name, sym.st_value));
 
 				if (link_addr == 0) {
 					LOG_ERR("Undefined symbol with no entry in "
@@ -837,18 +982,37 @@ static int llext_link(struct llext_loader *ldr, struct llext *ext, bool do_local
 				} else {
 					LOG_INF("found symbol %s at 0x%lx", name, link_addr);
 				}
-			} else if (ELF_ST_TYPE(sym.st_info) == STT_SECTION ||
-				   ELF_ST_TYPE(sym.st_info) == STT_FUNC ||
-				   ELF_ST_TYPE(sym.st_info) == STT_OBJECT) {
-				/* Link address is relative to the start of the section */
+			} else if (sym.st_shndx == SHN_ABS) {
+				/* Absolute symbol */
+				link_addr = sym.st_value;
+			} else if ((sym.st_shndx < ldr->hdr.e_shnum) &&
+				!IN_RANGE(sym.st_shndx, SHN_LORESERVE, SHN_HIRESERVE)) {
+				/* This check rejects all relocations whose target symbol
+				 * has a section index higher than the maximum possible
+				 * in this ELF file, or belongs in the reserved range:
+				 * they will be caught by the `else` below and cause an
+				 * error to be returned. This aborts the LLEXT's loading
+				 * and prevents execution of improperly relocated code,
+				 * which is dangerous.
+				 *
+				 * Note that the unsupported SHN_COMMON section is rejected
+				 * as part of this check. Also note that SHN_ABS would be
+				 * rejected as well, but we want to handle it properly:
+				 * for this reason, this check must come AFTER handling
+				 * the case where the symbol's section index is SHN_ABS!
+				 *
+				 *
+				 * For regular symbols, the link address is obtained by
+				 * adding st_value to the start address of the section
+				 * in which the target symbol resides.
+				 */
 				link_addr = (uintptr_t)ext->mem[ldr->sect_map[sym.st_shndx]]
 					+ sym.st_value;
-
-				LOG_INF("found section symbol %s addr 0x%lx", name, link_addr);
 			} else {
-				/* Nothing to relocate here */
-				LOG_DBG("not relocated");
-				continue;
+				LOG_ERR("rela section %d, entry %d: cannot apply relocation: "
+					"target symbol has unexpected section index %d (0x%X)",
+					i, j, sym.st_shndx, sym.st_shndx);
+				return -ENOEXEC;
 			}
 
 			LOG_INF("writing relocation symbol %s type %zd sym %zd at addr 0x%lx "
@@ -954,7 +1118,7 @@ static int do_llext_load(struct llext_loader *ldr, struct llext *ext,
 	}
 
 	LOG_DBG("Copying symbols...");
-	ret = llext_copy_symbols(ldr, ext);
+	ret = llext_copy_symbols(ldr, ext, ldr_parm ? ldr_parm->pre_located : false);
 	if (ret != 0) {
 		LOG_ERR("Failed to copy symbols, ret %d", ret);
 		goto out;

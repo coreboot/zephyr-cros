@@ -265,8 +265,7 @@ static int nsos_poll_prepare(struct nsos_socket *sock, struct zsock_pollfd *pfd,
 	sock->pollfd.cb = pollcb;
 
 	if (*pev == pev_end) {
-		errno = ENOMEM;
-		return -1;
+		return -ENOMEM;
 	}
 
 	k_poll_signal_init(&sock->poll);
@@ -624,6 +623,7 @@ static int nsos_accept(void *obj, struct sockaddr *addr, socklen_t *addrlen)
 
 	zephyr_fd = z_reserve_fd();
 	if (zephyr_fd < 0) {
+		errno = -zephyr_fd;
 		goto close_adapt_fd;
 	}
 
@@ -708,7 +708,7 @@ static ssize_t nsos_sendmsg(void *obj, const struct msghdr *msg, int flags)
 
 	msg_iov = k_calloc(msg->msg_iovlen, sizeof(*msg_iov));
 	if (!msg_iov) {
-		ret = -ENOMEM;
+		ret = -NSOS_MID_ENOMEM;
 		goto return_ret;
 	}
 

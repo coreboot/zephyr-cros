@@ -10,20 +10,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __AUDIO_H
-#define __AUDIO_H
+#ifndef AUDIO_SHELL_AUDIO_H
+#define AUDIO_SHELL_AUDIO_H
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
 
+#include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/hci_types.h>
+#include <zephyr/bluetooth/iso.h>
 #include <zephyr/shell/shell.h>
+#include <zephyr/sys/atomic_types.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/util_macro.h>
+#include <zephyr/sys_clock.h>
 
 #include "shell/bt.h"
 
 #define SHELL_PRINT_INDENT_LEVEL_SIZE 2
 #define MAX_CODEC_FRAMES_PER_SDU      4U
+
+/* BIS sync is a 32-bit bitfield where BIT(0) is not allowed */
+#define VALID_BIS_SYNC(_bis_sync) ((bis_sync & BIT(0)) == 0U && bis_sync < UINT32_MAX)
 
 extern struct bt_csip_set_member_svc_inst *svc_inst;
 
@@ -219,22 +234,6 @@ int bap_ac_create_unicast_group(const struct bap_unicast_ac_param *param,
 int cap_ac_unicast(const struct shell *sh, const struct bap_unicast_ac_param *param);
 #endif /* CONFIG_BT_BAP_UNICAST_CLIENT */
 #endif /* CONFIG_BT_BAP_UNICAST */
-
-static inline uint8_t get_chan_cnt(enum bt_audio_location chan_allocation)
-{
-	uint8_t cnt = 0U;
-
-	if (chan_allocation == BT_AUDIO_LOCATION_MONO_AUDIO) {
-		return 1;
-	}
-
-	while (chan_allocation != 0) {
-		cnt += chan_allocation & 1U;
-		chan_allocation >>= 1;
-	}
-
-	return cnt;
-}
 
 static inline void print_qos(const struct shell *sh, const struct bt_audio_codec_qos *qos)
 {
@@ -1172,4 +1171,4 @@ static inline void copy_broadcast_source_preset(struct broadcast_source *source,
 }
 #endif /* CONFIG_BT_AUDIO */
 
-#endif /* __AUDIO_H */
+#endif /* AUDIO_SHELL_AUDIO_H */
