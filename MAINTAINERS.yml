@@ -4495,9 +4495,7 @@ West:
     - erwango
   collaborators:
     - FRASTM
-    - ABOSTM
     - gautierg-st
-    - Desvauxm-st
     - marwaiehm-st
   files:
     - modules/Kconfig.stm32
