@@ -1,10 +1,13 @@
-Zephyr HTTP Server
-==================
+.. zephyr:code-sample:: sockets-http-server
+   :name: HTTP Server
+   :relevant-api: http_service http_server tls_credentials
+
+   Implement an HTTP(s) Server demonstrating various resource types.
 
 Overview
 --------
 
-This sample application demonstrates the use of the ``http_server`` library.
+This sample application demonstrates the use of the :ref:`http_server_interface` library.
 This library provides high-level functions to simplify and abstract server implementation.
 The server supports the HTTP/1.1 protocol which can also be upgraded to HTTP/2,
 it also support native HTTP/2 protocol without upgrading.

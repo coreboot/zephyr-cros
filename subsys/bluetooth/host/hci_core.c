@@ -329,8 +329,20 @@ int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf,
 
 	net_buf_put(&bt_dev.cmd_tx_queue, net_buf_ref(buf));
 
+	/* Wait for a response from the Bluetooth Controller.
+	 * The Controller may fail to respond if:
+	 *  - It was never programmed or connected.
+	 *  - There was a fatal error.
+	 *
+	 * See the `BT_HCI_OP_` macros in hci_types.h or
+	 * Core_v5.4, Vol 4, Part E, Section 5.4.1 and Section 7
+	 * to map the opcode to the HCI command documentation.
+	 * Example: 0x0c03 represents HCI_Reset command.
+	 */
 	err = k_sem_take(&sync_sem, HCI_CMD_TIMEOUT);
-	BT_ASSERT_MSG(err == 0, "command opcode 0x%04x timeout with err %d", opcode, err);
+	BT_ASSERT_MSG(err == 0,
+		      "Controller unresponsive, command opcode 0x%04x timeout with err %d",
+		      opcode, err);
 
 	status = cmd(buf)->status;
 	if (status) {
@@ -344,6 +356,8 @@ int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf,
 			return -ENOMEM;
 		case BT_HCI_ERR_INVALID_PARAM:
 			return -EINVAL;
+		case BT_HCI_ERR_CMD_DISALLOWED:
+			return -EACCES;
 		default:
 			return -EIO;
 		}
@@ -1157,6 +1171,7 @@ static void conn_auto_initiate(struct bt_conn *conn)
 
 static void le_conn_complete_cancel(uint8_t err)
 {
+	int ret;
 	struct bt_conn *conn;
 
 	/* Handle create connection cancel.
@@ -1170,27 +1185,30 @@ static void le_conn_complete_cancel(uint8_t err)
 		return;
 	}
 
-	conn->err = err;
-
-	/* Handle cancellation of outgoing connection attempt. */
-	if (!IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST)) {
-		/* We notify before checking autoconnect flag
-		 * as application may choose to change it from
-		 * callback.
-		 */
-		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
-		/* Check if device is marked for autoconnect. */
-		if (atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT)) {
+	if (atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT)) {
+		if (!IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST)) {
 			/* Restart passive scanner for device */
 			bt_conn_set_state(conn, BT_CONN_SCAN_BEFORE_INITIATING);
+		} else {
+			/* Restart FAL initiator after RPA timeout. */
+			ret = bt_le_create_conn(conn);
+			if (ret) {
+				LOG_ERR("Failed to restart initiator");
+			}
 		}
 	} else {
-		if (atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT)) {
-			/* Restart FAL initiator after RPA timeout. */
-			bt_le_create_conn(conn);
-		} else {
-			/* Create connection canceled by timeout */
+		int busy_status = k_work_delayable_busy_get(&conn->deferred_work);
+
+		if (!(busy_status & (K_WORK_QUEUED | K_WORK_DELAYED))) {
+			/* Connection initiation timeout triggered. */
+			conn->err = err;
 			bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
+		} else {
+			/* Restart initiator after RPA timeout. */
+			ret = bt_le_create_conn(conn);
+			if (ret) {
+				LOG_ERR("Failed to restart initiator");
+			}
 		}
 	}
 
@@ -2496,6 +2514,42 @@ void bt_hci_le_transmit_power_report(struct net_buf *buf)
 }
 #endif /* CONFIG_BT_TRANSMIT_POWER_CONTROL */
 
+#if defined(CONFIG_BT_PATH_LOSS_MONITORING)
+void bt_hci_le_path_loss_threshold_event(struct net_buf *buf)
+{
+	struct bt_hci_evt_le_path_loss_threshold *evt;
+	struct bt_conn_le_path_loss_threshold_report report;
+	struct bt_conn *conn;
+
+	evt = net_buf_pull_mem(buf, sizeof(*evt));
+
+	if (evt->zone_entered > BT_CONN_LE_PATH_LOSS_ZONE_ENTERED_HIGH) {
+		LOG_ERR("Invalid zone %u in bt_hci_evt_le_path_loss_threshold",
+			evt->zone_entered);
+		return;
+	}
+
+	conn = bt_conn_lookup_handle(sys_le16_to_cpu(evt->handle), BT_CONN_TYPE_LE);
+	if (!conn) {
+		LOG_ERR("Unknown conn handle 0x%04X for path loss threshold report",
+		       sys_le16_to_cpu(evt->handle));
+		return;
+	}
+
+	if (evt->current_path_loss == BT_HCI_LE_PATH_LOSS_UNAVAILABLE) {
+		report.zone = BT_CONN_LE_PATH_LOSS_ZONE_UNAVAILABLE;
+		report.path_loss = BT_HCI_LE_PATH_LOSS_UNAVAILABLE;
+	} else {
+		report.zone = evt->zone_entered;
+		report.path_loss = evt->current_path_loss;
+	}
+
+	notify_path_loss_threshold_report(conn, report);
+
+	bt_conn_unref(conn);
+}
+#endif /* CONFIG_BT_PATH_LOSS_MONITORING */
+
 static const struct event_handler vs_events[] = {
 #if defined(CONFIG_BT_DF_VS_CL_IQ_REPORT_16_BITS_IQ_SAMPLES)
 	EVENT_HANDLER(BT_HCI_EVT_VS_LE_CONNECTIONLESS_IQ_REPORT,
@@ -2524,7 +2578,7 @@ static void hci_vendor_event(struct net_buf *buf)
 	}
 #endif /* CONFIG_BT_HCI_VS_EVT_USER */
 
-	if (IS_ENABLED(CONFIG_BT_HCI_VS_EVT) && !handled) {
+	if (IS_ENABLED(CONFIG_BT_HCI_VS) && !handled) {
 		struct bt_hci_evt_vs *evt;
 
 		evt = net_buf_pull_mem(buf, sizeof(*evt));
@@ -2645,6 +2699,10 @@ static const struct event_handler meta_events[] = {
 	EVENT_HANDLER(BT_HCI_EVT_LE_TRANSMIT_POWER_REPORT, bt_hci_le_transmit_power_report,
 		      sizeof(struct bt_hci_evt_le_transmit_power_report)),
 #endif /* CONFIG_BT_TRANSMIT_POWER_CONTROL */
+#if defined(CONFIG_BT_PATH_LOSS_MONITORING)
+	EVENT_HANDLER(BT_HCI_EVT_LE_PATH_LOSS_THRESHOLD, bt_hci_le_path_loss_threshold_event,
+		      sizeof(struct bt_hci_evt_le_path_loss_threshold)),
+#endif /* CONFIG_BT_PATH_LOSS_MONITORING */
 #if defined(CONFIG_BT_PER_ADV_SYNC_RSP)
 	EVENT_HANDLER(BT_HCI_EVT_LE_PER_ADVERTISING_REPORT_V2, bt_hci_le_per_adv_report_v2,
 		      sizeof(struct bt_hci_evt_le_per_advertising_report_v2)),
@@ -3238,6 +3296,10 @@ static int le_set_event_mask(void)
 		if (IS_ENABLED(CONFIG_BT_TRANSMIT_POWER_CONTROL)) {
 			mask |= BT_EVT_MASK_LE_TRANSMIT_POWER_REPORTING;
 		}
+
+		if (IS_ENABLED(CONFIG_BT_PATH_LOSS_MONITORING)) {
+			mask |= BT_EVT_MASK_LE_PATH_LOSS_THRESHOLD;
+		}
 	}
 
 	if (IS_ENABLED(CONFIG_BT_SMP) &&
@@ -3663,7 +3725,7 @@ static void bt_dev_show_info(void)
 		bt_dev.lmp_version, bt_dev.lmp_subversion);
 }
 
-#if defined(CONFIG_BT_HCI_VS_EXT)
+#if defined(CONFIG_BT_HCI_VS)
 static const char *vs_hw_platform(uint16_t platform)
 {
 	static const char * const plat_str[] = {
@@ -3801,7 +3863,7 @@ static void hci_vs_init(void)
 		net_buf_unref(rsp);
 	}
 }
-#endif /* CONFIG_BT_HCI_VS_EXT */
+#endif /* CONFIG_BT_HCI_VS */
 
 static int hci_init(void)
 {
@@ -3856,7 +3918,7 @@ static int hci_init(void)
 		return err;
 	}
 
-#if defined(CONFIG_BT_HCI_VS_EXT)
+#if defined(CONFIG_BT_HCI_VS)
 	hci_vs_init();
 #endif
 	err = bt_id_init();
@@ -4231,6 +4293,13 @@ int bt_disable(void)
 	/* Some functions rely on checking this bitfield */
 	memset(bt_dev.supported_commands, 0x00, sizeof(bt_dev.supported_commands));
 
+	/* Reset IDs and corresponding keys. */
+	bt_dev.id_count = 0;
+#if defined(CONFIG_BT_SMP)
+	bt_dev.le.rl_entries = 0;
+	bt_keys_reset();
+#endif
+
 	/* If random address was set up - clear it */
 	bt_addr_le_copy(&bt_dev.random_addr, BT_ADDR_LE_ANY);
 
@@ -4261,6 +4330,10 @@ int bt_disable(void)
 	/* Abort RX thread */
 	k_thread_abort(&bt_workq.thread);
 #endif
+
+	if (IS_ENABLED(CONFIG_BT_ISO)) {
+		bt_iso_reset();
+	}
 
 	bt_monitor_send(BT_MONITOR_CLOSE_INDEX, NULL, 0);
 

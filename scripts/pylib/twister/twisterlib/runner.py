@@ -501,16 +501,10 @@ class FilterBuilder(CMake):
         if self.testsuite.sysbuild and self.env.options.device_testing:
             # Verify that twister's arguments support sysbuild.
             # Twister sysbuild flashing currently only works with west, so
-            # --west-flash must be passed. Additionally, erasing the DUT
-            # before each test with --west-flash=--erase will inherently not
-            # work with sysbuild.
+            # --west-flash must be passed.
             if self.env.options.west_flash is None:
                 logger.warning("Sysbuild test will be skipped. " +
                     "West must be used for flashing.")
-                return {os.path.join(self.platform.name, self.testsuite.name): True}
-            elif "--erase" in self.env.options.west_flash:
-                logger.warning("Sysbuild test will be skipped, " +
-                    "--erase is not supported with --west-flash")
                 return {os.path.join(self.platform.name, self.testsuite.name): True}
 
         if self.testsuite and self.testsuite.filter:
@@ -579,6 +573,7 @@ class ProjectBuilder(FilterBuilder):
     def log_info_file(self, inline_logs):
         build_dir = self.instance.build_dir
         h_log = "{}/handler.log".format(build_dir)
+        he_log = "{}/handler_stderr.log".format(build_dir)
         b_log = "{}/build.log".format(build_dir)
         v_log = "{}/valgrind.log".format(build_dir)
         d_log = "{}/device.log".format(build_dir)
@@ -590,6 +585,8 @@ class ProjectBuilder(FilterBuilder):
             self.log_info("{}".format(pytest_log), inline_logs, log_testcases=True)
         elif os.path.exists(h_log) and os.path.getsize(h_log) > 0:
             self.log_info("{}".format(h_log), inline_logs)
+        elif os.path.exists(he_log) and os.path.getsize(he_log) > 0:
+            self.log_info("{}".format(he_log), inline_logs)
         elif os.path.exists(d_log) and os.path.getsize(d_log) > 0:
             self.log_info("{}".format(d_log), inline_logs)
         else:
@@ -763,9 +760,12 @@ class ProjectBuilder(FilterBuilder):
         allow = [
             os.path.join('zephyr', '.config'),
             'handler.log',
+            'handler_stderr.log',
             'build.log',
             'device.log',
             'recording.csv',
+            'rom.json',
+            'ram.json',
             # below ones are needed to make --test-only work as well
             'Makefile',
             'CMakeCache.txt',
@@ -1317,8 +1317,22 @@ class TwisterRunner:
 
 
     def pipeline_mgr(self, pipeline, done_queue, lock, results):
-        if sys.platform == 'linux':
-            with self.jobserver.get_job():
+        try:
+            if sys.platform == 'linux':
+                with self.jobserver.get_job():
+                    while True:
+                        try:
+                            task = pipeline.get_nowait()
+                        except queue.Empty:
+                            break
+                        else:
+                            instance = task['test']
+                            pb = ProjectBuilder(instance, self.env, self.jobserver)
+                            pb.duts = self.duts
+                            pb.process(pipeline, done_queue, task, lock, results)
+
+                    return True
+            else:
                 while True:
                     try:
                         task = pipeline.get_nowait()
@@ -1329,20 +1343,10 @@ class TwisterRunner:
                         pb = ProjectBuilder(instance, self.env, self.jobserver)
                         pb.duts = self.duts
                         pb.process(pipeline, done_queue, task, lock, results)
-
                 return True
-        else:
-            while True:
-                try:
-                    task = pipeline.get_nowait()
-                except queue.Empty:
-                    break
-                else:
-                    instance = task['test']
-                    pb = ProjectBuilder(instance, self.env, self.jobserver)
-                    pb.duts = self.duts
-                    pb.process(pipeline, done_queue, task, lock, results)
-            return True
+        except Exception as e:
+            logger.error(f"General exception: {e}")
+            sys.exit(1)
 
     def execute(self, pipeline, done):
         lock = Lock()
@@ -1362,6 +1366,11 @@ class TwisterRunner:
         try:
             for p in processes:
                 p.join()
+                if p.exitcode != 0:
+                    logger.error(f"Process {p.pid} failed, aborting execution")
+                    for proc in processes:
+                        proc.terminate()
+                    sys.exit(1)
         except KeyboardInterrupt:
             logger.info("Execution interrupted")
             for p in processes:

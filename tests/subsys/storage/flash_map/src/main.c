@@ -13,6 +13,7 @@
 #define SLOT1_PARTITION		slot1_partition
 #define SLOT1_PARTITION_ID	FIXED_PARTITION_ID(SLOT1_PARTITION)
 #define SLOT1_PARTITION_DEV	FIXED_PARTITION_DEVICE(SLOT1_PARTITION)
+#define SLOT1_PARTITION_NODE	DT_NODELABEL(SLOT1_PARTITION)
 
 extern int flash_map_entries;
 struct flash_sector fs_sectors[256];
@@ -188,6 +189,78 @@ ZTEST(flash_map, test_flash_area_erased_val)
 		      "value different than the flash erase value");
 
 	flash_area_close(fa);
+}
+
+ZTEST(flash_map, test_fixed_partition_node_macros)
+{
+	/* Test against changes in API */
+	zassert_equal(FIXED_PARTITION_NODE_OFFSET(SLOT1_PARTITION_NODE),
+		DT_REG_ADDR(SLOT1_PARTITION_NODE));
+	zassert_equal(FIXED_PARTITION_NODE_SIZE(SLOT1_PARTITION_NODE),
+		DT_REG_SIZE(SLOT1_PARTITION_NODE));
+	zassert_equal(FIXED_PARTITION_NODE_DEVICE(SLOT1_PARTITION_NODE),
+		DEVICE_DT_GET(DT_MTD_FROM_FIXED_PARTITION(SLOT1_PARTITION_NODE)));
+}
+
+ZTEST(flash_map, test_flash_area_erase_and_flatten)
+{
+	int i;
+	bool erased = true;
+	int rc;
+	const struct flash_area *fa;
+	const struct device *flash_dev;
+
+	rc = flash_area_open(SLOT1_PARTITION_ID, &fa);
+	zassert_true(rc == 0, "flash_area_open() fail");
+
+	/* First erase the area so it's ready for use. */
+	flash_dev = flash_area_get_device(fa);
+
+	rc = flash_erase(flash_dev, fa->fa_off, fa->fa_size);
+	zassert_true(rc == 0, "flash area erase fail");
+
+	rc = flash_fill(flash_dev, 0xaa, fa->fa_off, fa->fa_size);
+	zassert_true(rc == 0, "flash device fill fail");
+
+	rc = flash_area_erase(fa, 0, fa->fa_size);
+	zassert_true(rc == 0, "flash area erase fail");
+
+	/* we work under assumption that flash_fill is working and tested */
+	for (i = 0; erased && i < fa->fa_size; ++i) {
+		uint8_t buf[32];
+		int chunk = MIN(sizeof(buf), fa->fa_size - i);
+
+		rc = flash_read(flash_dev, i, buf, chunk);
+		zassert_equal(rc, 0, "Unexpected read fail");
+		for (int ii = 0; ii < chunk; ++ii, ++i) {
+			if (buf[ii] != flash_area_erased_val(fa)) {
+				erased = false;
+				break;
+			}
+		}
+	}
+	zassert_true(erased, "Erase failed at index %d", i);
+
+	rc = flash_fill(flash_dev, 0xaa, fa->fa_off, fa->fa_size);
+	zassert_true(rc == 0, "flash device fill fail");
+
+	rc = flash_area_flatten(fa, 0, fa->fa_size);
+
+	erased = true;
+	for (i = 0; erased && i < fa->fa_size; ++i) {
+		uint8_t buf[32];
+		int chunk = MIN(sizeof(buf), fa->fa_size - i);
+
+		rc = flash_read(flash_dev, i, buf, chunk);
+		zassert_equal(rc, 0, "Unexpected read fail");
+		for (int ii = 0; ii < chunk; ++ii, ++i) {
+			if (buf[ii] != flash_area_erased_val(fa)) {
+				erased = false;
+				break;
+			}
+		}
+	}
+	zassert_true(erased, "Flatten/Erase failed at index %d", i);
 }
 
 ZTEST_SUITE(flash_map, NULL, NULL, NULL, NULL, NULL);

@@ -323,6 +323,8 @@ int bt_conn_iso_init(void);
 /* Cleanup ISO references */
 void bt_iso_cleanup_acl(struct bt_conn *iso_conn);
 
+void bt_iso_reset(void);
+
 /* Add a new BR/EDR connection */
 struct bt_conn *bt_conn_add_br(const bt_addr_t *peer);
 
@@ -405,6 +407,9 @@ bool le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param);
 
 void notify_tx_power_report(struct bt_conn *conn,
 			    struct bt_conn_le_tx_power_report report);
+
+void notify_path_loss_threshold_report(struct bt_conn *conn,
+				       struct bt_conn_le_path_loss_threshold_report report);
 
 #if defined(CONFIG_BT_SMP)
 /* If role specific LTK is present */

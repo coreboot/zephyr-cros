@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <zephyr/sys/atomic.h>
@@ -288,8 +294,8 @@ static bool tab_prepare(const struct shell *sh,
 	/* If last command is not completed (followed by space) it is treated
 	 * as uncompleted one.
 	 */
-	int space = isspace((int)sh->ctx->cmd_buff[
-						sh->ctx->cmd_buff_pos - 1]);
+	int space = (sh->ctx->cmd_buff_pos > 0) ?
+		     isspace((int)sh->ctx->cmd_buff[sh->ctx->cmd_buff_pos - 1]) : 0;
 
 	/* root command completion */
 	if ((*argc == 0) || ((space == 0) && (*argc == 1))) {

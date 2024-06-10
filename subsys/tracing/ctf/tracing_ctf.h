@@ -25,7 +25,7 @@ extern "C" {
 	sys_trace_k_thread_create(new_thread, stack_size, prio)
 
 #define sys_port_trace_k_thread_user_mode_enter()                              \
-	sys_trace_k_thread_user_mode_enter(entry, p1, p2, p3)
+	sys_trace_k_thread_user_mode_enter()
 
 #define sys_port_trace_k_thread_heap_assign(thread, heap)
 #define sys_port_trace_k_thread_join_enter(thread, timeout)
@@ -303,6 +303,8 @@ extern "C" {
 #define sys_port_trace_k_heap_alloc_enter(heap, timeout)
 #define sys_port_trace_k_heap_alloc_exit(heap, timeout, ret)
 #define sys_port_trace_k_heap_free(heap)
+#define sys_port_trace_k_heap_realloc_enter(h, ptr, bytes, timeout)
+#define sys_port_trace_k_heap_realloc_exit(h, ptr, bytes, timeout, ret)
 #define sys_port_trace_k_heap_sys_k_aligned_alloc_enter(heap)
 #define sys_port_trace_k_heap_sys_k_aligned_alloc_exit(heap, ret)
 #define sys_port_trace_k_heap_sys_k_malloc_enter(heap)
@@ -311,6 +313,8 @@ extern "C" {
 #define sys_port_trace_k_heap_sys_k_free_exit(heap, heap_ref)
 #define sys_port_trace_k_heap_sys_k_calloc_enter(heap)
 #define sys_port_trace_k_heap_sys_k_calloc_exit(heap, ret)
+#define sys_port_trace_k_heap_sys_k_realloc_enter(heap, ptr)
+#define sys_port_trace_k_heap_sys_k_realloc_exit(heap, ptr, ret)
 
 #define sys_port_trace_k_mem_slab_init(slab, rc)
 #define sys_port_trace_k_mem_slab_alloc_enter(slab, timeout)
@@ -368,8 +372,7 @@ void sys_trace_k_thread_foreach_unlocked_exit(k_thread_user_cb_t user_cb,
 					      void *user_data);
 void sys_trace_k_thread_create(struct k_thread *new_thread, size_t stack_size,
 			       int prio);
-void sys_trace_k_thread_user_mode_enter(k_thread_entry_t entry, void *p1,
-					void *p2, void *p3);
+void sys_trace_k_thread_user_mode_enter(void);
 void sys_trace_k_thread_heap_assign(struct k_thread *thread,
 				    struct k_heap *heap);
 void sys_trace_k_thread_join_blocking(struct k_thread *thread,

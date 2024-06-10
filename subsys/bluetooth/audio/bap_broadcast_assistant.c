@@ -8,20 +8,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/types.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
-#include <zephyr/device.h>
-#include <zephyr/init.h>
-
+#include <zephyr/autoconf.h>
+#include <zephyr/bluetooth/addr.h>
+#include <zephyr/bluetooth/audio/audio.h>
+#include <zephyr/bluetooth/audio/bap.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/gap.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/att.h>
+#include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/l2cap.h>
 #include <zephyr/bluetooth/buf.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/sys/__assert.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/check.h>
+#include <zephyr/sys/slist.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/types.h>
 
 #include <zephyr/logging/log.h>
 
@@ -81,7 +97,7 @@ NET_BUF_SIMPLE_DEFINE_STATIC(att_buf, ATT_BUF_SIZE);
 
 static int16_t lookup_index_by_handle(uint16_t handle)
 {
-	for (int i = 0; i < ARRAY_SIZE(broadcast_assistant.recv_state_handles); i++) {
+	for (size_t i = 0U; i < ARRAY_SIZE(broadcast_assistant.recv_state_handles); i++) {
 		if (broadcast_assistant.recv_state_handles[i] == handle) {
 			return i;
 		}
@@ -118,15 +134,14 @@ static void bap_broadcast_assistant_recv_state_changed(
 	}
 }
 
-static void bap_broadcast_assistant_recv_state_removed(struct bt_conn *conn, int err,
-						       uint8_t src_id)
+static void bap_broadcast_assistant_recv_state_removed(struct bt_conn *conn, uint8_t src_id)
 {
 	struct bt_bap_broadcast_assistant_cb *listener, *next;
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&broadcast_assistant_cbs,
 					  listener, next, _node) {
 		if (listener->recv_state_removed) {
-			listener->recv_state_removed(conn, err, src_id);
+			listener->recv_state_removed(conn, src_id);
 		}
 	}
 }
@@ -344,6 +359,10 @@ static void long_bap_read(struct bt_conn *conn, uint16_t handle)
 
 	LOG_DBG("conn %p busy %u", conn, broadcast_assistant.busy);
 
+	if (conn == NULL) {
+		return; /* noop */
+	}
+
 	if (broadcast_assistant.busy) {
 		/* If the client is busy reading or writing something else, reschedule the
 		 * long read.
@@ -403,6 +422,11 @@ static uint8_t notify_handler(struct bt_conn *conn,
 		return BT_GATT_ITER_STOP;
 	}
 
+	if (conn == NULL) {
+		/* Indicates that the CCC has been removed - no-op */
+		return BT_GATT_ITER_CONTINUE;
+	}
+
 	LOG_HEXDUMP_DBG(data, length, "Receive state notification:");
 
 	index = lookup_index_by_handle(handle);
@@ -414,16 +438,10 @@ static uint8_t notify_handler(struct bt_conn *conn,
 
 	if (length != 0) {
 		const uint8_t att_ntf_header_size = 3; /* opcode (1) + handle (2) */
-		uint16_t max_ntf_size;
+		const uint16_t max_ntf_size = bt_gatt_get_mtu(conn) - att_ntf_header_size;
 
 		/* Cancel any pending long reads containing now obsolete information */
 		(void)k_work_cancel_delayable(&broadcast_assistant.bap_read_work);
-
-		if (conn != NULL) {
-			max_ntf_size = bt_gatt_get_mtu(conn) - att_ntf_header_size;
-		} else {
-			max_ntf_size = MIN(BT_L2CAP_RX_MTU, BT_L2CAP_TX_MTU) - att_ntf_header_size;
-		}
 
 		if (length == max_ntf_size) {
 			/* TODO: if we are busy we should not overwrite the long_read_handle,
@@ -442,8 +460,8 @@ static uint8_t notify_handler(struct bt_conn *conn,
 		}
 	} else {
 		broadcast_assistant.recv_states[index].past_avail = false;
-		bap_broadcast_assistant_recv_state_removed(conn, 0,
-					broadcast_assistant.recv_states[index].src_id);
+		bap_broadcast_assistant_recv_state_removed(
+			conn, broadcast_assistant.recv_states[index].src_id);
 	}
 
 	return BT_GATT_ITER_CONTINUE;

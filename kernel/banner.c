@@ -7,7 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
 #include <zephyr/device.h>
-#include <version.h>
+#include <zephyr/version.h>
 
 #if defined(CONFIG_BOOT_DELAY) && (CONFIG_BOOT_DELAY > 0)
 #define DELAY_STR STRINGIFY(CONFIG_BOOT_DELAY)
@@ -27,7 +27,9 @@
 void boot_banner(void)
 {
 #if defined(CONFIG_BOOT_DELAY) && (CONFIG_BOOT_DELAY > 0)
+#ifdef CONFIG_BOOT_BANNER
 	printk("***** delaying boot " DELAY_STR "ms (per build configuration) *****\n");
+#endif /* CONFIG_BOOT_BANNER */
 	k_busy_wait(CONFIG_BOOT_DELAY * USEC_PER_MSEC);
 #endif /* defined(CONFIG_BOOT_DELAY) && (CONFIG_BOOT_DELAY > 0) */
 

@@ -383,17 +383,12 @@ static void wait_for_tx_work(struct bt_conn *conn)
 #if defined(CONFIG_BT_CONN_TX)
 	LOG_DBG("conn %p", conn);
 
-	if (IS_ENABLED(CONFIG_BT_RECV_WORKQ_SYS)) {
+	if (IS_ENABLED(CONFIG_BT_RECV_WORKQ_SYS) ||
+	    k_current_get() == k_work_queue_thread_get(&k_sys_work_q)) {
 		tx_notify(conn);
 	} else {
 		struct k_work_sync sync;
 		int err;
-
-		/* API docs mention undefined behavior if syncing on work item
-		 * from wq execution context.
-		 */
-		__ASSERT_NO_MSG(k_current_get() !=
-				k_work_queue_thread_get(&k_sys_work_q));
 
 		err = k_work_submit(&conn->tx_complete_work);
 		__ASSERT(err >= 0, "couldn't submit (err %d)", err);
@@ -482,6 +477,16 @@ int bt_conn_send_cb(struct bt_conn *conn, struct net_buf *buf,
 
 	LOG_DBG("conn handle %u buf len %u cb %p user_data %p", conn->handle, buf->len, cb,
 		user_data);
+
+	if (buf->ref != 1) {
+		/* The host may alter the buf contents when fragmenting. Higher
+		 * layers cannot expect the buf contents to stay intact. Extra
+		 * refs suggests a silent data corruption would occur if not for
+		 * this error.
+		 */
+		LOG_ERR("buf given to conn has other refs");
+		return -EINVAL;
+	}
 
 	if (buf->user_data_size < CONFIG_BT_CONN_TX_USER_DATA_SIZE) {
 		LOG_ERR("not enough room in user_data %d < %d pool %u",
@@ -857,7 +862,9 @@ static void conn_destroy(struct bt_conn *conn, void *data)
 		bt_conn_set_state(conn, BT_CONN_DISCONNECT_COMPLETE);
 	}
 
-	bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
+	if (conn->state != BT_CONN_DISCONNECTED) {
+		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
+	}
 }
 
 void bt_conn_cleanup_all(void)
@@ -2876,6 +2883,65 @@ int bt_conn_le_get_tx_power_level(struct bt_conn *conn,
 					 &tx_power_level->max_level);
 	return err;
 }
+
+#if defined(CONFIG_BT_PATH_LOSS_MONITORING)
+void notify_path_loss_threshold_report(struct bt_conn *conn,
+				       struct bt_conn_le_path_loss_threshold_report report)
+{
+	for (struct bt_conn_cb *cb = callback_list; cb; cb = cb->_next) {
+		if (cb->path_loss_threshold_report) {
+			cb->path_loss_threshold_report(conn, &report);
+		}
+	}
+
+	STRUCT_SECTION_FOREACH(bt_conn_cb, cb)
+	{
+		if (cb->path_loss_threshold_report) {
+			cb->path_loss_threshold_report(conn, &report);
+		}
+	}
+}
+
+int bt_conn_le_set_path_loss_mon_param(struct bt_conn *conn,
+				       const struct bt_conn_le_path_loss_reporting_param *params)
+{
+	struct bt_hci_cp_le_set_path_loss_reporting_parameters *cp;
+	struct net_buf *buf;
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_LE_SET_PATH_LOSS_REPORTING_PARAMETERS, sizeof(*cp));
+	if (!buf) {
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->handle = sys_cpu_to_le16(conn->handle);
+	cp->high_threshold = params->high_threshold;
+	cp->high_hysteresis = params->high_hysteresis;
+	cp->low_threshold = params->low_threshold;
+	cp->low_hysteresis = params->low_hysteresis;
+	cp->min_time_spent = sys_cpu_to_le16(params->min_time_spent);
+
+	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_PATH_LOSS_REPORTING_PARAMETERS, buf, NULL);
+}
+
+int bt_conn_le_set_path_loss_mon_enable(struct bt_conn *conn, bool reporting_enable)
+{
+	struct bt_hci_cp_le_set_path_loss_reporting_enable *cp;
+	struct net_buf *buf;
+
+	buf = bt_hci_cmd_create(BT_HCI_OP_LE_SET_PATH_LOSS_REPORTING_ENABLE, sizeof(*cp));
+	if (!buf) {
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->handle = sys_cpu_to_le16(conn->handle);
+	cp->enable = reporting_enable ? BT_HCI_LE_PATH_LOSS_REPORTING_ENABLE :
+			BT_HCI_LE_PATH_LOSS_REPORTING_DISABLE;
+
+	return bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_PATH_LOSS_REPORTING_ENABLE, buf, NULL);
+}
+#endif /* CONFIG_BT_PATH_LOSS_MONITORING */
 
 int bt_conn_le_param_update(struct bt_conn *conn,
 			    const struct bt_le_conn_param *param)

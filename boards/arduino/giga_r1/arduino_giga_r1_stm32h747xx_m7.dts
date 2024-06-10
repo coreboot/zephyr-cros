@@ -37,7 +37,6 @@
 		led0 = &red_led;
 		led1 = &green_led;
 		sw0 = &user_button;
-		spi-flash0 = &n25q128a1;
 	};
 };
 
@@ -141,8 +140,6 @@
 	pinctrl-names = "default";
 	clocks = <&rcc STM32_CLOCK_BUS_APB1_2 0x00000100>,
 		 <&rcc STM32_SRC_PLL1_Q FDCAN_SEL(1)>;
-	bus-speed = <125000>;
-	bus-speed-data = <1000000>;
 };
 
 &flash0 {
