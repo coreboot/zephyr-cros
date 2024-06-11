@@ -21,6 +21,7 @@
 #include <zephyr/fatal.h>
 #include <zephyr/debug/coredump.h>
 
+#line 25
 LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 
 /* LCOV_EXCL_START */

@@ -446,6 +446,7 @@ Bluetooth Audio:
     - tests/bsim/bluetooth/audio_samples/
     - tests/bluetooth/shell/audio.conf
     - tests/bluetooth/tester/overlay-le-audio.conf
+    - tests/bluetooth/tester/src/audio/
     - doc/connectivity/bluetooth/api/audio/
     - samples/bluetooth/bap*/
     - samples/bluetooth/hap*/
@@ -1250,6 +1251,7 @@ Release Notes:
   collaborators:
     - decsny
     - lmajewski
+    - pdgendt
   files:
     - drivers/ethernet/
     - include/zephyr/dt-bindings/ethernet/
@@ -1843,7 +1845,7 @@ Release Notes:
     - dts/bindings/sensor/
     - include/zephyr/drivers/sensor/
     - include/zephyr/dt-bindings/sensor/
-    - doc/hardware/peripherals/sensor.rst
+    - doc/hardware/peripherals/sensor/
     - tests/drivers/build_all/sensor/
   labels:
     - "area: Sensors"
@@ -2325,16 +2327,16 @@ Memory Management:
   tests:
     - mem_mgmt
 
-Laird Connectivity platforms:
+Ezurio platforms:
   status: maintained
   maintainers:
     - rerickson1
   collaborators:
     - greg-leach
   files:
-    - boards/lairdconnect/
+    - boards/ezurio/
   labels:
-    - "platform: Laird Connectivity"
+    - "platform: Ezurio"
 
 Linker Scripts:
   status: maintained
@@ -2989,6 +2991,7 @@ Sensor Subsystem:
     - doc/services/sensing/
     - subsys/sensing/
     - samples/subsys/sensing/
+    - tests/subsys/sensing/
   labels:
     - "area: Sensor Subsystem"
   tests:
@@ -3105,11 +3108,13 @@ State machine framework:
     - sambhurst
   collaborators:
     - keith-zephyr
+    - glenn-andrews
   files:
     - doc/services/smf/
     - include/zephyr/smf.h
     - lib/smf/
     - tests/lib/smf/
+    - samples/subsys/smf/
   labels:
     - "area: State Machine Framework"
   tests:
@@ -3244,8 +3249,13 @@ Raspberry Pi Pico Platforms:
   labels:
     - "platform: Raspberry Pi Pico"
 
-SiLabs Platforms:
-  status: odd fixes
+Silabs Platforms:
+  status: maintained
+  maintainers:
+    - jhedberg
+  collaborators:
+    - jerome-pouiller
+    - asmellby
   files:
     - soc/silabs/
     - boards/silabs/
@@ -3253,7 +3263,7 @@ SiLabs Platforms:
     - dts/bindings/*/silabs*
     - drivers/*/*_gecko*
   labels:
-    - "platform: SiLabs"
+    - "platform: Silabs"
 
 Intel Platforms (X86):
   status: maintained
@@ -4449,15 +4459,19 @@ West:
     - "platform: Raspberry Pi Pico"
 
 "West project: hal_silabs":
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - jhedberg
   collaborators:
+    - jerome-pouiller
+    - asmellby
     - sateeshkotapati
     - yonsch
     - mnkp
   files:
     - modules/Kconfig.silabs
   labels:
-    - "platform: SiLabs"
+    - "platform: Silabs"
 
 "West project: hal_st":
   status: maintained
