@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#line 21
 /*
  * Define COREDUMP_*_STR as public to allow coredump_backend_other to re-use
  * these strings if necessary
