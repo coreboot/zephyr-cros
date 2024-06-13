@@ -2139,9 +2139,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND}
         -DPROJECT_BINARY_DIR=${PROJECT_BINARY_DIR}
         -DAPPLICATION_SOURCE_DIR=${APPLICATION_SOURCE_DIR}
-        -DINTERFACE_INCLUDE_DIRECTORIES="$<JOIN:$<TARGET_PROPERTY:zephyr_interface,INTERFACE_INCLUDE_DIRECTORIES>,:>"
+        -DINTERFACE_INCLUDE_DIRECTORIES="$<TARGET_PROPERTY:zephyr_interface,INTERFACE_INCLUDE_DIRECTORIES>"
         -Dllext_edk_file=${llext_edk_file}
-        -DAUTOCONF_H=${AUTOCONF_H}
         -Dllext_cflags="${llext_edk_cflags}"
         -Dllext_edk_name=${CONFIG_LLEXT_EDK_NAME}
         -DWEST_TOPDIR=${WEST_TOPDIR}

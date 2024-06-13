@@ -62,19 +62,27 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define ETH_NXP_ENET_UNIQUE_ID	(OCOTP->FUSEN[40].FUSE)
 #elif defined(CONFIG_SOC_SERIES_KINETIS_K6X)
 #define ETH_NXP_ENET_UNIQUE_ID	(SIM->UIDH ^ SIM->UIDMH ^ SIM->UIDML ^ SIM->UIDL)
+#elif defined(CONFIG_SOC_SERIES_RW6XX)
+#define ETH_NXP_ENET_UNIQUE_ID	(OCOTP->OTP_SHADOW[46])
 #else
-#define ETH_NXP_ENET_UNIQUE_ID 0xFFFFFF
 #error "Unsupported SOC"
 #endif
 
 #define RING_ID 0
 
+enum mac_address_source {
+	MAC_ADDR_SOURCE_LOCAL,
+	MAC_ADDR_SOURCE_RANDOM,
+	MAC_ADDR_SOURCE_UNIQUE,
+	MAC_ADDR_SOURCE_FUSED,
+	MAC_ADDR_SOURCE_INVALID,
+};
+
 struct nxp_enet_mac_config {
 	ENET_Type *base;
 	const struct device *clock_dev;
 	clock_control_subsys_t clock_subsys;
-	bool generate_mac;
-	bool unique_mac;
+	enum mac_address_source mac_addr_source;
 	const struct pinctrl_dev_config *pincfg;
 	enet_buffer_config_t buffer_config;
 	uint8_t phy_mode;
@@ -599,16 +607,46 @@ static void eth_nxp_enet_isr(const struct device *dev)
 	irq_unlock(irq_lock_key);
 }
 
+/* Note this is not universally unique, it just is probably unique on a network */
 static inline void nxp_enet_unique_mac(uint8_t *mac_addr)
 {
 	uint32_t id = ETH_NXP_ENET_UNIQUE_ID;
 
-	mac_addr[0] = FREESCALE_OUI_B0;
+	/* Setting LAA bit because it is not guaranteed universally unique */
+	mac_addr[0] = FREESCALE_OUI_B0 | 0x02;
 	mac_addr[1] = FREESCALE_OUI_B1;
 	mac_addr[2] = FREESCALE_OUI_B2;
 	mac_addr[3] = FIELD_GET(0xFF0000, id);
 	mac_addr[4] = FIELD_GET(0x00FF00, id);
 	mac_addr[5] = FIELD_GET(0x0000FF, id);
+}
+
+#ifdef CONFIG_SOC_FAMILY_NXP_IMXRT
+#include <fsl_ocotp.h>
+#endif
+
+static inline void nxp_enet_fused_mac(uint8_t *mac_addr)
+{
+#ifdef CONFIG_SOC_FAMILY_NXP_IMXRT
+	uint32_t mac_addr_fuse[2] = {0};
+
+	OCOTP_ReadFuseShadowRegisterExt((OCOTP_Type *)OCOTP_BASE,
+#if defined(CONFIG_SOC_SERIES_IMXRT10XX)
+		0x620,
+#elif defined(CONFIG_SOC_SERIES_IMXRT11XX)
+		0xA90,
+#endif
+		mac_addr_fuse, 2);
+
+	mac_addr[0] = mac_addr_fuse[0] & 0x000000FF;
+	mac_addr[1] = mac_addr_fuse[0] & 0x0000FF00;
+	mac_addr[2] = mac_addr_fuse[0] & 0x00FF0000;
+	mac_addr[3] = mac_addr_fuse[0] & 0xFF000000;
+	mac_addr[4] = mac_addr_fuse[1] & 0x00FF;
+	mac_addr[5] = mac_addr_fuse[1] & 0xFF00;
+#else
+	ARG_UNUSED(mac_addr);
+#endif
 }
 
 static int eth_nxp_enet_init(const struct device *dev)
@@ -634,13 +672,21 @@ static int eth_nxp_enet_init(const struct device *dev)
 #endif
 	k_work_init(&data->rx_work, eth_nxp_enet_rx_thread);
 
-	if (config->unique_mac) {
-		nxp_enet_unique_mac(data->mac_addr);
-	}
-
-	if (config->generate_mac) {
+	switch (config->mac_addr_source) {
+	case MAC_ADDR_SOURCE_LOCAL:
+		break;
+	case MAC_ADDR_SOURCE_RANDOM:
 		gen_random_mac(data->mac_addr,
 			FREESCALE_OUI_B0, FREESCALE_OUI_B1, FREESCALE_OUI_B2);
+		break;
+	case MAC_ADDR_SOURCE_UNIQUE:
+		nxp_enet_unique_mac(data->mac_addr);
+		break;
+	case MAC_ADDR_SOURCE_FUSED:
+		nxp_enet_fused_mac(data->mac_addr);
+		break;
+	default:
+		return -ENOTSUP;
 	}
 
 	err = clock_control_get_rate(config->clock_dev, config->clock_subsys,
@@ -840,7 +886,8 @@ static const struct ethernet_api api_funcs = {
 #define NXP_ENET_NODE_HAS_MAC_ADDR_CHECK(n)						\
 	BUILD_ASSERT(NODE_HAS_VALID_MAC_ADDR(DT_DRV_INST(n)) ||				\
 			DT_INST_PROP(n, zephyr_random_mac_address) ||			\
-			DT_INST_PROP(n, nxp_unique_mac),				\
+			DT_INST_PROP(n, nxp_unique_mac) ||				\
+			DT_INST_PROP(n, nxp_fused_mac),					\
 			"MAC address not specified on ENET DT node");
 
 #define NXP_ENET_NODE_PHY_MODE_CHECK(n)							\
@@ -849,6 +896,15 @@ BUILD_ASSERT(NXP_ENET_PHY_MODE(DT_DRV_INST(n)) != NXP_ENET_RGMII_MODE ||		\
 			DT_NODE_HAS_COMPAT(DT_INST_PARENT(n), nxp_enet1g)),		\
 			"RGMII mode requires nxp,enet1g compatible on ENET DT node"	\
 			" and CONFIG_ETH_NXP_ENET_1G enabled");
+
+#define NXP_ENET_MAC_ADDR_SOURCE(n)							\
+	COND_CODE_1(DT_NODE_HAS_PROP(DT_DRV_INST(n), local_mac_address),		\
+			(MAC_ADDR_SOURCE_LOCAL),					\
+	(COND_CODE_1(DT_INST_PROP(n, zephyr_random_mac_address),			\
+			(MAC_ADDR_SOURCE_RANDOM),					\
+	(COND_CODE_1(DT_INST_PROP(n, nxp_unique_mac), (MAC_ADDR_SOURCE_UNIQUE),		\
+	(COND_CODE_1(DT_INST_PROP(n, nxp_fused_mac), (MAC_ADDR_SOURCE_FUSED),		\
+	(MAC_ADDR_SOURCE_INVALID))))))))
 
 #define NXP_ENET_MAC_INIT(n)								\
 		NXP_ENET_NODE_HAS_MAC_ADDR_CHECK(n)					\
@@ -909,9 +965,7 @@ BUILD_ASSERT(NXP_ENET_PHY_MODE(DT_DRV_INST(n)) != NXP_ENET_RGMII_MODE ||		\
 			.phy_dev = DEVICE_DT_GET(DT_INST_PHANDLE(n, phy_handle)),	\
 			.mdio = DEVICE_DT_GET(DT_INST_PHANDLE(n, nxp_mdio)),		\
 			NXP_ENET_PTP_DEV(n)						\
-			.generate_mac = DT_INST_PROP(n,					\
-						zephyr_random_mac_address),		\
-			.unique_mac = DT_INST_PROP(n, nxp_unique_mac),			\
+			.mac_addr_source = NXP_ENET_MAC_ADDR_SOURCE(n),			\
 		};									\
 											\
 		static _nxp_enet_driver_buffer_section uint8_t				\

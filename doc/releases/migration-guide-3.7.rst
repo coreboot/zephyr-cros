@@ -236,6 +236,17 @@ Analog-to-Digital Converter (ADC)
 Bluetooth HCI
 =============
 
+ * A new HCI driver API was introduced (:github:`72323`) and the old one deprecated. The new API
+   follows the normal Zephyr driver model, with devicetree nodes, etc. The host now
+   selects which driver instance to use as the controller by looking for a ``zephyr,bt-hci``
+   chosen property. The devicetree bindings for all HCI drivers derive from a common
+   ``bt-hci.yaml`` base binding.
+ * As part of the new HCI driver API, the ``zephyr,bt-uart`` chosen property is no longer used,
+   rather the UART HCI drivers select their UART by looking for the parent devicetree node of the
+   HCI driver instance node.
+ * As part of the new HCI driver API, the ``zephyr,bt-hci-ipc`` chosen property is only used for
+   the controller side, whereas the HCI driver now relies on nodes with the compatible string
+   ``zephyr,bt-hci-ipc``.
  * The ``BT_HCI_VS_EXT`` Kconfig option was deleted and the feature is now included in the
    :kconfig:option:`BT_HCI_VS` Kconfig option.
  * The ``BT_HCI_VS_EVT`` Kconfig option was removed, since vendor event support is implicit if
@@ -340,6 +351,50 @@ Display
         };
     };
 
+
+* ST7789V based displays now use the MIPI DBI driver class. These displays
+  must now be declared within a MIPI DBI driver wrapper device, which will
+  manage interfacing with the display. (:github:`73750`) Note that the
+  `cmd-data-gpios` pin has changed polarity with this update, to align better
+  with the new `dc-gpios` name. For an example, see below:
+
+  .. code-block:: devicetree
+
+    /* Legacy ST7789V display definition */
+    &spi0 {
+        st7789: st7789@0 {
+            compatible = "sitronix,st7789v";
+            reg = <0>;
+            spi-max-frequency = <32000000>;
+            reset-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+            cmd-data-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+            ...
+        };
+    };
+
+    /* New display definition with MIPI DBI device */
+
+    #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+
+    ...
+
+    mipi_dbi {
+        compatible = "zephyr,mipi-dbi-spi";
+        reset-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+        dc-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+        spi-dev = <&spi0>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        st7789: st7789@0 {
+            compatible = "sitronix,st7789v";
+            reg = <0>;
+            mipi-max-frequency = <32000000>;
+            mipi-mode = <MIPI_DBI_MODE_SPI_4WIRE>;
+            ...
+        };
+    };
+
 Enhanced Serial Peripheral Interface (eSPI)
 ===========================================
 
@@ -351,6 +406,8 @@ Enhanced Serial Peripheral Interface (eSPI)
   ``ESPI_VWIRE_SIGNAL_TARGET_BOOT_STS``, ``ESPI_VWIRE_SIGNAL_TARGET_BOOT_DONE`` and
   ``ESPI_VWIRE_SIGNAL_TARGET_GPIO_<NUMBER>`` respectively to reflect the new terminology
   in eSPI 1.5 specification. (:github:`68492`)
+  The KConfig ``CONFIG_ESPI_SLAVE`` was renamed to ``CONFIG_ESPI_TARGET``, similarly
+  ``CONFIG_ESPI_SAF`` was renamed as ``CONFIG_ESPI_TAF`` (:github:`73887`)
 
 Flash
 =====
@@ -413,6 +470,23 @@ LED Strip
 Sensors
 =======
 
+* The ``chip`` devicetree property from the :dtcompatible:`sensirion,shtcx` sensor driver has been
+  removed. Chip variants are now selected using the matching compatible property (:github:`74033`).
+  For an example of the new shtc3 configuration, see below:
+
+  .. code-block:: devicetree
+
+    &i2c0 {
+        status = "okay";
+
+        shtc3: shtc3@70 {
+            compatible = "sensirion,shtc3", "sensirion,shtcx";
+            reg = <0x70>;
+            measure-mode = "normal";
+            clock-stretching;
+        };
+    };
+
 Serial
 ======
 
@@ -473,6 +547,26 @@ Bluetooth Audio
 * :c:func:`bt_bap_stream_start` no longer connects the CIS. To connect the CIS,
   the :c:func:`bt_bap_stream_connect` shall now be called before :c:func:`bt_bap_stream_start`.
   (:github:`73032`)
+
+* Renamed ``stream_lang`` to just ``lang`` to better fit with the assigned numbers document.
+  This affects the ``BT_AUDIO_METADATA_TYPE_LANG`` macro and the following functions:
+
+  * :c:func:`bt_audio_codec_cap_meta_set_lang`
+  * :c:func:`bt_audio_codec_cap_meta_get_lang`
+  * :c:func:`bt_audio_codec_cfg_meta_set_lang`
+  * :c:func:`bt_audio_codec_cfg_meta_get_lang`
+
+  (:github:`72584`)
+
+* Changed ``lang`` from ``uint32_t`` to ``uint8_t [3]``. This modifies the following functions:
+
+  * :c:func:`bt_audio_codec_cap_meta_set_lang`
+  * :c:func:`bt_audio_codec_cap_meta_get_lang`
+  * :c:func:`bt_audio_codec_cfg_meta_set_lang`
+  * :c:func:`bt_audio_codec_cfg_meta_get_lang`
+
+  The result of this is that string values such as ``"eng"`` and ``"deu"`` can now be used to set
+  new values, and to prevent unnecessary copies of data when getting the values. (:github:`72584`)
 
 * All occurrences of ``set_sirk`` have been changed to just ``sirk`` as the ``s`` in ``sirk`` stands
   for set. (:github:`73413`)

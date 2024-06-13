@@ -35,6 +35,10 @@ https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
 * CVE-2024-4785: Under embargo until 2024-08-07
 
+* CVE-2024-5754: Under embargo until 2024-09-04
+
+* CVE-2024-5931: Under embargo until 2024-09-10
+
 API Changes
 ***********
 
@@ -238,6 +242,8 @@ Build system and Infrastructure
     choice to select the C Standard version. Additionally subsystems can select a minimum
     required C Standard version, with for example :kconfig:option:`CONFIG_REQUIRES_STD_C11`.
 
+  * Fixed issue with passing UTF-8 configs to applications using sysbuild.
+
 Drivers and Sensors
 *******************
 
@@ -302,8 +308,8 @@ Drivers and Sensors
 
 * eSPI
 
-  * Renamed eSPI virtual wire direction macros and enum values to match the new terminology in
-    eSPI 1.5 specification.
+  * Renamed eSPI virtual wire direction macros, enum values and KConfig to match the new
+    terminology in eSPI 1.5 specification.
 
 * Ethernet
 
@@ -521,6 +527,9 @@ Libraries / Subsystems
     to allow the user to specify how Mbed TLS PSA crypto core should generate random numbers.
     The former option, which is the default, relies on legacy entropy and CTR_DRBG/HMAC_DRBG
     modules, while the latter relies on CSPRNG drivers.
+  * :kconfig:option:`CONFIG_MBEDTLS_PSA_P256M_DRIVER_ENABLED` enables support
+    for the Mbed TLS's p256-m driver PSA crypto library. This is a Cortex-M SW
+    optimized implementation of secp256r1 curve.
 
 * Random
 

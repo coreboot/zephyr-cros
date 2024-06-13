@@ -438,6 +438,7 @@ Bluetooth Audio:
     - larsgk
     - pin-zephyr
     - niym-ot
+    - jthm-ot
   files:
     - subsys/bluetooth/audio/
     - include/zephyr/bluetooth/audio/
@@ -3129,16 +3130,18 @@ ADI Platforms:
     - microbuilder
   files:
     - boards/adi/
-    - drivers/*/max*
+    - drivers/*/*max*
     - drivers/*/*max*/
     - drivers/dac/dac_ltc*
     - drivers/ethernet/eth_adin*
     - drivers/mdio/mdio_adin*
     - drivers/regulator/regulator_adp5360*
     - drivers/sensor/adi/
+    - dts/arm/adi/
     - dts/bindings/*/adi,*
     - dts/bindings/*/lltc,*
     - dts/bindings/*/maxim,*
+    - soc/adi/
   labels:
     - "platform: ADI"
 
@@ -3551,6 +3554,8 @@ Renesas SmartBond Platforms:
     - ioannis-karachalios
     - andrzej-kaczmarek
     - blauret
+  collaborators:
+    - ydamigos
   files:
     - boards/renesas/da14*/
     - drivers/*/*smartbond*
@@ -3630,6 +3635,7 @@ STM32 Platforms:
     - FRASTM
     - gautierg-st
     - GeorgeCGV
+    - marwaiehm-st
   files:
     - boards/st/
     - drivers/*/*stm32*.c
@@ -3809,6 +3815,7 @@ RTIO:
     - teburd
   collaborators:
     - yperess
+    - ubieda
   files:
     - samples/subsys/rtio/
     - include/zephyr/rtio/
@@ -4445,6 +4452,7 @@ West:
   collaborators:
     - blauret
     - andrzej-kaczmarek
+    - ydamigos
   files: []
   labels:
     - "platform: Renesas"
@@ -4488,9 +4496,8 @@ West:
     - erwango
   collaborators:
     - FRASTM
-    - ABOSTM
     - gautierg-st
-    - Desvauxm-st
+    - marwaiehm-st
   files:
     - modules/Kconfig.stm32
   labels:

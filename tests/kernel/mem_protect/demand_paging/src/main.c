@@ -93,7 +93,7 @@ ZTEST(demand_paging, test_map_anon_pages)
 	zassert_not_null(arena, "failed to map anonymous memory arena size %zu",
 			 arena_size);
 	printk("Anonymous memory arena %p size %zu\n", arena, arena_size);
-	z_page_frames_dump();
+	k_mem_page_frames_dump();
 }
 
 static void print_paging_stats(struct k_mem_paging_stats_t *stats, const char *scope)
@@ -121,7 +121,7 @@ ZTEST(demand_paging, test_touch_anon_pages)
 	struct k_mem_paging_stats_t stats;
 	k_tid_t tid = k_current_get();
 
-	faults = z_num_pagefaults_get();
+	faults = k_mem_num_pagefaults_get();
 
 	printk("checking zeroes\n");
 	/* The mapped area should have started out zeroed. Check this. */
@@ -145,7 +145,7 @@ ZTEST(demand_paging, test_touch_anon_pages)
 			      i, &arena[i], arena[i], nums[i % 10]);
 	}
 
-	faults = z_num_pagefaults_get() - faults;
+	faults = k_mem_num_pagefaults_get() - faults;
 
 	/* Specific number depends on how much RAM we have but shouldn't be 0 */
 	zassert_not_equal(faults, 0UL, "no page faults handled?");
@@ -192,6 +192,21 @@ ZTEST(demand_paging, test_touch_anon_pages)
 	}
 }
 
+ZTEST(demand_paging, test_unmap_anon_pages)
+{
+	 k_mem_unmap(arena, arena_size);
+
+	 /* memory should no longer be accessible */
+	 expect_fault = true;
+	 compiler_barrier();
+
+	 TC_PRINT("Accessing unmapped memory should fault\n");
+	 arena[0] = 'x';
+
+	 /* and execution should not reach this point */
+	 ztest_test_fail();
+}
+
 static void test_k_mem_page_out(void)
 {
 	unsigned long faults;
@@ -201,7 +216,7 @@ static void test_k_mem_page_out(void)
 	 * are measuring stuff
 	 */
 	key = irq_lock();
-	faults = z_num_pagefaults_get();
+	faults = k_mem_num_pagefaults_get();
 	ret = k_mem_page_out(arena, HALF_BYTES);
 	zassert_equal(ret, 0, "k_mem_page_out failed with %d", ret);
 
@@ -209,7 +224,7 @@ static void test_k_mem_page_out(void)
 	for (size_t i = 0; i < HALF_BYTES; i++) {
 		arena[i] = nums[i % 10];
 	}
-	faults = z_num_pagefaults_get() - faults;
+	faults = k_mem_num_pagefaults_get() - faults;
 	irq_unlock(key);
 
 	zassert_equal(faults, HALF_PAGES,
@@ -236,12 +251,12 @@ ZTEST(demand_paging_api, test_k_mem_page_in)
 
 	k_mem_page_in(arena, HALF_BYTES);
 
-	faults = z_num_pagefaults_get();
+	faults = k_mem_num_pagefaults_get();
 	/* Write to the supposedly evicted region */
 	for (size_t i = 0; i < HALF_BYTES; i++) {
 		arena[i] = nums[i % 10];
 	}
-	faults = z_num_pagefaults_get() - faults;
+	faults = k_mem_num_pagefaults_get() - faults;
 	irq_unlock(key);
 
 	zassert_equal(faults, 0, "%d page faults when 0 expected",
@@ -262,11 +277,11 @@ ZTEST(demand_paging_api, test_k_mem_pin)
 
 	key = irq_lock();
 	/* Show no faults writing to the pinned area */
-	faults = z_num_pagefaults_get();
+	faults = k_mem_num_pagefaults_get();
 	for (size_t i = 0; i < HALF_BYTES; i++) {
 		arena[i] = nums[i % 10];
 	}
-	faults = z_num_pagefaults_get() - faults;
+	faults = k_mem_num_pagefaults_get() - faults;
 	irq_unlock(key);
 
 	zassert_equal(faults, 0, "%d page faults when 0 expected",
@@ -309,7 +324,7 @@ ZTEST(demand_paging_stat, test_backing_store_capacity)
 	zassert_is_null(ret, "k_mem_map shouldn't have succeeded");
 
 	key = irq_lock();
-	faults = z_num_pagefaults_get();
+	faults = k_mem_num_pagefaults_get();
 	/* Poke all anonymous memory */
 	for (size_t i = 0; i < HALF_BYTES; i++) {
 		arena[i] = nums[i % 10];
@@ -317,7 +332,7 @@ ZTEST(demand_paging_stat, test_backing_store_capacity)
 	for (size_t i = 0; i < size; i++) {
 		mem[i] = nums[i % 10];
 	}
-	faults = z_num_pagefaults_get() - faults;
+	faults = k_mem_num_pagefaults_get() - faults;
 	irq_unlock(key);
 
 	zassert_not_equal(faults, 0, "should have had some pagefaults");
@@ -407,6 +422,7 @@ ZTEST_USER(demand_paging_stat, test_user_get_hist)
 
 void *demand_paging_api_setup(void)
 {
+	arena = k_mem_map(arena_size, K_MEM_PERM_RW);
 	test_k_mem_page_out();
 
 	return NULL;

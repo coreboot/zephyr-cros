@@ -469,7 +469,10 @@ static int dwc2_handle_evt_setup(const struct device *dev)
 		/*  Allocate and feed buffer for data OUT stage */
 		LOG_DBG("s:%p|feed for -out-", buf);
 
-		err = dwc2_ctrl_feed_dout(dev, udc_data_stage_length(buf));
+		/* Allocate at least 8 bytes in case the host decides to send
+		 * SETUP DATA instead of OUT DATA packet.
+		 */
+		err = dwc2_ctrl_feed_dout(dev, MAX(udc_data_stage_length(buf), 8));
 		if (err == -ENOMEM) {
 			err = udc_submit_ep_event(dev, buf, err);
 		}
@@ -1338,6 +1341,15 @@ static int udc_dwc2_ep_deactivate(const struct device *dev,
 
 	sys_write32(dxepctl, dxepctl_reg);
 	dwc2_set_epint(dev, cfg, false);
+
+	if (cfg->addr == USB_CONTROL_EP_OUT) {
+		struct net_buf *buf = udc_buf_get_all(dev, cfg->addr);
+
+		/* Release the buffer allocated in dwc2_ctrl_feed_dout() */
+		if (buf) {
+			net_buf_unref(buf);
+		}
+	}
 
 	return 0;
 }
