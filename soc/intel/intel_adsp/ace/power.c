@@ -72,8 +72,8 @@ __imr void power_init(void)
  * (each bit corresponds to one ebb)
  * @param response_to_ipc       flag if ipc response should be send during power down
  */
-extern void power_down(bool disable_lpsram, uint32_t *hpsram_pg_mask,
-			   bool response_to_ipc);
+extern void power_down(bool disable_lpsram, uint32_t __sparse_cache * hpsram_pg_mask,
+		       bool response_to_ipc);
 
 #ifdef CONFIG_ADSP_IMR_CONTEXT_SAVE
 /**
@@ -122,6 +122,9 @@ struct core_state {
 	uint32_t intenable;
 	uint32_t ps;
 	uint32_t bctl;
+#if (XCHAL_NUM_MISC_REGS == 2)
+	uint32_t misc[XCHAL_NUM_MISC_REGS];
+#endif
 };
 
 static struct core_state core_desc[CONFIG_MP_MAX_NUM_CPUS] = {{0}};
@@ -142,6 +145,10 @@ static ALWAYS_INLINE void _save_core_context(uint32_t core_id)
 	core_desc[core_id].excsave2 = XTENSA_RSR("EXCSAVE2");
 	core_desc[core_id].excsave3 = XTENSA_RSR("EXCSAVE3");
 	core_desc[core_id].thread_ptr = XTENSA_RUR("THREADPTR");
+#if (XCHAL_NUM_MISC_REGS == 2)
+	core_desc[core_id].misc[0] = XTENSA_RSR("MISC0");
+	core_desc[core_id].misc[1] = XTENSA_RSR("MISC1");
+#endif
 	__asm__ volatile("mov %0, a0" : "=r"(core_desc[core_id].a0));
 	__asm__ volatile("mov %0, a1" : "=r"(core_desc[core_id].a1));
 
@@ -157,11 +164,18 @@ static ALWAYS_INLINE void _restore_core_context(void)
 {
 	uint32_t core_id = arch_proc_id();
 
+#ifdef CONFIG_XTENSA_MMU
+	xtensa_mmu_init();
+#endif
 	XTENSA_WSR("PS", core_desc[core_id].ps);
 	XTENSA_WSR("VECBASE", core_desc[core_id].vecbase);
 	XTENSA_WSR("EXCSAVE2", core_desc[core_id].excsave2);
 	XTENSA_WSR("EXCSAVE3", core_desc[core_id].excsave3);
 	XTENSA_WUR("THREADPTR", core_desc[core_id].thread_ptr);
+#if (XCHAL_NUM_MISC_REGS == 2)
+	XTENSA_WSR("MISC0", core_desc[core_id].misc[0]);
+	XTENSA_WSR("MISC1", core_desc[core_id].misc[1]);
+#endif
 	__asm__ volatile("mov a0, %0" :: "r"(core_desc[core_id].a0));
 	__asm__ volatile("mov a1, %0" :: "r"(core_desc[core_id].a1));
 	__asm__ volatile("rsync");
@@ -292,7 +306,7 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 			imr_layout->imr_state.header.imr_restore_vector =
 					(void *)boot_entry_d3_restore;
 			imr_layout->imr_state.header.imr_ram_storage = global_imr_ram_storage;
-			sys_cache_data_flush_range(imr_layout, sizeof(*imr_layout));
+			sys_cache_data_flush_range((void *)imr_layout, sizeof(*imr_layout));
 
 			/* save CPU context here
 			 * when _restore_core_context() is called, it will return directly to
@@ -323,7 +337,7 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 #else
 			imr_layout->imr_state.header.imr_restore_vector =
 					(void *)rom_entry;
-			sys_cache_data_flush_range(imr_layout, sizeof(*imr_layout));
+			sys_cache_data_flush_range((void *)imr_layout, sizeof(*imr_layout));
 #endif /* CONFIG_ADSP_IMR_CONTEXT_SAVE */
 			uint32_t hpsram_mask = 0;
 #ifdef CONFIG_ADSP_POWER_DOWN_HPSRAM

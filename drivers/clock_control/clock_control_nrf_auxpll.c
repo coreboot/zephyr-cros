@@ -5,16 +5,23 @@
 
 #define DT_DRV_COMPAT nordic_nrf_auxpll
 
+#include <errno.h>
 #include <stdint.h>
 
 #include <zephyr/arch/cpu.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/clock_control.h>
+#include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/toolchain.h>
 
 #include <hal/nrf_auxpll.h>
+
+/* maximum lock time in ms, >10x time observed experimentally */
+#define AUXPLL_LOCK_TIME_MAX_MS  20
+/* lock wait step in ms*/
+#define AUXPLL_LOCK_WAIT_STEP_MS 1
 
 struct clock_control_nrf_auxpll_config {
 	NRF_AUXPLL_Type *auxpll;
@@ -28,15 +35,22 @@ struct clock_control_nrf_auxpll_config {
 static int clock_control_nrf_auxpll_on(const struct device *dev, clock_control_subsys_t sys)
 {
 	const struct clock_control_nrf_auxpll_config *config = dev->config;
+	bool locked;
+	unsigned int wait = 0U;
 
 	ARG_UNUSED(sys);
 
 	nrf_auxpll_task_trigger(config->auxpll, NRF_AUXPLL_TASK_START);
 
-	while (!nrf_auxpll_mode_locked_check(config->auxpll)) {
-	}
+	do {
+		locked = nrf_auxpll_mode_locked_check(config->auxpll);
+		if (!locked) {
+			k_msleep(AUXPLL_LOCK_WAIT_STEP_MS);
+			wait += AUXPLL_LOCK_WAIT_STEP_MS;
+		}
+	} while (wait < AUXPLL_LOCK_TIME_MAX_MS && !locked);
 
-	return 0;
+	return locked ? 0 : -ETIMEDOUT;
 }
 
 static int clock_control_nrf_auxpll_off(const struct device *dev, clock_control_subsys_t sys)
@@ -85,7 +99,7 @@ static enum clock_control_status clock_control_nrf_auxpll_get_status(const struc
 	return CLOCK_CONTROL_STATUS_OFF;
 }
 
-static struct clock_control_driver_api clock_control_nrf_auxpll_api = {
+static const struct clock_control_driver_api clock_control_nrf_auxpll_api = {
 	.on = clock_control_nrf_auxpll_on,
 	.off = clock_control_nrf_auxpll_off,
 	.get_rate = clock_control_nrf_auxpll_get_rate,

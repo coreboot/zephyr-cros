@@ -85,10 +85,6 @@ if BT
 config FLASH
 	default y
 
-choice BT_HCI_BUS_TYPE
-	default BT_NXP
-endchoice
-
 config BT_DIS_MANUF
 	default "NXP"
 
@@ -108,6 +104,9 @@ config HEAP_MEM_POOL_SIZE
 	default 256
 
 endif # BT
+
+config NXP_MONOLITHIC_BT
+	default y if BT
 
 config NXP_FW_LOADER
 	default y if (BT || WIFI)

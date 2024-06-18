@@ -72,6 +72,17 @@ The AIROC™ CYW20829 Bluetooth®  MCU SoC is configured to use the internal IMO
 the system clock. Other sources for the system clock are provided in the SOC, depending on your
 system requirements.
 
+Fetch Binary Blobs
+******************
+
+cyw920829m2evk_02 board requires fetch binary files (e.g Bluetooth controller firmware).
+
+To fetch Binary Blobs:
+
+.. code-block:: console
+
+   west blobs fetch hal_infineon
+
 Build blinking led sample
 *************************
 
@@ -98,14 +109,14 @@ The CYW920829M2EVK-02 includes an onboard programmer/debugger (KitProg3) to prov
 
 On Windows:
 
-.. code-block:: console
+.. code-block:: shell
 
    west flash --openocd path/to/infineon/openocd/bin/openocd.exe
    west debug --openocd path/to/infineon/openocd/bin/openocd.exe
 
 On Linux:
 
-.. code-block:: console
+.. code-block:: shell
 
    west flash --openocd path/to/infineon/openocd/bin/openocd
    west debug --openocd path/to/infineon/openocd/bin/openocd

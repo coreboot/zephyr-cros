@@ -13,6 +13,7 @@ LOG_MODULE_REGISTER(net_sock, CONFIG_NET_SOCKETS_LOG_LEVEL);
 #include <zephyr/kernel.h>
 #include <zephyr/net/net_context.h>
 #include <zephyr/net/net_pkt.h>
+#include <zephyr/tracing/tracing.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/socket_types.h>
 #include <zephyr/posix/fcntl.h>
@@ -42,7 +43,7 @@ LOG_MODULE_REGISTER(net_sock, CONFIG_NET_SOCKETS_LOG_LEVEL);
 		const struct socket_op_vtable *vtable;	     \
 		struct k_mutex *lock;			     \
 		void *obj;				     \
-		int ret;				     \
+		int retval;				     \
 							     \
 		obj = get_sock_vtable(sock, &vtable, &lock); \
 		if (obj == NULL) {			     \
@@ -57,11 +58,11 @@ LOG_MODULE_REGISTER(net_sock, CONFIG_NET_SOCKETS_LOG_LEVEL);
 							     \
 		(void)k_mutex_lock(lock, K_FOREVER);         \
 							     \
-		ret = vtable->fn(obj, __VA_ARGS__);	     \
+		retval = vtable->fn(obj, __VA_ARGS__);	     \
 							     \
 		k_mutex_unlock(lock);                        \
 							     \
-		ret;					     \
+		retval;					     \
 	})
 
 const struct socket_op_vtable sock_fd_op_vtable;
@@ -230,7 +231,11 @@ int z_impl_zsock_socket(int family, int type, int proto)
 			continue;
 		}
 
+		errno = 0;
 		ret = sock_family->handler(family, type, proto);
+
+		SYS_PORT_TRACING_OBJ_INIT(socket, ret < 0 ? -errno : ret,
+					  family, type, proto);
 
 		(void)sock_obj_core_alloc(ret, sock_family, family, type, proto);
 
@@ -238,6 +243,7 @@ int z_impl_zsock_socket(int family, int type, int proto)
 	}
 
 	errno = EAFNOSUPPORT;
+	SYS_PORT_TRACING_OBJ_INIT(socket, -errno, family, type, proto);
 	return -1;
 }
 
@@ -282,9 +288,12 @@ int z_impl_zsock_close(int sock)
 	void *ctx;
 	int ret;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, close, sock);
+
 	ctx = get_sock_vtable(sock, &vtable, &lock);
 	if (ctx == NULL) {
 		errno = EBADF;
+		SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, close, sock, -errno);
 		return -1;
 	}
 
@@ -295,6 +304,8 @@ int z_impl_zsock_close(int sock)
 	ret = vtable->fd_vtable.close(ctx);
 
 	k_mutex_unlock(lock);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, close, sock, ret < 0 ? -errno : ret);
 
 	z_free_fd(sock);
 
@@ -318,14 +329,18 @@ int z_impl_zsock_shutdown(int sock, int how)
 	void *ctx;
 	int ret;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, shutdown, sock, how);
+
 	ctx = get_sock_vtable(sock, &vtable, &lock);
 	if (ctx == NULL) {
 		errno = EBADF;
+		SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, shutdown, sock, -errno);
 		return -1;
 	}
 
 	if (!vtable->shutdown) {
 		errno = ENOTSUP;
+		SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, shutdown, sock, -errno);
 		return -1;
 	}
 
@@ -336,6 +351,8 @@ int z_impl_zsock_shutdown(int sock, int how)
 	ret = vtable->shutdown(ctx, how);
 
 	k_mutex_unlock(lock);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, shutdown, sock, ret < 0 ? -errno : ret);
 
 	return ret;
 }
@@ -472,7 +489,15 @@ int zsock_bind_ctx(struct net_context *ctx, const struct sockaddr *addr,
 
 int z_impl_zsock_bind(int sock, const struct sockaddr *addr, socklen_t addrlen)
 {
-	return VTABLE_CALL(bind, sock, addr, addrlen);
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, bind, sock, addr, addrlen);
+
+	ret = VTABLE_CALL(bind, sock, addr, addrlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, bind, sock, ret < 0 ? -errno : ret);
+
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -551,7 +576,15 @@ int zsock_connect_ctx(struct net_context *ctx, const struct sockaddr *addr,
 int z_impl_zsock_connect(int sock, const struct sockaddr *addr,
 			socklen_t addrlen)
 {
-	return VTABLE_CALL(connect, sock, addr, addrlen);
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, connect, sock, addr, addrlen);
+
+	ret = VTABLE_CALL(connect, sock, addr, addrlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, connect, sock,
+				       ret < 0 ? -errno : ret);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -579,7 +612,15 @@ int zsock_listen_ctx(struct net_context *ctx, int backlog)
 
 int z_impl_zsock_listen(int sock, int backlog)
 {
-	return VTABLE_CALL(listen, sock, backlog);
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, listen, sock, backlog);
+
+	ret = VTABLE_CALL(listen, sock, backlog);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, listen, sock,
+				       ret < 0 ? -errno : ret);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -678,7 +719,12 @@ int z_impl_zsock_accept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 {
 	int new_sock;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, accept, sock);
+
 	new_sock = VTABLE_CALL(accept, sock, addr, addrlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, accept, new_sock, addr, addrlen,
+				       new_sock < 0 ? -errno : 0);
 
 	(void)sock_obj_core_alloc_find(sock, new_sock, SOCK_STREAM);
 
@@ -848,7 +894,13 @@ ssize_t z_impl_zsock_sendto(int sock, const void *buf, size_t len, int flags,
 {
 	int bytes_sent;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, sendto, sock, len, flags,
+					dest_addr, addrlen);
+
 	bytes_sent = VTABLE_CALL(sendto, sock, buf, len, flags, dest_addr, addrlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, sendto, sock,
+				       bytes_sent < 0 ? -errno : bytes_sent);
 
 	sock_obj_core_update_send_stats(sock, bytes_sent);
 
@@ -931,7 +983,12 @@ ssize_t z_impl_zsock_sendmsg(int sock, const struct msghdr *msg, int flags)
 {
 	int bytes_sent;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, sendmsg, sock, msg, flags);
+
 	bytes_sent = VTABLE_CALL(sendmsg, sock, msg, flags);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, sendmsg, sock,
+				       bytes_sent < 0 ? -errno : bytes_sent);
 
 	sock_obj_core_update_send_stats(sock, bytes_sent);
 
@@ -1257,7 +1314,6 @@ int zsock_wait_data(struct net_context *ctx, k_timeout_t *timeout)
 	return 0;
 }
 
-
 static int insert_pktinfo(struct msghdr *msg, int level, int type,
 			  void *pktinfo, size_t pktinfo_len)
 {
@@ -1267,7 +1323,12 @@ static int insert_pktinfo(struct msghdr *msg, int level, int type,
 		return -EINVAL;
 	}
 
-	cmsg = CMSG_FIRSTHDR(msg);
+	for (cmsg = CMSG_FIRSTHDR(msg); cmsg != NULL; cmsg = CMSG_NXTHDR(msg, cmsg)) {
+		if (cmsg->cmsg_len == 0) {
+			break;
+		}
+	}
+
 	if (cmsg == NULL) {
 		return -EINVAL;
 	}
@@ -1279,6 +1340,22 @@ static int insert_pktinfo(struct msghdr *msg, int level, int type,
 	memcpy(CMSG_DATA(cmsg), pktinfo, pktinfo_len);
 
 	return 0;
+}
+
+static int add_timestamping(struct net_context *ctx,
+			    struct net_pkt *pkt,
+			    struct msghdr *msg)
+{
+	uint8_t timestamping = 0;
+
+	net_context_get_option(ctx, NET_OPT_TIMESTAMPING, &timestamping, NULL);
+
+	if (timestamping) {
+		return insert_pktinfo(msg, SOL_SOCKET, SO_TIMESTAMPING,
+				      net_pkt_timestamp(pkt), sizeof(struct net_ptp_time));
+	}
+
+	return -ENOTSUP;
 }
 
 static int add_pktinfo(struct net_context *ctx,
@@ -1491,13 +1568,25 @@ static inline ssize_t zsock_recv_dgram(struct net_context *ctx,
 	if (msg != NULL) {
 		if (msg->msg_control != NULL) {
 			if (msg->msg_controllen > 0) {
+				bool clear_controllen = true;
+
+				if (IS_ENABLED(CONFIG_NET_CONTEXT_TIMESTAMPING)) {
+					clear_controllen = false;
+					if (add_timestamping(ctx, pkt, msg) < 0) {
+						msg->msg_flags |= ZSOCK_MSG_CTRUNC;
+					}
+				}
+
 				if (IS_ENABLED(CONFIG_NET_CONTEXT_RECV_PKTINFO) &&
 				    net_context_is_recv_pktinfo_set(ctx)) {
+					clear_controllen = false;
 					if (add_pktinfo(ctx, pkt, msg) < 0) {
 						msg->msg_flags |= ZSOCK_MSG_CTRUNC;
 					}
-				} else {
-					msg->msg_controllen = 0U;
+				}
+
+				if (clear_controllen) {
+					msg->msg_controllen = 0;
 				}
 			}
 		} else {
@@ -1766,7 +1855,13 @@ ssize_t z_impl_zsock_recvfrom(int sock, void *buf, size_t max_len, int flags,
 {
 	int bytes_received;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, recvfrom, sock, max_len, flags, src_addr, addrlen);
+
 	bytes_received = VTABLE_CALL(recvfrom, sock, buf, max_len, flags, src_addr, addrlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, recvfrom, sock,
+				       src_addr, addrlen,
+				       bytes_received < 0 ? -errno : bytes_received);
 
 	sock_obj_core_update_recv_stats(sock, bytes_received);
 
@@ -1843,7 +1938,12 @@ ssize_t z_impl_zsock_recvmsg(int sock, struct msghdr *msg, int flags)
 {
 	int bytes_received;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, recvmsg, sock, msg, flags);
+
 	bytes_received = VTABLE_CALL(recvmsg, sock, msg, flags);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, recvmsg, sock, msg,
+				       bytes_received < 0 ? -errno : bytes_received);
 
 	sock_obj_core_update_recv_stats(sock, bytes_received);
 
@@ -2030,9 +2130,12 @@ int z_impl_zsock_fcntl_impl(int sock, int cmd, int flags)
 	void *obj;
 	int ret;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, fcntl, sock, cmd, flags);
+
 	obj = get_sock_vtable(sock, &vtable, &lock);
 	if (obj == NULL) {
 		errno = EBADF;
+		SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, fcntl, sock, -errno);
 		return -1;
 	}
 
@@ -2043,6 +2146,8 @@ int z_impl_zsock_fcntl_impl(int sock, int cmd, int flags)
 
 	k_mutex_unlock(lock);
 
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, fcntl, sock,
+				       ret < 0 ? -errno : ret);
 	return ret;
 }
 
@@ -2061,9 +2166,12 @@ int z_impl_zsock_ioctl_impl(int sock, unsigned long request, va_list args)
 	void *ctx;
 	int ret;
 
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, ioctl, sock, request);
+
 	ctx = get_sock_vtable(sock, &vtable, &lock);
 	if (ctx == NULL) {
 		errno = EBADF;
+		SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, ioctl, sock, -errno);
 		return -1;
 	}
 
@@ -2075,6 +2183,8 @@ int z_impl_zsock_ioctl_impl(int sock, unsigned long request, va_list args)
 
 	k_mutex_unlock(lock);
 
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, ioctl, sock,
+				       ret < 0 ? -errno : ret);
 	return ret;
 
 }
@@ -2364,6 +2474,9 @@ int zsock_poll_internal(struct zsock_pollfd *fds, int nfds, k_timeout_t timeout)
 int z_impl_zsock_poll(struct zsock_pollfd *fds, int nfds, int poll_timeout)
 {
 	k_timeout_t timeout;
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, poll, fds, nfds, poll_timeout);
 
 	if (poll_timeout < 0) {
 		timeout = K_FOREVER;
@@ -2371,7 +2484,11 @@ int z_impl_zsock_poll(struct zsock_pollfd *fds, int nfds, int poll_timeout)
 		timeout = K_MSEC(poll_timeout);
 	}
 
-	return zsock_poll_internal(fds, nfds, timeout);
+	ret = zsock_poll_internal(fds, nfds, timeout);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, poll, fds, nfds,
+				       ret < 0 ? -errno : ret);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -2601,6 +2718,22 @@ int zsock_getsockopt_ctx(struct net_context *ctx, int level, int optname,
 			}
 
 			break;
+
+		case SO_TIMESTAMPING:
+			if (IS_ENABLED(CONFIG_NET_CONTEXT_TIMESTAMPING)) {
+				ret = net_context_get_option(ctx,
+							     NET_OPT_TIMESTAMPING,
+							     optval, optlen);
+
+				if (ret < 0) {
+					errno = -ret;
+					return -1;
+				}
+
+				return 0;
+			}
+
+			break;
 		}
 
 		break;
@@ -2757,7 +2890,15 @@ int zsock_getsockopt_ctx(struct net_context *ctx, int level, int optname,
 int z_impl_zsock_getsockopt(int sock, int level, int optname,
 			    void *optval, socklen_t *optlen)
 {
-	return VTABLE_CALL(getsockopt, sock, level, optname, optval, optlen);
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, getsockopt, sock, level, optname);
+
+	ret = VTABLE_CALL(getsockopt, sock, level, optname, optval, optlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, getsockopt, sock, level, optname,
+				       optval, *optlen, ret < 0 ? -errno : ret);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -3153,6 +3294,22 @@ int zsock_setsockopt_ctx(struct net_context *ctx, int level, int optname,
 			}
 
 			break;
+
+		case SO_TIMESTAMPING:
+			if (IS_ENABLED(CONFIG_NET_CONTEXT_TIMESTAMPING)) {
+				ret = net_context_set_option(ctx,
+							     NET_OPT_TIMESTAMPING,
+							     optval, optlen);
+
+				if (ret < 0) {
+					errno = -ret;
+					return -1;
+				}
+
+				return 0;
+			}
+
+			break;
 		}
 
 		break;
@@ -3373,7 +3530,16 @@ int zsock_setsockopt_ctx(struct net_context *ctx, int level, int optname,
 int z_impl_zsock_setsockopt(int sock, int level, int optname,
 			    const void *optval, socklen_t optlen)
 {
-	return VTABLE_CALL(setsockopt, sock, level, optname, optval, optlen);
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, setsockopt, sock,
+					level, optname, optval, optlen);
+
+	ret = VTABLE_CALL(setsockopt, sock, level, optname, optval, optlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, setsockopt, sock,
+				       ret < 0 ? -errno : ret);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -3447,7 +3613,16 @@ int zsock_getpeername_ctx(struct net_context *ctx, struct sockaddr *addr,
 int z_impl_zsock_getpeername(int sock, struct sockaddr *addr,
 			     socklen_t *addrlen)
 {
-	return VTABLE_CALL(getpeername, sock, addr, addrlen);
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, getpeername, sock);
+
+	ret = VTABLE_CALL(getpeername, sock, addr, addrlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, getpeername, sock,
+				       addr, addrlen,
+				       ret < 0 ? -errno : ret);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE
@@ -3533,7 +3708,16 @@ int zsock_getsockname_ctx(struct net_context *ctx, struct sockaddr *addr,
 int z_impl_zsock_getsockname(int sock, struct sockaddr *addr,
 			     socklen_t *addrlen)
 {
-	return VTABLE_CALL(getsockname, sock, addr, addrlen);
+	int ret;
+
+	SYS_PORT_TRACING_OBJ_FUNC_ENTER(socket, getsockname, sock);
+
+	ret = VTABLE_CALL(getsockname, sock, addr, addrlen);
+
+	SYS_PORT_TRACING_OBJ_FUNC_EXIT(socket, getsockname, sock,
+				       addr, addrlen,
+				       ret < 0 ? -errno : ret);
+	return ret;
 }
 
 #ifdef CONFIG_USERSPACE

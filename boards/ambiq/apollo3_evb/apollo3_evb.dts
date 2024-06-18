@@ -15,6 +15,7 @@
 		zephyr,shell-uart = &uart0;
 		zephyr,uart-pipe = &uart0;
 		zephyr,flash-controller = &flash;
+		zephyr,bt_hci = &bt_hci_apollo;
 	};
 
 	aliases {
@@ -98,6 +99,14 @@
 };
 
 &wdt0 {
+	status = "okay";
+};
+
+&spi0 {
+	compatible = "ambiq,spi";
+	pinctrl-0 = <&spi0_default>;
+	pinctrl-names = "default";
+	clock-frequency = <DT_FREQ_M(1)>;
 	status = "okay";
 };
 

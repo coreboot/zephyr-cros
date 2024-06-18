@@ -30,10 +30,10 @@ menuconfig BUILD_WITH_TFM
 	depends on TFM_BOARD != ""
 	depends on ARM_TRUSTZONE_M
 	select BUILD_OUTPUT_HEX
+	select PSA_CRYPTO_CLIENT
 	imply INIT_ARCH_HW_AT_BOOT
 	imply ARM_NONSECURE_PREEMPTIBLE_SECURE_CALLS
 	imply MBEDTLS
-	imply PSA_CRYPTO_ENABLE_ALL
 	help
 	  When enabled, this option instructs the Zephyr build process to
 	  additionally generate a TF-M image for the Secure Execution
@@ -93,7 +93,7 @@ endchoice
 choice TFM_CMAKE_BUILD_TYPE
 	prompt "The build type for TFM"
 	default TFM_CMAKE_BUILD_TYPE_RELEASE if SPEED_OPTIMIZATIONS && BUILD_OUTPUT_STRIPPED
-	default TFM_CMAKE_BUILD_TYPE_MINSIZEREL if SIZE_OPTIMIZATIONS
+	default TFM_CMAKE_BUILD_TYPE_MINSIZEREL if SIZE_OPTIMIZATIONS || SIZE_OPTIMIZATIONS_AGGRESSIVE
 	default TFM_CMAKE_BUILD_TYPE_DEBUG if DEBUG_OPTIMIZATIONS
 	default TFM_CMAKE_BUILD_TYPE_RELWITHDEBINFO
 

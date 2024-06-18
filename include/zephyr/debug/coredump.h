@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 #ifndef ZEPHYR_INCLUDE_DEBUG_COREDUMP_H_
 #define ZEPHYR_INCLUDE_DEBUG_COREDUMP_H_
 
@@ -11,6 +17,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#line 21
 /*
  * Define COREDUMP_*_STR as public to allow coredump_backend_other to re-use
  * these strings if necessary
@@ -232,7 +239,7 @@ struct coredump_backend_api {
 	coredump_backend_cmd_t			cmd;
 };
 
-void coredump(unsigned int reason, const z_arch_esf_t *esf,
+void coredump(unsigned int reason, const struct arch_esf *esf,
 	      struct k_thread *thread);
 void coredump_memory_dump(uintptr_t start_addr, uintptr_t end_addr);
 void coredump_buffer_output(uint8_t *buf, size_t buflen);
@@ -242,7 +249,7 @@ int coredump_cmd(enum coredump_cmd_id cmd_id, void *arg);
 
 #else
 
-static inline void coredump(unsigned int reason, const z_arch_esf_t *esf,
+static inline void coredump(unsigned int reason, const struct arch_esf *esf,
 			    struct k_thread *thread)
 {
 	ARG_UNUSED(reason);
@@ -279,7 +286,7 @@ static inline int coredump_cmd(enum coredump_cmd_id query_id, void *arg)
 #endif /* CONFIG_DEBUG_COREDUMP */
 
 /**
- * @fn void coredump(unsigned int reason, const z_arch_esf_t *esf, struct k_thread *thread);
+ * @fn void coredump(unsigned int reason, const struct arch_esf *esf, struct k_thread *thread);
  * @brief Perform coredump.
  *
  * Normally, this is called inside z_fatal_error() to generate coredump

@@ -10,15 +10,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __AUDIO_H
-#define __AUDIO_H
+#ifndef AUDIO_SHELL_AUDIO_H
+#define AUDIO_SHELL_AUDIO_H
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
 
+#include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/hci_types.h>
+#include <zephyr/bluetooth/iso.h>
 #include <zephyr/shell/shell.h>
+#include <zephyr/sys/atomic_types.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/util_macro.h>
+#include <zephyr/sys_clock.h>
 
 #include "shell/bt.h"
 
@@ -362,14 +374,10 @@ static inline void print_codec_meta_program_info(const struct shell *sh, size_t 
 }
 
 static inline void print_codec_meta_language(const struct shell *sh, size_t indent,
-					     uint32_t stream_lang)
+					     const uint8_t lang[BT_AUDIO_LANG_SIZE])
 {
-	uint8_t lang_array[3];
-
-	sys_put_be24(stream_lang, lang_array);
-
-	shell_print(sh, "%*sLanguage: %c%c%c", indent, "", (char)lang_array[0], (char)lang_array[1],
-		    (char)lang_array[2]);
+	shell_print(sh, "%*sLanguage: %c%c%c", indent, "", (char)lang[0], (char)lang[1],
+		    (char)lang[2]);
 }
 
 static inline void print_codec_meta_ccid_list(const struct shell *sh, size_t indent,
@@ -667,7 +675,7 @@ static inline void print_codec_cap(const struct shell *sh, size_t indent,
 						  (enum bt_audio_codec_cap_frame_dur)ret);
 		}
 
-		ret = bt_audio_codec_cap_get_supported_audio_chan_counts(codec_cap);
+		ret = bt_audio_codec_cap_get_supported_audio_chan_counts(codec_cap, true);
 		if (ret >= 0) {
 			print_codec_cap_chan_count(sh, indent,
 						   (enum bt_audio_codec_cap_chan_count)ret);
@@ -678,7 +686,7 @@ static inline void print_codec_cap(const struct shell *sh, size_t indent,
 			print_codec_cap_octets_per_codec_frame(sh, indent, &codec_frame);
 		}
 
-		ret = bt_audio_codec_cap_get_max_codec_frames_per_sdu(codec_cap);
+		ret = bt_audio_codec_cap_get_max_codec_frames_per_sdu(codec_cap, true);
 		if (ret >= 0) {
 			print_codec_cap_max_codec_frames_per_sdu(sh, indent, (uint8_t)ret);
 		}
@@ -721,9 +729,9 @@ static inline void print_codec_cap(const struct shell *sh, size_t indent,
 			print_codec_meta_program_info(sh, indent, data, (uint8_t)ret);
 		}
 
-		ret = bt_audio_codec_cap_meta_get_stream_lang(codec_cap);
+		ret = bt_audio_codec_cap_meta_get_lang(codec_cap, &data);
 		if (ret >= 0) {
-			print_codec_meta_language(sh, indent, (uint32_t)ret);
+			print_codec_meta_language(sh, indent, data);
 		}
 
 		ret = bt_audio_codec_cap_meta_get_ccid_list(codec_cap, &data);
@@ -904,8 +912,8 @@ static inline void print_codec_cfg(const struct shell *sh, size_t indent,
 						  (enum bt_audio_codec_cfg_frame_dur)ret);
 		}
 
-		ret = bt_audio_codec_cfg_get_chan_allocation(codec_cfg, &chan_allocation);
-		if (ret >= 0) {
+		ret = bt_audio_codec_cfg_get_chan_allocation(codec_cfg, &chan_allocation, false);
+		if (ret == 0) {
 			print_codec_cfg_chan_allocation(sh, indent, chan_allocation);
 		}
 
@@ -942,7 +950,7 @@ static inline void print_codec_cfg(const struct shell *sh, size_t indent,
 		const uint8_t *data;
 		int ret;
 
-		ret = bt_audio_codec_cfg_meta_get_pref_context(codec_cfg);
+		ret = bt_audio_codec_cfg_meta_get_pref_context(codec_cfg, true);
 		if (ret >= 0) {
 			print_codec_meta_pref_context(sh, indent, (enum bt_audio_context)ret);
 		}
@@ -957,9 +965,9 @@ static inline void print_codec_cfg(const struct shell *sh, size_t indent,
 			print_codec_meta_program_info(sh, indent, data, (uint8_t)ret);
 		}
 
-		ret = bt_audio_codec_cfg_meta_get_stream_lang(codec_cfg);
+		ret = bt_audio_codec_cfg_meta_get_lang(codec_cfg, &data);
 		if (ret >= 0) {
-			print_codec_meta_language(sh, indent, (uint32_t)ret);
+			print_codec_meta_language(sh, indent, data);
 		}
 
 		ret = bt_audio_codec_cfg_meta_get_ccid_list(codec_cfg, &data);
@@ -1159,4 +1167,4 @@ static inline void copy_broadcast_source_preset(struct broadcast_source *source,
 }
 #endif /* CONFIG_BT_AUDIO */
 
-#endif /* __AUDIO_H */
+#endif /* AUDIO_SHELL_AUDIO_H */
