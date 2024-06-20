@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <version.h>
+#include <zephyr/version.h>
 #include <errno.h>
 
 #include <zephyr/sys/util.h>
@@ -211,9 +211,9 @@ static uint32_t cis_pending_count;
 static uint64_t event_mask = DEFAULT_EVENT_MASK;
 static uint64_t event_mask_page_2 = DEFAULT_EVENT_MASK_PAGE_2;
 static uint64_t le_event_mask = DEFAULT_LE_EVENT_MASK;
-#if defined(CONFIG_BT_HCI_VS_EVT)
-static uint64_t vs_events_mask = DEFAULT_VS_EVT_MASK;
-#endif /* CONFIG_BT_HCI_VS_EVT */
+#if defined(CONFIG_BT_HCI_VS)
+__maybe_unused static uint64_t vs_events_mask = DEFAULT_VS_EVT_MASK;
+#endif /* CONFIG_BT_HCI_VS */
 
 static struct net_buf *cmd_complete_status(uint8_t status);
 
@@ -339,8 +339,8 @@ static void *meta_evt(struct net_buf *buf, uint8_t subevt, uint8_t melen)
 	return net_buf_add(buf, melen);
 }
 
-#if defined(CONFIG_BT_HCI_VS_EVT)
-static void *vs_event(struct net_buf *buf, uint8_t subevt, uint8_t evt_len)
+#if defined(CONFIG_BT_HCI_VS)
+__maybe_unused static void *vs_event(struct net_buf *buf, uint8_t subevt, uint8_t evt_len)
 {
 	struct bt_hci_evt_vs *evt;
 
@@ -350,7 +350,7 @@ static void *vs_event(struct net_buf *buf, uint8_t subevt, uint8_t evt_len)
 
 	return net_buf_add(buf, evt_len);
 }
-#endif /* CONFIG_BT_HCI_VS_EVT */
+#endif /* CONFIG_BT_HCI_VS */
 
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 static void *mesh_evt(struct net_buf *buf, uint8_t subevt, uint8_t melen)
@@ -1398,7 +1398,7 @@ static void le_read_buffer_size_v2(struct net_buf *buf, struct net_buf **evt)
 
 	rp->acl_max_len = sys_cpu_to_le16(LL_LENGTH_OCTETS_TX_MAX);
 	rp->acl_max_num = CONFIG_BT_BUF_ACL_TX_COUNT;
-	rp->iso_max_len = sys_cpu_to_le16(CONFIG_BT_CTLR_ISO_TX_BUFFER_SIZE);
+	rp->iso_max_len = sys_cpu_to_le16(BT_CTLR_ISO_TX_BUFFER_SIZE);
 	rp->iso_max_num = CONFIG_BT_CTLR_ISO_TX_BUFFERS;
 }
 #endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
@@ -1466,6 +1466,7 @@ static void le_rem_dev_from_fal(struct net_buf *buf, struct net_buf **evt)
 }
 #endif /* CONFIG_BT_CTLR_FILTER_ACCEPT_LIST */
 
+#if defined(CONFIG_BT_CTLR_CRYPTO)
 static void le_encrypt(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_cp_le_encrypt *cmd = (void *)buf->data;
@@ -1479,6 +1480,7 @@ static void le_encrypt(struct net_buf *buf, struct net_buf **evt)
 	rp->status = 0x00;
 	memcpy(rp->enc_data, enc_data, 16);
 }
+#endif /* CONFIG_BT_CTLR_CRYPTO */
 
 static void le_rand(struct net_buf *buf, struct net_buf **evt)
 {
@@ -4338,9 +4340,11 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		break;
 #endif /* CONFIG_BT_CTLR_FILTER_ACCEPT_LIST */
 
+#if defined(CONFIG_BT_CTLR_CRYPTO)
 	case BT_OCF(BT_HCI_OP_LE_ENCRYPT):
 		le_encrypt(cmd, evt);
 		break;
+#endif /* CONFIG_BT_CTLR_CRYPTO */
 
 	case BT_OCF(BT_HCI_OP_LE_RAND):
 		le_rand(cmd, evt);
@@ -4788,16 +4792,6 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	return 0;
 }
 
-/* If Zephyr VS HCI commands are not enabled provide this functionality directly
- */
-#if !defined(CONFIG_BT_HCI_VS_EXT)
-uint8_t bt_read_static_addr(struct bt_hci_vs_static_addr addrs[], uint8_t size)
-{
-	return hci_vendor_read_static_addr(addrs, size);
-}
-#endif /* !defined(CONFIG_BT_HCI_VS_EXT) */
-
-
 #if defined(CONFIG_BT_HCI_VS)
 static void vs_read_version_info(struct net_buf *buf, struct net_buf **evt)
 {
@@ -4827,7 +4821,6 @@ static void vs_read_supported_commands(struct net_buf *buf,
 
 	/* Set Version Information, Supported Commands, Supported Features. */
 	rp->commands[0] |= BIT(0) | BIT(1) | BIT(2);
-#if defined(CONFIG_BT_HCI_VS_EXT)
 	/* Write BD_ADDR, Read Build Info */
 	rp->commands[0] |= BIT(5) | BIT(7);
 	/* Read Static Addresses, Read Key Hierarchy Roots */
@@ -4846,7 +4839,6 @@ static void vs_read_supported_commands(struct net_buf *buf,
 	/* Set USB Transport Mode */
 	rp->commands[2] |= BIT(0);
 #endif /* USB_DEVICE_BLUETOOTH_VS_H4 */
-#endif /* CONFIG_BT_HCI_VS_EXT */
 }
 
 static void vs_read_supported_features(struct net_buf *buf,
@@ -4869,7 +4861,6 @@ uint8_t __weak hci_vendor_read_static_addr(struct bt_hci_vs_static_addr addrs[],
 	return 0;
 }
 
-#if defined(CONFIG_BT_HCI_VS_EXT)
 static void vs_write_bd_addr(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_cp_vs_write_bd_addr *cmd = (void *)buf->data;
@@ -5014,7 +5005,7 @@ NET_BUF_POOL_FIXED_DEFINE(vs_err_tx_pool, 1, BT_BUF_EVT_RX_SIZE,
 typedef struct bt_hci_vs_fata_error_cpu_data_cortex_m bt_hci_vs_fatal_error_cpu_data;
 
 static void vs_err_fatal_cpu_data_fill(bt_hci_vs_fatal_error_cpu_data *cpu_data,
-				       const z_arch_esf_t *esf)
+				       const struct arch_esf *esf)
 {
 	cpu_data->a1 = sys_cpu_to_le32(esf->basic.a1);
 	cpu_data->a2 = sys_cpu_to_le32(esf->basic.a2);
@@ -5049,7 +5040,7 @@ static struct net_buf *vs_err_evt_create(uint8_t subevt, uint8_t len)
 	return buf;
 }
 
-struct net_buf *hci_vs_err_stack_frame(unsigned int reason, const z_arch_esf_t *esf)
+struct net_buf *hci_vs_err_stack_frame(unsigned int reason, const struct arch_esf *esf)
 {
 	/* Prepare vendor specific HCI Fatal Error event */
 	struct bt_hci_vs_fatal_error_stack_frame *sf;
@@ -5323,8 +5314,6 @@ static void vs_le_df_connection_iq_report(struct node_rx_pdu *node_rx, struct ne
 }
 #endif /* CONFIG_BT_CTLR_DF_VS_CONN_IQ_REPORT_16_BITS_IQ_SAMPLES */
 
-#endif /* CONFIG_BT_HCI_VS_EXT */
-
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 static void mesh_get_opts(struct net_buf *buf, struct net_buf **evt)
 {
@@ -5501,7 +5490,6 @@ int hci_vendor_cmd_handle_common(uint16_t ocf, struct net_buf *cmd,
 		break;
 #endif /* CONFIG_USB_DEVICE_BLUETOOTH_VS_H4 */
 
-#if defined(CONFIG_BT_HCI_VS_EXT)
 	case BT_OCF(BT_HCI_OP_VS_READ_BUILD_INFO):
 		vs_read_build_info(cmd, evt);
 		break;
@@ -5539,7 +5527,6 @@ int hci_vendor_cmd_handle_common(uint16_t ocf, struct net_buf *cmd,
 		vs_set_min_used_chans(cmd, evt);
 		break;
 #endif /* CONFIG_BT_CTLR_MIN_USED_CHAN && CONFIG_BT_PERIPHERAL */
-#endif /* CONFIG_BT_HCI_VS_EXT */
 
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 	case BT_OCF(BT_HCI_OP_VS_MESH):
@@ -5709,7 +5696,7 @@ int hci_acl_handle(struct net_buf *buf, struct net_buf **evt)
 #if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
 int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 {
-	struct bt_hci_iso_data_hdr *iso_data_hdr;
+	struct bt_hci_iso_sdu_hdr *iso_sdu_hdr;
 	struct isoal_sdu_tx sdu_frag_tx;
 	struct bt_hci_iso_hdr *iso_hdr;
 	uint32_t *time_stamp;
@@ -5719,7 +5706,7 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 	uint8_t flags;
 	uint16_t len;
 
-	iso_data_hdr = NULL;
+	iso_sdu_hdr = NULL;
 	*evt  = NULL;
 
 	if (buf->len < sizeof(*iso_hdr)) {
@@ -5770,11 +5757,11 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 
 	/* Extract ISO data header if included (PB_Flag 0b00 or 0b10) */
 	if ((pb_flag & 0x01) == 0) {
-		iso_data_hdr = net_buf_pull_mem(buf, sizeof(*iso_data_hdr));
-		len -= sizeof(*iso_data_hdr);
-		sdu_frag_tx.packet_sn = sys_le16_to_cpu(iso_data_hdr->sn);
+		iso_sdu_hdr = net_buf_pull_mem(buf, sizeof(*iso_sdu_hdr));
+		len -= sizeof(*iso_sdu_hdr);
+		sdu_frag_tx.packet_sn = sys_le16_to_cpu(iso_sdu_hdr->sn);
 		sdu_frag_tx.iso_sdu_length =
-			sys_le16_to_cpu(bt_iso_pkt_len(iso_data_hdr->slen));
+			sys_le16_to_cpu(bt_iso_pkt_len(iso_sdu_hdr->slen));
 	} else {
 		sdu_frag_tx.packet_sn = 0;
 		sdu_frag_tx.iso_sdu_length = 0;
@@ -5802,6 +5789,7 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 		struct ll_conn_iso_group *cig;
 		struct ll_iso_stream_hdr *hdr;
 		struct ll_iso_datapath *dp_in;
+		uint8_t event_offset;
 
 		cis = ll_iso_stream_connected_get(handle);
 		if (!cis) {
@@ -5810,13 +5798,35 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 
 		cig = cis->group;
 
+		/* We must ensure sufficient time for ISO-AL to fragment SDU and
+		 * deliver PDUs to the TX queue. By checking ull_ref_get, we
+		 * know if we are within the subevents of an ISO event. If so,
+		 * we can assume that we have enough time to deliver in the next
+		 * ISO event. If we're not active within the ISO event, we don't
+		 * know if there is enough time to deliver in the next event,
+		 * and for safety we set the target to current event + 2.
+		 *
+		 * For FT > 1, we have the opportunity to retransmit in later
+		 * event(s), in which case we have the option to target an
+		 * earlier event (this or next) because being late does not
+		 * instantly flush the payload.
+		 */
+
+		event_offset = ull_ref_get(&cig->ull) ? 1 : 2;
+
+		if (cis->lll.tx.ft > 1) {
+			/* FT > 1, target an earlier event */
+			event_offset -= 1;
+		}
+
 #if defined(CONFIG_BT_CTLR_ISOAL_PSN_IGNORE)
 		uint64_t event_count;
 		uint64_t pkt_seq_num;
 
 		/* Catch up local pkt_seq_num with internal pkt_seq_num */
-		event_count = cis->lll.event_count;
+		event_count = cis->lll.event_count + event_offset;
 		pkt_seq_num = event_count + 1U;
+
 		/* If pb_flag is BT_ISO_START (0b00) or BT_ISO_SINGLE (0b10)
 		 * then we simply check that the pb_flag is an even value, and
 		 * then  pkt_seq_num is a future sequence number value compare
@@ -5857,29 +5867,6 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 						   ISO_INT_UNIT_US));
 
 #else /* !CONFIG_BT_CTLR_ISOAL_PSN_IGNORE */
-		uint8_t event_offset;
-
-		/* We must ensure sufficient time for ISO-AL to fragment SDU and
-		 * deliver PDUs to the TX queue. By checking ull_ref_get, we
-		 * know if we are within the subevents of an ISO event. If so,
-		 * we can assume that we have enough time to deliver in the next
-		 * ISO event. If we're not active within the ISO event, we don't
-		 * know if there is enough time to deliver in the next event,
-		 * and for safety we set the target to current event + 2.
-		 *
-		 * For FT > 1, we have the opportunity to retransmit in later
-		 * event(s), in which case we have the option to target an
-		 * earlier event (this or next) because being late does not
-		 * instantly flush the payload.
-		 */
-
-		event_offset = ull_ref_get(&cig->ull) ? 1 : 2;
-
-		if (cis->lll.tx.ft > 1) {
-			/* FT > 1, target an earlier event */
-			event_offset -= 1;
-		}
-
 		sdu_frag_tx.target_event = cis->lll.event_count + event_offset;
 		sdu_frag_tx.grp_ref_point =
 			isoal_get_wrapped_time_us(cig->cig_ref_point,
@@ -5921,7 +5908,10 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 		struct lll_adv_iso_stream *stream;
 		struct ll_adv_iso_set *adv_iso;
 		struct lll_adv_iso *lll_iso;
+		uint16_t latency_prepare;
 		uint16_t stream_handle;
+		uint64_t target_event;
+		uint8_t event_offset;
 
 		/* Get BIS stream handle and stream context */
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
@@ -5939,13 +5929,42 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 
 		lll_iso = &adv_iso->lll;
 
+		/* Determine the target event and the first event offset after
+		 * datapath setup.
+		 * event_offset mitigates the possibility of first SDU being
+		 * late on the datapath and avoid all subsequent SDUs being
+		 * dropped for a said SDU interval. i.e. upper layer is not
+		 * drifting, say first SDU dropped, hence subsequent SDUs all
+		 * dropped, is mitigated by offsetting the grp_ref_point.
+		 *
+		 * It is ok to do the below for every received ISO data, ISOAL
+		 * will not consider subsequent skewed target_event after the
+		 * first use of target_event value.
+		 *
+		 * In BIG implementation in LLL, payload_count corresponds to
+		 * the next BIG event, hence calculate grp_ref_point for next
+		 * BIG event by incrementing the previous elapsed big_ref_point
+		 * by one additional ISO interval.
+		 */
+		target_event = lll_iso->payload_count / lll_iso->bn;
+		latency_prepare = lll_iso->latency_prepare;
+		if (latency_prepare) {
+			/* big_ref_point has been updated, but payload_count
+			 * hasn't been updated yet - increment target_event to
+			 * compensate
+			 */
+			target_event += latency_prepare;
+		}
+		event_offset = ull_ref_get(&adv_iso->ull) ? 0U : 1U;
+
 #if defined(CONFIG_BT_CTLR_ISOAL_PSN_IGNORE)
 		uint64_t event_count;
 		uint64_t pkt_seq_num;
 
 		/* Catch up local pkt_seq_num with internal pkt_seq_num */
-		event_count = lll_iso->payload_count / lll_iso->bn;
-		pkt_seq_num = event_count;
+		event_count = target_event + event_offset;
+		pkt_seq_num = event_count + 1U;
+
 		/* If pb_flag is BT_ISO_START (0b00) or BT_ISO_SINGLE (0b10)
 		 * then we simply check that the pb_flag is an even value, and
 		 * then  pkt_seq_num is a future sequence number value compare
@@ -5998,30 +6017,6 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 						   ISO_INT_UNIT_US));
 
 #else /* !CONFIG_BT_CTLR_ISOAL_PSN_IGNORE */
-		uint64_t target_event;
-		uint8_t event_offset;
-
-		/* Determine the target event and the first event offset after
-		 * datapath setup.
-		 * event_offset mitigates the possibility of first SDU being
-		 * late on the datapath and avoid all subsequent SDUs being
-		 * dropped for a said SDU interval. i.e. upper layer is not
-		 * drifting, say first SDU dropped, hence subsequent SDUs all
-		 * dropped, is mitigated by offsetting the grp_ref_point.
-		 *
-		 * It is ok to do the below for every received ISO data, ISOAL
-		 * will not consider subsequent skewed target_event after the
-		 * first use of target_event value.
-		 *
-		 * In BIG implementation in LLL, payload_count corresponds to
-		 * the next BIG event, hence calculate grp_ref_point for next
-		 * BIG event by incrementing the previous elapsed big_ref_point
-		 * by one additional ISO interval.
-		 */
-		target_event = lll_iso->payload_count / lll_iso->bn;
-		event_offset = ull_ref_get(&adv_iso->ull) ? 0U : 1U;
-		event_offset += lll_iso->latency_prepare;
-
 		sdu_frag_tx.target_event = target_event + event_offset;
 		sdu_frag_tx.grp_ref_point =
 			isoal_get_wrapped_time_us(adv_iso->big_ref_point,
@@ -8634,7 +8629,7 @@ static void le_ltk_request(struct pdu_data *pdu_data, uint16_t handle,
 }
 
 static void encrypt_change(uint8_t err, uint16_t handle,
-			   struct net_buf *buf)
+			   struct net_buf *buf, bool encryption_on)
 {
 	struct bt_hci_evt_encrypt_change *ep;
 
@@ -8645,9 +8640,9 @@ static void encrypt_change(uint8_t err, uint16_t handle,
 	hci_evt_create(buf, BT_HCI_EVT_ENCRYPT_CHANGE, sizeof(*ep));
 	ep = net_buf_add(buf, sizeof(*ep));
 
-	ep->status = err;
+	ep->status = err ? err : (encryption_on ? err : BT_HCI_ERR_UNSPECIFIED);
 	ep->handle = sys_cpu_to_le16(handle);
-	ep->encrypt = !err ? 1 : 0;
+	ep->encrypt = encryption_on ? 1 : 0;
 }
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 
@@ -8789,7 +8784,7 @@ static void encode_data_ctrl(struct node_rx_pdu *node_rx,
 		break;
 
 	case PDU_DATA_LLCTRL_TYPE_START_ENC_RSP:
-		encrypt_change(0x00, handle, buf);
+		encrypt_change(0x00, handle, buf, true);
 		break;
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 
@@ -8806,7 +8801,7 @@ static void encode_data_ctrl(struct node_rx_pdu *node_rx,
 #if defined(CONFIG_BT_CTLR_LE_ENC)
 	case PDU_DATA_LLCTRL_TYPE_REJECT_IND:
 		encrypt_change(pdu_data->llctrl.reject_ind.error_code, handle,
-			       buf);
+			       buf, false);
 		break;
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 

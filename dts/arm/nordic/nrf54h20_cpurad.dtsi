@@ -11,6 +11,8 @@ systick: &cpurad_systick {};
 nvic: &cpurad_nvic {};
 cpuppr_vevif: &cpuppr_vevif_remote {};
 cpusys_vevif: &cpusys_vevif_remote {};
+wdt010: &cpurad_wdt010 {};
+wdt011: &cpurad_wdt011 {};
 
 /delete-node/ &cpuapp;
 /delete-node/ &cpuapp_peripherals;
@@ -48,7 +50,7 @@ cpusys_vevif: &cpusys_vevif_remote {};
 };
 
 &grtc {
-	owned-channels = <7 8 9 10 11 12 13 14>;
+	owned-channels = <7 8 9 10 11 12 13 14 15>;
 	child-owned-channels = <8 9 10 11 12>;
 	nonsecure-channels = <8 9 10 11 12>;
 	interrupts = <109 NRF_DEFAULT_IRQ_PRIORITY>,

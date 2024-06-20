@@ -12,17 +12,19 @@
  *
  * @defgroup bt_gatt_vcp Volume Control Profile (VCP)
  *
+ * @since 2.7
+ * @version 0.8.0
+ *
  * @ingroup bluetooth
  * @{
- *
- * [Experimental] Users should note that the APIs can change
- * as a part of ongoing development.
  */
 
 #include <stdint.h>
 
 #include <zephyr/bluetooth/audio/aics.h>
 #include <zephyr/bluetooth/audio/vocs.h>
+#include <zephyr/bluetooth/conn.h>
+#include <zephyr/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {

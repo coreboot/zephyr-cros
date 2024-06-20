@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 #ifndef ZEPHYR_INCLUDE_LOGGING_LOG_MSG_H_
 #define ZEPHYR_INCLUDE_LOGGING_LOG_MSG_H_
 
@@ -23,6 +29,12 @@
 #else
 #include <alloca.h>
 #endif
+
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 38
 
 #ifdef __cplusplus
 extern "C" {
@@ -858,7 +870,7 @@ static inline uint8_t *log_msg_get_package(struct log_msg *msg, size_t *len)
  * @}
  */
 
-#include <syscalls/log_msg.h>
+#include <zephyr/syscalls/log_msg.h>
 
 #ifdef __cplusplus
 }

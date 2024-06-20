@@ -10,12 +10,17 @@
 #include <zephyr/kernel_structs.h>
 #include <kernel_internal.h>
 #include <kswap.h>
-#include <_soc_inthandlers.h>
 #include <zephyr/toolchain.h>
 #include <zephyr/logging/log.h>
-#include <offsets.h>
-#include <zsr.h>
+#include <zephyr/offsets.h>
+#include <zephyr/zsr.h>
 #include <zephyr/arch/common/exc_handle.h>
+
+#ifdef CONFIG_XTENSA_GEN_HANDLERS
+#include <xtensa_handlers.h>
+#else
+#include <_soc_inthandlers.h>
+#endif
 
 #include <xtensa_internal.h>
 
@@ -32,7 +37,7 @@ static const struct z_exc_handle exceptions[] = {
 };
 #endif /* CONFIG_USERSPACE */
 
-void xtensa_dump_stack(const z_arch_esf_t *stack)
+void xtensa_dump_stack(const void *stack)
 {
 	_xtensa_irq_stack_frame_raw_t *frame = (void *)stack;
 	_xtensa_irq_bsa_t *bsa = frame->ptr_to_bsa;
@@ -213,9 +218,10 @@ static inline DEF_INT_C_HANDLER(1)
  * different because exceptions and interrupts land at the same
  * vector; other interrupt levels have their own vectors.
  */
-void *xtensa_excint1_c(int *interrupted_stack)
+void *xtensa_excint1_c(void *esf)
 {
 	int cause;
+	int *interrupted_stack = &((struct arch_esf *)esf)->dummy;
 	_xtensa_irq_bsa_t *bsa = (void *)*(int **)interrupted_stack;
 	bool is_fatal_error = false;
 	bool is_dblexc = false;
@@ -359,7 +365,7 @@ void *xtensa_excint1_c(int *interrupted_stack)
 		 *    thread.
 		 */
 		__asm__ volatile("rsil %0, %1"
-				: "=r" (ignore) : "i"(XCHAL_NMILEVEL));
+				: "=r" (ignore) : "i"(XCHAL_EXCM_LEVEL));
 
 		_current_cpu->nested = 1;
 	}
@@ -380,7 +386,7 @@ fixup_out:
 #if defined(CONFIG_GDBSTUB)
 void *xtensa_debugint_c(int *interrupted_stack)
 {
-	extern void z_gdb_isr(z_arch_esf_t *esf);
+	extern void z_gdb_isr(struct arch_esf *esf);
 
 	z_gdb_isr((void *)interrupted_stack);
 
