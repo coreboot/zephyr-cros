@@ -21,6 +21,7 @@
 
 #include "ds.h"
 #include "state_machine.h"
+#include "tlv.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,45 +37,49 @@ extern "C" {
  */
 struct ptp_port {
 	/** Object list. */
-	sys_snode_t		    node;
+	sys_snode_t		       node;
 	/** PTP Port Dataset*/
-	struct ptp_port_ds	    port_ds;
+	struct ptp_port_ds	       port_ds;
 	/** Interface related to the Port. */
-	struct net_if		    *iface;
+	struct net_if		       *iface;
 	/** Array of BSD sockets. */
-	int			    socket[2];
+	int			       socket[2];
+	/** Status of a link. */
+	uint8_t			       link_status;
+	/** Link event callback. */
+	struct net_mgmt_event_callback link_cb;
 	/** Structure of system timers used by the Port. */
 	struct {
-		struct k_timer      announce;
-		struct k_timer      delay;
-		struct k_timer      sync;
-		struct k_timer      qualification;
+		struct k_timer	       announce;
+		struct k_timer	       delay;
+		struct k_timer	       sync;
+		struct k_timer	       qualification;
 	} timers;
 	/** Bitmask of tiemouts. */
-	atomic_t		    timeouts;
+	atomic_t		       timeouts;
 	/** Structure of unique sequence IDs used for messages. */
 	struct {
-		uint16_t	    announce;
-		uint16_t	    delay;
-		uint16_t	    signaling;
-		uint16_t	    sync;
+		uint16_t	       announce;
+		uint16_t	       delay;
+		uint16_t	       signaling;
+		uint16_t	       sync;
 	} seq_id;
 	/** Pointer to finite state machine. */
-	enum ptp_port_state	    (*state_machine)(enum ptp_port_state state,
-						     enum ptp_port_event event,
-						     bool tt_diff);
+	enum ptp_port_state	       (*state_machine)(enum ptp_port_state state,
+							enum ptp_port_event event,
+							bool tt_diff);
 	/** Pointer to the Port's best Foreign TimeTransmitter. */
-	struct ptp_foreign_tt_clock *best;
+	struct ptp_foreign_tt_clock    *best;
 	/** List of Foreign TimeTransmitters discovered through received Announce messages. */
-	sys_slist_t		    foreign_list;
+	sys_slist_t		       foreign_list;
 	/** List of valid sent Delay_Req messages (in network byte order). */
-	sys_slist_t		    delay_req_list;
+	sys_slist_t		       delay_req_list;
 	/** Pointer to the last received Sync or Follow_Up message. */
-	struct ptp_msg		    *last_sync_fup;
+	struct ptp_msg		       *last_sync_fup;
 	/** Timestamping callback for sent Delay_Req messages. */
-	struct net_if_timestamp_cb  delay_req_ts_cb;
+	struct net_if_timestamp_cb     delay_req_ts_cb;
 	/** Timestamping callback for sent Sync messages. */
-	struct net_if_timestamp_cb  sync_ts_cb;
+	struct net_if_timestamp_cb     sync_ts_cb;
 };
 
 /**
@@ -142,6 +147,15 @@ bool ptp_port_id_eq(const struct ptp_port_id *p1, const struct ptp_port_id *p2);
  *  pointer to the ptp_dataset of the best foreign timeTransmitter clock.
  */
 struct ptp_dataset *ptp_port_best_foreign_ds(struct ptp_port *port);
+
+/**
+ * @brief Compute PTP Port's best Foreign TimeTransmitter Clock.
+ *
+ * @param[in] port Pointer to the PTP Port.
+ *
+ * @return Pointer to the PTP Port's best Foreign TimeTransmitter.
+ */
+struct ptp_foreign_tt_clock *ptp_port_best_foreign(struct ptp_port *port);
 
 /**
  * @brief Function adding foreign TimeTransmitter Clock for the PTP Port based on specified message.

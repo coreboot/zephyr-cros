@@ -450,6 +450,7 @@ Bluetooth Audio:
     - tests/bluetooth/tester/src/audio/
     - doc/connectivity/bluetooth/api/audio/
     - samples/bluetooth/bap*/
+    - samples/bluetooth/cap*/
     - samples/bluetooth/hap*/
     - samples/bluetooth/pbp*/
     - samples/bluetooth/tmap*/
@@ -782,10 +783,10 @@ DFU:
 
 Devicetree:
   status: maintained
-  maintainers:
-    - galak
+  maintainers: []
   collaborators:
     - decsny
+    - galak
   files:
     - scripts/dts/
     - dts/common/
@@ -803,10 +804,10 @@ Devicetree:
 
 Devicetree Bindings:
   status: maintained
-  maintainers:
-    - galak
+  maintainers: []
   collaborators:
     - decsny
+    - galak
   files:
     - dts/bindings/
     - include/zephyr/dt-bindings/
@@ -1509,6 +1510,21 @@ Release Notes:
   tests:
     - drivers.mipi_dsi
 
+"Drivers: MSPI":
+  status: maintained
+  maintainers:
+    - swift-tk
+  files:
+    - drivers/mspi/
+    - include/zephyr/drivers/mspi.h
+    - include/zephyr/drivers/mspi/
+    - tests/drivers/mspi/
+    - doc/hardware/peripherals/mspi.rst
+  labels:
+    - "area: MSPI"
+  tests:
+    - drivers.mspi
+
 "Drivers: Reset":
   status: odd fixes
   collaborators:
@@ -1593,9 +1609,9 @@ Release Notes:
 "Drivers: LED Strip":
   status: maintained
   maintainers:
-    - mbolivar-ampere
     - simonguinot
   collaborators:
+    - mbolivar-ampere
     - soburi
     - thedjnK
   files:
@@ -2432,6 +2448,7 @@ Mbed TLS:
     - ceolin
   collaborators:
     - ithinuel
+    - valeriosetti
   files:
     - tests/crypto/mbedtls/
     - tests/benchmarks/mbedtls/
@@ -2597,9 +2614,11 @@ Networking:
   files-exclude:
     - doc/connectivity/networking/api/gptp.rst
     - doc/connectivity/networking/api/ieee802154.rst
+    - doc/connectivity/networking/api/ptp.rst
     - doc/connectivity/networking/api/wifi.rst
     - include/zephyr/net/gptp.h
     - include/zephyr/net/ieee802154*.h
+    - include/zephyr/net/ptp.h
     - include/zephyr/net/wifi*.h
     - include/zephyr/net/buf.h
     - include/zephyr/net/dhcpv4*.h
@@ -2615,6 +2634,7 @@ Networking:
     - subsys/net/lib/coap/
     - subsys/net/lib/config/ieee802154*
     - subsys/net/lib/lwm2m/
+    - subsys/net/lib/ptp/
     - subsys/net/lib/tls_credentials/
     - subsys/net/lib/dhcpv4/
     - tests/net/dhcpv4/
@@ -2769,6 +2789,20 @@ Networking:
     - "area: Networking"
   tests:
     - net.mqtt_sn
+
+"Networking: PTP":
+  status: maintained
+  maintainers:
+    - awojasinski
+  files:
+    - doc/connectivity/networking/api/ptp.rst
+    - include/zephyr/net/ptp.h
+    - subsys/net/lib/ptp/
+    - samples/net/ptp/
+  labels:
+    - "area: Networking"
+  tests:
+    - sample.net.ptp
 
 "Networking: Native IEEE 802.15.4":
   status: maintained
@@ -3913,6 +3947,7 @@ TF-M Integration:
   collaborators:
     - Vge0rge
     - ithinuel
+    - valeriosetti
   files:
     - samples/tfm_integration/
     - modules/trusted-firmware-m/
@@ -4083,9 +4118,9 @@ VFS:
 
 West:
   status: maintained
-  maintainers:
-    - mbolivar-ampere
+  maintainers: []
   collaborators:
+    - mbolivar-ampere
     - carlescufi
     - swinslow
   files:

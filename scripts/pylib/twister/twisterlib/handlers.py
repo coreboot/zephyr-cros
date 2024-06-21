@@ -153,7 +153,7 @@ class Handler:
         self.instance.record(harness.recording)
 
     def get_default_domain_build_dir(self):
-        if self.instance.testsuite.sysbuild:
+        if self.instance.sysbuild:
             # Load domain yaml to get default domain build directory
             # Note: for targets using QEMU, we assume that the target will
             # have added any additional images to the run target manually
@@ -799,6 +799,10 @@ class QEMUHandler(Handler):
 
         self.pid_fn = os.path.join(instance.build_dir, "qemu.pid")
 
+        self.stdout_fn = os.path.join(instance.build_dir, "qemu.stdout")
+
+        self.stderr_fn = os.path.join(instance.build_dir, "qemu.stderr")
+
         if instance.testsuite.ignore_qemu_crash:
             self.ignore_qemu_crash = True
             self.ignore_unexpected_eof = True
@@ -1033,7 +1037,7 @@ class QEMUHandler(Handler):
         is_timeout = False
         qemu_pid = None
 
-        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.build_dir) as proc:
+        with subprocess.Popen(command, stdout=open(self.stdout_fn, "wt"), stderr=open(self.stderr_fn, "wt"), cwd=self.build_dir) as proc:
             logger.debug("Spawning QEMUHandler Thread for %s" % self.name)
 
             try:

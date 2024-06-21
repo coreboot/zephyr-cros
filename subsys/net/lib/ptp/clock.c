@@ -11,6 +11,8 @@ LOG_MODULE_REGISTER(ptp_clock, CONFIG_PTP_LOG_LEVEL);
 #include <stdlib.h>
 #include <string.h>
 
+#include <zephyr/posix/sys/eventfd.h>
+
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/ptp_clock.h>
 #include <zephyr/net/ethernet.h>
@@ -41,7 +43,7 @@ struct ptp_clock {
 	struct ptp_dataset	    dataset;
 	struct ptp_foreign_tt_clock *best;
 	sys_slist_t		    ports_list;
-	struct zsock_pollfd	    pollfd[2 * CONFIG_PTP_NUM_PORTS];
+	struct zsock_pollfd	    pollfd[1 + 2 * CONFIG_PTP_NUM_PORTS];
 	bool			    pollfd_valid;
 	bool			    state_decision_event;
 	uint8_t			    time_src;
@@ -220,6 +222,26 @@ static void clock_update_time_receiver(void)
 	clock.time_prop_ds.flags = best_msg->header.flags[1];
 }
 
+static void clock_check_pollfd(void)
+{
+	struct ptp_port *port;
+	struct zsock_pollfd *fd = &clock.pollfd[1];
+
+	if (clock.pollfd_valid) {
+		return;
+	}
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&clock.ports_list, port, node) {
+		for (int i = 0; i < PTP_SOCKET_CNT; i++) {
+			fd->fd = port->socket[i];
+			fd->events = ZSOCK_POLLIN | ZSOCK_POLLPRI;
+			fd++;
+		}
+	}
+
+	clock.pollfd_valid = true;
+}
+
 const struct ptp_clock *ptp_clock_init(void)
 {
 	struct ptp_default_ds *dds = &clock.default_ds;
@@ -263,9 +285,84 @@ const struct ptp_clock *ptp_clock_init(void)
 		return NULL;
 	}
 
+	clock.pollfd[0].fd = eventfd(0, EFD_NONBLOCK);
+	clock.pollfd[0].events = ZSOCK_POLLIN;
+
 	sys_slist_init(&clock.ports_list);
 	LOG_DBG("PTP Clock %s initialized", clock_id_str(&dds->clk_id));
 	return &clock;
+}
+
+struct zsock_pollfd *ptp_clock_poll_sockets(void)
+{
+	int ret;
+
+	clock_check_pollfd();
+	ret = zsock_poll(clock.pollfd, PTP_SOCKET_CNT * clock.default_ds.n_ports + 1, -1);
+	if (ret > 0 && clock.pollfd[0].revents) {
+		eventfd_t value;
+
+		eventfd_read(clock.pollfd[0].fd, &value);
+	}
+
+	return &clock.pollfd[1];
+}
+
+void ptp_clock_handle_state_decision_evt(void)
+{
+	struct ptp_foreign_tt_clock *best = NULL, *foreign;
+	struct ptp_port *port;
+	bool tt_changed = false;
+
+	if (!clock.state_decision_event) {
+		return;
+	}
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&clock.ports_list, port, node) {
+		foreign = ptp_port_best_foreign(port);
+		if (!foreign) {
+			continue;
+		}
+		if (!best || ptp_btca_ds_cmp(&foreign->dataset, &best->dataset)) {
+			best = foreign;
+		}
+	}
+
+	clock.best = best;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&clock.ports_list, port, node) {
+		enum ptp_port_state state;
+		enum ptp_port_event event;
+
+		state = ptp_btca_state_decision(port);
+
+		switch (state) {
+		case PTP_PS_LISTENING:
+			event = PTP_EVT_NONE;
+			break;
+		case PTP_PS_GRAND_MASTER:
+			clock_update_grandmaster();
+			event = PTP_EVT_RS_GRAND_MASTER;
+			break;
+		case PTP_PS_TIME_TRANSMITTER:
+			event = PTP_EVT_RS_TIME_TRANSMITTER;
+			break;
+		case PTP_PS_TIME_RECEIVER:
+			clock_update_time_receiver();
+			event = PTP_EVT_RS_TIME_RECEIVER;
+			break;
+		case PTP_PS_PASSIVE:
+			event = PTP_EVT_RS_PASSIVE;
+			break;
+		default:
+			event = PTP_EVT_FAULT_DETECTED;
+			break;
+		}
+
+		ptp_port_event_handle(port, event, tt_changed);
+	}
+
+	clock.state_decision_event = false;
 }
 
 int ptp_clock_management_msg_process(struct ptp_port *port, struct ptp_msg *msg)
@@ -458,6 +555,11 @@ void ptp_clock_delay(uint64_t egress, uint64_t ingress)
 	clock.current_ds.mean_delay = clock_ns_to_timeinterval(delay);
 }
 
+sys_slist_t *ptp_clock_ports_list(void)
+{
+	return &clock.ports_list;
+}
+
 enum ptp_clock_type ptp_clock_type(void)
 {
 	return (enum ptp_clock_type)clock.default_ds.type;
@@ -520,6 +622,16 @@ struct ptp_port *ptp_clock_port_from_iface(struct net_if *iface)
 void ptp_clock_pollfd_invalidate(void)
 {
 	clock.pollfd_valid = false;
+}
+
+void ptp_clock_signal_timeout(void)
+{
+	eventfd_write(clock.pollfd[0].fd, 1);
+}
+
+void ptp_clock_state_decision_req(void)
+{
+	clock.state_decision_event = true;
 }
 
 void ptp_clock_port_add(struct ptp_port *port)

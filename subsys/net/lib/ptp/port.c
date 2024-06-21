@@ -13,6 +13,7 @@ LOG_MODULE_REGISTER(ptp_port, CONFIG_PTP_LOG_LEVEL);
 #include <zephyr/net/ptp_time.h>
 #include <zephyr/random/random.h>
 
+#include "btca.h"
 #include "clock.h"
 #include "port.h"
 #include "msg.h"
@@ -22,6 +23,11 @@ LOG_MODULE_REGISTER(ptp_port, CONFIG_PTP_LOG_LEVEL);
 #define DEFAULT_LOG_MSG_INTERVAL (0x7F)
 
 #define PORT_DELAY_REQ_CLEARE_TO (3 * NSEC_PER_SEC)
+
+#define PORT_LINK_UP	     BIT(0)
+#define PORT_LINK_DOWN	     BIT(1)
+#define PORT_LINK_CHANGED    BIT(2)
+#define PORT_LINK_EVENT_MASK (NET_EVENT_IF_DOWN | NET_EVENT_IF_UP)
 
 static struct ptp_port ports[CONFIG_PTP_NUM_PORTS];
 static struct k_mem_slab foreign_tts_slab;
@@ -369,6 +375,8 @@ static void port_timer_to_handler(struct k_timer *timer)
 	} else if (timer == &port->timers.qualification) {
 		atomic_set_bit(&port->timeouts, PTP_PORT_TIMER_QUALIFICATION_TO);
 	}
+
+	ptp_clock_signal_timeout();
 }
 
 static void foreign_clock_cleanup(struct ptp_foreign_tt_clock *foreign)
@@ -868,6 +876,9 @@ static int port_enable(struct ptp_port *port)
 	while (!net_if_is_up(port->iface)) {
 		return -1;
 	}
+
+	port->link_status = PORT_LINK_UP;
+
 	if (ptp_transport_open(port)) {
 		LOG_ERR("Couldn't open socket on Port %d.", port->port_ds.id.port_number);
 		return -1;
@@ -951,6 +962,42 @@ int port_state_update(struct ptp_port *port, enum ptp_port_event event, bool tt_
 	return 0;
 }
 
+static void port_link_monitor(struct net_mgmt_event_callback *cb,
+			      uint32_t mgmt_event,
+			      struct net_if *iface)
+{
+	ARG_UNUSED(cb);
+
+	enum ptp_port_event event = PTP_EVT_NONE;
+	struct ptp_port *port = ptp_clock_port_from_iface(iface);
+	int iface_state = mgmt_event == NET_EVENT_IF_UP ? PORT_LINK_UP : PORT_LINK_DOWN;
+
+	if (!port) {
+		return;
+	}
+
+	if (iface_state & port->link_status) {
+		port->link_status = port->link_status;
+	} else {
+		port->link_status = iface_state | PORT_LINK_CHANGED;
+		LOG_DBG("Port %d link %s",
+			port->port_ds.id.port_number,
+			port->link_status & PORT_LINK_UP ? "up" : "down");
+	}
+
+	if (port->link_status & PORT_LINK_CHANGED) {
+		event = iface_state == PORT_LINK_UP ?
+			PTP_EVT_FAULT_CLEARED : PTP_EVT_FAULT_DETECTED;
+		port->link_status ^= PORT_LINK_CHANGED;
+	}
+
+	if (port->link_status & PORT_LINK_DOWN) {
+		ptp_clock_state_decision_req();
+	}
+
+	ptp_port_event_handle(port, event, false);
+}
+
 void ptp_port_init(struct net_if *iface, void *user_data)
 {
 	struct ptp_port *port;
@@ -988,6 +1035,9 @@ void ptp_port_init(struct net_if *iface, void *user_data)
 
 	ptp_clock_pollfd_invalidate();
 	ptp_clock_port_add(port);
+
+	net_mgmt_init_event_callback(&port->link_cb, port_link_monitor, PORT_LINK_EVENT_MASK);
+	net_mgmt_add_event_callback(&port->link_cb);
 
 	LOG_DBG("Port %d initialized", port->port_ds.id.port_number);
 }
@@ -1246,6 +1296,51 @@ bool ptp_port_id_eq(const struct ptp_port_id *p1, const struct ptp_port_id *p2)
 struct ptp_dataset *ptp_port_best_foreign_ds(struct ptp_port *port)
 {
 	return port->best ? &port->best->dataset : NULL;
+}
+
+struct ptp_foreign_tt_clock *ptp_port_best_foreign(struct ptp_port *port)
+{
+	struct ptp_foreign_tt_clock *foreign;
+	struct ptp_announce_msg *last;
+
+	port->best = NULL;
+
+	if (port->port_ds.time_transmitter_only) {
+		return NULL;
+	}
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&port->foreign_list, foreign, node) {
+		if (!foreign->messages_count) {
+			continue;
+		}
+
+		foreign_clock_cleanup(foreign);
+
+		if (foreign->messages_count < FOREIGN_TIME_TRANSMITTER_THRESHOLD) {
+			continue;
+		}
+
+		last = (struct ptp_announce_msg *)k_fifo_peek_head(&foreign->messages);
+
+		foreign->dataset.priority1 = last->gm_priority1;
+		foreign->dataset.priority2 = last->gm_priority2;
+		foreign->dataset.steps_rm = last->steps_rm;
+
+		memcpy(&foreign->dataset.clk_quality,
+		       &last->gm_clk_quality,
+		       sizeof(last->gm_clk_quality));
+		memcpy(&foreign->dataset.clk_id, &last->gm_id, sizeof(last->gm_id));
+		memcpy(&foreign->dataset.receiver, &port->port_ds.id, sizeof(port->port_ds.id));
+
+		if (!port->best) {
+			port->best = foreign;
+		} else if (ptp_btca_ds_cmp(&foreign->dataset, &port->best->dataset)) {
+			port->best = foreign;
+		} else {
+			port_clear_foreign_clock_records(foreign);
+		}
+	}
+	return port->best;
 }
 
 int ptp_port_add_foreign_tt(struct ptp_port *port, struct ptp_msg *msg)

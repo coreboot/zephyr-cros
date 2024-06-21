@@ -241,20 +241,24 @@ Bluetooth HCI
    selects which driver instance to use as the controller by looking for a ``zephyr,bt-hci``
    chosen property. The devicetree bindings for all HCI drivers derive from a common
    ``bt-hci.yaml`` base binding.
- * As part of the new HCI driver API, the ``zephyr,bt-uart`` chosen property is no longer used,
-   rather the UART HCI drivers select their UART by looking for the parent devicetree node of the
-   HCI driver instance node.
- * As part of the new HCI driver API, the ``zephyr,bt-hci-ipc`` chosen property is only used for
-   the controller side, whereas the HCI driver now relies on nodes with the compatible string
-   ``zephyr,bt-hci-ipc``.
- * The ``BT_HCI_VS_EXT`` Kconfig option was deleted and the feature is now included in the
-   :kconfig:option:`BT_HCI_VS` Kconfig option.
- * The ``BT_HCI_VS_EVT`` Kconfig option was removed, since vendor event support is implicit if
-   the :kconfig:option:`BT_HCI_VS` option is enabled.
- * The bt_read_static_addr() API was removed. This wasn't really a completely public API, but
-   since it was exposed by the public hci_driver.h header file the removal is mentioned here.
-   Enable the :kconfig:option:`BT_HCI_VS` Kconfig option instead, and use vendor specific HCI
-   commands API to get the Controller's Bluetooth static address when available.
+
+   * As part of the new HCI driver API, the ``zephyr,bt-uart`` chosen property is no longer used,
+      rather the UART HCI drivers select their UART by looking for the parent devicetree node of the
+      HCI driver instance node.
+   * As part of the new HCI driver API, the ``zephyr,bt-hci-ipc`` chosen property is only used for
+      the controller side, whereas the HCI driver now relies on nodes with the compatible string
+      ``zephyr,bt-hci-ipc``.
+   * The ``BT_NO_DRIVER`` Kconfig option was removed. HCI drivers are no-longer behind a Kconfig
+      choice, rather they can now be enabled and disabled independently, mostly based on their
+      respective devicetree node being enabled or not.
+   * The ``BT_HCI_VS_EXT`` Kconfig option was deleted and the feature is now included in the
+      :kconfig:option:`BT_HCI_VS` Kconfig option.
+   * The ``BT_HCI_VS_EVT`` Kconfig option was removed, since vendor event support is implicit if
+      the :kconfig:option:`BT_HCI_VS` option is enabled.
+   * The bt_read_static_addr() API was removed. This wasn't really a completely public API, but
+      since it was exposed by the public hci_driver.h header file the removal is mentioned here.
+      Enable the :kconfig:option:`BT_HCI_VS` Kconfig option instead, and use vendor specific HCI
+      commands API to get the Controller's Bluetooth static address when available.
 
 Charger
 =======
@@ -308,6 +312,50 @@ Controller Area Network (CAN)
 Display
 =======
 
+* GC9X01 based displays now use the MIPI DBI driver class. These displays
+  must now be declared within a MIPI DBI driver wrapper device, which will
+  manage interfacing with the display. (:github:`73686`)
+  For an example, see below:
+
+  .. code-block:: devicetree
+
+    /* Legacy GC9X01 display definition */
+    &spi0 {
+        gc9a01: gc9a01@0 {
+            status = "okay";
+            compatible = "galaxycore,gc9x01x";
+            reg = <0>;
+            spi-max-frequency = <100000000>;
+            cmd-data-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+            reset-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+            ...
+        };
+    };
+
+    /* New display definition with MIPI DBI device */
+
+    #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+
+    ...
+
+    mipi_dbi {
+        compatible = "zephyr,mipi-dbi-spi";
+        dc-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+        spi-dev = <&spi0>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        gc9a01: gc9a01@0 {
+            status = "okay";
+            compatible = "galaxycore,gc9x01x";
+            reg = <0>;
+            mipi-max-frequency = <100000000>;
+            ...
+        };
+    };
+
+
 * ST7735R based displays now use the MIPI DBI driver class. These displays
   must now be declared within a MIPI DBI driver wrapper device, which will
   manage interfacing with the display. Note that the `cmd-data-gpios` pin has
@@ -351,12 +399,51 @@ Display
         };
     };
 
+* UC81XX based displays now use the MIPI DBI driver class. These displays must
+  now be declared within a MIPI DBI driver wrapper device, which will manage
+  interfacing with the display. (:github:`73812`) Note that the ``dc-gpios``
+  pin has changed polarity with this update, for an example, see below:
+
+  .. code-block:: devicetree
+
+    /* Legacy UC81XX display definition */
+    &spi0 {
+        uc8179: uc8179@0 {
+            compatible = "ultrachip,uc8179";
+            reg = <0>;
+            spi-max-frequency = <4000000>;
+            reset-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+            dc-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+            ...
+        };
+    };
+
+    /* New display definition with MIPI DBI device */
+
+    #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+
+    ...
+
+    mipi_dbi {
+        compatible = "zephyr,mipi-dbi-spi";
+        reset-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+        dc-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+        spi-dev = <&spi0>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+        uc8179: uc8179@0 {
+            compatible = "ultrachip,uc8179";
+            reg = <0>;
+            mipi-max-frequency = <4000000>;
+            ...
+        };
+    };
 
 * ST7789V based displays now use the MIPI DBI driver class. These displays
   must now be declared within a MIPI DBI driver wrapper device, which will
   manage interfacing with the display. (:github:`73750`) Note that the
-  `cmd-data-gpios` pin has changed polarity with this update, to align better
-  with the new `dc-gpios` name. For an example, see below:
+  ``cmd-data-gpios`` pin has changed polarity with this update, to align better
+  with the new ``dc-gpios`` name. For an example, see below:
 
   .. code-block:: devicetree
 
@@ -394,6 +481,52 @@ Display
             ...
         };
     };
+
+* SSD16XX based displays now use the MIPI DBI driver class (:github:`73946`).
+  These displays must now be declared within a MIPI DBI driver wrapper device,
+  which will manage interfacing with the display. Note that the ``dc-gpios``
+  pin has changed polarity with this update. For an example, see below:
+
+  .. code-block:: devicetree
+
+    /* Legacy SSD16XX display definition */
+    &spi0 {
+        ssd1680: ssd1680@0 {
+            compatible = "solomon,ssd1680";
+            reg = <0>;
+            spi-max-frequency = <4000000>;
+            reset-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+            dc-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+            ...
+        };
+    };
+
+    /* New display definition with MIPI DBI device */
+
+    #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+
+    ...
+
+    mipi_dbi {
+        compatible = "zephyr,mipi-dbi-spi";
+        reset-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+        dc-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+        spi-dev = <&spi0>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        ssd1680: ssd1680@0 {
+            compatible = "solomon,ssd1680";
+            reg = <0>;
+            mipi-max-frequency = <4000000>;
+            ...
+        };
+    };
+
+* The ``orientation-flipped`` property has been removed from the SSD16XX
+  display driver, as the driver now supports display rotation. Users should
+  drop this property from their devicetree, and set orientation at runtime
+  via :c:func:`display_set_orientation` (:github:`73360`)
 
 Enhanced Serial Peripheral Interface (eSPI)
 ===========================================
@@ -571,6 +704,21 @@ Bluetooth Audio
 * All occurrences of ``set_sirk`` have been changed to just ``sirk`` as the ``s`` in ``sirk`` stands
   for set. (:github:`73413`)
 
+* Added ``fallback_to_default`` parameter to :c:func:`bt_audio_codec_cfg_get_chan_allocation`.
+  To maintain existing behavior set the parameter to ``false``. (:github:`72090`)
+
+* Added ``fallback_to_default`` parameter to
+  :c:func:`bt_audio_codec_cap_get_supported_audio_chan_counts`.
+  To maintain existing behavior set the parameter to ``false``. (:github:`72090`)
+
+* Added ``fallback_to_default`` parameter to
+  :c:func:`bt_audio_codec_cap_get_max_codec_frames_per_sdu`.
+  To maintain existing behavior set the parameter to ``false``. (:github:`72090`)
+
+* Added ``fallback_to_default`` parameter to
+  :c:func:`bt_audio_codec_cfg_meta_get_pref_context`.
+  To maintain existing behavior set the parameter to ``false``. (:github:`72090`)
+
 Bluetooth Classic
 =================
 
@@ -596,6 +744,14 @@ Bluetooth Host
 * The field :code:`init_credits` in :c:type:`bt_l2cap_le_endpoint` has been removed as it was no
   longer used in Zephyr 3.4.0 and later. Any references to this field should be removed. No further
   action is needed.
+
+Bluetooth Crypto
+================
+
+* :kconfig:option:`CONFIG_BT_USE_PSA_API` was added to explicitly request use
+  of PSA APIs instead of TinyCrypt for crypto operations. Of course, this is
+  possible only a PSA crypto provider available in the system, i.e.
+  :kconfig:option:`CONFIG_PSA_CRYPTO_CLIENT` is set. (:github:`73378`)
 
 Networking
 **********
@@ -674,6 +830,17 @@ Networking
 Other Subsystems
 ****************
 
+Flash map
+=========
+
+* The crypto backend for the flash check functions (:kconfig:option:`CONFIG_FLASH_AREA_CHECK_INTEGRITY_BACKEND`),
+  previously provided through either TinyCrypt or Mbed TLS, is now provided through either PSA or Mbed TLS.
+  The updated Mbed TLS implementation has a slightly smaller footprint than the previous TinyCrypt one,
+  and the PSA implementation offers an even greater footprint reduction for devices built with TF-M.
+  PSA is the supported way forward, however as of now you may still use Mbed TLS if you cannot afford the
+  one-time cost of enabling the PSA API (:kconfig:option:`CONFIG_MBEDTLS_PSA_CRYPTO_C` for devices without TF-M).
+  :github:`73511`
+
 hawkBit
 =======
 
@@ -730,6 +897,15 @@ State Machine Framework
   exit actions from the current state to the topmost parent, with the expectation the topmost exit
   action would terminate the state machine. Passing ``NULL`` is now not allowed. Instead create a
   'terminate' state at the top level, and call :c:func:`smf_set_terminate` from its entry action.
+
+UpdateHub
+=========
+
+* The SHA-256 implementation used to perform integrity checks is not chosen with
+  :kconfig:option:`CONFIG_FLASH_AREA_CHECK_INTEGRITY_BACKEND` anymore. Instead, the implementation
+  used (now either Mbed TLS or PSA) is chosen based on :kconfig:option:`CONFIG_PSA_CRYPTO_CLIENT`.
+  It still defaults to using Mbed TLS (with a smaller footprint than previously) unless the
+  board is built with TF-M or :kconfig:option:`CONFIG_MBEDTLS_PSA_CRYPTO_C` is enabled. (:github:`73511`)
 
 ZBus
 ====

@@ -300,7 +300,40 @@ Drivers and Sensors
 
 * Crypto
 
+* Disk
+
+  * Support for eMMC devices was added to the STM32 SD driver. This can
+    be enabled with :kconfig:option:`CONFIG_SDMMC_STM32_EMMC`.
+  * Added a loopback disk driver, to expose a disk device backed by a file.
+    A file can be registered with the loopback disk driver using
+    :c:func:`loopback_disk_access_register`
+  * Added support for :c:macro:`DISK_IOCTL_CTRL_INIT` and
+    :c:macro:`DISK_IOCTL_CTRL_DEINIT` macros, which allow for initializing
+    and de-initializing a disk at runtime. This allows hotpluggable
+    disk devices (like SD cards) to be removed and reinserted at runtime.
+
 * Display
+
+  * All in tree displays capable of supporting the :ref:`mipi_dbi_api` have
+    been converted to use it. GC9X01X, UC81XX, SSD16XX, ST7789V, ST7735R based
+    displays have been converted to this API. Boards using these displays will
+    need their devicetree updated, see the display section of
+    :ref:`migration_3.7` for examples of this process.
+  * Added driver for ST7796S display controller (:dtcompatible:`sitronix,st7796s`)
+  * Added support for :c:func:`display_read` API to ILI9XXX display driver,
+    which can be enabled with :kconfig:option:`CONFIG_ILI9XXX_READ`
+  * Added support for :c:func:`display_set_orientation` API to SSD16XXX
+    display driver
+  * Added driver for NT35510 MIPI-DSI display controller
+    (:dtcompatible:`frida,nt35510`)
+  * Added driver to abstract LED strip devices as displays
+    (:dtcompatible:`led-strip-matrix`)
+  * Added support for :c:func:`display_set_pixel_format` API to NXP eLCDIF
+    driver. ARGB8888, RGB888, and BGR565 formats are supported.
+  * Added support for inverting color at runtime to the SSD1306 driver, via
+    the :c:func:`display_set_pixel_format` API.
+  * Inversion mode can now be disabled in the ST7789V driver
+    (:dtcompatible:`sitronix,st7789v`) using the ``inversion-off`` property.
 
 * DMA
 
@@ -345,6 +378,11 @@ Drivers and Sensors
   * The ``chain-length`` and ``color-mapping`` properties have been added to all LED strip
     bindings.
 
+
+* LoRa
+
+  * Added driver for Reyax LoRa module
+
 * MDIO
 
 * MFD
@@ -380,6 +418,9 @@ Drivers and Sensors
 * SMBUS:
 
 * SDHC
+
+  * Added ESP32 SDHC driver (:dtcompatible:`espressif,esp32-sdhc`).
+  * Added SDHC driver for Renesas MMC controller (:dtcompatible:`renesas,rcar-mmc`).
 
 * Sensor
 
@@ -540,6 +581,14 @@ Libraries / Subsystems
 * Retention
 
 * SD
+
+  * SDMMC and SDIO frequency and timing selection logic have been reworked,
+    to resolve an issue where a timing mode would not be selected if the
+    SDHC device in use did not report support for the maximum frequency
+    possible in that mode. Now, if the host controller and card both report
+    support for a given timing mode but not the highest frequency that
+    mode supports, the timing mode will be selected and configured at
+    the reduced frequency (:github:`72705`).
 
 * State Machine Framework
 

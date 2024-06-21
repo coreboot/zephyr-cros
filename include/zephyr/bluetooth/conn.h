@@ -847,7 +847,8 @@ struct bt_conn_le_create_param {
  *  This uses the General Connection Establishment procedure.
  *
  *  The application must disable explicit scanning before initiating
- *  a new LE connection.
+ *  a new LE connection if @kconfig{CONFIG_BT_SCAN_AND_INITIATE_IN_PARALLEL}
+ *  is not enabled.
  *
  *  @param[in]  peer         Remote address.
  *  @param[in]  create_param Create connection parameters.
@@ -1247,7 +1248,8 @@ struct bt_conn_cb {
 				const struct bt_conn_le_path_loss_threshold_report *report);
 #endif /* CONFIG_BT_PATH_LOSS_MONITORING */
 
-	struct bt_conn_cb *_next;
+	/** @internal Internally used field for list handling */
+	sys_snode_t _node;
 };
 
 /** @brief Register connection callbacks.
@@ -1255,8 +1257,11 @@ struct bt_conn_cb {
  *  Register callbacks to monitor the state of connections.
  *
  *  @param cb Callback struct. Must point to memory that remains valid.
+ *
+ * @retval 0 Success.
+ * @retval -EEXIST if @p cb was already registered.
  */
-void bt_conn_cb_register(struct bt_conn_cb *cb);
+int bt_conn_cb_register(struct bt_conn_cb *cb);
 
 /**
  * @brief Unregister connection callbacks.

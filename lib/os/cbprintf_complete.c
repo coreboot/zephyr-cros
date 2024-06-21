@@ -1060,7 +1060,7 @@ static char *encode_float(double value,
 			/* Fraction is subnormal.  Normalize it and correct
 			 * the exponent.
 			 */
-			while (((fract <<= 1) & BIT_63) == 0) {
+			for (fract <<= 1; (fract & BIT_63) == 0; fract <<= 1) {
 				expo--;
 			}
 		}
@@ -1128,7 +1128,7 @@ static char *encode_float(double value,
 		 * representation and correct the precision and zero-pruning
 		 * in accordance with the ISO C rule.
 		 */
-		if (decexp < (-4 + 1) || decexp > precision) {
+		if ((decexp < (-4 + 1)) || (decexp > precision)) {
 			c += 'e' - 'g';  /* e or E */
 			if (precision > 0) {
 				precision--;
@@ -1173,7 +1173,7 @@ static char *encode_float(double value,
 	if (c == 'f') {
 		if (decexp > 0) {
 			/* Emit the digits above the decimal point. */
-			while (decexp > 0 && digit_count > 0) {
+			while ((decexp > 0) && (digit_count > 0)) {
 				*buf++ = _get_digit(&fract, &digit_count);
 				decexp--;
 			}
@@ -1192,7 +1192,7 @@ static char *encode_float(double value,
 			*buf++ = '.';
 		}
 
-		if (decexp < 0 && precision > 0) {
+		if ((decexp < 0) && (precision > 0)) {
 			conv->pad0_value = -decexp;
 			if (conv->pad0_value > precision) {
 				conv->pad0_value = precision;
@@ -1218,7 +1218,7 @@ static char *encode_float(double value,
 		}
 	}
 
-	while (precision > 0 && digit_count > 0) {
+	while ((precision > 0) && (digit_count > 0)) {
 		*buf++ = _get_digit(&fract, &digit_count);
 		precision--;
 	}
@@ -1364,7 +1364,7 @@ int z_cbvprintf_impl(cbprintf_cb out, void *ctx, const char *fp,
  */
 
 #define OUTS(_sp, _ep) do { \
-	int rc = outs(out, ctx, _sp, _ep); \
+	int rc = outs(out, ctx, (_sp), (_ep)); \
 	\
 	if (rc < 0) {	    \
 		return rc; \

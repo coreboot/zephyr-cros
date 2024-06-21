@@ -597,6 +597,7 @@ test_i2c_bmp388: bmp388@55 {
 test_i2c_lm75: lm75@56 {
 	compatible = "lm75";
 	reg = <0x56>;
+	int-gpios = <&test_gpio 0 0>;
 };
 
 test_i2c_ina230: ina230@57 {
@@ -1054,4 +1055,15 @@ test_i2c_shtc1: shtc1@8e {
 	reg = <0x8e>;
 	measure-mode = "low-power";
 	clock-stretching;
+};
+
+test_i2c_lm95234: lm95234@8f {
+	compatible = "national,lm95234";
+	reg = <0x8f>;
+	status = "okay";
+};
+
+test_i2c_sht21@90 {
+	compatible = "sensirion,sht21";
+	reg = <0x90>;
 };

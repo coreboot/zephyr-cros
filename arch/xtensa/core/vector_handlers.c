@@ -29,14 +29,6 @@ LOG_MODULE_DECLARE(os, CONFIG_KERNEL_LOG_LEVEL);
 extern char xtensa_arch_except_epc[];
 extern char xtensa_arch_kernel_oops_epc[];
 
-#ifdef CONFIG_USERSPACE
-Z_EXC_DECLARE(xtensa_user_string_nlen);
-
-static const struct z_exc_handle exceptions[] = {
-	Z_EXC_HANDLE(xtensa_user_string_nlen)
-};
-#endif /* CONFIG_USERSPACE */
-
 void xtensa_dump_stack(const void *stack)
 {
 	_xtensa_irq_stack_frame_raw_t *frame = (void *)stack;
@@ -229,12 +221,13 @@ void *xtensa_excint1_c(void *esf)
 	void *pc, *print_stack = (void *)interrupted_stack;
 	uint32_t depc = 0;
 
-	__asm__ volatile("rsr.exccause %0" : "=r"(cause));
-
 #ifdef CONFIG_XTENSA_MMU
-	__asm__ volatile("rsr.depc %0" : "=r"(depc));
+	depc = XTENSA_RSR(ZSR_DEPC_SAVE_STR);
+	cause = XTENSA_RSR(ZSR_EXCCAUSE_SAVE_STR);
 
 	is_dblexc = (depc != 0U);
+#else /* CONFIG_XTENSA_MMU */
+	__asm__ volatile("rsr.exccause %0" : "=r"(cause));
 #endif /* CONFIG_XTENSA_MMU */
 
 	switch (cause) {
@@ -263,21 +256,6 @@ void *xtensa_excint1_c(void *esf)
 	default:
 		ps = bsa->ps;
 		pc = (void *)bsa->pc;
-
-#ifdef CONFIG_USERSPACE
-		/* If the faulting address is from one of the known
-		 * exceptions that should not be fatal, return to
-		 * the fixup address.
-		 */
-		for (int i = 0; i < ARRAY_SIZE(exceptions); i++) {
-			if ((pc >= exceptions[i].start) &&
-			    (pc < exceptions[i].end)) {
-				bsa->pc = (uintptr_t)exceptions[i].fixup;
-
-				goto fixup_out;
-			}
-		}
-#endif /* CONFIG_USERSPACE */
 
 		/* Default for exception */
 		int reason = K_ERR_CPU_EXCEPTION;
@@ -370,15 +348,11 @@ void *xtensa_excint1_c(void *esf)
 		_current_cpu->nested = 1;
 	}
 
-#if defined(CONFIG_XTENSA_MMU) || defined(CONFIG_XTENSA_MPU)
-#ifdef CONFIG_USERSPACE
-fixup_out:
-#endif
+#if defined(CONFIG_XTENSA_MMU)
 	if (is_dblexc) {
-		__asm__ volatile("wsr.depc %0" : : "r"(0));
+		XTENSA_WSR(ZSR_DEPC_SAVE_STR, 0);
 	}
-#endif /* CONFIG_XTENSA_MMU || CONFIG_XTENSA_MPU */
-
+#endif /* CONFIG_XTENSA_MMU */
 
 	return return_to(interrupted_stack);
 }
