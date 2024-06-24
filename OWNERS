@@ -9,3 +9,6 @@ keithshort@chromium.org
 peress@chromium.org
 phoenixshen@google.com
 yllin@google.com
+
+# Allow fingerprint team to be a code owner of this branch
+include chromiumos/owners:v1:/firmware/OWNERS.cros_fp_lrs
