@@ -264,8 +264,8 @@ static struct spair *spair_new(void)
 		goto cleanup;
 	}
 
-	z_finalize_fd(spair->remote, spair,
-		      (const struct fd_op_vtable *)&spair_fd_op_vtable);
+	z_finalize_typed_fd(spair->remote, spair, (const struct fd_op_vtable *)&spair_fd_op_vtable,
+			    ZVFS_MODE_IFSOCK);
 
 	goto out;
 
@@ -597,7 +597,7 @@ out:
  * -# @ref SPAIR_SIG_DATA - data has been written to the @em local
  *    @ref spair.pipe. Thus, allowing more data to be read.
  *
- * -# @ref SPAIR_SIG_CANCEL - read of the the @em local @spair.pipe
+ * -# @ref SPAIR_SIG_CANCEL - read of the @em local @spair.pipe
  *    must be cancelled for some reason (e.g. the file descriptor will be
  *    closed imminently). In this case, the function will return -1 and set
  *    @ref errno to @ref EINTR.

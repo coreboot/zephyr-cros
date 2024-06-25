@@ -1252,7 +1252,7 @@ static void le_conn_complete_cancel(uint8_t err)
 		int busy_status = k_work_delayable_busy_get(&conn->deferred_work);
 
 		if (!(busy_status & (K_WORK_QUEUED | K_WORK_DELAYED))) {
-			/* Connection initiation timeout triggered. */
+			LOG_WRN("Connection creation timeout triggered");
 			conn->err = err;
 			bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 		} else {
@@ -4653,10 +4653,10 @@ static void tx_processor(struct k_work *item)
 	}
 }
 
-K_WORK_DELAYABLE_DEFINE(tx_work, tx_processor);
+static K_WORK_DEFINE(tx_work, tx_processor);
 
 void bt_tx_irq_raise(void)
 {
 	LOG_DBG("kick TX");
-	k_work_reschedule(&tx_work, K_NO_WAIT);
+	k_work_submit(&tx_work);
 }

@@ -127,6 +127,14 @@ Trusted Firmware-M
 zcbor
 =====
 
+LVGL
+====
+
+* :kconfig:option:`CONFIG_LV_Z_POINTER_KSCAN` was removed, you need to convert your kscan based
+  driver to the input subsystem and use a :dtcompatible:`zephyr,lvgl-pointer-input` in your
+  devicetree instead. (:github:`73800`)
+
+
 Device Drivers and Devicetree
 *****************************
 
@@ -522,6 +530,11 @@ Display
             ...
         };
     };
+
+* The ``orientation-flipped`` property has been removed from the SSD16XX
+  display driver, as the driver now supports display rotation. Users should
+  drop this property from their devicetree, and set orientation at runtime
+  via :c:func:`display_set_orientation` (:github:`73360`)
 
 Enhanced Serial Peripheral Interface (eSPI)
 ===========================================

@@ -475,6 +475,33 @@ static enum bt_security_err security_err_get(uint8_t smp_err)
 	}
 }
 
+const char *bt_security_err_to_str(enum bt_security_err err)
+{
+	#define SEC_ERR(err) [err] = #err
+
+	const char * const mapping_table[] = {
+		SEC_ERR(BT_SECURITY_ERR_SUCCESS),
+		SEC_ERR(BT_SECURITY_ERR_AUTH_FAIL),
+		SEC_ERR(BT_SECURITY_ERR_PIN_OR_KEY_MISSING),
+		SEC_ERR(BT_SECURITY_ERR_OOB_NOT_AVAILABLE),
+		SEC_ERR(BT_SECURITY_ERR_AUTH_REQUIREMENT),
+		SEC_ERR(BT_SECURITY_ERR_PAIR_NOT_SUPPORTED),
+		SEC_ERR(BT_SECURITY_ERR_PAIR_NOT_ALLOWED),
+		SEC_ERR(BT_SECURITY_ERR_INVALID_PARAM),
+		SEC_ERR(BT_SECURITY_ERR_KEY_REJECTED),
+		SEC_ERR(BT_SECURITY_ERR_UNSPECIFIED),
+	};
+
+	if (err < ARRAY_SIZE(mapping_table) && mapping_table[err]) {
+		return mapping_table[err];
+	} else {
+		return "(unknown)";
+	}
+
+	#undef SEC_ERR
+}
+
+
 static uint8_t smp_err_get(enum bt_security_err auth_err)
 {
 	switch (auth_err) {
@@ -498,6 +525,38 @@ static uint8_t smp_err_get(enum bt_security_err auth_err)
 	default:
 		return 0;
 	}
+}
+
+const char *bt_smp_err_to_str(uint8_t smp_err)
+{
+	#define SMP_ERR(err) [err] = #err
+
+	const char * const mapping_table[] = {
+		SMP_ERR(BT_SMP_ERR_SUCCESS),
+		SMP_ERR(BT_SMP_ERR_PASSKEY_ENTRY_FAILED),
+		SMP_ERR(BT_SMP_ERR_OOB_NOT_AVAIL),
+		SMP_ERR(BT_SMP_ERR_AUTH_REQUIREMENTS),
+		SMP_ERR(BT_SMP_ERR_CONFIRM_FAILED),
+		SMP_ERR(BT_SMP_ERR_PAIRING_NOTSUPP),
+		SMP_ERR(BT_SMP_ERR_ENC_KEY_SIZE),
+		SMP_ERR(BT_SMP_ERR_CMD_NOTSUPP),
+		SMP_ERR(BT_SMP_ERR_UNSPECIFIED),
+		SMP_ERR(BT_SMP_ERR_REPEATED_ATTEMPTS),
+		SMP_ERR(BT_SMP_ERR_INVALID_PARAMS),
+		SMP_ERR(BT_SMP_ERR_DHKEY_CHECK_FAILED),
+		SMP_ERR(BT_SMP_ERR_NUMERIC_COMP_FAILED),
+		SMP_ERR(BT_SMP_ERR_BREDR_PAIRING_IN_PROGRESS),
+		SMP_ERR(BT_SMP_ERR_CROSS_TRANSP_NOT_ALLOWED),
+		SMP_ERR(BT_SMP_ERR_KEY_REJECTED),
+	};
+
+	if (smp_err < ARRAY_SIZE(mapping_table) && mapping_table[smp_err]) {
+		return mapping_table[smp_err];
+	} else {
+		return "(unknown)";
+	}
+
+	#undef SMP_ERR
 }
 
 static struct net_buf *smp_create_pdu(struct bt_smp *smp, uint8_t op, size_t len)

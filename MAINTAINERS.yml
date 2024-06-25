@@ -1516,10 +1516,15 @@ Release Notes:
     - swift-tk
   files:
     - drivers/mspi/
+    - drivers/memc/*mspi*
+    - drivers/flash/*mspi*
     - include/zephyr/drivers/mspi.h
     - include/zephyr/drivers/mspi/
+    - samples/drivers/mspi/
     - tests/drivers/mspi/
     - doc/hardware/peripherals/mspi.rst
+    - dts/bindings/mspi/
+    - dts/bindings/mtd/mspi*
   labels:
     - "area: MSPI"
   tests:
@@ -2448,6 +2453,7 @@ Mbed TLS:
     - ceolin
   collaborators:
     - ithinuel
+    - valeriosetti
   files:
     - tests/crypto/mbedtls/
     - tests/benchmarks/mbedtls/
@@ -3946,6 +3952,7 @@ TF-M Integration:
   collaborators:
     - Vge0rge
     - ithinuel
+    - valeriosetti
   files:
     - samples/tfm_integration/
     - modules/trusted-firmware-m/
@@ -3980,6 +3987,7 @@ TF-M Integration:
   files:
     - cmake/*/arcmwdt/
     - include/zephyr/toolchain/mwdt.h
+    - include/zephyr/linker/linker-tool-mwdt.h
     - lib/libc/arcmwdt/*
   labels:
     - "area: Toolchains"

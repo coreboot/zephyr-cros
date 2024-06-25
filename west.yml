@@ -147,12 +147,12 @@ manifest:
       groups:
         - hal
     - name: hal_ambiq
-      revision: fcbbd99e20db1432196f4aec92678bd1f5b19c96
+      revision: 367ae6a0396e3074bebbd55ef72f8e577168e567
       path: modules/hal/ambiq
       groups:
         - hal
     - name: hal_atmel
-      revision: d6221e73d76a4a31d802e0657342fcbda77e21ae
+      revision: 56d60ebc909ad065bf6554cee73487969857614b
       path: modules/hal/atmel
       groups:
         - hal
@@ -198,7 +198,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: bee15c31e19ff1982583d9b750ef844d64320160
+      revision: 862e001504bd6e0a4feade6a718e9f973116849c
       path: modules/hal/nxp
       groups:
         - hal
@@ -234,7 +234,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 6443e5c4d391c3e9e283c5728cd07d855e663965
+      revision: 855f195793df094644ce8b8617c01275408bbf58
       path: modules/hal/stm32
       groups:
         - hal
