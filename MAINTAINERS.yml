@@ -4674,6 +4674,7 @@ West:
     - ceolin
   collaborators:
     - ithinuel
+    - valeriosetti
   files:
     - modules/mbedtls/
   labels:
