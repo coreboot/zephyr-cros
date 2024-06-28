@@ -52,6 +52,8 @@ Removed APIs in this release
 
  * Removed deprecated ``pcie_probe`` and ``pcie_bdf_lookup`` functions from the PCIe APIs.
 
+ * Removed deprecated ``CONFIG_EMUL_EEPROM_AT2X`` Kconfig option.
+
 Deprecated in this release
 ==========================
 
@@ -69,6 +71,16 @@ Deprecated in this release
 
    Application developer will now need to set the advertised name themselves by updating the advertising data
    or the scan response data.
+
+* CAN
+
+  * Deprecated the :c:func:`can_calc_prescaler` API function, as it allows for bitrate
+    errors. Bitrate errors between nodes on the same network leads to them drifting apart after the
+    start-of-frame (SOF) synchronization has taken place, leading to bus errors.
+  * Deprecated the :c:func:`can_get_min_bitrate` and :c:func:`can_get_max_bitrate` API functions in
+    favor of :c:func:`can_get_bitrate_min` and :c:func:`can_get_bitrate_max`.
+  * Deprecated the :c:macro:`CAN_MAX_STD_ID` and :c:macro:`CAN_MAX_EXT_ID` macros in favor of
+    :c:macro:`CAN_STD_ID_MASK` and :c:macro:`CAN_EXT_ID_MASK`.
 
 .. _zephyr_3.7_posix_api_deprecations:
 
@@ -255,6 +267,18 @@ Build system and Infrastructure
 
   * Fixed issue with passing UTF-8 configs to applications using sysbuild.
 
+  * Fixed issue whereby domain file in sysbuild projects would be loaded and used with outdated
+    information if sysbuild configuration was changed, and ``west flash`` was ran directly after.
+
+  * Fixed issue with Zephyr modules not being listed in sysbuild if they did not have a Kconfig
+    file set.
+
+  * Add sysbuild ``SB_CONFIG_COMPILER_WARNINGS_AS_ERRORS`` Kconfig option to turn on
+    "warning as error" toolchain flags for all images, if set.
+
+  * Fixed issue whereby files used in a project (e.g. devicetree overlays or Kconfig fragments)
+    were not correctly watched and CMake would not reconfigure if they were changed.
+
 Drivers and Sensors
 *******************
 
@@ -273,9 +297,6 @@ Drivers and Sensors
 
 * CAN
 
-  * Deprecated the :c:func:`can_calc_prescaler` API function, as it allows for bitrate
-    errors. Bitrate errors between nodes on the same network leads to them drifting apart after the
-    start-of-frame (SOF) synchronization has taken place, leading to bus errors.
   * Added :c:func:`can_get_bitrate_min` and :c:func:`can_get_bitrate_max` for retrieving the minimum
     and maximum supported bitrate for a given CAN controller/CAN transceiver combination, reflecting
     that retrieving the bitrate limits can no longer fail. Deprecated the existing
@@ -288,13 +309,16 @@ Drivers and Sensors
     transceiver.
   * Added support for specifying the minimum bitrate supported by a CAN controller in the internal
     ``CAN_DT_DRIVER_CONFIG_GET`` and ``CAN_DT_DRIVER_CONFIG_INST_GET`` macros.
-  * Added a new CAN controller API function :c:func:`can_get_min_bitrate` for getting the minimum
+  * Added a new CAN controller API function :c:func:`can_get_bitrate_min` for getting the minimum
     supported bitrate of a CAN controller/transceiver combination.
   * Updated the CAN timing functions to take the minimum supported bitrate into consideration when
     validating the bitrate.
   * Made the ``sample-point`` and ``sample-point-data`` devicetree properties optional.
   * Renamed the ``bus_speed`` and ``bus_speed_data`` fields of :c:struct:`can_driver_config` to
     ``bitrate`` and ``bitrate_data``.
+  * Added driver for :dtcompatible:`nordic,nrf-can`.
+  * Added driver support for Numaker M2l31x to the :dtcompatible:`nuvoton,numaker-canfd` driver.
+  * Added host communication test suite.
 
 * Charger
 
@@ -350,6 +374,10 @@ Drivers and Sensors
 
 * Entropy
 
+* EEPROM
+
+  * Added property for specifying ``address-width`` to :dtcompatible:`zephyr,i2c-target-eeprom`.
+
 * eSPI
 
   * Renamed eSPI virtual wire direction macros, enum values and KConfig to match the new
@@ -357,7 +385,7 @@ Drivers and Sensors
 
 * Ethernet
 
-  * Deperecated eth_mcux driver in favor of the reworked nxp_enet driver.
+  * Deprecated eth_mcux driver in favor of the reworked nxp_enet driver.
   * Driver nxp_enet is no longer experimental.
   * All boards and SOCs with :dtcompatible:`nxp,kinetis-ethernet` compatible nodes
     reworked to use the new :dtcompatible:`nxp,enet` binding.
@@ -384,6 +412,13 @@ Drivers and Sensors
 * IEEE 802.15.4
 
 * Input
+
+  * New drivers: :dtcompatible:`adc-keys`, :dtcompatible:`chipsemi,chsc6x`,
+    :dtcompatible:`cirque,pinnacle`, :dtcompatible:`futaba,sbus`,
+    :dtcompatible:`pixart,pat912x`, :dtcompatible:`pixart,paw32xx`,
+    :dtcompatible:`pixart,pmw3610` and :dtcompatible:`sitronix,cf1133`.
+  * Migrated :dtcompatible:`holtek,ht16k33` and
+    :dtcompatible:`microchip,xec-kbd` from kscan to input subsystem.
 
 * LED Strip
 
@@ -432,6 +467,12 @@ Drivers and Sensors
 * PWM
 
 * Regulators
+
+* Reset
+
+  * Added driver for reset controller on Nuvoton NPCX chips.
+  * Added reset controller driver for NXP SYSCON.
+  * Added reset controller driver for NXP RSTCTL.
 
 * Retained memory
 
@@ -488,7 +529,7 @@ Drivers and Sensors
     to control whether AP may poll the STA before throwing away STA due to inactivity.
 
   * Added support to configure "max_num_sta" BSS parameter. Users can set this both build and run time
-    parameter to control the maximum numuber of STA entries.
+    parameter to control the maximum number of STA entries.
 
 Networking
 **********
@@ -649,6 +690,13 @@ Libraries / Subsystems
 
 * LoRa/LoRaWAN
 
+  * Added the Fragmented Data Block Transport service, which can be enabled via
+    :kconfig:option:`CONFIG_LORAWAN_FRAG_TRANSPORT`. In addition to the default fragment decoder
+    implementation from Semtech, an in-tree implementation with reduced memory footprint is
+    available.
+
+  * Added a sample to demonstrate LoRaWAN firmware-upgrade over the air (FUOTA).
+
 * ZBus
 
 HALs
@@ -658,6 +706,42 @@ HALs
 
 MCUboot
 *******
+
+  * Fixed memory leak in bootutil HKDF implementation
+
+  * Fixed enforcing TLV entries to be protected
+
+  * Fixed disabling instruction/data caches
+
+  * Fixed estimated image overhead size calculation
+
+  * Fixed issue with swap-move algorithm failing to validate multiple-images
+
+  * Fixed align script error in imgtool
+
+  * Fixed img verify for hex file format in imgtool
+
+  * Fixed issue with reading the flash image reset vector
+
+  * Fixed too-early ``check_config.h`` include in mbedtls
+
+  * Refactored image dependency functions to reduce code size
+
+  * Added MCUboot support for ``ESP32-C6``
+
+  * Added optional MCUboot boot banner
+
+  * Added TLV querying for protected region
+
+  * Added using builtin keys for verification in bootutil
+
+  * Added builtin ECDSA key support for PSA Crypto backend
+
+  * Added ``OVERWRITE_ONLY_KEEP_BACKUP`` option for secondary images
+
+  * Added defines for ``SOC_FLASH_0_ID`` and ``SPI_FLASH_0_ID``
+
+  * The MCUboot version in this release is version ``2.1.0+0-dev``.
 
 Trusted Firmware-M
 ******************
@@ -674,6 +758,26 @@ zcbor
 
 LVGL
 ****
+
+LVGL was updated to 8.4.0. Release notes can be found at:
+https://docs.lvgl.io/8.4/CHANGELOG.html#v8-4-0-19-march-2024
+
+Additionally, the following changes in Zephyr were done:
+
+  * Added support to place memory pool buffers in ``.lvgl_heap`` section by enabling
+    :kconfig:option:`CONFIG_LV_Z_MEMORY_POOL_CUSTOM_SECTION`
+
+  * Removed kscan-based pointer input wrapper code.
+
+  * Corrected encoder button behavior to emit ``LV_KEY_ENTER`` events correctly.
+
+  * Improved handling for :samp:`invert-{x,y}` and ``swap-xy`` configurations.
+
+  * Added ``LV_MEM_CUSTOM_FREE`` call on file closure.
+
+  * Added missing Kconfig stubs for DMA2D symbols.
+
+  * Integrated support for LVGL rounder callback function.
 
 Tests and Samples
 *****************

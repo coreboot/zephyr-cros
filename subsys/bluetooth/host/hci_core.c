@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <zephyr/net/buf.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/check.h>
 #include <zephyr/sys/util.h>
@@ -354,6 +355,12 @@ int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf,
 		buf = bt_hci_cmd_create(opcode, 0);
 		if (!buf) {
 			return -ENOBUFS;
+		}
+	} else {
+		/* `cmd(buf)` depends on this  */
+		if (net_buf_pool_get(buf->pool_id) != &hci_cmd_pool) {
+			__ASSERT_NO_MSG(false);
+			return -EINVAL;
 		}
 	}
 
@@ -1610,7 +1617,7 @@ void bt_hci_le_enh_conn_complete_sync(struct bt_hci_evt_le_enh_conn_complete_v2 
 	update_conn(conn, &id_addr, (const struct bt_hci_evt_le_enh_conn_complete *)evt);
 
 #if defined(CONFIG_BT_USER_PHY_UPDATE)
-	/* The connection is always initated on the same phy as the PAwR advertiser */
+	/* The connection is always initiated on the same phy as the PAwR advertiser */
 	conn->le.phy.tx_phy = sync->phy;
 	conn->le.phy.rx_phy = sync->phy;
 #endif
@@ -4627,7 +4634,7 @@ int bt_configure_data_path(uint8_t dir, uint8_t id, uint8_t vs_config_len,
 static bool process_pending_cmd(k_timeout_t timeout)
 {
 	if (!k_fifo_is_empty(&bt_dev.cmd_tx_queue)) {
-		if (k_sem_take(&bt_dev.ncmd_sem, K_NO_WAIT) == 0) {
+		if (k_sem_take(&bt_dev.ncmd_sem, timeout) == 0) {
 			hci_core_send_cmd();
 			return true;
 		}

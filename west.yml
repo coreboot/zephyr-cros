@@ -137,7 +137,7 @@ manifest:
       groups:
         - fs
     - name: hal_adi
-      revision: 2858da5ab4a7a01cde48a41818a1a6693529f68d
+      revision: dee9a7b1eff13a9da0560daf8842d61657f9d61e
       path: modules/hal/adi
       groups:
         - hal
@@ -147,7 +147,7 @@ manifest:
       groups:
         - hal
     - name: hal_ambiq
-      revision: 367ae6a0396e3074bebbd55ef72f8e577168e567
+      revision: e25327f026df1ee08f1bf01a4bbfeb5e5f4026f1
       path: modules/hal/ambiq
       groups:
         - hal
@@ -157,7 +157,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: 99dce9490ef4a84ddffe75c9d8853b30008c64bc
+      revision: e4e8df61b371554f4ce08d203426d7875421666e
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -215,7 +215,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: a8cd5ed480a31982a86dab8952ac8baaf646c3cb
+      revision: af77d7cdfeeff290593e7e99f54f0c1e2a3f91e6
       groups:
         - hal
     - name: hal_rpi_pico
@@ -332,7 +332,7 @@ manifest:
       groups:
         - tee
     - name: trusted-firmware-a
-      revision: 421dc050278287839f5c70019bd6aec617f2bbdb
+      revision: 713ffbf96c5bcbdeab757423f10f73eb304eff07
       path: modules/tee/tf-a/trusted-firmware-a
       groups:
         - tee
