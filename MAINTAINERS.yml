@@ -750,8 +750,8 @@ Device Driver Model:
   status: maintained
   maintainers:
     - gmarull
-  collaborators:
     - tbursztyka
+  collaborators:
     - dcpleung
     - nashif
   files:
@@ -1341,7 +1341,7 @@ Release Notes:
 "Drivers: GNSS":
   status: maintained
   maintainers:
-    - bjarki-trackunit
+    - bjarki-andreasen
   collaborators:
     - tomi-font
     - fabiobaltieri
@@ -1516,10 +1516,15 @@ Release Notes:
     - swift-tk
   files:
     - drivers/mspi/
+    - drivers/memc/*mspi*
+    - drivers/flash/*mspi*
     - include/zephyr/drivers/mspi.h
     - include/zephyr/drivers/mspi/
+    - samples/drivers/mspi/
     - tests/drivers/mspi/
     - doc/hardware/peripherals/mspi.rst
+    - dts/bindings/mspi/
+    - dts/bindings/mtd/mspi*
   labels:
     - "area: MSPI"
   tests:
@@ -1692,7 +1697,7 @@ Release Notes:
 "Drivers: RTC":
   status: maintained
   maintainers:
-    - bjarki-trackunit
+    - bjarki-andreasen
   files:
     - drivers/rtc/
     - include/zephyr/drivers/rtc/
@@ -2496,7 +2501,7 @@ Modbus:
 Modem:
   status: maintained
   maintainers:
-    - bjarki-trackunit
+    - bjarki-andreasen
   collaborators:
     - tomi-font
   files:
@@ -2969,6 +2974,8 @@ RISCV arch:
     - ycsin
   files:
     - arch/riscv/
+    - boards/enjoydigital/litex_vexriscv/
+    - boards/lowrisc/opentitan_earlgrey/
     - boards/qemu/riscv*/
     - boards/sifive/
     - boards/sparkfun/red_v_things_plus/
@@ -3395,6 +3402,7 @@ NXP Drivers:
     - decsny
     - manuargue
     - dbaluta
+    - MarkWangChinese
   files:
     - drivers/*/*imx*
     - drivers/*/*lpc*.c
@@ -3525,6 +3533,20 @@ Microchip MEC Platforms:
     - dts/bindings/*/microchip,*
   labels:
     - "platform: Microchip MEC"
+
+Microchip RISC-V Platforms:
+  status: maintained
+  maintainers:
+    - fkokosinski
+    - kgugala
+    - tgorochowik
+  files:
+    - boards/microchip/m2gl025_miv/
+    - boards/microchip/mpfs_icicle/
+    - dts/riscv/microchip/
+    - soc/microchip/miv/
+  labels:
+    - "platform: Microchip RISC-V"
 
 Microchip SAM Platforms:
   status: maintained
@@ -3982,6 +4004,7 @@ TF-M Integration:
   files:
     - cmake/*/arcmwdt/
     - include/zephyr/toolchain/mwdt.h
+    - include/zephyr/linker/linker-tool-mwdt.h
     - lib/libc/arcmwdt/*
   labels:
     - "area: Toolchains"
