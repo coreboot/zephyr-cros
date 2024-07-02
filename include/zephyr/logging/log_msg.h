@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 #ifndef ZEPHYR_INCLUDE_LOGGING_LOG_MSG_H_
 #define ZEPHYR_INCLUDE_LOGGING_LOG_MSG_H_
 
@@ -23,6 +29,12 @@
 #else
 #include <alloca.h>
 #endif
+
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 38
 
 #ifdef __cplusplus
 extern "C" {
@@ -500,9 +512,7 @@ do { \
  *
  * @param ...  Optional string with arguments (fmt, ...). It may be empty.
  */
-#if defined(CONFIG_LOG_ALWAYS_RUNTIME) || \
-	(!defined(CONFIG_LOG) && \
-		(!TOOLCHAIN_HAS_PRAGMA_DIAG || !TOOLCHAIN_HAS_C_AUTO_TYPE))
+#if defined(CONFIG_LOG_ALWAYS_RUNTIME) || !defined(CONFIG_LOG)
 #define Z_LOG_MSG_CREATE2(_try_0cpy, _mode,  _cstr_cnt, _domain_id, _source,\
 			  _level, _data, _dlen, ...) \
 do {\
@@ -515,7 +525,7 @@ do {\
 				  Z_LOG_FMT_RUNTIME_ARGS(_fmt, ##__VA_ARGS__));\
 	_mode = Z_LOG_MSG_MODE_RUNTIME; \
 } while (false)
-#else /* CONFIG_LOG_ALWAYS_RUNTIME */
+#else /* CONFIG_LOG_ALWAYS_RUNTIME || !CONFIG_LOG */
 #define Z_LOG_MSG_CREATE3(_try_0cpy, _mode,  _cstr_cnt, _domain_id, _source,\
 			  _level, _data, _dlen, ...) \
 do { \
@@ -580,9 +590,7 @@ do { \
 			   _level, _data, _dlen, \
 			   FOR_EACH_IDX(Z_LOG_LOCAL_ARG_NAME, (,), __VA_ARGS__)); \
 } while (false)
-#endif /* CONFIG_LOG_ALWAYS_RUNTIME ||
-	* (!LOG && (!TOOLCHAIN_HAS_PRAGMA_DIAG || !TOOLCHAIN_HAS_C_AUTO_TYPE))
-	*/
+#endif /* CONFIG_LOG_ALWAYS_RUNTIME || !CONFIG_LOG */
 
 
 #define Z_LOG_MSG_CREATE(_try_0cpy, _mode,  _domain_id, _source,\
@@ -858,7 +866,7 @@ static inline uint8_t *log_msg_get_package(struct log_msg *msg, size_t *len)
  * @}
  */
 
-#include <syscalls/log_msg.h>
+#include <zephyr/syscalls/log_msg.h>
 
 #ifdef __cplusplus
 }

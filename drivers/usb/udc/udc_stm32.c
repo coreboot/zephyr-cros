@@ -353,6 +353,16 @@ void HAL_PCD_DataInStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 	}
 }
 
+#if DT_INST_NODE_HAS_PROP(0, disconnect_gpios)
+void HAL_PCDEx_SetConnectionState(PCD_HandleTypeDef *hpcd, uint8_t state)
+{
+	struct gpio_dt_spec usb_disconnect = GPIO_DT_SPEC_INST_GET(0, disconnect_gpios);
+
+	gpio_pin_configure_dt(&usb_disconnect,
+			      state ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE);
+}
+#endif
+
 static void udc_stm32_irq(const struct device *dev)
 {
 	const struct udc_stm32_data *priv =  udc_get_private(dev);
@@ -974,33 +984,31 @@ static int priv_clock_enable(void)
 
 #endif /* RCC_CFGR_OTGFSPRE / RCC_CFGR_USBPRE */
 
-#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs)
-#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_usbphyc)
+#if USB_OTG_HS_ULPI_PHY
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_USB1OTGHSULPI);
+#else
 	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_OTGHSULPI);
-	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_OTGPHYC);
-#elif defined(CONFIG_SOC_SERIES_STM32H7X)
-#if !USB_OTG_HS_ULPI_PHY
-	/* Disable ULPI interface (for external high-speed PHY) clock in sleep
-	 * mode.
-	 */
-	LL_AHB1_GRP1_DisableClockSleep(LL_AHB1_GRP1_PERIPH_USB1OTGHSULPI);
 #endif
-#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otgfs)
+#elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs) /* USB_OTG_HS_ULPI_PHY */
+	/* Disable ULPI interface (for external high-speed PHY) clock in sleep/low-power mode. It is
+	 * disabled by default in run power mode, no need to disable it.
+	 */
+#if defined(CONFIG_SOC_SERIES_STM32H7X)
+	LL_AHB1_GRP1_DisableClockSleep(LL_AHB1_GRP1_PERIPH_USB1OTGHSULPI);
+#else
+	LL_AHB1_GRP1_DisableClockLowPower(LL_AHB1_GRP1_PERIPH_OTGHSULPI);
+#endif /* defined(CONFIG_SOC_SERIES_STM32H7X) */
+
+#if USB_OTG_HS_EMB_PHY
+	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_OTGPHYC);
+#endif
+#elif defined(CONFIG_SOC_SERIES_STM32H7X) && DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otgfs)
 	/* The USB2 controller only works in FS mode, but the ULPI clock needs
 	 * to be disabled in sleep mode for it to work.
 	 */
 	LL_AHB1_GRP1_DisableClockSleep(LL_AHB1_GRP1_PERIPH_USB2OTGHSULPI);
-#endif
-#else /* DT_HAS_COMPAT_STATUS_OKAY(st_stm32_usbphyc) */
-#if !USB_OTG_HS_ULPI_PHY
-	/* Disable ULPI interface (for external high-speed PHY) clock in low
-	 * power mode. It is disabled by default in run power mode, no need to
-	 * disable it.
-	 */
-	LL_AHB1_GRP1_DisableClockLowPower(LL_AHB1_GRP1_PERIPH_OTGHSULPI);
 #endif /* USB_OTG_HS_ULPI_PHY */
-#endif /* DT_HAS_COMPAT_STATUS_OKAY(st_stm32_usbphyc) */
-#endif /* DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs) */
 
 	return 0;
 }

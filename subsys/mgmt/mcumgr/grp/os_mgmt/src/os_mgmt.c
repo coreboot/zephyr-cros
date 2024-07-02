@@ -40,7 +40,7 @@
 
 #if defined(CONFIG_MCUMGR_GRP_OS_INFO) || defined(CONFIG_MCUMGR_GRP_OS_BOOTLOADER_INFO)
 #include <stdio.h>
-#include <version.h>
+#include <zephyr/version.h>
 #if defined(CONFIG_MCUMGR_GRP_OS_INFO)
 #include <os_mgmt_processor.h>
 #endif
@@ -65,7 +65,7 @@ K_WORK_DELAYABLE_DEFINE(os_mgmt_reset_work, os_mgmt_reset_work_handler);
 
 /* This is passed to zcbor_map_start/end_endcode as a number of
  * expected "columns" (tid, priority, and so on)
- * The value here does not affect memory allocation is is used
+ * The value here does not affect memory allocation is used
  * to predict how big the map may be. If you increase number
  * of "columns" the taskstat sends you may need to increase the
  * value otherwise zcbor_map_end_encode may return with error.

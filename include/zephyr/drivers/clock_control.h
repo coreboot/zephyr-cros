@@ -6,6 +6,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 14
+
 /**
  * @file
  * @brief Public Clock Control APIs
@@ -99,7 +105,7 @@ typedef int (*clock_control_configure_fn)(const struct device *dev,
 					  clock_control_subsys_t sys,
 					  void *data);
 
-struct clock_control_driver_api {
+__subsystem struct clock_control_driver_api {
 	clock_control			on;
 	clock_control			off;
 	clock_control_async_on_fn	async_on;

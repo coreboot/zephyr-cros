@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 #ifndef ZEPHYR_INCLUDE_LOGGING_LOG_CORE_H_
 #define ZEPHYR_INCLUDE_LOGGING_LOG_CORE_H_
 
@@ -198,7 +204,7 @@ static inline char z_log_minimal_level_to_char(int level)
  * emitted instead. String check may increase compilation time so it is not
  * always performed (could significantly increase CI time).
  */
-#if CONFIG_LOG_FMT_STRING_VALIDATE
+#ifdef CONFIG_LOG_FMT_STRING_VALIDATE
 #define LOG_STRING_WARNING(_mode, _src, ...) \
 	    Z_LOG_MSG_CREATE(UTIL_NOT(IS_ENABLED(CONFIG_USERSPACE)), _mode, \
 			     Z_LOG_LOCAL_DOMAIN_ID, _src, LOG_LEVEL_ERR, NULL, 0, \
