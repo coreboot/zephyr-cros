@@ -98,7 +98,7 @@ static struct k_thread engine_thread_data;
 
 static K_MUTEX_DEFINE(engine_lock);
 
-#define MAX_POLL_FD CONFIG_NET_SOCKETS_POLL_MAX
+#define MAX_POLL_FD CONFIG_ZVFS_POLL_MAX
 
 /* Resources */
 static struct zsock_pollfd sock_fds[MAX_POLL_FD];
