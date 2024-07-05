@@ -3686,7 +3686,6 @@ STM32 Platforms:
   maintainers:
     - erwango
   collaborators:
-    - ajarmouni-st
     - FRASTM
     - gautierg-st
     - GeorgeCGV
