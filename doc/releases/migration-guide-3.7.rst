@@ -64,6 +64,10 @@ Kernel
 
 * The named struct ``z_arch_esf_t`` is now deprecated. Use ``struct arch_esf`` instead. (:github:`73593`)
 
+* The header file :zephyr_file:`include/zephyr/arch/arch_interface.h` has been moved from
+  ``include/zephyr/sys/`` into ``include/zephyr/arch/``. Out-of-tree source files will need to
+  update the include path. (:github:`64987`)
+
 Boards
 ******
 
@@ -236,6 +240,27 @@ Device Drivers and Devicetree
             pwm-controller;
             #pwm-cells = <2>;
         };
+    };
+
+* The driver for :dtcompatible:`invensense,icm42688` now correctly supports device
+  tree configuration(:github:`74267`). Prior devicetrees may have tried to use
+  the bindings to set sample rate and scale for the accel/gyro without any
+  effect. The devicetree usage should now use the provided defines and include
+  file along with new bindings which take these values.
+
+  For example:
+
+  .. code-block:: devicetree
+
+    #include <zephyr/dt-bindings/sensor/icm42688.h>
+
+    icm42688: icm42688@0 {
+        accel-pwr-mode = <ICM42688_ACCEL_LN>;
+        accel-fs = <ICM42688_ACCEL_FS_16G>;
+        accel-odr = <ICM42688_ACCEL_ODR_2000>;
+        gyro-pwr-mode= <ICM42688_GYRO_LN>;
+        gyro-fs = <ICM42688_GYRO_FS_2000>;
+        gyro-odr = <ICM42688_GYRO_ODR_2000>;
     };
 
 * `st,lis2mdl` property `spi-full-duplex` changed to `duplex =
@@ -634,6 +659,9 @@ Sensors
 Serial
 ======
 
+* The Raspberry Pi UART driver ``uart_rpi_pico`` has been removed.
+  Use ``uart_pl011`` (:dtcompatible:`arm,pl011`) instead. (:github:`71074`)
+
 Timer
 =====
 
@@ -755,6 +783,22 @@ Bluetooth Host
 * The field :code:`init_credits` in :c:type:`bt_l2cap_le_endpoint` has been removed as it was no
   longer used in Zephyr 3.4.0 and later. Any references to this field should be removed. No further
   action is needed.
+
+* :c:macro:`BT_LE_ADV_PARAM` now returns a :code:`const` pointer.
+  Any place where the result is stored in a local variable such as
+  :code:`struct bt_le_adv_param *param = BT_LE_ADV_CONN;` will need to
+  be updated to :code:`const struct bt_le_adv_param *param = BT_LE_ADV_CONN;` or use it for
+  initialization like :code:`struct bt_le_adv_param param = *BT_LE_ADV_CONN;`
+
+  The change to :c:macro:`BT_LE_ADV_PARAM` also affects all of its derivatives, including but not
+  limited to:
+
+  * :c:macro:`BT_LE_ADV_CONN`
+  * :c:macro:`BT_LE_ADV_NCONN`
+  * :c:macro:`BT_LE_EXT_ADV_SCAN`
+  * :c:macro:`BT_LE_EXT_ADV_CODED_NCONN_NAME`
+
+  (:github:`75065`)
 
 Bluetooth Crypto
 ================
