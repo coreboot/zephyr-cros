@@ -124,7 +124,7 @@ manifest:
       revision: 6489e771e9c405f1763b52d64a3f17a1ec488ace
       path: modules/lib/cmsis-dsp
     - name: cmsis-nn
-      revision: 0c8669d81381ccf3b1a01d699f3b68b50134a99f
+      revision: ea987c1ca661be723de83bd159aed815d6cbd430
       path: modules/lib/cmsis-nn
     - name: edtt
       revision: 8d7b543d4d2f2be0f78481e4e1d8d73a88024803
@@ -157,7 +157,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: e4e8df61b371554f4ce08d203426d7875421666e
+      revision: 61b977fd2b033c656b1b2fa07b3137872236f710
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -234,7 +234,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: 855f195793df094644ce8b8617c01275408bbf58
+      revision: f1317150eac951fdd8259337a47cbbc4c2e6d335
       path: modules/hal/stm32
       groups:
         - hal
@@ -263,7 +263,7 @@ manifest:
       path: modules/lib/hostap
       revision: 83574f533fb5c6808af0d9872741d72d48be2f98
     - name: libmetal
-      revision: 243eed541b9c211a2ce8841c788e62ddce84425e
+      revision: a6851ba6dba8c9e87d00c42f171a822f7a29639b
       path: modules/hal/libmetal
       groups:
         - hal
@@ -303,7 +303,7 @@ manifest:
       revision: 6c389b9b5fa0a079cd4502e69d375da4c0c289b7
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
-      revision: da78aea63159771956fe0c9263f2e6985b66e9d5
+      revision: 76d2168bcdfcd23a9a7dce8c21f2083b90a1e60a
       path: modules/lib/open-amp
     - name: openthread
       revision: 3873c6fcd5a8a9dd01b71e8efe32ef5dc7923bb1
@@ -327,7 +327,7 @@ manifest:
       groups:
         - crypto
     - name: trusted-firmware-m
-      revision: 8df9cc8baf46252fd188bba1d87333a8daa9a5e8
+      revision: f8d3a903578192d226ac1552f383d95b94ee8780
       path: modules/tee/tf-m/trusted-firmware-m
       groups:
         - tee

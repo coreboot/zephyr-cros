@@ -237,10 +237,11 @@ MIPS arch:
     - arch.mips
 
 Ambiq Platforms:
-  status: odd fixes
+  status: maintained
+  maintainers:
+    - AlessandroLuo
   collaborators:
     - aaronyegx
-    - AlessandroLuo
     - RichardSWheatley
   files:
     - soc/ambiq/
@@ -782,8 +783,7 @@ DFU:
     - dfu
 
 Devicetree:
-  status: maintained
-  maintainers: []
+  status: odd fixes
   collaborators:
     - decsny
     - galak
@@ -803,8 +803,7 @@ Devicetree:
     - libraries.devicetree
 
 Devicetree Bindings:
-  status: maintained
-  maintainers: []
+  status: odd fixes
   collaborators:
     - decsny
     - galak
@@ -1009,6 +1008,7 @@ Release Notes:
     - samples/modules/canopennode/
     - samples/net/sockets/can/
     - samples/subsys/canbus/
+    - scripts/west_commands/runners/canopen_program.py
     - subsys/canbus/
     - subsys/net/l2/canbus/
     - tests/drivers/build_all/can/
@@ -3054,7 +3054,6 @@ Twister:
   collaborators:
     - PerMac
     - hakehuang
-    - gopiotr
     - golowanow
     - gchwier
     - LukaszMrugala
@@ -4140,8 +4139,7 @@ VFS:
     - filesystem
 
 West:
-  status: maintained
-  maintainers: []
+  status: odd fixes
   collaborators:
     - mbolivar-ampere
     - carlescufi
@@ -4677,6 +4675,7 @@ West:
     - ceolin
   collaborators:
     - ithinuel
+    - valeriosetti
   files:
     - modules/mbedtls/
   labels:
@@ -5038,7 +5037,7 @@ Random:
 
 # This area is to be converted to a subarea
 Testing with Renode:
-  status: maintained
+  status: odd fixes
   collaborators:
     - mateusz-holenko
     - fkokosinski
