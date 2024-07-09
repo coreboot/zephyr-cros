@@ -27,6 +27,7 @@
 #include "spi_nor.h"
 
 #include <zephyr/logging/log.h>
+#line 31
 LOG_MODULE_REGISTER(flash_npcx_fiu_nor, CONFIG_FLASH_LOG_LEVEL);
 
 #define BLOCK_64K_SIZE KB(64)
