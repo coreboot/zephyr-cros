@@ -1206,7 +1206,7 @@ Release Notes:
     - samples/drivers/eeprom/
     - tests/drivers/eeprom/
     - tests/drivers/*/eeprom/
-    - doc/hardware/peripherals/eeprom.rst
+    - doc/hardware/peripherals/eeprom/
   labels:
     - "area: EEPROM"
   tests:
@@ -3686,7 +3686,6 @@ STM32 Platforms:
   maintainers:
     - erwango
   collaborators:
-    - ajarmouni-st
     - FRASTM
     - gautierg-st
     - GeorgeCGV
@@ -5077,6 +5076,6 @@ zbus:
     - subsys/llext/
     - doc/services/llext/
   labels:
-    - "area: Linkable Loadable Extensions"
+    - "area: llext"
   tests:
     - llext

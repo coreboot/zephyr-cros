@@ -93,6 +93,8 @@ https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
 * CVE-2024-6135: Under embargo until 2024-09-11
 
+* CVE-2024-6258: Under embargo until 2024-09-05
+
 * CVE-2024-6259: Under embargo until 2024-09-12
 
 * CVE-2024-6442: Under embargo until 2024-09-22
@@ -289,6 +291,10 @@ Bluetooth
     with the buffer pools for HCI fragments and L2CAP segments. All communication with the
     Controller is now exclusively done in the system workqueue context.
 
+  * :kconfig:option:`CONFIG_BT_PER_ADV_SYNC_TRANSFER_RECEIVER` and
+    :kconfig:option:`CONFIG_BT_PER_ADV_SYNC_TRANSFER_SENDER` now depend on
+    :kconfig:option:`CONFIG_BT_CONN` as they do not work without connections.
+
 * HCI Driver
 
   * Added support for Ambiq Apollo3 Blue series.
@@ -332,7 +338,7 @@ Boards & SoC Support
 
   * On :ref:`ST STM32H7B3I Discovery Kit <stm32h7b3i_dk_board>`: ``stm32h7b3i_dk_board``,
     enabled full cache management, Chrom-ART, double frame buffer and full refresh for
-    optimal LVGL perfomances.
+    optimal LVGL performance.
   * On ST STM32 boards, stm32cubeprogrammer runner can now be used to program external
     flash using ``--extload`` option.
 
@@ -385,6 +391,10 @@ Drivers and Sensors
 * ADC
 
   * Added support for STM32H7R/S series.
+
+  * Changed phandle type DT property ``nxp,reference-supply`` to phandle-array type DT property
+    ``nxp,references`` in ``nxp,lpc-lpadc`` binding. The NXP LPADC driver now supports passing
+    the reference voltage value by using ``nxp,references``.
 
 * Auxiliary Display
 
@@ -871,7 +881,7 @@ Networking
   * Implemented IPv6 Privacy Extensions according to RFC 8981.
   * Added :c:func:`net_ipv6_is_private_addr` API function.
   * Implemented reachability hint for IPv6. Upper layers can use
-    c:func:`net_if_nbr_reachability_hint` to report Neigbor reachability and
+    c:func:`net_if_nbr_reachability_hint` to report Neighbor reachability and
     avoid unnecessary Neighbor Discovery solicitations.
   * Added :kconfig:option:`CONFIG_NET_IPV6_MTU` allowing to set custom IPv6 MTU.
   * Added :kconfig:option:`CONFIG_NET_MCAST_ROUTE_MAX_IFACES` which allows to set

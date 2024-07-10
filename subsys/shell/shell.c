@@ -23,6 +23,7 @@
 #include "shell_vt100.h"
 #include "shell_wildcard.h"
 
+#line 27
 /* 2 == 1 char for cmd + 1 char for '\0' */
 #if (CONFIG_SHELL_CMD_BUFF_SIZE < 2)
 	#error too small CONFIG_SHELL_CMD_BUFF_SIZE
