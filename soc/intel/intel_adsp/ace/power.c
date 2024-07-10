@@ -164,9 +164,6 @@ static ALWAYS_INLINE void _restore_core_context(void)
 {
 	uint32_t core_id = arch_proc_id();
 
-#ifdef CONFIG_XTENSA_MMU
-	xtensa_mmu_init();
-#endif
 	XTENSA_WSR("PS", core_desc[core_id].ps);
 	XTENSA_WSR("VECBASE", core_desc[core_id].vecbase);
 	XTENSA_WSR("EXCSAVE2", core_desc[core_id].excsave2);
@@ -175,6 +172,9 @@ static ALWAYS_INLINE void _restore_core_context(void)
 #if (XCHAL_NUM_MISC_REGS == 2)
 	XTENSA_WSR("MISC0", core_desc[core_id].misc[0]);
 	XTENSA_WSR("MISC1", core_desc[core_id].misc[1]);
+#endif
+#ifdef CONFIG_XTENSA_MMU
+	xtensa_mmu_reinit();
 #endif
 	__asm__ volatile("mov a0, %0" :: "r"(core_desc[core_id].a0));
 	__asm__ volatile("mov a1, %0" :: "r"(core_desc[core_id].a1));
@@ -339,7 +339,8 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 					(void *)rom_entry;
 			sys_cache_data_flush_range((void *)imr_layout, sizeof(*imr_layout));
 #endif /* CONFIG_ADSP_IMR_CONTEXT_SAVE */
-			uint32_t hpsram_mask = 0;
+			/* This assumes a single HPSRAM segment */
+			static uint32_t hpsram_mask;
 #ifdef CONFIG_ADSP_POWER_DOWN_HPSRAM
 			/* turn off all HPSRAM banks - get a full bitmap */
 			uint32_t ebb_banks = ace_hpsram_get_bank_count();

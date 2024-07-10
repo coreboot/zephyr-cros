@@ -41,6 +41,10 @@ user_dram_seg_len = user_idram_size;
 #undef GROUP_ROM_LINK_IN
 #define GROUP_ROM_LINK_IN(vregion, lregion) > RODATA_REGION AT > lregion
 
+/* Make sure new sections have consistent alignment between input and output sections */
+#undef SECTION_PROLOGUE
+#define SECTION_PROLOGUE SECTION_DATA_PROLOGUE
+
 /* Global symbols required for espressif hal build */
 MEMORY
 {
@@ -660,6 +664,7 @@ SECTIONS
     _text_start = ABSOLUTE(.);
     _instruction_reserved_start = ABSOLUTE(.);
     __text_region_start = ABSOLUTE(.);
+    __rom_region_start = ABSOLUTE(.);
 
 #if !defined(CONFIG_ESP32_WIFI_IRAM_OPT)
     *libnet80211.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.*)
@@ -691,6 +696,7 @@ SECTIONS
     _text_end = ABSOLUTE(.);
     _instruction_reserved_end = ABSOLUTE(.);
     __text_region_end = ABSOLUTE(.);
+    __rom_region_end = ABSOLUTE(.);
     _etext = .;
 
   } GROUP_DATA_LINK_IN(FLASH_CODE_REGION, ROMABLE_REGION)
@@ -771,7 +777,7 @@ SECTIONS
   } GROUP_DATA_LINK_IN(RODATA_REGION, ROMABLE_REGION)
 
   #include <zephyr/linker/cplusplus-rom.ld>
-  #include <zephyr/linker/common-rom/common-rom-cpp.ld>
+  #include <zephyr/linker/common-rom/common-rom-init.ld>
   #include <zephyr/linker/common-rom/common-rom-kernel-devices.ld>
   #include <zephyr/linker/common-rom/common-rom-ztest.ld>
   #include <zephyr/linker/common-rom/common-rom-net.ld>
@@ -786,6 +792,14 @@ SECTIONS
   .flash.rodata_end : ALIGN(0x10)
   {
     . = ALIGN(4);
+
+#ifdef CONFIG_THREAD_LOCAL_STORAGE
+     /* create explicit symbol for __tdata_start so that it is loaded
+      * into proper DROM region atributted by AT keyword below
+      */
+    __tdata_start = ADDR(tdata);
+#endif
+
     _rodata_reserved_end = ABSOLUTE(.);
     _image_rodata_end = ABSOLUTE(.);
   } GROUP_DATA_LINK_IN(RODATA_REGION, ROMABLE_REGION)

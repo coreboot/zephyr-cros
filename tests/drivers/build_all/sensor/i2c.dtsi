@@ -914,7 +914,7 @@ test_i2c_vishay_vcnl36825t: vcnl36825t@81 {
 	compatible = "vishay,vcnl36825t";
 	reg = <0x81>;
 
-	proximity-it = "3.5";
+	proximity-it = "1";
 	multi-pulse = <8>;
 
 	low-power;
@@ -1061,4 +1061,9 @@ test_i2c_lm95234: lm95234@8f {
 	compatible = "national,lm95234";
 	reg = <0x8f>;
 	status = "okay";
+};
+
+test_i2c_sht21@90 {
+	compatible = "sensirion,sht21";
+	reg = <0x90>;
 };

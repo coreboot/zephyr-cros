@@ -437,7 +437,7 @@ static inline bool bt_conn_is_handle_valid(struct bt_conn *conn)
 bool bt_conn_is_peer_addr_le(const struct bt_conn *conn, uint8_t id,
 			     const bt_addr_le_t *peer);
 
-/* Helpers for identifying & looking up connections based on the the index to
+/* Helpers for identifying & looking up connections based on the index to
  * the connection list. This is useful for O(1) lookups, but can't be used
  * e.g. as the handle since that's assigned to us by the controller.
  */
@@ -547,5 +547,11 @@ void bt_conn_tx_processor(void);
 
 /* To be called by upper layers when they want to send something.
  * Functions just like an IRQ.
+ *
+ * Note: This fn will take and hold a reference to `conn` until the IRQ for that
+ * conn is serviced.
+ * For the current implementation, that means:
+ * - ref the conn when putting on an "conn-ready" slist
+ * - unref the conn when popping the conn from the slist
  */
 void bt_conn_data_ready(struct bt_conn *conn);

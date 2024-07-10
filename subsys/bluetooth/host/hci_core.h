@@ -302,7 +302,7 @@ struct bt_dev_le {
 #endif /* CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_SMP)
-	/* Size of the the controller resolving list */
+	/* Size of the controller resolving list */
 	uint8_t                    rl_size;
 	/* Number of entries in the resolving list. rl_entries > rl_size
 	 * means that host-side resolving is used.
@@ -311,6 +311,8 @@ struct bt_dev_le {
 #endif /* CONFIG_BT_SMP */
 	/* List of `struct bt_conn` that have either pending data to send, or
 	 * something to process (e.g. a disconnection event).
+	 *
+	 * Each element in this list contains a reference to its `conn` object.
 	 */
 	sys_slist_t		conn_ready;
 };

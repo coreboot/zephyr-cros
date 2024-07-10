@@ -317,6 +317,13 @@ void xtensa_mmu_init(void)
 
 	xtensa_init_paging(xtensa_kernel_ptables);
 
+	/*
+	 * This is used to determine whether we are faulting inside double
+	 * exception if this is not zero. Sometimes SoC starts with this not
+	 * being set to zero. So clear it during boot.
+	 */
+	XTENSA_WSR(ZSR_DEPC_SAVE_STR, 0);
+
 	arch_xtensa_mmu_post_init(_current_cpu->id == 0);
 }
 
@@ -1076,15 +1083,13 @@ static bool page_validate(uint32_t *ptables, uint32_t page, uint8_t ring, bool w
 	return true;
 }
 
-int arch_buffer_validate(const void *addr, size_t size, int write)
+static int mem_buffer_validate(const void *addr, size_t size, int write, int ring)
 {
 	int ret = 0;
 	uint8_t *virt;
 	size_t aligned_size;
 	const struct k_thread *thread = _current;
 	uint32_t *ptables = thread_page_tables_get(thread);
-	uint8_t ring = ((thread->base.user_options & K_USER) != 0) ?
-		XTENSA_MMU_USER_RING : XTENSA_MMU_KERNEL_RING;
 
 	/* addr/size arbitrary, fix this up into an aligned region */
 	k_mem_region_align((uintptr_t *)&virt, &aligned_size,
@@ -1099,6 +1104,16 @@ int arch_buffer_validate(const void *addr, size_t size, int write)
 	}
 
 	return ret;
+}
+
+bool xtensa_mem_kernel_has_access(void *addr, size_t size, int write)
+{
+	return mem_buffer_validate(addr, size, write, XTENSA_MMU_KERNEL_RING) == 0;
+}
+
+int arch_buffer_validate(const void *addr, size_t size, int write)
+{
+	return mem_buffer_validate(addr, size, write, XTENSA_MMU_USER_RING);
 }
 
 void xtensa_swap_update_page_tables(struct k_thread *incoming)

@@ -34,6 +34,10 @@ user_sram_size = (user_sram_end - user_sram_org);
 #undef GROUP_ROM_LINK_IN
 #define GROUP_ROM_LINK_IN(vregion, lregion) > CACHED_REGION AT > lregion
 
+/* Make sure new sections have consistent alignment between input and output sections */
+#undef SECTION_PROLOGUE
+#define SECTION_PROLOGUE SECTION_DATA_PROLOGUE
+
 /* TODO: add RTC support */
 #define RESERVE_RTC_MEM 0
 
@@ -661,6 +665,7 @@ SECTIONS
     _text_start = ABSOLUTE(.);
     _instruction_reserved_start = ABSOLUTE(.);
     __text_region_start = ABSOLUTE(.);
+    __rom_region_start = ABSOLUTE(.);
 
 #if !defined(CONFIG_ESP32_WIFI_IRAM_OPT)
     *libnet80211.a:( .wifi0iram  .wifi0iram.* .wifislpiram .wifislpiram.*)
@@ -692,6 +697,7 @@ SECTIONS
     _text_end = ABSOLUTE(.);
     _instruction_reserved_end = ABSOLUTE(.);
     __text_region_end = ABSOLUTE(.);
+    __rom_region_end = ABSOLUTE(.);
     _etext = .;
 
   } GROUP_DATA_LINK_IN(CACHED_REGION, ROMABLE_REGION)
@@ -771,7 +777,7 @@ SECTIONS
   } GROUP_DATA_LINK_IN(CACHED_REGION, ROMABLE_REGION)
 
   #include <zephyr/linker/cplusplus-rom.ld>
-  #include <zephyr/linker/common-rom/common-rom-cpp.ld>
+  #include <zephyr/linker/common-rom/common-rom-init.ld>
   #include <zephyr/linker/common-rom/common-rom-kernel-devices.ld>
   #include <zephyr/linker/common-rom/common-rom-ztest.ld>
   #include <zephyr/linker/common-rom/common-rom-net.ld>
