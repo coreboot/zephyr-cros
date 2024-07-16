@@ -249,6 +249,15 @@ Kernel
   * Added :c:func:`k_realloc`, that uses kernel heap to implement traditional :c:func:`realloc`
     semantics.
 
+  * Devices can now store devicetree metadata such as nodelabels by turning on
+    :kconfig:option:`CONFIG_DEVICE_DT_METADATA`. This option may be useful in
+    e.g. shells as devices can be obtained using human-friendly names thanks to
+    APIs like :c:func:`device_get_by_dt_nodelabel`.
+
+  * Any device initialization can be deferred if its associated devicetree node
+    has the special ``zephyr,deferred-init`` property set. The device can be
+    initialized later in time by using :c:func:`device_init`.
+
 Bluetooth
 *********
 * Audio
@@ -316,7 +325,7 @@ Boards & SoC Support
   * STM32C0: Added support for :kconfig:option:`CONFIG_POWEROFF`.
   * STM32U5: Added support for Stop3 mode.
 
-* Added support for these ARM boards:
+* Added support for these boards:
 
   * Added support for :ref:`Ambiq Apollo3 Blue board <apollo3_evb>`: ``apollo3_evb``.
   * Added support for :ref:`Ambiq Apollo3 Blue Plus board <apollo3p_evb>`: ``apollo3p_evb``.
@@ -332,25 +341,19 @@ Boards & SoC Support
   * Added support for :ref:`ST STM32L152CDISCOVERY board <stm32l1_disco_board>`: ``stm32l152c_disco``.
   * Added support for :ref:`ST STEVAL STWINBX1 Development kit <steval_stwinbx1_board>`: ``steval_stwinbx1``.
 
-* Added support for these Xtensa boards:
-
-* Made these changes for ARM boards:
+* Made these board changes:
 
   * On :ref:`ST STM32H7B3I Discovery Kit <stm32h7b3i_dk_board>`: ``stm32h7b3i_dk_board``,
     enabled full cache management, Chrom-ART, double frame buffer and full refresh for
     optimal LVGL performance.
   * On ST STM32 boards, stm32cubeprogrammer runner can now be used to program external
     flash using ``--extload`` option.
-
-* Made these changes for RISC-V boards:
-
-* Made these changes for native/POSIX boards:
-
   * Introduced the simulated :ref:`nrf54l15bsim<nrf54l15bsim>` target.
-
   * The nrf5x bsim targets now support BT LE Coded PHY.
-
   * LLVM fuzzing support has been refactored while adding support for it in native_sim.
+  * nRF54H20 PDK (pre-release) converted to :ref:`nrf54h20dk_nrf54h20`
+  * PPR core target in :ref:`nrf54h20dk_nrf54h20` runs from RAM by default. A
+    new ``xip`` variant has been introduced which runs from MRAM (XIP).
 
 * Added support for these following shields:
 
@@ -396,6 +399,10 @@ Drivers and Sensors
     ``nxp,references`` in ``nxp,lpc-lpadc`` binding. The NXP LPADC driver now supports passing
     the reference voltage value by using ``nxp,references``.
 
+  * Fixed issue which allowed negative ADC readings in single-ended mode using the ``adc_nrfx_saadc.c``
+    device driver. Note that this fix prevents the nRF54H and nRF54L series from performing
+    8-bit resolution single-ended readings due to hardware limitations.
+
 * Auxiliary Display
 
 * Audio
@@ -411,10 +418,6 @@ Drivers and Sensors
 
 * CAN
 
-  * Added :c:func:`can_get_bitrate_min` and :c:func:`can_get_bitrate_max` for retrieving the minimum
-    and maximum supported bitrate for a given CAN controller/CAN transceiver combination, reflecting
-    that retrieving the bitrate limits can no longer fail. Deprecated the existing
-    :c:func:`can_get_min_bitrate` and :c:func:`can_get_max_bitrate` API functions.
   * Extended support for automatic sample point location to also cover :c:func:`can_calc_timing` and
     :c:func:`can_calc_timing_data`.
   * Added optional ``min-bitrate`` devicetree property for CAN transceivers.
@@ -423,8 +426,10 @@ Drivers and Sensors
     transceiver.
   * Added support for specifying the minimum bitrate supported by a CAN controller in the internal
     ``CAN_DT_DRIVER_CONFIG_GET`` and ``CAN_DT_DRIVER_CONFIG_INST_GET`` macros.
-  * Added a new CAN controller API function :c:func:`can_get_bitrate_min` for getting the minimum
-    supported bitrate of a CAN controller/transceiver combination.
+  * Added :c:func:`can_get_bitrate_min` and :c:func:`can_get_bitrate_max` for retrieving the minimum
+    and maximum supported bitrate for a given CAN controller/CAN transceiver combination, reflecting
+    that retrieving the bitrate limits can no longer fail. Deprecated the existing
+    :c:func:`can_get_max_bitrate` API function.
   * Updated the CAN timing functions to take the minimum supported bitrate into consideration when
     validating the bitrate.
   * Made the ``sample-point`` and ``sample-point-data`` devicetree properties optional.
@@ -636,6 +641,15 @@ Drivers and Sensors
 
 * Pin control
 
+  * Added driver for Renesas RA8 series
+  * Added driver for Infineon PSoC6 (legacy)
+  * Added driver for Analog Devices MAX32690
+  * Added driver for Ambiq Apollo3
+  * Added driver for ENE KB1200
+  * Added driver for NXP RW
+  * Espressif driver now supports ESP32C6
+  * STM32 driver now supports remap functionality for STM32C0
+
 * PWM
 
   * Added support for STM32H7R/S series.
@@ -828,6 +842,7 @@ Networking
   * Added :kconfig:option:`CONFIG_NET_DHCPV4_SERVER_NAK_UNRECOGNIZED_REQUESTS` which
     allows to override RFC-defined behavior, and NAK requests from unrecognized
     clients.
+  * Fixed client ID generation in DHCPv4 server.
   * Other minor fixes in DHCPv4 client and server implementations.
 
 * DHCPv6:
@@ -863,6 +878,7 @@ Networking
   * Added HTTP shell component.
   * Improved HTTP client error reporting.
   * Moved HTTP client library out of experimental.
+  * Added POLLOUT monitoring when sending response in HTTP client.
 
 * IPSP:
 
@@ -943,11 +959,14 @@ Networking
   * Added new driver for Native Simulator offloaded sockets.
   * Overhauled VLAN support to use Virtual network interfaces.
   * Added statistics collection for Virtual network interfaces.
+  * Fixed system workqueue block in :c:func:`mgmt_event_work_handler`
+    when :kconfig:option:`CONFIG_NET_MGMT_EVENT_SYSTEM_WORKQUEUE` is enabled.
 
 * MQTT:
 
   * Added ALPN support for MQTT TLS backend.
   * Added user data field in :c:struct:`mqtt_client` context structure.
+  * Fixed a potential socket leak in MQTT Websockets transport.
 
 * Network Interface:
 
@@ -959,6 +978,7 @@ Networking
   * Improved debug logging in the network interface code.
   * Added reference counter to the :c:struct:`net_if_addr` structure.
   * Fixed IPv6 DAD and MLDv2 operation when interface goes up.
+  * Added unique default name for OpenThread interfaces.
   * Other minor fixes.
 
 * OpenThread
@@ -995,6 +1015,12 @@ Networking
   * Fixed the protocol field endianness for ``AF_PACKET`` type sockets.
   * Fixed :c:func:`getsockname` for TCP.
   * Improve :c:func:`sendmsg` support when using DTLS sockets.
+  * Fixed :c:func:`net_socket_service_register` function stall in case socket
+    services thread stopped.
+  * Fixed potential socket services thread stoppage when deregistering service.
+  * Removed support for asynchronous timeouts in socket services library.
+  * Fixed potential busy looping when using :c:func:`zsock_accept` in case of
+    file descriptors shortage.
 
 * Syslog:
 
@@ -1017,6 +1043,7 @@ Networking
   * Improved debug logs, so that they're easier to follow under heavy load.
   * ISN generation now uses SHA-256 instead of MD5. Moreover it now relies on PSA APIs
     instead of legacy Mbed TLS functions for hash computation.
+  * Improved ACK reply logic in case no PSH flag is present to reduce redundant ACKs.
 
 * Websocket:
 
@@ -1027,6 +1054,7 @@ Networking
 
   * Converted Websocket library to use ``zsock_*`` API.
   * Added Object Core support to Websocket sockets.
+  * Added POLLOUT monitoring when sending.
 
 * Wi-Fi:
 
@@ -1059,12 +1087,32 @@ Networking
   * Added a new ``ZPERF_SESSION_PERIODIC_RESULT`` event for periodic updates
     during TCP upload sessions.
   * Fixed possible socket leak in case of errors during zperf session.
+  * Improved performance in the default configuration for the zperf sample.
 
 USB
 ***
 
 Devicetree
 **********
+
+* Added :c:macro:`DT_INST_NODE_HAS_COMPAT` to check if a node has a compatible.
+  This is useful for nodes that have multiple compatibles.
+* Added :c:macro:`DT_CHILD_NUM` and variants to count the number of children of a node.
+* Added :c:macro:`DT_FOREACH_NODELABEL` and variants, which can be used to iterate over the
+  node labels of a devicetree node.
+* Added :c:macro:`DT_NODELABEL_STRING_ARRAY` and :c:macro:`DT_NUM_NODELABELS` and their variants.
+* Added :c:macro:`DT_REG_HAS_NAME` and variants.
+* Reworked :c:macro:`DT_ANY_INST_HAS_PROP_STATUS_OKAY` so that the result can
+  be used with macros like :c:macro:`IS_ENABLED`, IF_ENABLED, or COND_CODE_x.
+* Reworked :c:macro:`DT_NODE_HAS_COMPAT_STATUS` so that it can be evaluated at preprocessor time.
+* Updated PyYaml version used in dts scripts to 6.0 to remove supply chain vulnerabilities.
+
+Kconfig
+*******
+
+* Added a `substring` kconfig preprocessor function.
+* Added a `dt_node_ph_prop_path` kconfig preprocessor function.
+* Added a `dt_compat_any_has_prop` kconfig preprocessor function.
 
 Libraries / Subsystems
 **********************
@@ -1103,6 +1151,9 @@ Libraries / Subsystems
 
     * Instructions for the deprecated mcumgr go tool have been removed, a list of alternative,
       supported clients can be found on :ref:`mcumgr_tools_libraries`.
+
+    * Fixed an issue with the SMP structure not being packed which would cause a fault on devices
+      that do not support unaligned memory accesses.
 
 * Logging
 
@@ -1259,6 +1310,18 @@ MCUboot
 
   * Added defines for ``SOC_FLASH_0_ID`` and ``SPI_FLASH_0_ID``
 
+  * Fixed ASN.1 support for mbedtls version >= 3.1
+
+  * Fixed bootutil signed/unsigned comparison in ``boot_read_enc_key``
+
+  * Updated imgtool version.py to take command line arguments
+
+  * Added imgtool improvements to dumpinfo
+
+  * Fixed various imgtool dumpinfo issues
+
+  * Fixed imgtool verify command for edcsa-p384 signed images
+
   * The MCUboot version in this release is version ``2.1.0+0-dev``.
 
 Trusted Firmware-M
@@ -1315,3 +1378,11 @@ Tests and Samples
     based on the ``MODEM_CELLULAR`` device driver.
 
   * BT LE Coded PHY is now runtime tested in CI with the nrf5x bsim targets.
+
+Issue Related Items
+*******************
+
+Known Issues
+============
+
+- :github:`74345` - Bluetooth: Non functional on nRF51 with fault
