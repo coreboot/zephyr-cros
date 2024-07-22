@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 /**
  * @file
  * @brief Kernel thread support
@@ -135,14 +141,14 @@ static inline int z_vrfy_k_thread_priority_get(k_tid_t thread)
 #include <zephyr/syscalls/k_thread_priority_get_mrsh.c>
 #endif /* CONFIG_USERSPACE */
 
-int z_impl_k_thread_name_set(struct k_thread *thread, const char *value)
+int z_impl_k_thread_name_set(k_tid_t thread, const char *str)
 {
 #ifdef CONFIG_THREAD_NAME
 	if (thread == NULL) {
 		thread = _current;
 	}
 
-	strncpy(thread->name, value, CONFIG_THREAD_MAX_NAME_LEN - 1);
+	strncpy(thread->name, str, CONFIG_THREAD_MAX_NAME_LEN - 1);
 	thread->name[CONFIG_THREAD_MAX_NAME_LEN - 1] = '\0';
 
 	SYS_PORT_TRACING_OBJ_FUNC(k_thread, name_set, thread, 0);
@@ -150,7 +156,7 @@ int z_impl_k_thread_name_set(struct k_thread *thread, const char *value)
 	return 0;
 #else
 	ARG_UNUSED(thread);
-	ARG_UNUSED(value);
+	ARG_UNUSED(str);
 
 	SYS_PORT_TRACING_OBJ_FUNC(k_thread, name_set, thread, -ENOSYS);
 
@@ -159,7 +165,7 @@ int z_impl_k_thread_name_set(struct k_thread *thread, const char *value)
 }
 
 #ifdef CONFIG_USERSPACE
-static inline int z_vrfy_k_thread_name_set(struct k_thread *thread, const char *str)
+static inline int z_vrfy_k_thread_name_set(k_tid_t thread, const char *str)
 {
 #ifdef CONFIG_THREAD_NAME
 	char name[CONFIG_THREAD_MAX_NAME_LEN];
@@ -340,7 +346,7 @@ void z_check_stack_sentinel(void)
 }
 #endif /* CONFIG_STACK_SENTINEL */
 
-void z_impl_k_thread_start(struct k_thread *thread)
+void z_impl_k_thread_start(k_tid_t thread)
 {
 	SYS_PORT_TRACING_OBJ_FUNC(k_thread, start, thread);
 
@@ -348,7 +354,7 @@ void z_impl_k_thread_start(struct k_thread *thread)
 }
 
 #ifdef CONFIG_USERSPACE
-static inline void z_vrfy_k_thread_start(struct k_thread *thread)
+static inline void z_vrfy_k_thread_start(k_tid_t thread)
 {
 	K_OOPS(K_SYSCALL_OBJ(thread, K_OBJ_THREAD));
 	return z_impl_k_thread_start(thread);
@@ -429,8 +435,9 @@ static char *setup_thread_stack(struct k_thread *new_thread,
 	 * stack. If CONFIG_INIT_STACKS is enabled, the stack will be
 	 * cleared below.
 	 */
-	void *stack_mapped = k_mem_phys_map((uintptr_t)stack, stack_obj_size,
-					    K_MEM_PERM_RW | K_MEM_CACHE_WB | K_MEM_MAP_UNINIT);
+	void *stack_mapped = k_mem_map_phys_guard((uintptr_t)stack, stack_obj_size,
+				K_MEM_PERM_RW | K_MEM_CACHE_WB | K_MEM_MAP_UNINIT,
+				false);
 
 	__ASSERT_NO_MSG((uintptr_t)stack_mapped != 0);
 
@@ -1051,8 +1058,8 @@ void do_thread_cleanup(struct k_thread *thread)
 
 #ifdef CONFIG_THREAD_STACK_MEM_MAPPED
 	if (thread_cleanup_stack_addr != NULL) {
-		k_mem_phys_unmap(thread_cleanup_stack_addr,
-				 thread_cleanup_stack_sz);
+		k_mem_unmap_phys_guard(thread_cleanup_stack_addr,
+				       thread_cleanup_stack_sz, false);
 
 		thread_cleanup_stack_addr = NULL;
 	}

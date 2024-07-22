@@ -149,7 +149,7 @@ class Filters:
             os.remove(fname)
 
     def find_modules(self):
-        if 'west.yml' in self.modified_files:
+        if 'west.yml' in self.modified_files and args.commits is not None:
             print(f"Manifest file 'west.yml' changed")
             print("=========")
             old_manifest_content = repo_to_scan.git.show(f"{args.commits[:-2]}:west.yml")
@@ -313,8 +313,6 @@ class Filters:
             if self.platforms:
                 for platform in self.platforms:
                     _options.extend(["-p", platform])
-            else:
-                _options.append("--all")
             self.get_plan(_options, use_testsuite_root=False)
 
     def find_tags(self):
