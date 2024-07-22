@@ -272,6 +272,10 @@ Device Drivers and Devicetree
   property to specify the reference voltage and reference voltage value to be used by
   the lpadc. (:github:`75005`)
 
+ * The DT properties ``mc,interface-type``, ``mc,reset-gpio``, and ``mc,interrupt-gpio`` of
+   the :dtcompatible:`microchip,ksz8081` phy binding have changed to
+   ``microchip,interface-type``, ``reset-gpios``, and ``int-gpios``, respectively (:github:`73725`)
+
 Analog-to-Digital Converter (ADC)
 =================================
 
@@ -351,6 +355,11 @@ Controller Area Network (CAN)
     furthermore allows CAN controller drivers not supporting manual recovery mode to fail early in
     :c:func:`can_set_mode` during application startup instead of failing when :c:func:`can_recover`
     is called at a later point in time.
+
+Crypto
+======
+
+* The CSS driver has been deprecated on NXP lpc55s36 (:github:`71173`).
 
 Display
 =======
@@ -643,6 +652,18 @@ LED Strip
 
 * Made ``update_channels`` function optional and removed unimplemented functions.
 
+* The ``CONFIG_WS2812_STRIP_DRIVER`` kconfig option has been removed.
+  Previously, when using :kconfig:option:`CONFIG_WS2812_STRIP_SPI`,
+  :kconfig:option:`CONFIG_WS2812_STRIP_I2S`, :kconfig:option:`CONFIG_WS2812_STRIP_GPIO`,
+  or :kconfig:option:`CONFIG_WS2812_STRIP_RPI_PICO_PIO`, one of them had to be selected with
+  ``CONFIG_WS2812_STRIP_DRIVER``, but this is no longer necessary. Please set each option directly.
+
+MDIO
+====
+
+* :kconfig:option:`CONFIG_MDIO_NXP_ENET_TIMEOUT` is now in units of
+  microseconds instead of milliseconds. (:github:`75625`)
+
 Sensors
 =======
 
@@ -672,7 +693,7 @@ Serial
 Timer
 =====
 
-regulator
+Regulator
 =========
 
 * The :dtcompatible:`nxp,vref` driver no longer supports the ground selection function,
