@@ -14,10 +14,12 @@
  * @{
  */
 
+#include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include <zephyr/device.h>
-#include <zephyr/kernel.h>
-#include <zephyr/types.h>
-#include <zephyr/sys/util.h>
+#include <zephyr/sys/slist.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,7 +92,6 @@ struct i3c_config_target {
  * reference to i3c_target_register().
  */
 struct i3c_target_config {
-	/** Private, do not modify */
 	sys_snode_t node;
 
 	/**
