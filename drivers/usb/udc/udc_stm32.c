@@ -20,7 +20,6 @@
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/drivers/clock_control/stm32_clock_control.h>
 #include <zephyr/sys/util.h>
-#include <zephyr/usb/usb_device.h>
 
 #include "udc_common.h"
 
@@ -31,11 +30,17 @@ LOG_MODULE_REGISTER(udc_stm32, CONFIG_UDC_DRIVER_LOG_LEVEL);
 
 #if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs)
 #define DT_DRV_COMPAT st_stm32_otghs
+#define UDC_STM32_IRQ_NAME     otghs
 #elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otgfs)
 #define DT_DRV_COMPAT st_stm32_otgfs
+#define UDC_STM32_IRQ_NAME     otgfs
 #elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_usb)
 #define DT_DRV_COMPAT st_stm32_usb
+#define UDC_STM32_IRQ_NAME     usb
 #endif
+
+#define UDC_STM32_IRQ		DT_INST_IRQ_BY_NAME(0, UDC_STM32_IRQ_NAME, irq)
+#define UDC_STM32_IRQ_PRI	DT_INST_IRQ_BY_NAME(0, UDC_STM32_IRQ_NAME, priority)
 
 struct udc_stm32_data  {
 	PCD_HandleTypeDef pcd;
@@ -547,7 +552,7 @@ static int udc_stm32_disable(const struct device *dev)
 	struct udc_stm32_data *priv = udc_get_private(dev);
 	HAL_StatusTypeDef status;
 
-	irq_disable(DT_INST_IRQN(0));
+	irq_disable(UDC_STM32_IRQ);
 
 	if (udc_ep_disable_internal(dev, USB_CONTROL_EP_OUT)) {
 		LOG_ERR("Failed to disable control endpoint");
@@ -630,44 +635,43 @@ static int udc_stm32_host_wakeup(const struct device *dev)
 	return 0;
 }
 
-static inline int eptype2hal(enum usb_dc_ep_transfer_type eptype)
+static int udc_stm32_ep_enable(const struct device *dev,
+			       struct udc_ep_config *ep_cfg)
 {
-	switch (eptype) {
-	case USB_DC_EP_CONTROL:
-		return EP_TYPE_CTRL;
-	case USB_DC_EP_ISOCHRONOUS:
-		return EP_TYPE_ISOC;
-	case USB_DC_EP_BULK:
-		return EP_TYPE_BULK;
-	case USB_DC_EP_INTERRUPT:
-		return EP_TYPE_INTR;
+	struct udc_stm32_data *priv = udc_get_private(dev);
+	HAL_StatusTypeDef status;
+	uint8_t ep_type;
+	int ret;
+
+	LOG_DBG("Enable ep 0x%02x", ep_cfg->addr);
+
+	switch (ep_cfg->attributes & USB_EP_TRANSFER_TYPE_MASK) {
+	case USB_EP_TYPE_CONTROL:
+		ep_type = EP_TYPE_CTRL;
+		break;
+	case USB_EP_TYPE_BULK:
+		ep_type = EP_TYPE_BULK;
+		break;
+	case USB_EP_TYPE_INTERRUPT:
+		ep_type = EP_TYPE_INTR;
+		break;
+	case USB_EP_TYPE_ISO:
+		ep_type = EP_TYPE_ISOC;
+		break;
 	default:
 		return -EINVAL;
 	}
 
-	return -EINVAL;
-}
-
-static int udc_stm32_ep_enable(const struct device *dev,
-			       struct udc_ep_config *ep)
-{
-	enum usb_dc_ep_transfer_type type = ep->attributes & USB_EP_TRANSFER_TYPE_MASK;
-	struct udc_stm32_data *priv = udc_get_private(dev);
-	HAL_StatusTypeDef status;
-	int ret;
-
-	LOG_DBG("Enable ep 0x%02x", ep->addr);
-
-	ret = udc_stm32_ep_mem_config(dev, ep, true);
+	ret = udc_stm32_ep_mem_config(dev, ep_cfg, true);
 	if (ret) {
 		return ret;
 	}
 
-	status = HAL_PCD_EP_Open(&priv->pcd, ep->addr, ep->mps,
-				 eptype2hal(type));
+	status = HAL_PCD_EP_Open(&priv->pcd, ep_cfg->addr, ep_cfg->mps,
+				 ep_type);
 	if (status != HAL_OK) {
 		LOG_ERR("HAL_PCD_EP_Open failed(0x%02x), %d",
-			ep->addr, (int)status);
+			ep_cfg->addr, (int)status);
 		return -EIO;
 	}
 
@@ -1124,12 +1128,12 @@ static int udc_stm32_driver_init0(const struct device *dev)
 	data->caps.mps0 = UDC_MPS0_64;
 
 	priv->dev = dev;
-	priv->irq = DT_INST_IRQN(0);
+	priv->irq = UDC_STM32_IRQ;
 	priv->clk_enable = priv_clock_enable;
 	priv->clk_disable = priv_clock_disable;
 	priv->pcd_prepare = priv_pcd_prepare;
 
-	IRQ_CONNECT(DT_INST_IRQN(0), DT_INST_IRQ(0, priority), udc_stm32_irq,
+	IRQ_CONNECT(UDC_STM32_IRQ, UDC_STM32_IRQ_PRI, udc_stm32_irq,
 		    DEVICE_DT_INST_GET(0), 0);
 
 	err = pinctrl_apply_state(usb_pcfg, PINCTRL_STATE_DEFAULT);
