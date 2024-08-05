@@ -6,6 +6,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 14
+
 #ifndef ZEPHYR_KERNEL_INCLUDE_WAIT_Q_H_
 #define ZEPHYR_KERNEL_INCLUDE_WAIT_Q_H_
 
