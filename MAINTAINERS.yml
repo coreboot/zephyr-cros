@@ -3217,6 +3217,8 @@ ADI Platforms:
   maintainers:
     - MaureenHelm
   collaborators:
+    - ozersa
+    - ttmut
     - galak
     - microbuilder
   files:
@@ -3688,13 +3690,14 @@ Renesas RA Platforms:
     - thaoluonguw
   files:
     - boards/arduino/uno_r4/
+    - boards/renesas/*ra8*/
     - drivers/*/*renesas_ra*
     - drivers/pinctrl/renesas/ra/
     - dts/arm/renesas/ra/
     - dts/bindings/*/*renesas,ra*
     - soc/renesas/ra/
   labels:
-    - "platforms: Renesas RA"
+    - "platform: Renesas RA"
   description: >-
     Renesas RA SOCs, dts files, and related drivers. Boards based
     on Renesas RA SoCs.
@@ -3901,7 +3904,6 @@ LiteX Platforms:
   files:
     - boards/enjoydigital/litex_vexriscv/
     - drivers/*/*litex*
-    - drivers/spi/spi_litespi*
     - drivers/*/Kconfig.litex
     - dts/bindings/*/litex*
     - dts/riscv/riscv32-litex-vexriscv.dtsi
@@ -4393,6 +4395,7 @@ West:
     - MaureenHelm
   collaborators:
     - ozersa
+    - ttmut
   files: []
   labels:
     - "platform: ADI"

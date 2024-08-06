@@ -929,8 +929,6 @@ static void priv_pcd_prepare(const struct device *dev)
 	priv->pcd.Init.dev_endpoints = cfg->num_endpoints;
 	priv->pcd.Init.ep0_mps = cfg->ep0_mps;
 	priv->pcd.Init.speed = PCD_SPEED_FULL;
-	priv->pcd.Init.low_power_enable = 0;
-	priv->pcd.Init.Sof_enable = 0; /* Usually not needed */
 
 	/* Per controller/Phy values */
 #if defined(USB)
@@ -939,20 +937,20 @@ static void priv_pcd_prepare(const struct device *dev)
 	priv->pcd.Instance = USB_DRD_FS;
 #elif defined(USB_OTG_FS) || defined(USB_OTG_HS)
 	priv->pcd.Init.speed = usb_dc_stm32_get_maximum_speed();
-	priv->pcd.Init.vbus_sensing_enable = DISABLE;
 #if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs)
 	priv->pcd.Instance = USB_OTG_HS;
 #else
 	priv->pcd.Instance = USB_OTG_FS;
 #endif
+#endif /* USB */
+
 #if USB_OTG_HS_EMB_PHY
 	priv->pcd.Init.phy_itface = USB_OTG_HS_EMBEDDED_PHY;
 #elif USB_OTG_HS_ULPI_PHY
 	priv->pcd.Init.phy_itface = USB_OTG_ULPI_PHY;
 #else
 	priv->pcd.Init.phy_itface = PCD_PHY_EMBEDDED;
-#endif
-#endif
+#endif /* USB_OTG_HS_EMB_PHY */
 }
 
 static const struct stm32_pclken pclken[] = STM32_DT_INST_CLOCKS(0);
@@ -966,13 +964,46 @@ static int priv_clock_enable(void)
 		return -ENODEV;
 	}
 
-#if defined(PWR_USBSCR_USB33SV) || defined(PWR_SVMCR_USV)
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs) && defined(CONFIG_SOC_SERIES_STM32U5X)
+	/* Sequence to enable the power of the OTG HS on a stm32U5 serie : Enable VDDUSB */
+	bool pwr_clk = LL_AHB3_GRP1_IsEnabledClock(LL_AHB3_GRP1_PERIPH_PWR);
+
+	if (!pwr_clk) {
+		LL_AHB3_GRP1_EnableClock(LL_AHB3_GRP1_PERIPH_PWR);
+	}
+
+	/* Check that power range is 1 or 2 */
+	if (LL_PWR_GetRegulVoltageScaling() < LL_PWR_REGU_VOLTAGE_SCALE2) {
+		LOG_ERR("Wrong Power range to use USB OTG HS");
+		return -EIO;
+	}
+
+	LL_PWR_EnableVddUSB();
+	/* Configure VOSR register of USB HSTransceiverSupply(); */
+	LL_PWR_EnableUSBPowerSupply();
+	LL_PWR_EnableUSBEPODBooster();
+	while (LL_PWR_IsActiveFlag_USBBOOST() != 1) {
+		/* Wait for USB EPOD BOOST ready */
+	}
+
+	/* Leave the PWR clock in its initial position */
+	if (!pwr_clk) {
+		LL_AHB3_GRP1_DisableClock(LL_AHB3_GRP1_PERIPH_PWR);
+	}
+
+	/* Set the OTG PHY reference clock selection (through SYSCFG) block */
+	LL_APB3_GRP1_EnableClock(LL_APB3_GRP1_PERIPH_SYSCFG);
+	HAL_SYSCFG_SetOTGPHYReferenceClockSelection(SYSCFG_OTG_HS_PHY_CLK_SELECT_1);
+	/* Configuring the SYSCFG registers OTG_HS PHY : OTG_HS PHY enable*/
+	HAL_SYSCFG_EnableOTGPHY(SYSCFG_OTG_HS_PHY_ENABLE);
+#elif defined(PWR_USBSCR_USB33SV) || defined(PWR_SVMCR_USV)
 	/*
 	 * VDDUSB independent USB supply (PWR clock is on)
 	 * with LL_PWR_EnableVDDUSB function (higher case)
 	 */
 	LL_PWR_EnableVDDUSB();
-#endif /* PWR_USBSCR_USB33SV or PWR_SVMCR_USV */
+#endif
+
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
 	LL_PWR_EnableUSBVoltageDetector();
 
@@ -1030,11 +1061,16 @@ static int priv_clock_enable(void)
 	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_OTGHSULPI);
 #endif
 #elif DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs) /* USB_OTG_HS_ULPI_PHY */
-	/* Disable ULPI interface (for external high-speed PHY) clock in sleep/low-power mode. It is
-	 * disabled by default in run power mode, no need to disable it.
+	/* Disable ULPI interface (for external high-speed PHY) clock in sleep/low-power mode.
+	 * It is disabled by default in run power mode, no need to disable it.
 	 */
 #if defined(CONFIG_SOC_SERIES_STM32H7X)
 	LL_AHB1_GRP1_DisableClockSleep(LL_AHB1_GRP1_PERIPH_USB1OTGHSULPI);
+#elif defined(CONFIG_SOC_SERIES_STM32U5X)
+	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_USBPHY);
+	/* Both OTG HS and USBPHY sleep clock MUST be disabled here at the same time */
+	LL_AHB2_GRP1_DisableClockStopSleep(LL_AHB2_GRP1_PERIPH_OTG_HS ||
+						LL_AHB2_GRP1_PERIPH_USBPHY);
 #else
 	LL_AHB1_GRP1_DisableClockLowPower(LL_AHB1_GRP1_PERIPH_OTGHSULPI);
 #endif /* defined(CONFIG_SOC_SERIES_STM32H7X) */
@@ -1060,6 +1096,9 @@ static int priv_clock_disable(void)
 		LOG_ERR("Unable to disable USB clock");
 		return -EIO;
 	}
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs) && defined(CONFIG_SOC_SERIES_STM32U5X)
+	LL_AHB2_GRP1_DisableClock(LL_AHB2_GRP1_PERIPH_USBPHY);
+#endif
 
 	return 0;
 }

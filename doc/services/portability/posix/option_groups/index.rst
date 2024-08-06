@@ -942,11 +942,11 @@ Enable this option with :kconfig:option:`CONFIG_POSIX_THREAD_PRIO_PROTECT`.
    :header: API, Supported
    :widths: 50,10
 
-    pthread_mutex_getprioceiling(),
-    pthread_mutex_setprioceiling(),
-    pthread_mutexattr_getprioceiling(),
+    pthread_mutex_getprioceiling(),yes
+    pthread_mutex_setprioceiling(),yes
+    pthread_mutexattr_getprioceiling(),yes
     pthread_mutexattr_getprotocol(),yes
-    pthread_mutexattr_setprioceiling(),
+    pthread_mutexattr_setprioceiling(),yes
     pthread_mutexattr_setprotocol(),yes
 
 .. _posix_option_thread_priority_scheduling:
@@ -988,16 +988,16 @@ Enable this option with :kconfig:option:`CONFIG_POSIX_THREAD_SAFE_FUNCTIONS`.
     funlockfile(),
     getc_unlocked(),
     getchar_unlocked(),
-    getgrgid_r(),
-    getgrnam_r(),
-    getpwnam_r(),
-    getpwuid_r(),
+    getgrgid_r(),yes :ref:`†<posix_undefined_behaviour>`
+    getgrnam_r(),yes :ref:`†<posix_undefined_behaviour>`
+    getpwnam_r(),yes :ref:`†<posix_undefined_behaviour>`
+    getpwuid_r(),yes :ref:`†<posix_undefined_behaviour>`
     gmtime_r(), yes
     localtime_r(),
     putc_unlocked(),
     putchar_unlocked(),
     rand_r(), yes
-    readdir_r(),
+    readdir_r(), yes
     strerror_r(), yes
     strtok_r(), yes
 

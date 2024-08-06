@@ -39,6 +39,12 @@ LVGL
 Device Drivers and Devicetree
 *****************************
 
+* The ``compatible`` of the LiteX ethernet controller has been renamed from
+  ``litex,eth0`` to :dtcompatible:`litex,liteeth`. (:github:`75433`)
+
+* The ``compatible`` of the LiteX uart controller has been renamed from
+  ``litex,uart0`` to :dtcompatible:`litex,uart`. (:github:`74522`)
+
 Controller Area Network (CAN)
 =============================
 
@@ -100,6 +106,12 @@ Bluetooth Crypto
 
 Networking
 **********
+
+* The CoAP public API functions :c:func:`coap_get_block1_option` and
+  :c:func:`coap_get_block2_option` have changed. The ``block_number`` pointer
+  type has changed from ``uint8_t *`` to ``uint32_t *``. Additionally,
+  :c:func:`coap_get_block2_option` now accepts an additional ``bool *has_more``
+  parameter, to store the value of the more flag. (:github:`76052`)
 
 Other Subsystems
 ****************

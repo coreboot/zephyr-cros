@@ -978,8 +978,8 @@ enum usbd_speed usbd_caps_speed(const struct usbd_context *const uds_ctx);
  *
  * @return 0 on success, other values on fail.
  */
-int usbd_device_set_bcd(struct usbd_context *const uds_ctx,
-			const enum usbd_speed speed, const uint16_t bcd);
+int usbd_device_set_bcd_usb(struct usbd_context *const uds_ctx,
+			    const enum usbd_speed speed, const uint16_t bcd);
 
 /**
  * @brief Set USB device descriptor value idVendor
@@ -1002,6 +1002,17 @@ int usbd_device_set_vid(struct usbd_context *const uds_ctx,
  */
 int usbd_device_set_pid(struct usbd_context *const uds_ctx,
 			const uint16_t pid);
+
+/**
+ * @brief Set USB device descriptor value bcdDevice
+ *
+ * @param[in] uds_ctx Pointer to USB device support context
+ * @param[in] bcd     bcdDevice value
+ *
+ * @return 0 on success, other values on fail.
+ */
+int usbd_device_set_bcd_device(struct usbd_context *const uds_ctx,
+			       const uint16_t bcd);
 
 /**
  * @brief Set USB device descriptor code triple Base Class, SubClass, and Protocol
