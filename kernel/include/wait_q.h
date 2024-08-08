@@ -21,6 +21,8 @@
 #include <timeout_q.h>
 #include <priority_q.h>
 
+#line 25
+
 #ifdef __cplusplus
 extern "C" {
 #endif
