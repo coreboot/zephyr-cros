@@ -13,5 +13,7 @@ supported:
   - spi
   - i2c
   - trng
+  - dma
+  - watchdog
 ram: 1024
 flash: 3072

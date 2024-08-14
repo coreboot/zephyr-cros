@@ -18,7 +18,7 @@
 #include <zephyr/usb/bos.h>
 #include <zephyr/usb/usb_ch9.h>
 #include <zephyr/usb/usbd_msg.h>
-#include <zephyr/net/buf.h>
+#include <zephyr/drivers/usb/udc_buf.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/logging/log.h>
@@ -978,8 +978,8 @@ enum usbd_speed usbd_caps_speed(const struct usbd_context *const uds_ctx);
  *
  * @return 0 on success, other values on fail.
  */
-int usbd_device_set_bcd(struct usbd_context *const uds_ctx,
-			const enum usbd_speed speed, const uint16_t bcd);
+int usbd_device_set_bcd_usb(struct usbd_context *const uds_ctx,
+			    const enum usbd_speed speed, const uint16_t bcd);
 
 /**
  * @brief Set USB device descriptor value idVendor
@@ -1002,6 +1002,17 @@ int usbd_device_set_vid(struct usbd_context *const uds_ctx,
  */
 int usbd_device_set_pid(struct usbd_context *const uds_ctx,
 			const uint16_t pid);
+
+/**
+ * @brief Set USB device descriptor value bcdDevice
+ *
+ * @param[in] uds_ctx Pointer to USB device support context
+ * @param[in] bcd     bcdDevice value
+ *
+ * @return 0 on success, other values on fail.
+ */
+int usbd_device_set_bcd_device(struct usbd_context *const uds_ctx,
+			       const uint16_t bcd);
 
 /**
  * @brief Set USB device descriptor code triple Base Class, SubClass, and Protocol

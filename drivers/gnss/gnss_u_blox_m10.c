@@ -92,14 +92,14 @@ static int ubx_m10_resume(const struct device *dev)
 	struct ubx_m10_data *data = dev->data;
 	int ret;
 
-	ret = modem_pipe_open(data->uart_pipe);
+	ret = modem_pipe_open(data->uart_pipe, K_SECONDS(10));
 	if (ret < 0) {
 		return ret;
 	}
 
 	ret = modem_chat_attach(&data->chat, data->uart_pipe);
 	if (ret < 0) {
-		(void)modem_pipe_close(data->uart_pipe);
+		(void)modem_pipe_close(data->uart_pipe, K_SECONDS(10));
 		return ret;
 	}
 
@@ -110,7 +110,7 @@ static int ubx_m10_turn_off(const struct device *dev)
 {
 	struct ubx_m10_data *data = dev->data;
 
-	return modem_pipe_close(data->uart_pipe);
+	return modem_pipe_close(data->uart_pipe, K_SECONDS(10));
 }
 
 static int ubx_m10_init_nmea0183_match(const struct device *dev)
@@ -203,7 +203,7 @@ static int ubx_m10_modem_module_change(const struct device *dev, bool change_fro
 	}
 
 	if (ret < 0) {
-		(void)modem_pipe_close(data->uart_pipe);
+		(void)modem_pipe_close(data->uart_pipe, K_SECONDS(10));
 	}
 
 	return ret;
@@ -524,9 +524,9 @@ static int ubx_m10_navigation_mode_to_ubx_dynamic_model(const struct device *dev
 	case GNSS_NAVIGATION_MODE_LOW_DYNAMICS:
 		return UBX_DYN_MODEL_PORTABLE;
 	case GNSS_NAVIGATION_MODE_BALANCED_DYNAMICS:
-		return UBX_DYN_MODEL_AIRBONE1G;
+		return UBX_DYN_MODEL_AIRBORNE1G;
 	case GNSS_NAVIGATION_MODE_HIGH_DYNAMICS:
-		return UBX_DYN_MODEL_AIRBONE4G;
+		return UBX_DYN_MODEL_AIRBORNE4G;
 	default:
 		return -EINVAL;
 	}
@@ -542,17 +542,17 @@ static int ubx_m10_ubx_dynamic_model_to_navigation_mode(const struct device *dev
 		return GNSS_NAVIGATION_MODE_ZERO_DYNAMICS;
 	case UBX_DYN_MODEL_PEDESTRIAN:
 		return GNSS_NAVIGATION_MODE_LOW_DYNAMICS;
-	case UBX_DYN_MODEL_AUTOMOTIV:
+	case UBX_DYN_MODEL_AUTOMOTIVE:
 		return GNSS_NAVIGATION_MODE_LOW_DYNAMICS;
 	case UBX_DYN_MODEL_SEA:
 		return GNSS_NAVIGATION_MODE_BALANCED_DYNAMICS;
-	case UBX_DYN_MODEL_AIRBONE1G:
+	case UBX_DYN_MODEL_AIRBORNE1G:
 		return GNSS_NAVIGATION_MODE_BALANCED_DYNAMICS;
-	case UBX_DYN_MODEL_AIRBONE2G:
+	case UBX_DYN_MODEL_AIRBORNE2G:
 		return GNSS_NAVIGATION_MODE_BALANCED_DYNAMICS;
-	case UBX_DYN_MODEL_AIRBONE4G:
+	case UBX_DYN_MODEL_AIRBORNE4G:
 		return GNSS_NAVIGATION_MODE_HIGH_DYNAMICS;
-	case UBX_DYN_MODEL_WIRST:
+	case UBX_DYN_MODEL_WRIST:
 		return GNSS_NAVIGATION_MODE_BALANCED_DYNAMICS;
 	case UBX_DYN_MODEL_BIKE:
 		return GNSS_NAVIGATION_MODE_HIGH_DYNAMICS;
@@ -734,7 +734,6 @@ static int ubx_m10_set_enabled_systems(const struct device *dev, gnss_systems_t 
 	for (int i = 0; i < payload->num_config_blocks; ++i) {
 		ret = ubx_m10_ubx_gnss_id_to_gnss_system(dev, payload->config_blocks[i].gnss_id);
 		if (ret < 0) {
-			ret = -EINVAL;
 			goto unlock;
 		}
 
@@ -753,6 +752,11 @@ static int ubx_m10_set_enabled_systems(const struct device *dev, gnss_systems_t 
 	/* Prepare payload (payload) for sending CFG-GNSS for enabling the gnss systems. */
 	payload = malloc(sizeof(*payload) +
 		sizeof(struct ubx_cfg_gnss_payload_config_block) * UBX_M10_GNSS_SUPP_SYS_CNT);
+	if (!payload) {
+		ret = -ENOMEM;
+		goto unlock;
+	}
+
 	payload->num_config_blocks = UBX_M10_GNSS_SUPP_SYS_CNT;
 
 	ubx_cfg_gnss_payload_default(payload);

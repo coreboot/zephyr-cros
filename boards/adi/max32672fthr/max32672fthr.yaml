@@ -11,5 +11,8 @@ supported:
   - gpio
   - serial
   - trng
+  - i2c
+  - dma
+  - watchdog
 ram: 200
 flash: 1024

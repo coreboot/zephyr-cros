@@ -363,6 +363,27 @@ class KconfigCheck(ComplianceTest):
                 ))
             fp_module_file.write(content)
 
+    def get_module_setting_root(self, root, settings_file):
+        """
+        Parse the Zephyr module generated settings file given by 'settings_file'
+        and return all root settings defined by 'root'.
+        """
+        # Invoke the script directly using the Python executable since this is
+        # not a module nor a pip-installed Python utility
+        root_paths = []
+
+        if os.path.exists(settings_file):
+            with open(settings_file, 'r') as fp_setting_file:
+                content = fp_setting_file.read()
+
+            lines = content.strip().split('\n')
+            for line in lines:
+                root = root.upper()
+                if line.startswith(f'"{root}_ROOT":'):
+                    _, root_path = line.split(":", 1)
+                    root_paths.append(Path(root_path.strip('"')))
+        return root_paths
+
     def get_kconfig_dts(self, kconfig_dts_file, settings_file):
         """
         Generate the Kconfig.dts using dts/bindings as the source.
@@ -377,15 +398,9 @@ class KconfigCheck(ComplianceTest):
         binding_paths = []
         binding_paths.append(os.path.join(ZEPHYR_BASE, "dts", "bindings"))
 
-        if os.path.exists(settings_file):
-            with open(settings_file, 'r') as fp_setting_file:
-                content = fp_setting_file.read()
-
-            lines = content.strip().split('\n')
-            for line in lines:
-                if line.startswith('"DTS_ROOT":'):
-                    _, dts_root_path = line.split(":", 1)
-                    binding_paths.append(os.path.join(dts_root_path.strip('"'), "dts", "bindings"))
+        dts_root_paths = self.get_module_setting_root('dts', settings_file)
+        for p in dts_root_paths:
+            binding_paths.append(p / "dts" / "bindings")
 
         cmd = [sys.executable, zephyr_drv_kconfig_path,
                '--kconfig-out', kconfig_dts_file, '--bindings-dirs']
@@ -423,7 +438,7 @@ class KconfigCheck(ComplianceTest):
                     fp_kconfig_v1_syms_file.write('\n\t' + kconfiglib.TYPE_TO_STR[s.type])
                     fp_kconfig_v1_syms_file.write('\n\n')
 
-    def get_v2_model(self, kconfig_dir):
+    def get_v2_model(self, kconfig_dir, settings_file):
         """
         Get lists of v2 boards and SoCs and put them in a file that is parsed by
         Kconfig
@@ -435,8 +450,12 @@ class KconfigCheck(ComplianceTest):
         kconfig_boards_file = os.path.join(kconfig_dir, 'boards', 'Kconfig.boards')
         kconfig_defconfig_file = os.path.join(kconfig_dir, 'boards', 'Kconfig.defconfig')
 
-        root_args = argparse.Namespace(**{'board_roots': [Path(ZEPHYR_BASE)],
-                                          'soc_roots': [Path(ZEPHYR_BASE)], 'board': None})
+        board_roots = self.get_module_setting_root('board', settings_file)
+        board_roots.insert(0, Path(ZEPHYR_BASE))
+        soc_roots = self.get_module_setting_root('soc', settings_file)
+        soc_roots.insert(0, Path(ZEPHYR_BASE))
+        root_args = argparse.Namespace(**{'board_roots': board_roots,
+                                          'soc_roots': soc_roots, 'board': None})
         v2_boards = list_boards.find_v2_boards(root_args)
 
         with open(kconfig_defconfig_file, 'w') as fp:
@@ -542,7 +561,7 @@ class KconfigCheck(ComplianceTest):
         os.makedirs(os.path.join(kconfiglib_dir, 'arch'), exist_ok=True)
 
         os.environ["BOARD_DIR"] = kconfiglib_boards_dir
-        self.get_v2_model(kconfiglib_dir)
+        self.get_v2_model(kconfiglib_dir, os.path.join(kconfiglib_dir, "settings_file.txt"))
 
         # Tells Kconfiglib to generate warnings for all references to undefined
         # symbols within Kconfig files
@@ -845,6 +864,12 @@ flagged.
                               # Zephyr toolchain variant and therefore not
                               # visible to compliance.
         "BOARD_", # Used as regex in scripts/utils/board_v1_to_v2.py
+        "BOOT_DIRECT_XIP", # Used in sysbuild for MCUboot configuration
+        "BOOT_DIRECT_XIP_REVERT", # Used in sysbuild for MCUboot configuration
+        "BOOT_FIRMWARE_LOADER", # Used in sysbuild for MCUboot configuration
+        "BOOT_RAM_LOAD", # Used in sysbuild for MCUboot configuration
+        "BOOT_SWAP_USING_MOVE", # Used in sysbuild for MCUboot configuration
+        "BOOT_SWAP_USING_SCRATCH", # Used in sysbuild for MCUboot configuration
         "BOOT_ENCRYPTION_KEY_FILE", # Used in sysbuild
         "BOOT_ENCRYPT_IMAGE", # Used in sysbuild
         "BINDESC_", # Used in documentation as a prefix
@@ -907,6 +932,7 @@ flagged.
         "MYFEATURE",
         "MY_DRIVER_0",
         "NORMAL_SLEEP",  # #defined by RV32M1 in ext/
+        "NRF_WIFI_FW_BIN", # Directly passed from CMakeLists.txt
         "OPT",
         "OPT_0",
         "PEDO_THS_MIN",
@@ -918,6 +944,7 @@ flagged.
         "LOG_BACKEND_MOCK_OUTPUT_SYST", #Referenced in testcase.yaml of log_syst test
         "SEL",
         "SHIFT",
+        "SINGLE_APPLICATION_SLOT", # Used in sysbuild for MCUboot configuration
         "SOC_SERIES_", # Used as regex in scripts/utils/board_v1_to_v2.py
         "SOC_WATCH",  # Issue 13749
         "SOME_BOOL",
@@ -1513,10 +1540,11 @@ def annotate(res):
     """
     https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#about-workflow-commands
     """
+    msg = res.message.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
     notice = f'::{res.severity} file={res.file}' + \
              (f',line={res.line}' if res.line else '') + \
              (f',col={res.col}' if res.col else '') + \
-             f',title={res.title}::{res.message}'
+             f',title={res.title}::{msg}'
     print(notice)
 
 

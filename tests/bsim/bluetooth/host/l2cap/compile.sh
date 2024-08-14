@@ -11,13 +11,17 @@ set -ue
 source ${ZEPHYR_BASE}/tests/bsim/compile.source
 
 app=tests/bsim/bluetooth/host/l2cap/many_conns compile
+app=tests/bsim/bluetooth/host/l2cap/multilink_peripheral compile
 app=tests/bsim/bluetooth/host/l2cap/general compile
 app=tests/bsim/bluetooth/host/l2cap/userdata compile
+app=tests/bsim/bluetooth/host/l2cap/userdata conf_file=prj_no_checks.conf compile
 app=tests/bsim/bluetooth/host/l2cap/stress compile
 app=tests/bsim/bluetooth/host/l2cap/stress conf_file=prj_nofrag.conf compile
 app=tests/bsim/bluetooth/host/l2cap/stress conf_file=prj_syswq.conf compile
 app=tests/bsim/bluetooth/host/l2cap/split/dut compile
 app=tests/bsim/bluetooth/host/l2cap/split/tester compile
+app=tests/bsim/bluetooth/host/l2cap/reassembly/dut compile
+app=tests/bsim/bluetooth/host/l2cap/reassembly/peer compile
 app=tests/bsim/bluetooth/host/l2cap/ecred/dut compile
 app=tests/bsim/bluetooth/host/l2cap/ecred/peer compile
 app=tests/bsim/bluetooth/host/l2cap/credits compile

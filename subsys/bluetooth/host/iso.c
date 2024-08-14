@@ -840,11 +840,6 @@ int conn_iso_send(struct bt_conn *conn, struct net_buf *buf, enum bt_iso_timesta
 		return -EINVAL;
 	}
 
-	/* push the TS flag on the buffer itself.
-	 * It will be popped and read back by conn before adding the ISO HCI header.
-	 */
-	net_buf_push_u8(buf, has_ts);
-
 	net_buf_put(&conn->iso.txq, buf);
 	BT_ISO_DATA_DBG("%p put on list", buf);
 
@@ -876,6 +871,18 @@ static int validate_send(const struct bt_iso_chan *chan, const struct net_buf *b
 	if (!iso_conn->iso.info.can_send) {
 		LOG_DBG("Channel %p not able to send", chan);
 		return -EINVAL;
+	}
+
+	if (net_buf_headroom(buf) != BT_BUF_ISO_SIZE(0)) {
+		LOG_DBG("Buffer headroom (%d) != BT_BUF_ISO_SIZE(0) (%d) bytes",
+			net_buf_headroom(buf), BT_BUF_ISO_SIZE(0));
+
+		/* DO NOT remove this check. We rely on precise headroom further
+		 * below in the stack to determine if `buf` contains a timestamp
+		 * field or not. See conn.c:contains_iso_timestamp.
+		 */
+
+		return -EMSGSIZE;
 	}
 
 	if (buf->size < hdr_size) {
@@ -1162,7 +1169,7 @@ void hci_le_cis_established(struct net_buf *buf)
 	uint16_t handle = sys_le16_to_cpu(evt->conn_handle);
 	struct bt_conn *iso;
 
-	LOG_DBG("status 0x%02x handle %u", evt->status, handle);
+	LOG_DBG("status 0x%02x %s handle %u", evt->status, bt_hci_err_to_str(evt->status), handle);
 
 	/* ISO connection handles are already assigned at this point */
 	iso = bt_conn_lookup_handle(handle, BT_CONN_TYPE_ISO);
@@ -2334,7 +2341,8 @@ void bt_iso_security_changed(struct bt_conn *acl, uint8_t hci_status)
 			param[param_count].iso_chan = iso_chan;
 			param_count++;
 		} else {
-			LOG_DBG("Failed to encrypt ACL %p for ISO %p: %u", acl, iso, hci_status);
+			LOG_DBG("Failed to encrypt ACL %p for ISO %p: %u %s",
+				acl, iso, hci_status, bt_hci_err_to_str(hci_status));
 
 			/* We utilize the disconnected callback to make the
 			 * upper layers aware of the error
@@ -3053,7 +3061,8 @@ void hci_le_big_complete(struct net_buf *buf)
 	big = lookup_big_by_handle(evt->big_handle);
 	atomic_clear_bit(big->flags, BT_BIG_PENDING);
 
-	LOG_DBG("BIG[%u] %p completed, status 0x%02x", big->handle, big, evt->status);
+	LOG_DBG("BIG[%u] %p completed, status 0x%02x %s",
+		big->handle, big, evt->status, bt_hci_err_to_str(evt->status));
 
 	if (evt->status || evt->num_bis != big->num_bis) {
 		if (evt->status == BT_HCI_ERR_SUCCESS && evt->num_bis != big->num_bis) {
@@ -3227,7 +3236,8 @@ void hci_le_big_sync_established(struct net_buf *buf)
 	big = lookup_big_by_handle(evt->big_handle);
 	atomic_clear_bit(big->flags, BT_BIG_SYNCING);
 
-	LOG_DBG("BIG[%u] %p sync established, status 0x%02x", big->handle, big, evt->status);
+	LOG_DBG("BIG[%u] %p sync established, status 0x%02x %s",
+		big->handle, big, evt->status, bt_hci_err_to_str(evt->status));
 
 	if (evt->status || evt->num_bis != big->num_bis) {
 		if (evt->status == BT_HCI_ERR_SUCCESS && evt->num_bis != big->num_bis) {

@@ -20,6 +20,8 @@
 #include <stdarg.h>
 #include <zephyr/sys/util.h>
 
+#line 24
+
 /* This header file keeps all macros and functions needed for creating logging
  * messages (macros like @ref LOG_ERR).
  */
