@@ -47,6 +47,7 @@
 		led0 = &red_led;
 		led1 = &green_led;
 		sw0 = &pb0;
+		watchdog0 = &wdt0;
 	 };
 };
 
@@ -85,5 +86,23 @@
 	current-speed = <115200>;
 	data-bits = <8>;
 	parity = "none";
+	status = "okay";
+};
+
+&trng {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	pinctrl-0 = <&i2c0a_scl_p2_8 &i2c0a_sda_p2_7>;
+	pinctrl-names = "default";
+};
+
+&dma0 {
+	status = "okay";
+};
+
+&wdt0 {
 	status = "okay";
 };

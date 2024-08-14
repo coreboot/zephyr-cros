@@ -10,5 +10,9 @@ toolchain:
 supported:
   - gpio
   - serial
+  - trng
+  - i2c
+  - dma
+  - watchdog
 ram: 160
 flash: 384

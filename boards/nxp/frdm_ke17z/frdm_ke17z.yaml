@@ -10,5 +10,10 @@ toolchain:
   - xtools
 supported:
   - gpio
+  - adc
   - uart
+  - pwm
+  - i2c
+  - spi
+  - dma
 vendor: nxp
