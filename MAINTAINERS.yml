@@ -437,6 +437,7 @@ Bluetooth Mesh:
     - akredalen
     - HaavardRei
     - omkar3141
+    - KyraLengfeld
   files:
     - doc/connectivity/bluetooth/api/mesh/
     - include/zephyr/bluetooth/mesh/
@@ -995,8 +996,8 @@ Documentation Infrastructure:
 Release Notes:
   status: maintained
   maintainers:
-    - nashif
-    - aescolar
+    - dkalowsk
+    - mmahadevan108
   collaborators:
     - kartben
   files:
@@ -1445,6 +1446,22 @@ Release Notes:
     - "area: GNSS"
   tests:
     - drivers.gnss
+
+"Drivers: Haptics":
+  status: maintained
+  maintainers:
+    - rriveramcrus
+  files:
+    - drivers/haptics/
+    - dts/bindings/haptics/
+    - include/zephyr/drivers/haptics.h
+    - doc/hardware/peripherals/haptics.rst
+    - tests/drivers/build_all/haptics/
+    - samples/drivers/haptics/
+  labels:
+    - "area: Haptics"
+  tests:
+    - drivers.haptics
 
 "Drivers: HW Info":
   status: maintained
@@ -3833,6 +3850,7 @@ STM32 Platforms:
     - gautierg-st
     - GeorgeCGV
     - marwaiehm-st
+    - mathieuchopstm
   files:
     - boards/st/
     - drivers/*/*stm32*.c
@@ -4807,9 +4825,10 @@ West:
 "West project: lz4":
   status: odd fixes
   collaborators:
-    - Navin-Sankar
+    - parthitce
   files:
     - modules/lz4/
+    - samples/modules/compression/lz4/
   labels:
     - "area: Compression"
 
