@@ -35,6 +35,8 @@
 #include <zephyr/sys/slist.h>
 #include <zephyr/rtio/rtio.h>
 
+#line 39
+
 #ifdef __cplusplus
 extern "C" {
 #endif
