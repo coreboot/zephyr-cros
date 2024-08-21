@@ -8,9 +8,12 @@ toolchain:
   - gnuarmemb
   - xtools
 supported:
+  - dma
   - gpio
+  - i2c
   - serial
   - trng
   - watchdog
+  - spi
 ram: 80
 flash: 256

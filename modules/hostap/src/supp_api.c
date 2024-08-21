@@ -399,7 +399,9 @@ static int wpas_add_and_config_network(struct wpa_supplicant *wpa_s,
 			}
 		}
 
-		if (params->security == WIFI_SECURITY_TYPE_SAE) {
+		if (params->security == WIFI_SECURITY_TYPE_SAE_HNP ||
+		    params->security == WIFI_SECURITY_TYPE_SAE_H2E ||
+		    params->security == WIFI_SECURITY_TYPE_SAE_AUTO) {
 			if (params->sae_password) {
 				if (!wpa_cli_cmd_v("set_network %d sae_password \"%s\"",
 						   resp.network_id, params->sae_password)) {
@@ -408,6 +410,15 @@ static int wpas_add_and_config_network(struct wpa_supplicant *wpa_s,
 			} else {
 				if (!wpa_cli_cmd_v("set_network %d sae_password \"%s\"",
 						   resp.network_id, params->psk)) {
+					goto out;
+				}
+			}
+
+			if (params->security == WIFI_SECURITY_TYPE_SAE_H2E ||
+			    params->security == WIFI_SECURITY_TYPE_SAE_AUTO) {
+				params->sae_pwe =
+					(params->security == WIFI_SECURITY_TYPE_SAE_H2E) ? 1 : 2;
+				if (!wpa_cli_cmd_v("set sae_pwe %d", params->sae_pwe)) {
 					goto out;
 				}
 			}
@@ -917,6 +928,34 @@ int supplicant_channel(const struct device *dev, struct wifi_channel_info *chann
 
 	return wifi_mgmt_api->channel(dev, channel);
 }
+
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_WNM
+int supplicant_btm_query(const struct device *dev, uint8_t reason)
+{
+	struct wpa_supplicant *wpa_s;
+	int ret = -1;
+
+	k_mutex_lock(&wpa_supplicant_mutex, K_FOREVER);
+
+	wpa_s = get_wpa_s_handle(dev);
+	if (!wpa_s) {
+		ret = -1;
+		wpa_printf(MSG_ERROR, "Interface %s not found", dev->name);
+		goto out;
+	}
+
+	if (!wpa_cli_cmd_v("wnm_bss_query %d", reason)) {
+		goto out;
+	}
+
+	ret = 0;
+
+out:
+	k_mutex_unlock(&wpa_supplicant_mutex);
+
+	return ret;
+}
+#endif
 
 #ifdef CONFIG_AP
 int supplicant_ap_enable(const struct device *dev,

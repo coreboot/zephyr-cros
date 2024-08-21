@@ -1117,6 +1117,7 @@ static void process_unack_tx(struct bt_conn *conn)
 		node = sys_slist_get(&conn->tx_pending);
 
 		if (!node) {
+			bt_tx_irq_raise();
 			return;
 		}
 
@@ -3002,7 +3003,7 @@ void notify_path_loss_threshold_report(struct bt_conn *conn,
 {
 	struct bt_conn_cb *callback;
 
-	SYS_SLIST_FOR_EACH_CONTAINER(&callback_list, callback, _node) {
+	SYS_SLIST_FOR_EACH_CONTAINER(&conn_cbs, callback, _node) {
 		if (callback->path_loss_threshold_report) {
 			callback->path_loss_threshold_report(conn, &report);
 		}

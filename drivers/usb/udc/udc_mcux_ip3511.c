@@ -151,7 +151,7 @@ static int udc_mcux_ctrl_feed_dout(const struct device *dev,
 		return -ENOMEM;
 	}
 
-	net_buf_put(&cfg->fifo, buf);
+	k_fifo_put(&cfg->fifo, buf);
 
 	ret = udc_mcux_ep_feed(dev, cfg, buf);
 
@@ -453,6 +453,9 @@ usb_status_t USB_DeviceNotificationTrigger(void *handle, void *msg)
 		break;
 	case kUSB_DeviceNotifyAttach:
 		udc_submit_event(dev, UDC_EVT_VBUS_READY, 0);
+		break;
+	case kUSB_DeviceNotifySOF:
+		udc_submit_event(dev, UDC_EVT_SOF, 0);
 		break;
 	default:
 		ep  = mcux_msg->code;

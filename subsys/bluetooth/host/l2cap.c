@@ -261,7 +261,7 @@ void bt_l2cap_chan_del(struct bt_l2cap_chan *chan)
 	 * `l2cap_chan_destroy()` as it is not called for fixed channels.
 	 */
 	while (chan_has_data(le_chan)) {
-		struct net_buf *buf = net_buf_get(&le_chan->tx_queue, K_NO_WAIT);
+		struct net_buf *buf = k_fifo_get(&le_chan->tx_queue, K_NO_WAIT);
 
 		net_buf_unref(buf);
 	}
@@ -312,7 +312,7 @@ static void l2cap_rx_process(struct k_work *work)
 	struct bt_l2cap_le_chan *ch = CHAN_RX(work);
 	struct net_buf *buf;
 
-	while ((buf = net_buf_get(&ch->rx_queue, K_NO_WAIT))) {
+	while ((buf = k_fifo_get(&ch->rx_queue, K_NO_WAIT))) {
 		LOG_DBG("ch %p buf %p", ch, buf);
 		l2cap_chan_le_recv(ch, buf);
 		net_buf_unref(buf);
@@ -329,6 +329,23 @@ void bt_l2cap_chan_add(struct bt_conn *conn, struct bt_l2cap_chan *chan,
 	chan->destroy = destroy;
 
 	LOG_DBG("conn %p chan %p", conn, chan);
+}
+
+static void init_le_chan_private(struct bt_l2cap_le_chan *le_chan)
+{
+	/* Initialize private members of the struct. We can't "just memset" as
+	 * some members are used as application parameters.
+	 */
+#if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
+	le_chan->_sdu = NULL;
+	le_chan->_sdu_len = 0;
+#if defined(CONFIG_BT_L2CAP_SEG_RECV)
+	le_chan->_sdu_len_done = 0;
+#endif /* CONFIG_BT_L2CAP_SEG_RECV */
+#endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
+	memset(&le_chan->_pdu_ready, 0, sizeof(le_chan->_pdu_ready));
+	le_chan->_pdu_ready_lock = 0;
+	le_chan->_pdu_remaining = 0;
 }
 
 static bool l2cap_chan_add(struct bt_conn *conn, struct bt_l2cap_chan *chan,
@@ -348,6 +365,7 @@ static bool l2cap_chan_add(struct bt_conn *conn, struct bt_l2cap_chan *chan,
 	}
 
 	atomic_clear(chan->status);
+	init_le_chan_private(le_chan);
 
 	bt_l2cap_chan_add(conn, chan, destroy);
 
@@ -720,7 +738,7 @@ int bt_l2cap_send_pdu(struct bt_l2cap_le_chan *le_chan, struct net_buf *pdu,
 	make_closure(pdu->user_data, cb, user_data);
 	LOG_DBG("push: pdu %p len %d cb %p userdata %p", pdu, pdu->len, cb, user_data);
 
-	net_buf_put(&le_chan->tx_queue, pdu);
+	k_fifo_put(&le_chan->tx_queue, pdu);
 
 	raise_data_ready(le_chan); /* tis just a flag */
 
@@ -1281,7 +1299,7 @@ static void l2cap_chan_destroy(struct bt_l2cap_chan *chan)
 	}
 
 	/* Remove buffers on the SDU RX queue */
-	while ((buf = net_buf_get(&le_chan->rx_queue, K_NO_WAIT))) {
+	while ((buf = k_fifo_get(&le_chan->rx_queue, K_NO_WAIT))) {
 		net_buf_unref(buf);
 	}
 
@@ -2241,12 +2259,12 @@ static void l2cap_chan_shutdown(struct bt_l2cap_chan *chan)
 	}
 
 	/* Remove buffers on the TX queue */
-	while ((buf = net_buf_get(&le_chan->tx_queue, K_NO_WAIT))) {
+	while ((buf = k_fifo_get(&le_chan->tx_queue, K_NO_WAIT))) {
 		l2cap_tx_buf_destroy(chan->conn, buf, -ESHUTDOWN);
 	}
 
 	/* Remove buffers on the RX queue */
-	while ((buf = net_buf_get(&le_chan->rx_queue, K_NO_WAIT))) {
+	while ((buf = k_fifo_get(&le_chan->rx_queue, K_NO_WAIT))) {
 		net_buf_unref(buf);
 	}
 
@@ -2651,7 +2669,7 @@ static void l2cap_chan_recv_queue(struct bt_l2cap_le_chan *chan,
 		return;
 	}
 
-	net_buf_put(&chan->rx_queue, buf);
+	k_fifo_put(&chan->rx_queue, buf);
 	k_work_submit(&chan->rx_work);
 }
 #endif /* CONFIG_BT_L2CAP_DYNAMIC_CHANNEL */
@@ -3117,9 +3135,9 @@ static int bt_l2cap_dyn_chan_send(struct bt_l2cap_le_chan *le_chan, struct net_b
 		return -EINVAL;
 	}
 
-	CHECKIF(user_data_not_empty(buf)) {
-		LOG_DBG("Please clear user_data first");
-		return -EINVAL;
+	if (user_data_not_empty(buf)) {
+		/* There may be issues if user_data is not empty. */
+		LOG_WRN("user_data is not empty");
 	}
 
 	/* Prepend SDU length.
@@ -3144,7 +3162,7 @@ static int bt_l2cap_dyn_chan_send(struct bt_l2cap_le_chan *le_chan, struct net_b
 	net_buf_push_le16(buf, sdu_len);
 
 	/* Put buffer on TX queue */
-	net_buf_put(&le_chan->tx_queue, buf);
+	k_fifo_put(&le_chan->tx_queue, buf);
 
 	/* Always process the queue in the same context */
 	raise_data_ready(le_chan);

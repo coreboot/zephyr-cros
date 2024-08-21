@@ -157,7 +157,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: e2902b60bc8b540b49f1012e6d45f8eef067f5bb
+      revision: e05b24f5caee741e0f3b43123bf2082e8cc908e7
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -198,7 +198,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: 42ea394cbd2d8632339bbecb1efffffa696d11e6
+      revision: 7a6f26344ebde67838566d9265ec745dda4c8c81
       path: modules/hal/nxp
       groups:
         - hal
@@ -214,7 +214,7 @@ manifest:
         - hal
     - name: hal_renesas
       path: modules/hal/renesas
-      revision: af77d7cdfeeff290593e7e99f54f0c1e2a3f91e6
+      revision: d17dc07ba2af3cedf869454c9cb9c293d8379fe4
       groups:
         - hal
     - name: hal_rpi_pico
@@ -259,7 +259,7 @@ manifest:
         - hal
     - name: hostap
       path: modules/lib/hostap
-      revision: a941086775a865d170743a5d4790f1fa213ec6a4
+      revision: 77a4cad575c91f1b234c8d15630f87999881cde2
     - name: libmetal
       revision: a6851ba6dba8c9e87d00c42f171a822f7a29639b
       path: modules/hal/libmetal
@@ -310,7 +310,7 @@ manifest:
       path: modules/lib/openthread
     - name: percepio
       path: modules/debug/percepio
-      revision: a49e5f3947faad0dd654eddd5a750127fb81e50d
+      revision: b68d17993109b9bee6b45dc8c9794e7b7bce236d
       groups:
         - debug
     - name: picolibc

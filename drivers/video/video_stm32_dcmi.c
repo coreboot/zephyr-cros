@@ -308,12 +308,17 @@ static int video_stm32_dcmi_enqueue(const struct device *dev,
 				  struct video_buffer *vbuf)
 {
 	struct video_stm32_dcmi_data *data = dev->data;
+	const uint32_t buffer_size = data->pitch * data->height;
 
 	if (ep != VIDEO_EP_OUT) {
 		return -EINVAL;
 	}
 
-	vbuf->bytesused = data->pitch * data->height;
+	if (buffer_size > vbuf->size) {
+		return -EINVAL;
+	}
+
+	vbuf->bytesused = buffer_size;
 
 	k_fifo_put(&data->fifo_in, vbuf);
 
@@ -356,6 +361,28 @@ static int video_stm32_dcmi_get_caps(const struct device *dev,
 	return ret;
 }
 
+static inline int video_stm32_dcmi_set_ctrl(const struct device *dev, unsigned int cid, void *value)
+{
+	const struct video_stm32_dcmi_config *config = dev->config;
+	int ret;
+
+	/* Forward to source dev if any */
+	ret = video_set_ctrl(config->sensor_dev, cid, value);
+
+	return ret;
+}
+
+static inline int video_stm32_dcmi_get_ctrl(const struct device *dev, unsigned int cid, void *value)
+{
+	const struct video_stm32_dcmi_config *config = dev->config;
+	int ret;
+
+	/* Forward to source dev if any */
+	ret = video_get_ctrl(config->sensor_dev, cid, value);
+
+	return ret;
+}
+
 static const struct video_driver_api video_stm32_dcmi_driver_api = {
 	.set_format = video_stm32_dcmi_set_fmt,
 	.get_format = video_stm32_dcmi_get_fmt,
@@ -364,6 +391,8 @@ static const struct video_driver_api video_stm32_dcmi_driver_api = {
 	.enqueue = video_stm32_dcmi_enqueue,
 	.dequeue = video_stm32_dcmi_dequeue,
 	.get_caps = video_stm32_dcmi_get_caps,
+	.set_ctrl = video_stm32_dcmi_set_ctrl,
+	.get_ctrl = video_stm32_dcmi_get_ctrl,
 };
 
 static void video_stm32_dcmi_irq_config_func(const struct device *dev)

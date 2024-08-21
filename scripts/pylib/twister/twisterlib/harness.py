@@ -16,6 +16,7 @@ import time
 import shutil
 import json
 
+from pytest import ExitCode
 from twisterlib.reports import ReportStatus
 from twisterlib.error import ConfigurationError
 from twisterlib.environment import ZEPHYR_BASE, PYTEST_PLUGIN_INSTALLED
@@ -353,7 +354,8 @@ class Pytest(Harness):
         self.source_dir = instance.testsuite.source_dir
         self.report_file = os.path.join(self.running_dir, 'report.xml')
         self.pytest_log_file_path = os.path.join(self.running_dir, 'twister_harness.log')
-        self.reserved_serial = None
+        self.reserved_dut = None
+        self._output = []
 
     def pytest_run(self, timeout):
         try:
@@ -364,10 +366,10 @@ class Pytest(Harness):
             self.status = TwisterStatus.FAIL
             self.instance.reason = str(pytest_exception)
         finally:
-            if self.reserved_serial:
-                self.instance.handler.make_device_available(self.reserved_serial)
-        self.instance.record(self.recording)
-        self._update_test_status()
+            self.instance.record(self.recording)
+            self._update_test_status()
+            if self.reserved_dut:
+                self.instance.handler.make_dut_available(self.reserved_dut)
 
     def generate_command(self):
         config = self.instance.testsuite.harness_config
@@ -383,7 +385,8 @@ class Pytest(Harness):
             f'--junit-xml={self.report_file}',
             '--log-file-level=DEBUG',
             '--log-file-format=%(asctime)s.%(msecs)d:%(levelname)s:%(name)s: %(message)s',
-            f'--log-file={self.pytest_log_file_path}'
+            f'--log-file={self.pytest_log_file_path}',
+            f'--platform={self.instance.platform.name}'
         ]
         command.extend([os.path.normpath(os.path.join(
             self.source_dir, os.path.expanduser(os.path.expandvars(src)))) for src in pytest_root])
@@ -418,12 +421,8 @@ class Pytest(Harness):
 
         if handler.options.pytest_args:
             command.extend(handler.options.pytest_args)
-            if pytest_args_yaml:
-                logger.warning(f'The pytest_args ({handler.options.pytest_args}) specified '
-                               'in the command line will override the pytest_args defined '
-                               f'in the YAML file {pytest_args_yaml}')
-        else:
-            command.extend(pytest_args_yaml)
+
+        command.extend(pytest_args_yaml)
 
         return command
 
@@ -435,7 +434,7 @@ class Pytest(Harness):
         # update the instance with the device id to have it in the summary report
         self.instance.dut = hardware.id
 
-        self.reserved_serial = hardware.serial_pty or hardware.serial
+        self.reserved_dut = hardware
         if hardware.serial_pty:
             command.append(f'--device-serial-pty={hardware.serial_pty}')
         else:
@@ -487,7 +486,7 @@ class Pytest(Harness):
             env=env
         ) as proc:
             try:
-                reader_t = threading.Thread(target=self._output_reader, args=(proc, self), daemon=True)
+                reader_t = threading.Thread(target=self._output_reader, args=(proc,), daemon=True)
                 reader_t.start()
                 reader_t.join(timeout)
                 if reader_t.is_alive():
@@ -500,6 +499,13 @@ class Pytest(Harness):
             except subprocess.TimeoutExpired:
                 self.status = TwisterStatus.FAIL
                 proc.kill()
+
+        if proc.returncode in (ExitCode.INTERRUPTED, ExitCode.USAGE_ERROR, ExitCode.INTERNAL_ERROR):
+            self.status = TwisterStatus.ERROR
+            self.instance.reason = f'Pytest error - return code {proc.returncode}'
+            with open(self.pytest_log_file_path, 'w') as log_file:
+                log_file.write(shlex.join(cmd) + '\n\n')
+                log_file.write('\n'.join(self._output))
 
     @staticmethod
     def _update_command_with_env_dependencies(cmd):
@@ -523,14 +529,15 @@ class Pytest(Harness):
 
         return cmd, env
 
-    @staticmethod
-    def _output_reader(proc, harness):
+    def _output_reader(self, proc):
+        self._output = []
         while proc.stdout.readable() and proc.poll() is None:
             line = proc.stdout.readline().decode().strip()
             if not line:
                 continue
+            self._output.append(line)
             logger.debug('PYTEST: %s', line)
-            harness.parse_record(line)
+            self.parse_record(line)
         proc.communicate()
 
     def _update_test_status(self):
@@ -695,6 +702,7 @@ class Gtest(Harness):
 
 
 class Test(Harness):
+    __test__ = False  # for pytest to skip this class when collects tests
     RUN_PASSED = "PROJECT EXECUTION SUCCESSFUL"
     RUN_FAILED = "PROJECT EXECUTION FAILED"
     test_suite_start_pattern = r"Running TESTSUITE (?P<suite_name>.*)"

@@ -431,6 +431,7 @@ static void bt_iso_chan_disconnected(struct bt_iso_chan *chan, uint8_t reason)
 	__ASSERT(chan->iso != NULL, "NULL conn for iso chan %p", chan);
 
 	bt_iso_chan_set_state(chan, BT_ISO_STATE_DISCONNECTED);
+	bt_conn_set_state(chan->iso, BT_CONN_DISCONNECT_COMPLETE);
 
 	/* The peripheral does not have the concept of a CIG, so once a CIS
 	 * disconnects it is completely freed by unref'ing it
@@ -778,6 +779,8 @@ static struct net_buf *iso_data_pull(struct bt_conn *conn,
 		LOG_DBG("channel has been disconnected");
 		__ASSERT_NO_MSG(b == frag);
 
+		net_buf_unref(b);
+
 		/* Service other connections */
 		bt_tx_irq_raise();
 
@@ -840,7 +843,7 @@ int conn_iso_send(struct bt_conn *conn, struct net_buf *buf, enum bt_iso_timesta
 		return -EINVAL;
 	}
 
-	net_buf_put(&conn->iso.txq, buf);
+	k_fifo_put(&conn->iso.txq, buf);
 	BT_ISO_DATA_DBG("%p put on list", buf);
 
 	/* only one ISO channel per conn-object */
