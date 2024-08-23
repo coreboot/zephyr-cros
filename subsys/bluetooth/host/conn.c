@@ -35,6 +35,7 @@
 #include "hci_core.h"
 #include "id.h"
 #include "adv.h"
+#include "scan.h"
 #include "conn_internal.h"
 #include "l2cap_internal.h"
 #include "keys.h"
@@ -934,12 +935,7 @@ struct bt_conn *get_conn_ready(void)
 		__maybe_unused sys_snode_t *s = sys_slist_get(&bt_dev.le.conn_ready);
 
 		__ASSERT_NO_MSG(s == node);
-
 		(void)atomic_set(&conn->_conn_ready_lock, 0);
-		/* Note: we can't assert `old` is non-NULL here, as the
-		 * connection might have been marked ready by an l2cap channel
-		 * that cancelled its request to send.
-		 */
 
 		/* Append connection to list if it still has data */
 		if (conn->has_data(conn)) {
@@ -1117,6 +1113,7 @@ static void process_unack_tx(struct bt_conn *conn)
 		node = sys_slist_get(&conn->tx_pending);
 
 		if (!node) {
+			bt_tx_irq_raise();
 			return;
 		}
 
@@ -1245,6 +1242,8 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 		case BT_CONN_DISCONNECT_COMPLETE:
 			wait_for_tx_work(conn);
 
+			bt_conn_reset_rx_state(conn);
+
 			LOG_DBG("trigger disconnect work");
 			k_work_reschedule(&conn->deferred_work, K_NO_WAIT);
 
@@ -1267,10 +1266,18 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state)
 			 * the application through bt_conn_disconnect or by
 			 * timeout set by bt_conn_le_create_param.timeout.
 			 */
-			if (conn->err) {
-				notify_connected(conn);
-			}
+			if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
+				int err = bt_le_scan_user_remove(BT_LE_SCAN_USER_CONN);
 
+				if (err) {
+					LOG_WRN("Error while removing conn user from scanner (%d)",
+						err);
+				}
+
+				if (conn->err) {
+					notify_connected(conn);
+				}
+			}
 			bt_conn_unref(conn);
 			break;
 		case BT_CONN_ADV_DIR_CONNECTABLE:
@@ -1695,7 +1702,7 @@ int bt_conn_disconnect(struct bt_conn *conn, uint8_t reason)
 		conn->err = reason;
 		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 		if (IS_ENABLED(CONFIG_BT_CENTRAL)) {
-			bt_le_scan_update(false);
+			return bt_le_scan_user_add(BT_LE_SCAN_USER_CONN);
 		}
 		return 0;
 	case BT_CONN_INITIATING:
@@ -3000,7 +3007,7 @@ void notify_path_loss_threshold_report(struct bt_conn *conn,
 {
 	struct bt_conn_cb *callback;
 
-	SYS_SLIST_FOR_EACH_CONTAINER(&callback_list, callback, _node) {
+	SYS_SLIST_FOR_EACH_CONTAINER(&conn_cbs, callback, _node) {
 		if (callback->path_loss_threshold_report) {
 			callback->path_loss_threshold_report(conn, &report);
 		}
@@ -3362,27 +3369,32 @@ static int conn_le_create_common_checks(const bt_addr_le_t *peer,
 {
 
 	if (!atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
+		LOG_DBG("Conn check failed: BT dev not ready.");
 		return -EAGAIN;
 	}
 
 	if (!bt_le_conn_params_valid(conn_param)) {
+		LOG_DBG("Conn check failed: invalid parameters.");
 		return -EINVAL;
 	}
 
-	if (!BT_LE_STATES_SCAN_INIT(bt_dev.le.states) &&
-	    atomic_test_bit(bt_dev.flags, BT_DEV_EXPLICIT_SCAN)) {
+	if (!BT_LE_STATES_SCAN_INIT(bt_dev.le.states) && bt_le_explicit_scanner_running()) {
+		LOG_DBG("Conn check failed: scanner was explicitly requested.");
 		return -EAGAIN;
 	}
 
 	if (atomic_test_bit(bt_dev.flags, BT_DEV_INITIATING)) {
+		LOG_DBG("Conn check failed: device is already initiating.");
 		return -EALREADY;
 	}
 
 	if (!bt_id_scan_random_addr_check()) {
+		LOG_DBG("Conn check failed: invalid random address.");
 		return -EINVAL;
 	}
 
 	if (bt_conn_exists_le(BT_ID_DEFAULT, peer)) {
+		LOG_DBG("Conn check failed: ACL connection already exists.");
 		return -EINVAL;
 	}
 
@@ -3435,8 +3447,9 @@ int bt_conn_le_create(const bt_addr_le_t *peer, const struct bt_conn_le_create_p
 		/* Use host-based identity resolving. */
 		bt_conn_set_state(conn, BT_CONN_SCAN_BEFORE_INITIATING);
 
-		err = bt_le_scan_update(true);
+		err = bt_le_scan_user_add(BT_LE_SCAN_USER_CONN);
 		if (err) {
+			bt_le_scan_user_remove(BT_LE_SCAN_USER_CONN);
 			bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 			bt_conn_unref(conn);
 
@@ -3456,7 +3469,12 @@ int bt_conn_le_create(const bt_addr_le_t *peer, const struct bt_conn_le_create_p
 		bt_conn_set_state(conn, BT_CONN_DISCONNECTED);
 		bt_conn_unref(conn);
 
-		bt_le_scan_update(false);
+		/* Best-effort attempt to inform the scanner that the initiator stopped. */
+		int scan_check_err = bt_le_scan_user_add(BT_LE_SCAN_USER_NONE);
+
+		if (scan_check_err) {
+			LOG_WRN("Error while updating the scanner (%d)", scan_check_err);
+		}
 		return err;
 	}
 
@@ -3558,17 +3576,18 @@ int bt_le_set_auto_conn(const bt_addr_le_t *addr,
 		}
 	}
 
+	int err = 0;
 	if (conn->state == BT_CONN_DISCONNECTED &&
 	    atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
 		if (param) {
 			bt_conn_set_state(conn, BT_CONN_SCAN_BEFORE_INITIATING);
+			err = bt_le_scan_user_add(BT_LE_SCAN_USER_CONN);
 		}
-		bt_le_scan_update(false);
 	}
 
 	bt_conn_unref(conn);
 
-	return 0;
+	return err;
 }
 #endif /* !defined(CONFIG_BT_FILTER_ACCEPT_LIST) */
 #endif /* CONFIG_BT_CENTRAL */

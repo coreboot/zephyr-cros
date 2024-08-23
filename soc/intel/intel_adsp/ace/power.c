@@ -43,7 +43,7 @@ __imr void power_init(void)
 #if CONFIG_SOC_INTEL_ACE15_MTPM
 	*((__sparse_force uint32_t *)sys_cache_cached_ptr_get(&adsp_pending_buffer)) =
 		INTEL_ADSP_ACE15_MAGIC_KEY;
-	cache_data_flush_range((__sparse_force void *)
+	sys_cache_data_flush_range((__sparse_force void *)
 			sys_cache_cached_ptr_get(&adsp_pending_buffer),
 			sizeof(adsp_pending_buffer));
 #endif /* CONFIG_SOC_INTEL_ACE15_MTPM */
@@ -445,7 +445,7 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 
 #endif /* CONFIG_PM */
 
-#ifdef CONFIG_ARCH_CPU_IDLE_CUSTOM
+#ifdef CONFIG_ARCH_HAS_CUSTOM_CPU_IDLE
 
 __no_optimization
 void arch_cpu_idle(void)
@@ -465,4 +465,4 @@ void arch_cpu_idle(void)
 	__asm__ volatile ("waiti 0");
 }
 
-#endif /* CONFIG_ARCH_CPU_IDLE_CUSTOM */
+#endif /* CONFIG_ARCH_HAS_CUSTOM_CPU_IDLE */

@@ -124,7 +124,7 @@ struct net_buf *udc_buf_get(const struct device *dev, const uint8_t ep)
 		return NULL;
 	}
 
-	return net_buf_get(&ep_cfg->fifo, K_NO_WAIT);
+	return k_fifo_get(&ep_cfg->fifo, K_NO_WAIT);
 }
 
 struct net_buf *udc_buf_get_all(const struct device *dev, const uint8_t ep)
@@ -169,7 +169,7 @@ struct net_buf *udc_buf_peek(const struct device *dev, const uint8_t ep)
 void udc_buf_put(struct udc_ep_config *const ep_cfg,
 		 struct net_buf *const buf)
 {
-	net_buf_put(&ep_cfg->fifo, buf);
+	k_fifo_put(&ep_cfg->fifo, buf);
 }
 
 void udc_ep_buf_set_setup(struct net_buf *const buf)
@@ -262,7 +262,7 @@ static bool ep_check_config(const struct device *dev,
 		return false;
 	}
 
-	if (mps > cfg->caps.mps) {
+	if (USB_MPS_EP_SIZE(mps) > USB_MPS_EP_SIZE(cfg->caps.mps)) {
 		return false;
 	}
 
@@ -273,12 +273,16 @@ static bool ep_check_config(const struct device *dev,
 		}
 		break;
 	case USB_EP_TYPE_INTERRUPT:
-		if (!cfg->caps.interrupt) {
+		if (!cfg->caps.interrupt ||
+		    (USB_MPS_ADDITIONAL_TRANSACTIONS(mps) &&
+		     !cfg->caps.high_bandwidth)) {
 			return false;
 		}
 		break;
 	case USB_EP_TYPE_ISO:
-		if (!cfg->caps.iso) {
+		if (!cfg->caps.iso ||
+		    (USB_MPS_ADDITIONAL_TRANSACTIONS(mps) &&
+		     !cfg->caps.high_bandwidth)) {
 			return false;
 		}
 		break;

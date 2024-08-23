@@ -76,6 +76,8 @@ struct udc_ep_caps {
 	uint32_t bulk : 1;
 	/** ISO transfer capable endpoint */
 	uint32_t iso : 1;
+	/** High-Bandwidth (interrupt or iso) capable endpoint */
+	uint32_t high_bandwidth : 1;
 	/** IN transfer capable endpoint */
 	uint32_t in : 1;
 	/** OUT transfer capable endpoint */
@@ -722,6 +724,18 @@ static inline const void *udc_get_event_ctx(const struct device *dev)
 	struct udc_data *data = dev->data;
 
 	return data->event_ctx;
+}
+
+/**
+ * @brief Get endpoint size from UDC endpoint configuration
+ *
+ * @param[in] cfg Pointer to UDC endpoint configuration
+ *
+ * @return Endpoint size
+ */
+static inline uint16_t udc_mps_ep_size(const struct udc_ep_config *const cfg)
+{
+	return USB_MPS_EP_SIZE(cfg->mps);
 }
 
 /**

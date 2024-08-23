@@ -21,10 +21,6 @@
 	erase-block-size = <16384>;
 };
 
-&gcr {
-	/delete-property/ sysclk-prescaler;
-};
-
 &pinctrl {
 	reg = <0x40008000 0x3220>;
 
@@ -179,6 +175,15 @@
 			dma-channels = <16>;
 			status = "disabled";
 			#dma-cells = <2>;
+		};
+
+		wdt1: watchdog@40080800  {
+			compatible = "adi,max32-watchdog";
+			reg = <0x40080800 0x400>;
+			interrupts = <57 0>;
+			clocks = <&gcr ADI_MAX32_CLOCK_BUS2 1>;
+			clock-source = <ADI_MAX32_PRPH_CLK_SRC_IBRO>;
+			status = "disabled";
 		};
 	};
 };

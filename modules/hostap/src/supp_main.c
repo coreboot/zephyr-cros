@@ -61,12 +61,20 @@ static const struct wifi_mgmt_ops mgmt_ops = {
 	.mode = supplicant_mode,
 	.filter = supplicant_filter,
 	.channel = supplicant_channel,
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_WNM
+	.btm_query = supplicant_btm_query,
+#endif
+	.get_conn_params = supplicant_get_wifi_conn_params,
 #ifdef CONFIG_AP
 	.ap_enable = supplicant_ap_enable,
 	.ap_disable = supplicant_ap_disable,
 	.ap_sta_disconnect = supplicant_ap_sta_disconnect,
 #endif /* CONFIG_AP */
 	.dpp_dispatch = supplicant_dpp_dispatch,
+	.pmksa_flush = supplicant_pmksa_flush,
+#ifdef CONFIG_WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE
+	.enterprise_creds = supplicant_add_enterprise_creds,
+#endif
 };
 
 DEFINE_WIFI_NM_INSTANCE(wifi_supplicant, &mgmt_ops);

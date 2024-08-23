@@ -24,11 +24,17 @@ Kernel
 Boards
 ******
 
+* :ref:`native_posix<native_posix>` has been deprecated in favour of
+  :ref:`native_sim<native_sim>` (:github:`76898`).
+
 Modules
 *******
 
 Mbed TLS
 ========
+
+* The Kconfig options ``CONFIG_MBEDTLS_TLS_VERSION_1_0`` and ``CONFIG_MBEDTLS_TLS_VERSION_1_1``
+  have been removed because Mbed TLS doesn't support TLS 1.0 and 1.1 anymore since v3.0. (:github:`76833`)
 
 Trusted Firmware-M
 ==================
@@ -144,6 +150,12 @@ Bluetooth Mesh
 Bluetooth Audio
 ===============
 
+* The Volume Renderer callback functions :code:`bt_vcp_vol_rend_cb.state` and
+  :code:`bt_vcp_vol_rend_cb.flags` for VCP now contain an additional parameter for
+  the connection.
+  This needs to be added to all instances of VCP Volume Renderer callback functions defined.
+  (:github:`76992`)
+
 Bluetooth Classic
 =================
 
@@ -161,6 +173,10 @@ Networking
   type has changed from ``uint8_t *`` to ``uint32_t *``. Additionally,
   :c:func:`coap_get_block2_option` now accepts an additional ``bool *has_more``
   parameter, to store the value of the more flag. (:github:`76052`)
+
+* The Ethernet bridge shell is moved under network shell. This is done so that
+  all the network shell activities can be found under ``net`` shell command.
+  After this change the bridge shell is used by ``net bridge`` command.
 
 Other Subsystems
 ****************

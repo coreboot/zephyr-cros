@@ -356,7 +356,7 @@ int bt_hci_cmd_send(uint16_t opcode, struct net_buf *buf)
 		return err;
 	}
 
-	net_buf_put(&bt_dev.cmd_tx_queue, buf);
+	k_fifo_put(&bt_dev.cmd_tx_queue, buf);
 	bt_tx_irq_raise();
 
 	return 0;
@@ -392,7 +392,7 @@ int bt_hci_cmd_send_sync(uint16_t opcode, struct net_buf *buf,
 	k_sem_init(&sync_sem, 0, 1);
 	cmd(buf)->sync = &sync_sem;
 
-	net_buf_put(&bt_dev.cmd_tx_queue, net_buf_ref(buf));
+	k_fifo_put(&bt_dev.cmd_tx_queue, net_buf_ref(buf));
 	bt_tx_irq_raise();
 
 	/* TODO: disallow sending sync commands from syswq altogether */
@@ -1010,7 +1010,12 @@ static void hci_disconn_complete(struct net_buf *buf)
 #if defined(CONFIG_BT_CENTRAL) && !defined(CONFIG_BT_FILTER_ACCEPT_LIST)
 	if (atomic_test_bit(conn->flags, BT_CONN_AUTO_CONNECT)) {
 		bt_conn_set_state(conn, BT_CONN_SCAN_BEFORE_INITIATING);
-		bt_le_scan_update(false);
+		/* Just a best-effort check if the scanner should be started. */
+		int err = bt_le_scan_user_remove(BT_LE_SCAN_USER_NONE);
+
+		if (err) {
+			LOG_WRN("Error while updating the scanner (%d)", err);
+		}
 	}
 #endif /* defined(CONFIG_BT_CENTRAL) && !defined(CONFIG_BT_FILTER_ACCEPT_LIST) */
 
@@ -1561,9 +1566,14 @@ void bt_hci_le_enh_conn_complete(struct bt_hci_evt_le_enh_conn_complete *evt)
 
 	bt_conn_unref(conn);
 
-	if (IS_ENABLED(CONFIG_BT_CENTRAL) &&
-	    conn->role == BT_HCI_ROLE_CENTRAL) {
-		bt_le_scan_update(false);
+	if (IS_ENABLED(CONFIG_BT_CENTRAL) && conn->role == BT_HCI_ROLE_CENTRAL) {
+		int err;
+
+		/* Just a best-effort check if the scanner should be started. */
+		err = bt_le_scan_user_remove(BT_LE_SCAN_USER_NONE);
+		if (err) {
+			LOG_WRN("Error while updating the scanner (%d)", err);
+		}
 	}
 }
 
@@ -1661,7 +1671,11 @@ static void enh_conn_complete_error_handle(uint8_t status)
 
 	if (IS_ENABLED(CONFIG_BT_CENTRAL) && status == BT_HCI_ERR_UNKNOWN_CONN_ID) {
 		le_conn_complete_cancel(status);
-		bt_le_scan_update(false);
+		int err = bt_le_scan_user_remove(BT_LE_SCAN_USER_NONE);
+
+		if (err) {
+			LOG_WRN("Error while updating the scanner (%d)", err);
+		}
 		return;
 	}
 
@@ -3042,7 +3056,7 @@ static void hci_core_send_cmd(void)
 
 	/* Get next command */
 	LOG_DBG("fetch cmd");
-	buf = net_buf_get(&bt_dev.cmd_tx_queue, K_NO_WAIT);
+	buf = k_fifo_get(&bt_dev.cmd_tx_queue, K_NO_WAIT);
 	BT_ASSERT(buf);
 
 	/* Clear out any existing sent command */
@@ -4200,7 +4214,7 @@ void bt_finalize_init(void)
 	atomic_set_bit(bt_dev.flags, BT_DEV_READY);
 
 	if (IS_ENABLED(CONFIG_BT_OBSERVER)) {
-		bt_le_scan_update(false);
+		bt_scan_reset();
 	}
 
 	bt_dev_show_info();
@@ -4310,7 +4324,14 @@ k_tid_t bt_testing_tx_tid_get(void)
 	/* We now TX everything from the syswq */
 	return &k_sys_work_q.thread;
 }
-#endif
+
+#if defined(CONFIG_BT_ISO)
+void bt_testing_set_iso_mtu(uint16_t mtu)
+{
+	bt_dev.le.iso_mtu = mtu;
+}
+#endif /* CONFIG_BT_ISO */
+#endif /* CONFIG_BT_TESTING */
 
 int bt_enable(bt_ready_cb_t cb)
 {
