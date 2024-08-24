@@ -387,7 +387,7 @@ Bluetooth Host:
     - subsys/bluetooth/host/classic/
     - include/zephyr/bluetooth/audio/
     - include/zephyr/bluetooth/classic/
-    - include/zephyr/bluetooth/audio/
+    - include/zephyr/bluetooth/mesh/
     - include/zephyr/bluetooth/iso.h
     - include/zephyr/bluetooth/controller.h
     - include/zephyr/bluetooth/mesh.h
@@ -807,6 +807,18 @@ Debug:
     - "area: Debugging"
   tests:
     - debug
+
+"Debug: Profiling: Perf":
+  status: odd fixes
+  files:
+    - doc/services/profiling/perf.rst
+    - samples/subsys/profiling/perf/
+    - scripts/profiling/stackcollapse.py
+    - subsys/profiling/perf/
+  labels:
+    - "area: Profiling / Perf"
+  tests:
+    - debug.profiling.perf
 
 "Debug: Symtab":
   status: maintained
@@ -2142,6 +2154,8 @@ Release Notes:
   maintainers:
     - krish2718
     - jukkar
+  collaborators:
+    - sachinthegreen
   files:
     - drivers/wifi/nrfwifi/
     - dts/bindings/wifi/nordic,nrf70.yaml
@@ -3335,6 +3349,7 @@ ADI Platforms:
     - microbuilder
   files:
     - boards/adi/
+    - boards/shields/pmod_acl/
     - drivers/*/*max*
     - drivers/*/*max*/
     - drivers/dac/dac_ltc*
@@ -3437,6 +3452,19 @@ Nuvoton Numicro Numaker Platforms:
     - drivers/*/*_numaker*
   labels:
     - "platform: Nuvoton Numicro Numaker"
+
+Nuvoton NPCM Platforms:
+  status: maintained
+  maintainers:
+    - maxdog988
+    - warp5tw
+    - jc849
+  files:
+    - soc/nuvoton/npcm/
+    - boards/nuvoton/npcm*/
+    - dts/arm/nuvoton/
+  labels:
+    - "platform: Nuvoton NPCM"
 
 Raspberry Pi Pico Platforms:
   status: maintained
@@ -4302,6 +4330,7 @@ West:
     - mbolivar-ampere
     - carlescufi
     - swinslow
+    - pdgendt
   files:
     - scripts/west-commands.yml
     - scripts/west_commands/
@@ -4610,6 +4639,11 @@ West:
   collaborators:
     - hubertmis
     - nordic-krch
+    - krish2718
+    - sachinthegreen
+    - udaynordic
+    - rajb9
+    - srkanordic
   files:
     - modules/hal_nordic/
   labels:

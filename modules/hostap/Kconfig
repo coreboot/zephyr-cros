@@ -24,6 +24,7 @@ config WIFI_NM_WPA_SUPPLICANT
 if WIFI_NM_WPA_SUPPLICANT
 
 config COMMON_LIBC_MALLOC_ARENA_SIZE
+	default 85000 if WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE && !MBEDTLS_ENABLE_HEAP
 	default 40000 if WIFI_NM_WPA_SUPPLICANT_AP
 	# 8192 for MbedTLS heap
 	default 21808 if MBEDTLS_ENABLE_HEAP
@@ -136,6 +137,11 @@ config WIFI_NM_WPA_SUPPLICANT_CRYPTO_ALT
 	select MBEDTLS
 	select MBEDTLS_CIPHER_MODE_CTR_ENABLED
 	select MBEDTLS_CIPHER_MODE_CBC_ENABLED
+	select MBEDTLS_CIPHER_AES_ENABLED
+	select MBEDTLS_CIPHER_DES_ENABLED
+	select MBEDTLS_SHA1
+	select MBEDTLS_ENTROPY_ENABLED
+	select MBEDTLS_CIPHER
 	select MBEDTLS_ECP_C
 	select MBEDTLS_ECP_ALL_ENABLED
 	select MBEDTLS_CMAC
@@ -164,6 +170,7 @@ config WIFI_NM_WPA_SUPPLICANT_CRYPTO_MBEDTLS_PSA
 
 config WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE
 	bool "Enterprise Crypto support for WiFi"
+	select MBEDTLS_PEM_CERTIFICATE_FORMAT
 	depends on !WIFI_NM_WPA_SUPPLICANT_CRYPTO_NONE
 
 config WIFI_NM_WPA_SUPPLICANT_WPA3
@@ -185,6 +192,7 @@ config WIFI_NM_WPA_SUPPLICANT_P2P
 
 config WIFI_NM_WPA_SUPPLICANT_EAPOL
 	bool "EAPoL supplicant"
+	default y if WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE
 
 config WIFI_NM_WPA_SUPPLICANT_CLI
 	bool "CLI support for wpa_supplicant"
@@ -222,11 +230,15 @@ config WIFI_NM_WPA_SUPPLICANT_DPP
 	select MBEDTLS_X509_CSR_WRITE_C
 	select MBEDTLS_X509_CSR_PARSE_C
 
-
 config WPA_CLI
 	bool "WPA CLI support"
 	help
 	  Enable WPA CLI support for wpa_supplicant.
+
+if WIFI_NM_WPA_SUPPLICANT_CRYPTO_ENTERPRISE
+	config MBEDTLS_SSL_MAX_CONTENT_LEN
+		default 16384
+endif
 
 # Create hidden config options that are used in hostap. This way we do not need
 # to mark them as allowed for CI checks, and also someone else cannot use the

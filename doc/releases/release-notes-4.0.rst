@@ -32,6 +32,9 @@ API Changes
 * Removed deprecated ``ceiling_fraction`` macro. :c:macro:`DIV_ROUND_UP` needs
   to be used now.
 
+* Deprecated ``EARLY``, ``APPLICATION`` and ``SMP`` init levels can no longer be
+  used for devices.
+
 Removed APIs in this release
 ============================
 
@@ -75,6 +78,9 @@ Boards & SoC Support
 * Added support for these SoC series:
 
 * Made these changes in other SoC series:
+
+  * NXP S32Z270: Added support for the new silicon cut version 2.0. Note that the previous
+    versions (1.0 and 1.1) are no longer supported.
 
 * Added support for these boards:
 

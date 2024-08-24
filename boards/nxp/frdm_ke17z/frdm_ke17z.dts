@@ -16,6 +16,7 @@
 	compatible = "nxp,frdm-ke17z", "nxp,ke17z", "nxp,mke17z7";
 
 	aliases {
+		watchdog0 = &wdog;
 		led0 = &red_led;
 		led1 = &green_led;
 		led2 = &blue_led;
@@ -78,6 +79,15 @@
 			zephyr,code = <INPUT_KEY_1>;
 		};
 	};
+};
+
+&idle {
+	min-residency-us = <1>;
+};
+
+&stop {
+	min-residency-us = <20000>;
+	exit-latency-us = <13>;
 };
 
 &lpuart0 {
@@ -158,5 +168,9 @@
 };
 
 &edma {
+	status = "okay";
+};
+
+&wdog {
 	status = "okay";
 };
