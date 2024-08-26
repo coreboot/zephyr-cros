@@ -11,6 +11,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import platform
 import re
 import subprocess
 import sys
@@ -19,6 +20,7 @@ import traceback
 import shlex
 import shutil
 import textwrap
+import unidiff
 
 from yamllint import config, linter
 
@@ -219,6 +221,13 @@ class CheckPatch(ComplianceTest):
                     r'^\s*#(\d+):\s*FILE:\s*(.+):(\d+):'
 
             matches = re.findall(regex, output, re.MULTILINE)
+
+            # add a guard here for excessive number of errors, do not try and
+            # process each one of them and instead push this as one failure.
+            if len(matches) > 500:
+                self.failure(output)
+                return
+
             for m in matches:
                 self.fmtd_failure(m[1].lower(), m[2], m[5], m[6], col=None,
                         desc=m[3])
@@ -261,6 +270,46 @@ class BoardYmlCheck(ComplianceTest):
         path = Path(ZEPHYR_BASE)
         for file in path.glob("**/board.yml"):
             self.check_board_file(file, vendor_prefixes)
+
+
+class ClangFormatCheck(ComplianceTest):
+    """
+    Check if clang-format reports any issues
+    """
+    name = "ClangFormat"
+    doc = "See https://docs.zephyrproject.org/latest/contribute/guidelines.html#clang-format for more details."
+    path_hint = "<git-top>"
+
+    def run(self):
+        exe = f"clang-format-diff.{'exe' if platform.system() == 'Windows' else 'py'}"
+
+        for file in get_files():
+            if Path(file).suffix not in ['.c', '.h']:
+                continue
+
+            diff = subprocess.Popen(('git', 'diff', '-U0', '--no-color', COMMIT_RANGE, '--', file),
+                                    stdout=subprocess.PIPE,
+                                    cwd=GIT_TOP)
+            try:
+                subprocess.run((exe, '-p1'),
+                               check=True,
+                               stdin=diff.stdout,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT,
+                               cwd=GIT_TOP)
+
+            except subprocess.CalledProcessError as ex:
+                patchset = unidiff.PatchSet.from_string(ex.output, encoding="utf-8")
+                for patch in patchset:
+                    for hunk in patch:
+                        # Strip the before and after context
+                        msg = "".join([str(l) for l in hunk[3:-3]])
+                        # show the hunk at the last line
+                        self.fmtd_failure("notice",
+                                          "You may want to run clang-format on this change",
+                                          file, line=hunk.source_start + hunk.source_length - 3,
+                                          desc=f'\r\n{msg}')
+
 
 class DevicetreeBindingsCheck(ComplianceTest):
     """
@@ -802,7 +851,7 @@ Missing SoC names or CONFIG_SOC vs soc.yml out of sync:
         undef_to_locs = collections.defaultdict(list)
 
         # Warning: Needs to work with both --perl-regexp and the 're' module
-        regex = r"\bCONFIG_[A-Z0-9_]+\b(?!\s*##|[$@{*])"
+        regex = r"\bCONFIG_[A-Z0-9_]+\b(?!\s*##|[$@{(.*])"
 
         # Skip doc/releases and doc/security/vulnerabilities.rst, which often
         # reference removed symbols
@@ -845,7 +894,7 @@ If the reference is for a comment like /* CONFIG_FOO_* */ (or
 /* CONFIG_FOO_*_... */), then please use exactly that form (with the '*'). The
 CI check knows not to flag it.
 
-More generally, a reference followed by $, @, {{, *, or ## will never be
+More generally, a reference followed by $, @, {{, (, ., *, or ## will never be
 flagged.
 
 {undef_desc}""")

@@ -23,6 +23,7 @@
 	};
 
 	aliases {
+		watchdog0 = &wdog;
 		led0 = &red_led;
 		led1 = &green_led;
 		led2 = &blue_led;
@@ -80,6 +81,15 @@
 	};
 };
 
+&idle {
+	min-residency-us = <1>;
+};
+
+&stop {
+	min-residency-us = <20000>;
+	exit-latency-us = <13>;
+};
+
 &lpuart2 {
 	dmas = <&edma 5 6>, <&edma 6 7>;
 	dma-names = "rx", "tx";
@@ -98,6 +108,12 @@
 
 &gpiod {
 	status = "okay";
+};
+
+&scg {
+	bus_clk {
+		clock-div = <2>;
+	};
 };
 
 &gpioe {
@@ -170,5 +186,9 @@
 };
 
 &edma {
+	status = "okay";
+};
+
+&wdog {
 	status = "okay";
 };

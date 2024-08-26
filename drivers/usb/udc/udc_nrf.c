@@ -308,7 +308,7 @@ static int usbd_ctrl_feed_dout(const struct device *dev,
 		return -ENOMEM;
 	}
 
-	net_buf_put(&cfg->fifo, buf);
+	k_fifo_put(&cfg->fifo, buf);
 	udc_nrf_clear_control_out(dev);
 
 	return 0;
@@ -553,7 +553,7 @@ static int udc_nrf_ep_enable(const struct device *dev,
 	uint16_t mps;
 
 	__ASSERT_NO_MSG(cfg);
-	mps = (cfg->mps == 0) ? cfg->caps.mps : cfg->mps;
+	mps = (udc_mps_ep_size(cfg) == 0) ? cfg->caps.mps : udc_mps_ep_size(cfg);
 	nrf_usbd_common_ep_max_packet_size_set(cfg->addr, mps);
 	nrf_usbd_common_ep_enable(cfg->addr);
 	if (!NRF_USBD_EPISO_CHECK(cfg->addr)) {

@@ -33,7 +33,9 @@ from twisterlib.handlers import (
     QEMUHandler,
     SimulationHandler
 )
-
+from twisterlib.hardwaremap import (
+    DUT
+)
 
 @pytest.fixture
 def mocked_instance(tmp_path):
@@ -736,12 +738,16 @@ TESTDATA_10 = [
                 fixtures=[],
                 platform='dummy_platform',
                 available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
                 counter=0
             ),
             mock.Mock(
                 fixtures=['dummy fixture'],
                 platform='another_platform',
                 available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
                 counter=0
             ),
             mock.Mock(
@@ -750,6 +756,8 @@ TESTDATA_10 = [
                 serial_pty=None,
                 serial=None,
                 available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
                 counter=0
             ),
             mock.Mock(
@@ -757,10 +765,72 @@ TESTDATA_10 = [
                 platform='dummy_platform',
                 serial_pty=mock.Mock(),
                 available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
+                counter=0
+            ),
+            mock.Mock(
+                fixtures=['dummy fixture'],
+                platform='dummy_platform',
+                serial_pty=mock.Mock(),
+                available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
                 counter=0
             )
         ],
         3
+    ),
+    (
+        'dummy_platform',
+        'dummy fixture',
+        [
+            mock.Mock(
+                fixtures=[],
+                platform='dummy_platform',
+                available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
+                counter=0
+            ),
+            mock.Mock(
+                fixtures=['dummy fixture'],
+                platform='another_platform',
+                available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
+                counter=0
+            ),
+            mock.Mock(
+                fixtures=['dummy fixture'],
+                platform='dummy_platform',
+                serial_pty=None,
+                serial=None,
+                available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
+                counter=0
+            ),
+            mock.Mock(
+                fixtures=['dummy fixture'],
+                platform='dummy_platform',
+                serial_pty=mock.Mock(),
+                available=1,
+                failures=1,
+                counter_increment=mock.Mock(),
+                counter=0
+            ),
+            mock.Mock(
+                fixtures=['dummy fixture'],
+                platform='dummy_platform',
+                serial_pty=mock.Mock(),
+                available=1,
+                failures=0,
+                counter_increment=mock.Mock(),
+                counter=0
+            )
+        ],
+        4
     ),
     (
         'dummy_platform',
@@ -776,24 +846,32 @@ TESTDATA_10 = [
                 fixtures=['dummy fixture'],
                 platform='dummy_platform',
                 serial_pty=mock.Mock(),
+                counter_increment=mock.Mock(),
+                failures=0,
                 available=0
             ),
             mock.Mock(
                 fixtures=['another fixture'],
                 platform='dummy_platform',
                 serial_pty=mock.Mock(),
+                counter_increment=mock.Mock(),
+                failures=0,
                 available=0
             ),
             mock.Mock(
                 fixtures=['dummy fixture'],
                 platform='dummy_platform',
                 serial=mock.Mock(),
+                counter_increment=mock.Mock(),
+                failures=0,
                 available=0
             ),
             mock.Mock(
                 fixtures=['another fixture'],
                 platform='dummy_platform',
                 serial=mock.Mock(),
+                counter_increment=mock.Mock(),
+                failures=0,
                 available=0
             )
         ],
@@ -804,7 +882,9 @@ TESTDATA_10 = [
 @pytest.mark.parametrize(
     'platform_name, fixture, duts, expected',
     TESTDATA_10,
-    ids=['one good dut', 'exception - no duts', 'no available duts']
+    ids=['two good duts, select the first one',
+         'two duts, the first was failed once, select the second not failed',
+         'exception - no duts', 'no available duts']
 )
 def test_devicehandler_device_is_available(
     mocked_instance,
@@ -824,7 +904,7 @@ def test_devicehandler_device_is_available(
 
         assert device == duts[expected]
         assert device.available == 0
-        assert device.counter == 1
+        device.counter_increment.assert_called_once()
     elif expected is None:
         device = handler.device_is_available(mocked_instance)
 
@@ -836,7 +916,7 @@ def test_devicehandler_device_is_available(
         assert False
 
 
-def test_devicehandler_make_device_available(mocked_instance):
+def test_devicehandler_make_dut_available(mocked_instance):
     serial = mock.Mock(name='dummy_serial')
     duts = [
         mock.Mock(available=0, serial=serial, serial_pty=None),
@@ -851,7 +931,13 @@ def test_devicehandler_make_device_available(mocked_instance):
     handler = DeviceHandler(mocked_instance, 'build')
     handler.duts = duts
 
-    handler.make_device_available(serial)
+    handler.make_dut_available(duts[1])
+
+    assert len([None for d in handler.duts if d.available == 1]) == 1
+    assert handler.duts[0].available == 0
+    assert handler.duts[2].available == 0
+
+    handler.make_dut_available(duts[0])
 
     assert len([None for d in handler.duts if d.available == 1]) == 2
     assert handler.duts[2].available == 0
@@ -1031,7 +1117,7 @@ TESTDATA_13 = [
         'jlink',
         'product',
         ['west', 'flash', '--skip-rebuild', '-d', '$build_dir',
-         '--runner', 'jlink', '--tool-opt=-SelectEmuBySN  12345',  # 2x space
+         '--runner', 'jlink', '--dev-id', 12345,
          'param1', 'param2']
     ),
     (
@@ -1166,13 +1252,14 @@ def test_devicehandler_create_serial_connection(
         return expected_result
 
     handler = DeviceHandler(mocked_instance, 'build')
-    handler.make_device_available = mock.Mock()
     missing_mock = mock.Mock()
     handler.instance.add_missing_case_status = missing_mock
-    available_mock = mock.Mock()
-    handler.make_device_available = available_mock
     handler.options = mock.Mock(timeout_multiplier=1)
     twisterlib.handlers.terminate_process = mock.Mock()
+
+    dut = DUT()
+    dut.available = 0
+    dut.failures = 0
 
     hardware_baud = 14400
     flash_timeout = 60
@@ -1181,25 +1268,24 @@ def test_devicehandler_create_serial_connection(
     with mock.patch('serial.Serial', serial_mock), \
          pytest.raises(expected_exception) if expected_exception else \
          nullcontext():
-        result = handler._create_serial_connection(serial_device, hardware_baud,
+        result = handler._create_serial_connection(dut, serial_device, hardware_baud,
                                                    flash_timeout, serial_pty,
                                                    ser_pty_process)
 
     if expected_result:
         assert result is not None
+        assert dut.failures == 0
 
     if expected_exception:
         assert handler.instance.status == TwisterStatus.FAIL
         assert handler.instance.reason == 'Serial Device Error'
-
+        assert dut.available == 1
+        assert dut.failures == 1
         missing_mock.assert_called_once_with('blocked', 'Serial Device Error')
 
     if terminate_ser_pty_process:
         twisterlib.handlers.terminate_process.assert_called_once()
         ser_pty_process.communicate.assert_called_once()
-
-    if make_available:
-        available_mock.assert_called_once_with(make_available)
 
 
 TESTDATA_16 = [
@@ -1355,7 +1441,7 @@ def test_devicehandler_handle(
     handler.terminate = mock.Mock(side_effect=mock_terminate)
     handler._update_instance_info = mock.Mock()
     handler._final_handle_actions = mock.Mock()
-    handler.make_device_available = mock.Mock()
+    handler.make_dut_available = mock.Mock()
     twisterlib.handlers.terminate_process = mock.Mock()
     handler.instance.platform.name = 'IPName'
 
@@ -1393,9 +1479,7 @@ def test_devicehandler_handle(
     if expected_status:
         assert handler.instance.status == expected_status
 
-    handler.make_device_available.assert_called_once_with(
-        'Serial PTY' if use_pty else 'dummy serial device'
-    )
+    handler.make_dut_available.assert_called_once_with(hardware)
 
 
 TESTDATA_18 = [
