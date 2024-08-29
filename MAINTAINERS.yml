@@ -1048,7 +1048,6 @@ Release Notes:
   collaborators:
     - lyakh
     - lgirdwood
-    - marc-hb
     - kv2019i
   files:
     - drivers/audio/
@@ -3570,7 +3569,6 @@ Intel Platforms (Xtensa):
     - andyross
     - lyakh
     - lgirdwood
-    - marc-hb
     - kv2019i
     - ceolin
     - tmleman
@@ -5044,7 +5042,6 @@ West:
     - nashif
     - lyakh
     - lgirdwood
-    - marc-hb
   files:
     - modules/Kconfig.sof
   labels:
