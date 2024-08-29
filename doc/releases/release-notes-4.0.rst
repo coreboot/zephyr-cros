@@ -38,6 +38,9 @@ API Changes
 Removed APIs in this release
 ============================
 
+* Macro ``K_THREAD_STACK_MEMBER``, deprecated since v3.5.0, has been removed.
+  Use :c:macro:`K_KERNEL_STACK_MEMBER` instead.
+
 Deprecated in this release
 ==========================
 
@@ -53,9 +56,18 @@ Architectures
 
 * ARM64
 
+  * Added initial support for :c:func:`arch_stack_walk` that supports unwinding via esf only
+
 * RISC-V
 
+  * The stack traces upon fatal exception now prints the address of stack pointer (sp) or frame
+    pointer (fp) depending on the build configuration.
+
 * Xtensa
+
+* x86
+
+  * Added initial support for :c:func:`arch_stack_walk` that supports unwinding via esf only
 
 Kernel
 ******
@@ -88,11 +100,19 @@ Boards & SoC Support
 
   * :ref:`native_posix<native_posix>` has been deprecated in favour of
     :ref:`native_sim<native_sim>`.
+  * Support for Google Kukui EC board (``google_kukui``) has been dropped.
 
 * Added support for the following shields:
 
 Build system and Infrastructure
 *******************************
+
+Documentation
+*************
+
+ * Added two new build commands, ``make html-live`` and ``make html-live-fast``, that automatically locally
+   host the generated documentation. They also automatically rebuild and rehost the documentation when changes
+   to the input ``.rst`` files are detected on the filesystem.
 
 Drivers and Sensors
 *******************
@@ -136,6 +156,10 @@ Drivers and Sensors
 * Input
 
 * LED
+
+  * lp5569: added ``charge-pump-mode`` property to configure the charge pump of the lp5569.
+
+  * lp5569: added ``enable-gpios`` property to describe the EN/PWM GPIO of the lp5569.
 
 * LED Strip
 
@@ -256,6 +280,11 @@ Libraries / Subsystems
 * Formatted output
 
 * Management
+
+  * MCUmgr
+
+    * Added support for :ref:`mcumgr_smp_group_10`, which allows for listing information on
+      supported groups.
 
 * Logging
 
