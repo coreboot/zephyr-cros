@@ -17,7 +17,8 @@ LOG_MODULE_REGISTER(esp32_spi, CONFIG_SPI_LOG_LEVEL);
 #include <soc.h>
 #include <esp_memory_utils.h>
 #include <zephyr/drivers/spi.h>
-#if defined(CONFIG_SOC_SERIES_ESP32C3) || defined(CONFIG_SOC_SERIES_ESP32C6)
+#if defined(CONFIG_SOC_SERIES_ESP32C2) || defined(CONFIG_SOC_SERIES_ESP32C3) ||                    \
+	defined(CONFIG_SOC_SERIES_ESP32C6)
 #include <zephyr/drivers/interrupt_controller/intc_esp32c3.h>
 #else
 #include <zephyr/drivers/interrupt_controller/intc_esp32.h>
@@ -30,7 +31,8 @@ LOG_MODULE_REGISTER(esp32_spi, CONFIG_SPI_LOG_LEVEL);
 #include "spi_context.h"
 #include "spi_esp32_spim.h"
 
-#if defined(CONFIG_SOC_SERIES_ESP32C3) || defined(CONFIG_SOC_SERIES_ESP32C6)
+#if defined(CONFIG_SOC_SERIES_ESP32C2) || defined(CONFIG_SOC_SERIES_ESP32C3) ||                    \
+	defined(CONFIG_SOC_SERIES_ESP32C6)
 #define ISR_HANDLER isr_handler_t
 #else
 #define ISR_HANDLER intr_handler_t
@@ -244,11 +246,17 @@ static int spi_esp32_init(const struct device *dev)
 	spi_ll_disable_int(cfg->spi);
 	spi_ll_clear_int_stat(cfg->spi);
 
-	esp_intr_alloc(cfg->irq_source,
-			0,
+	err = esp_intr_alloc(cfg->irq_source,
+			ESP_PRIO_TO_FLAGS(cfg->irq_priority) |
+			ESP_INT_FLAGS_CHECK(cfg->irq_flags) | ESP_INTR_FLAG_IRAM,
 			(ISR_HANDLER)spi_esp32_isr,
 			(void *)dev,
 			NULL);
+
+	if (err != 0) {
+		LOG_ERR("could not allocate interrupt (err %d)", err);
+		return err;
+	}
 #endif
 
 	err = spi_context_cs_configure_all(&data->ctx);
@@ -377,11 +385,11 @@ static int IRAM_ATTR spi_esp32_configure(const struct device *dev,
 #endif
 
 	/*
-	 * Workaround for ESP32S3 and ESP32Cx SoC. This dummy transaction is needed to sync CLK and
-	 * software controlled CS when SPI is in mode 3
+	 * Workaround for ESP32S3 and ESP32Cx SoC's. This dummy transaction is needed
+	 * to sync CLK and software controlled CS when SPI is in mode 3
 	 */
-#if defined(CONFIG_SOC_SERIES_ESP32S3) || defined(CONFIG_SOC_SERIES_ESP32C3) ||	\
-	defined(CONFIG_SOC_SERIES_ESP32C6)
+#if defined(CONFIG_SOC_SERIES_ESP32S3) || defined(CONFIG_SOC_SERIES_ESP32C2) ||                    \
+	defined(CONFIG_SOC_SERIES_ESP32C3) || defined(CONFIG_SOC_SERIES_ESP32C6)
 	if (ctx->num_cs_gpios && (hal_dev->mode & (SPI_MODE_CPOL | SPI_MODE_CPHA))) {
 		spi_esp32_transfer(dev);
 	}
@@ -425,12 +433,12 @@ static int transceive(const struct device *dev,
 
 	spi_context_lock(&data->ctx, asynchronous, cb, userdata, spi_cfg);
 
+	data->dfs = spi_esp32_get_frame_size(spi_cfg);
+
 	ret = spi_esp32_configure(dev, spi_cfg);
 	if (ret) {
 		goto done;
 	}
-
-	data->dfs = spi_esp32_get_frame_size(spi_cfg);
 
 	spi_context_buffers_setup(&data->ctx, tx_bufs, rx_bufs, data->dfs);
 
@@ -525,7 +533,9 @@ static const struct spi_driver_api spi_api = {
 		.clock_dev = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(idx)),	\
 		.duty_cycle = 0, \
 		.input_delay_ns = 0, \
-		.irq_source = DT_INST_IRQN(idx), \
+		.irq_source = DT_INST_IRQ_BY_IDX(idx, 0, irq), \
+		.irq_priority = DT_INST_IRQ_BY_IDX(idx, 0, priority), \
+		.irq_flags = DT_INST_IRQ_BY_IDX(idx, 0, flags), \
 		.pcfg = PINCTRL_DT_INST_DEV_CONFIG_GET(idx),	\
 		.clock_subsys =	\
 			(clock_control_subsys_t)DT_INST_CLOCKS_CELL(idx, offset),	\

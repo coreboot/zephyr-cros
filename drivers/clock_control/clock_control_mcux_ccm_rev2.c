@@ -63,9 +63,15 @@ static int mcux_ccm_get_subsys_rate(const struct device *dev,
 	instance = (clock_name & IMX_CCM_INSTANCE_MASK);
 	switch (peripheral) {
 #ifdef CONFIG_I2C_MCUX_LPI2C
+#if defined(CONFIG_SOC_SERIES_IMXRT118X)
+	case IMX_CCM_LPI2C0102_CLK:
+		clock_root = kCLOCK_Root_Lpi2c0102 + instance;
+		break;
+#else
 	case IMX_CCM_LPI2C1_CLK:
 		clock_root = kCLOCK_Root_Lpi2c1 + instance;
 		break;
+#endif
 #endif
 
 #ifdef CONFIG_SPI_MCUX_LPSPI
@@ -169,6 +175,15 @@ static int mcux_ccm_get_subsys_rate(const struct device *dev,
 #ifdef CONFIG_COUNTER_MCUX_TPM
 	case IMX_CCM_TPM_CLK:
 		clock_root = kCLOCK_Root_Tpm1 + instance;
+		break;
+#endif
+
+#ifdef CONFIG_MCUX_FLEXIO
+	case IMX_CCM_FLEXIO1_CLK:
+		clock_root = kCLOCK_Root_Flexio1;
+		break;
+	case IMX_CCM_FLEXIO2_CLK:
+		clock_root = kCLOCK_Root_Flexio2;
 		break;
 #endif
 

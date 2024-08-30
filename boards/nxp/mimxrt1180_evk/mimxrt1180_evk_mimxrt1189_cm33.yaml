@@ -17,4 +17,6 @@ flash: 16384
 supported:
   - gpio
   - uart
+  - i2c
+  - counter
 vendor: nxp

@@ -59,6 +59,10 @@ Current Zephyr's ESP8684-Devkitm board supports the following features:
 +------------+------------+-------------------------------------+
 | Timers     | on-chip    | counter                             |
 +------------+------------+-------------------------------------+
+| Wi-Fi      | on-chip    |                                     |
++------------+------------+-------------------------------------+
+| LEDC       | on-chip    | pwm                                 |
++------------+------------+-------------------------------------+
 
 For a getting started user guide, please check `ESP8684 Devkitm User Guide`_.
 

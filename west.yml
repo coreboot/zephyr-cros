@@ -127,7 +127,7 @@ manifest:
       revision: ea987c1ca661be723de83bd159aed815d6cbd430
       path: modules/lib/cmsis-nn
     - name: edtt
-      revision: 8d7b543d4d2f2be0f78481e4e1d8d73a88024803
+      revision: b9ca3c7030518f07b7937dacf970d37a47865a76
       path: tools/edtt
       groups:
         - tools
@@ -157,7 +157,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: e05b24f5caee741e0f3b43123bf2082e8cc908e7
+      revision: 8c2ae3b0017cadac3de1f57592e879a7bb6ef75d
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -188,7 +188,7 @@ manifest:
       groups:
         - hal
     - name: hal_nordic
-      revision: 0b6040d9b440b769a65f25c6fd9320eeff88ee94
+      revision: 9717cc2845116ac1c4465b1eb8cc913513601e2a
       path: modules/hal/nordic
       groups:
         - hal
@@ -198,7 +198,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: e400b5dba27d9abe1403fc799d48b58fa1b1daee
+      revision: 00fd3f5a3b1b7fc3a715b1e96cb2d5036b5cc27e
       path: modules/hal/nxp
       groups:
         - hal
@@ -223,7 +223,7 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: a09dd1b82b24aa3060e162c0dfa40026c0dba450
+      revision: 4c813a1f6c0bba03dec45a3878ba06cfb385565d
       path: modules/hal/silabs
       groups:
         - hal
@@ -233,7 +233,7 @@ manifest:
       groups:
         - hal
     - name: hal_stm32
-      revision: f1317150eac951fdd8259337a47cbbc4c2e6d335
+      revision: 4c1adf8a2e2e9888f3b43374bf6521b0788aa82d
       path: modules/hal/stm32
       groups:
         - hal
@@ -259,7 +259,7 @@ manifest:
         - hal
     - name: hostap
       path: modules/lib/hostap
-      revision: 77a4cad575c91f1b234c8d15630f87999881cde2
+      revision: 7761b17eea9a2442af6ea9df830904fa4ba7bbca
     - name: libmetal
       revision: a6851ba6dba8c9e87d00c42f171a822f7a29639b
       path: modules/hal/libmetal
