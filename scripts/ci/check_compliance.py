@@ -264,8 +264,12 @@ class BoardYmlCheck(ComplianceTest):
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                vendor, _ = line.split("\t", 2)
-                vendor_prefixes.append(vendor)
+                try:
+                    vendor, _ = line.split("\t", 2)
+                    vendor_prefixes.append(vendor)
+                except ValueError:
+                    self.error(f"Invalid line in vendor-prefixes.txt:\"{line}\".")
+                    self.error("Did you forget the tab character?")
 
         path = Path(ZEPHYR_BASE)
         for file in path.glob("**/board.yml"):
@@ -303,8 +307,8 @@ class ClangFormatCheck(ComplianceTest):
                 for patch in patchset:
                     for hunk in patch:
                         # Strip the before and after context
-                        before = next(i for i,v in enumerate(hunk) if str(v).startswith('-'))
-                        after = next(i for i,v in enumerate(reversed(hunk)) if str(v).startswith('+'))
+                        before = next(i for i,v in enumerate(hunk) if str(v).startswith(('-', '+')))
+                        after = next(i for i,v in enumerate(reversed(hunk)) if str(v).startswith(('-', '+')))
                         msg = "".join([str(l) for l in hunk[before:-after or None]])
 
                         # show the hunk at the last line

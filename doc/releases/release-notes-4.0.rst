@@ -193,6 +193,11 @@ Drivers and Sensors
 
 * Sensors
 
+  * The existing driver for the Microchip MCP9808 temperature sensor transformed and renamed
+    to support all JEDEC JC 42.4 compatible temperature sensors. It now uses the
+    :dtcompatible:`jedec,jc-42.4-temp` compatible string instead to the ``microchip,mcp9808``
+    string.
+
 * Serial
 
   * LiteX: Renamed the ``compatible`` from ``litex,uart0`` to :dtcompatible:`litex,uart`.
@@ -236,6 +241,8 @@ Networking
   * Location object: optional resources altitude, radius, and speed can now be
   used optionally as per the location object's specification. Users of these
   resources will now need to provide a read buffer.
+
+  * lwm2m_senml_cbor: Regenerated generated code files using zcbor 0.9.0
 
 * Misc:
 
@@ -302,6 +309,13 @@ Libraries / Subsystems
 
 * SD
 
+* Shell:
+
+  * Reorganized the ``kernel threads`` and ``kernel stacks`` shell command under the
+    L1 ``kernel thread`` shell command as ``kernel thread list`` & ``kernel thread stacks``
+  * Added multiple shell command to configure the CPU mask affinity / pinning a thread in
+    runtime, do ``kernel thread -h`` for more info.
+
 * State Machine Framework
 
 * Storage
@@ -340,6 +354,20 @@ Trusted Firmware-M
 
 LVGL
 ****
+
+zcbor
+*****
+
+* Updated the zcbor library to version 0.9.0.
+  Full release notes at https://github.com/NordicSemiconductor/zcbor/blob/0.9.0/RELEASE_NOTES.md
+  Migration guide at https://github.com/NordicSemiconductor/zcbor/blob/0.9.0/MIGRATION_GUIDE.md
+  Highlights:
+
+    * Many code generation bugfixes
+
+    * You can now decide at run-time whether the decoder should enforce canonical encoding.
+
+    * Allow --file-header to accept a path to a file with header contents
 
 Tests and Samples
 *****************

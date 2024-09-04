@@ -82,14 +82,13 @@ struct llext *llext_by_name(const char *name)
 int llext_iterate(int (*fn)(struct llext *ext, void *arg), void *arg)
 {
 	sys_snode_t *node;
-	unsigned int i;
 	int ret = 0;
 
 	k_mutex_lock(&llext_lock, K_FOREVER);
 
-	for (node = sys_slist_peek_head(&_llext_list), i = 0;
+	for (node = sys_slist_peek_head(&_llext_list);
 	     node;
-	     node = sys_slist_peek_next(node), i++) {
+	     node = sys_slist_peek_next(node)) {
 		struct llext *ext = CONTAINER_OF(node, struct llext, _llext_list);
 
 		ret = fn(ext, arg);
@@ -180,12 +179,63 @@ out:
 	return ret;
 }
 
+#include <zephyr/logging/log_ctrl.h>
+
+static void llext_log_flush(void)
+{
+#ifdef CONFIG_LOG_MODE_DEFERRED
+	extern struct k_thread logging_thread;
+	int cur_prio = k_thread_priority_get(k_current_get());
+	int log_prio = k_thread_priority_get(&logging_thread);
+	int target_prio;
+	bool adjust_cur, adjust_log;
+
+	/*
+	 * Our goal is to raise the logger thread priority above current, but if
+	 * current has the highest possble priority, both need to be adjusted,
+	 * particularly if the logger thread has the lowest possible priority
+	 */
+	if (log_prio < cur_prio) {
+		adjust_cur = false;
+		adjust_log = false;
+		target_prio = 0;
+	} else if (cur_prio == K_HIGHEST_THREAD_PRIO) {
+		adjust_cur = true;
+		adjust_log = true;
+		target_prio = cur_prio;
+		k_thread_priority_set(k_current_get(), cur_prio + 1);
+	} else {
+		adjust_cur = false;
+		adjust_log = true;
+		target_prio = cur_prio - 1;
+	}
+
+	/* adjust logging thread priority if needed */
+	if (adjust_log) {
+		k_thread_priority_set(&logging_thread, target_prio);
+	}
+
+	log_thread_trigger();
+	k_yield();
+
+	if (adjust_log) {
+		k_thread_priority_set(&logging_thread, log_prio);
+	}
+	if (adjust_cur) {
+		k_thread_priority_set(&logging_thread, cur_prio);
+	}
+#endif
+}
+
 int llext_unload(struct llext **ext)
 {
 	__ASSERT(*ext, "Expected non-null extension");
 	struct llext *tmp = *ext;
 
 	k_mutex_lock(&llext_lock, K_FOREVER);
+
+	llext_log_flush();
+
 	__ASSERT(tmp->use_count, "A valid LLEXT cannot have a zero use-count!");
 
 	if (tmp->use_count-- != 1) {
@@ -197,6 +247,8 @@ int llext_unload(struct llext **ext)
 
 	/* FIXME: protect the global list */
 	sys_slist_find_and_remove(&_llext_list, &tmp->_llext_list);
+
+	llext_dependency_remove_all(tmp);
 
 	*ext = NULL;
 	k_mutex_unlock(&llext_lock);
