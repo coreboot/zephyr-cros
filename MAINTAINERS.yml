@@ -2812,7 +2812,6 @@ Networking:
     - samples/net/lwm2m_client/
     - samples/net/wifi/
     - samples/net/dhcpv4_client/
-    - subsys/net/buf*.c
     - subsys/net/l2/ethernet/gptp/
     - subsys/net/l2/ieee802154/
     - subsys/net/l2/wifi/
@@ -2855,7 +2854,7 @@ Networking:
     - jukkar
   files:
     - include/zephyr/net/buf.h
-    - subsys/net/buf*.c
+    - lib/net_buf/
     - tests/net/buf/
   labels:
     - "area: Networking Buffers"
