@@ -4116,6 +4116,14 @@ RTIO:
   tests:
     - rtio
 
+Secure storage:
+  status: maintained
+  maintainers:
+    - tomi-font
+  files:
+    - subsys/secure_storage/
+  labels:
+    - "area: Secure storage"
 Storage:
   status: odd fixes
   files:
