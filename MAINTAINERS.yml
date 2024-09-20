@@ -5314,6 +5314,7 @@ zbus:
     - lyakh
     - pillo79
   files:
+    - cmake/llext-edk.cmake
     - samples/subsys/llext/
     - include/zephyr/llext/
     - tests/subsys/llext/
