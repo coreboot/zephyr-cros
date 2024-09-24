@@ -166,7 +166,7 @@ static void llext_link_plt(struct llext_loader *ldr, struct llext *ext,
 		}
 
 		/* Index in the symbol table */
-		unsigned int j = ELF32_R_SYM(rela.r_info);
+		unsigned int j = ELF_R_SYM(rela.r_info);
 
 		if (j >= sym_cnt) {
 			LOG_WRN("PLT: idx %u >= %u", j, sym_cnt);
@@ -284,8 +284,7 @@ int llext_link(struct llext_loader *ldr, struct llext *ext, bool do_local)
 			}
 			break;
 		case SHT_RELA:
-			/* FIXME: currently implemented only on the Xtensa code path */
-			if (!IS_ENABLED(CONFIG_XTENSA)) {
+			if (IS_ENABLED(CONFIG_ARM)) {
 				LOG_ERR("Found unsupported SHT_RELA section %d", i);
 				return -ENOTSUP;
 			}

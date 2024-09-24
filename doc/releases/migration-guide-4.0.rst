@@ -21,6 +21,9 @@ Build System
 Kernel
 ******
 
+* Removed the deprecated :kconfig:option:`CONFIG_MP_NUM_CPUS`, application should be updated to use
+  :kconfig:option:`CONFIG_MP_MAX_NUM_CPUS` instead.
+
 Boards
 ******
 
@@ -30,14 +33,14 @@ Boards
   to define default flash and ram partitioning based on TF-M.
 
 * STM32WBA: The command used for fetching blobs required to build ble applications is now
-  `west blobs fetch hal_stm32` instead of `west blobs fetch stm32`.
+  ``west blobs fetch hal_stm32`` instead of ``west blobs fetch stm32``.
 
 STM32
 =====
 
-* On all official STM32 boards, `west flash` selects STM32CubeProgrammer as the default west runner.
+* On all official STM32 boards, ``west flash`` selects STM32CubeProgrammer as the default west runner.
   If you want to enforce the selection of another runner like OpenOCD or pyOCD for flashing, you should
-  specify it using the west `--runner` or `-r` option. (:github:`75284`)
+  specify it using the west ``--runner`` or ``-r`` option. (:github:`75284`)
 
 Modules
 *******
@@ -48,8 +51,12 @@ Mbed TLS
 * The Kconfig options ``CONFIG_MBEDTLS_TLS_VERSION_1_0`` and ``CONFIG_MBEDTLS_TLS_VERSION_1_1``
   have been removed because Mbed TLS doesn't support TLS 1.0 and 1.1 anymore since v3.0. (:github:`76833`)
 * The following Kconfig symbols were renamed (:github:`76408`):
-  * ``CONFIG_MBEDTLS_ENTROPY_ENABLED`` is now :kconfig:option:``CONFIG_MBEDTLS_ENTROPY_C``,
-  * ``CONFIG_MBEDTLS_ZEPHYR_ENTROPY`` is now :kconfig:option:``CONFIG_MBEDTLS_ENTROPY_POLL_ZEPHYR``.
+  * ``CONFIG_MBEDTLS_ENTROPY_ENABLED`` is now :kconfig:option:`CONFIG_MBEDTLS_ENTROPY_C`,
+  * ``CONFIG_MBEDTLS_ZEPHYR_ENTROPY`` is now :kconfig:option:`CONFIG_MBEDTLS_ENTROPY_POLL_ZEPHYR`.
+
+* The Kconfig option ``CONFIG_MBEDTLS_SSL_EXPORT_KEYS`` was removed because the
+  corresponding build symbol was removed in Mbed TLS 3.1.0 and is now assumed to
+  be enabled. (:github:`77657`)
 
 Trusted Firmware-M
 ==================
@@ -65,10 +72,10 @@ zcbor
   Migration guide at https://github.com/NordicSemiconductor/zcbor/blob/0.9.0/MIGRATION_GUIDE.md
   Migration guide copied here:
 
-  * `zcbor_simple_*()` functions have been removed to avoid confusion about their use.
+  * ``zcbor_simple_*()`` functions have been removed to avoid confusion about their use.
     They are still in the C file because they are used by other functions.
     Instead, use the specific functions for the currently supported simple values, i.e.
-    `zcbor_bool_*()`, `zcbor_nil_*()`, and `zcbor_undefined_*()`.
+    ``zcbor_bool_*()``, ``zcbor_nil_*()``, and ``zcbor_undefined_*()``.
     If a removed variant is strictly needed, add your own forward declaration in your code.
 
   * Code generation naming:
@@ -94,6 +101,53 @@ Device Drivers and Devicetree
   Chip variants with open-drain outputs (``mcp23x09``, ``mcp23x18``) now correctly reflect this in
   their driver API, users of these devices should ensure they pass appropriate values to
   :c:func:`gpio_pin_set`. (:github:`65797`)
+
+Clock control
+=============
+
+* LFXO/HFXO (High/Low Frequency Crystal Oscillator) present in nRF53 series can
+  now be configured using devicetree. The Kconfig options
+  :kconfig:option:`CONFIG_SOC_ENABLE_LFXO`,
+  :kconfig:option:`CONFIG_SOC_LFXO_CAP_EXTERNAL`,
+  :kconfig:option:`CONFIG_SOC_LFXO_CAP_INT_6PF`,
+  :kconfig:option:`CONFIG_SOC_LFXO_CAP_INT_7PF`,
+  :kconfig:option:`CONFIG_SOC_LFXO_CAP_INT_9PF`,
+  :kconfig:option:`CONFIG_SOC_HFXO_CAP_DEFAULT`,
+  :kconfig:option:`CONFIG_SOC_HFXO_CAP_EXTERNAL`,
+  :kconfig:option:`CONFIG_SOC_HFXO_CAP_INTERNAL` and
+  :kconfig:option:`CONFIG_SOC_HFXO_CAP_INT_VALUE_X2` have been deprecated.
+
+  LFXO can now be configured like this:
+
+  .. code-block:: devicetree
+
+     /* use external capacitors */
+     &lfxo {
+           load-capacitors = "external";
+     };
+
+     /* use internal capacitors (value needs to be selected: 6, 7, 9pF)
+     &lfxo {
+           load-capacitors = "internal";
+           load-capacitance-picofarad = <...>;
+     };
+
+  HFXO can now be configured like this:
+
+  .. code-block:: devicetree
+
+     /* use external capacitors */
+     &hfxo {
+           load-capacitors = "external";
+     };
+
+     /* use internal capacitors (value needs to be selected: 7pF...20pF in 0.5pF
+      * steps, units: femtofarads)
+      */
+     &hfxo {
+           load-capacitors = "internal";
+           load-capacitance-femtofarad = <...>;
+     };
 
 Controller Area Network (CAN)
 =============================
@@ -244,7 +298,7 @@ Networking
 
 * The Ethernet bridge shell is moved under network shell. This is done so that
   all the network shell activities can be found under ``net`` shell command.
-  After this change the bridge shell is used by ``net bridge`` command.
+  After this change the bridge shell is used by ``net bridge`` command. (:github:`77235`)
 
 * The Ethernet bridging code is changed to allow similar configuration experience
   as in Linux. The bridged Ethernet interface can be used normally even if bridging
@@ -256,7 +310,7 @@ Networking
   removed as same functionality can be achieved using promiscuous API.
   Because the bridge interface is a normal network interface,
   the :c:func:`eth_bridge_iface_add` and :c:func:`eth_bridge_iface_remove`
-  will take network interface pointer as a first parameter.
+  will take network interface pointer as a first parameter. (:github:`77987`)
 
 * To facilitate use outside of the networking subsystem, the network buffer header file was renamed
   from :zephyr_file:`include/zephyr/net/buf.h` to :zephyr_file:`include/zephyr/net_buf.h` and the
@@ -278,6 +332,10 @@ hawkBit
 
 MCUmgr
 ======
+
+* The ``MCUMGR_TRANSPORT_BT_AUTHEN`` Kconfig option from the :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT` MCUmgr transport has been replaced with the :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW` Kconfig choice.
+  The requirement for Bluetooth authentication is now indicated by the :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN` Kconfig option.
+  To remove the default requirement for Bluetooth authentication it is necessary to enable the :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW` Kconfig option in the project configuration.
 
 Modem
 =====

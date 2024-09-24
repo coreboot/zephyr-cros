@@ -416,6 +416,8 @@ Bluetooth Host:
     - tests/bluetooth/controller/
     - tests/bluetooth/mesh*/
     - tests/bluetooth/qualification/
+    - tests/bluetooth/shell/audio.conf
+    - tests/bluetooth/shell/mesh.conf
     - tests/bluetooth/tester/
     - tests/bsim/bluetooth/audio/
     - tests/bsim/bluetooth/audio_samples/
@@ -446,6 +448,7 @@ Bluetooth Mesh:
     - samples/bluetooth/mesh*/
     - subsys/bluetooth/mesh/
     - tests/bluetooth/mesh*/
+    - tests/bluetooth/shell/mesh.conf
     - tests/bsim/bluetooth/mesh/
   labels:
     - "area: Bluetooth Mesh"
@@ -2084,6 +2087,7 @@ Release Notes:
   status: odd fixes
   collaborators:
     - loicpoulain
+    - josuah
   files:
     - drivers/video/
     - include/zephyr/drivers/video.h
@@ -2091,6 +2095,7 @@ Release Notes:
     - doc/hardware/peripherals/video.rst
     - tests/drivers/*/video/
     - dts/bindings/video/
+    - samples/drivers/video/
   labels:
     - "area: Video"
   tests:
@@ -2315,7 +2320,7 @@ Google Platforms:
     - duda-patryk
   files:
     - boards/google/
-    - samples/boards/google_*/
+    - samples/boards/google/
 
 Hash Utilities:
   status: maintained
@@ -3574,7 +3579,7 @@ Intel Platforms (Xtensa):
     - soc/intel/intel_adsp/
     - dts/xtensa/intel/
     - tests/boards/intel_adsp/
-    - samples/boards/intel_adsp/
+    - samples/boards/intel/adsp/
     - dts/bindings/*/intel,adsp*
     - scripts/west_commands/runners/intel_adsp.py
   labels:
@@ -3617,8 +3622,8 @@ NXP Drivers:
   status: maintained
   maintainers:
     - dleach02
-  collaborators:
     - mmahadevan108
+  collaborators:
     - danieldegrasse
     - decsny
     - manuargue
@@ -3654,8 +3659,8 @@ NXP Platforms (MCU):
   status: maintained
   maintainers:
     - dleach02
-  collaborators:
     - mmahadevan108
+  collaborators:
     - danieldegrasse
     - DerekSnell
     - yvanderv
@@ -3700,7 +3705,7 @@ NXP Platforms (S32):
     - drivers/misc/*nxp_s32*/
     - dts/bindings/*/nxp,s32*
     - dts/arm/nxp/*s32*
-    - samples/boards/nxp_s32/
+    - samples/boards/nxp/s32/
     - include/zephyr/dt-bindings/*/nxp-s32*
     - include/zephyr/dt-bindings/*/nxp_s32*
     - include/zephyr/drivers/*/*nxp_s32*
@@ -3807,7 +3812,7 @@ nRF Platforms:
     - drivers/*/*nrf*.c
     - drivers/*/*nordic*/
     - soc/nordic/
-    - samples/boards/nrf/
+    - samples/boards/nordic/
     - dts/*/nordic/
     - dts/bindings/*/nordic,*
     - tests/drivers/*/*nrf*/
@@ -3932,7 +3937,7 @@ STM32 Platforms:
     - dts/arm/st/
     - dts/bindings/*/*stm32*
     - soc/st/stm32/
-    - samples/boards/stm32/
+    - samples/boards/st/
   labels:
     - "platform: STM32"
   description: >-
@@ -3956,7 +3961,7 @@ Espressif Platforms:
     - dts/xtensa/espressif/
     - dts/riscv/espressif/
     - dts/bindings/*/*esp32*
-    - samples/boards/esp32*/
+    - samples/boards/espressif/
     - tests/boards/espressif_esp32/
     - drivers/*/*esp32*/
   labels:
@@ -4082,7 +4087,7 @@ LiteX Platforms:
     - dts/bindings/*/litex*
     - dts/riscv/riscv32-litex-vexriscv.dtsi
     - include/zephyr/drivers/*/*litex*
-    - samples/boards/litex/
+    - samples/boards/enjoydigital/litex/
     - samples/drivers/*litex/
     - soc/litex/
   labels:
@@ -4693,8 +4698,8 @@ West:
   status: maintained
   maintainers:
     - dleach02
-  collaborators:
     - mmahadevan108
+  collaborators:
     - danieldegrasse
     - manuargue
     - PetervdPerk-NXP

@@ -21,6 +21,8 @@ The following CVEs are addressed by this release:
 More detailed information can be found in:
 https://docs.zephyrproject.org/latest/security/vulnerabilities.html
 
+* CVE-2024-8798: Under embargo until 2024-11-22
+
 API Changes
 ***********
 
@@ -48,6 +50,8 @@ Deprecated in this release
 * Deprecated the :c:func:`net_buf_put` and :c:func:`net_buf_get` API functions in favor of
   :c:func:`k_fifo_put` and :c:func:`k_fifo_get`.
 
+* The :ref:`kscan_api` subsystem has been marked as deprecated.
+
 Architectures
 *************
 
@@ -68,8 +72,8 @@ Architectures
     has an additional field ``csf`` that points to the callee-saved-registers upon an fatal error,
     which can be accessed in :c:func:`k_sys_fatal_error_handler` by ``esf->csf``.
 
-    * For SoCs that select `RISCV_SOC_HAS_ISR_STACKING`, the `SOC_ISR_STACKING_ESF_DECLARE` has to
-      include the `csf` member, otherwise the build would fail.
+    * For SoCs that select ``RISCV_SOC_HAS_ISR_STACKING``, the ``SOC_ISR_STACKING_ESF_DECLARE`` has to
+      include the ``csf`` member, otherwise the build would fail.
 
 * Xtensa
 
@@ -86,6 +90,14 @@ Bluetooth
 * Audio
 
   * :c:func:`bt_tbs_client_register_cb` now supports multiple listeners and may now return an error.
+
+  * Added APIs for getting and setting the assisted listening stream values in codec capabilities
+    and codec configuration:
+
+    * :c:func:`bt_audio_codec_cfg_meta_get_assisted_listening_stream`
+    * :c:func:`bt_audio_codec_cfg_meta_set_assisted_listening_stream`
+    * :c:func:`bt_audio_codec_cap_meta_get_assisted_listening_stream`
+    * :c:func:`bt_audio_codec_cap_meta_set_assisted_listening_stream`
 
 * Host
 
@@ -111,6 +123,8 @@ Boards & SoC Support
   * :ref:`native_posix<native_posix>` has been deprecated in favour of
     :ref:`native_sim<native_sim>`.
   * Support for Google Kukui EC board (``google_kukui``) has been dropped.
+  * STM32: Deprecated MCO configuration via Kconfig in favour of setting it through devicetree.
+    See ``samples/boards/stm32/mco`` sample.
 
 * Added support for the following shields:
 
@@ -168,6 +182,8 @@ Drivers and Sensors
 * Input
 
 * LED
+
+  * lp5562: added ``enable-gpios`` property to describe the EN/VCC GPIO of the lp5562.
 
   * lp5569: added ``charge-pump-mode`` property to configure the charge pump of the lp5569.
 
@@ -313,6 +329,9 @@ Libraries / Subsystems
       supported groups.
     * Fixed formatting of milliseconds in :c:enum:`OS_MGMT_ID_DATETIME_STR` by adding
       leading zeros.
+    * Added support for custom os mgmt bootloader info responses using notification hooks, this
+      can be enabled witbh :kconfig:option:`CONFIG_MCUMGR_GRP_OS_BOOTLOADER_INFO_HOOK`, the data
+      structure is :c:struct:`os_mgmt_bootloader_info_data`.
 
 * Logging
 
@@ -329,6 +348,18 @@ Libraries / Subsystems
     secure random sources when :kconfig:option:`CONFIG_MBEDTLS_PSA_CRYPTO_EXTERNAL_RNG`
     is also enabled. This is only meant to be used for test purposes, not in production.
     (:github:`76408`)
+  * The Kconfig symbol :kconfig:option:`CONFIG_MBEDTLS_TLS_VERSION_1_3` was added to
+    enable TLS 1.3 support from Mbed TLS. When this is enabled the following
+    new Kconfig symbols can also be enabled:
+
+    * :kconfig:option:`CONFIG_MBEDTLS_TLS_SESSION_TICKETS` to enable session tickets
+      (RFC 5077);
+    * :kconfig:option:`CONFIG_MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_ENABLED`
+      for TLS 1.3 PSK key exchange mode;
+    * :kconfig:option:`CONFIG_MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL_ENABLED`
+      for TLS 1.3 ephemeral key exchange mode;
+    * :kconfig:option:`CONFIG_MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL_ENABLED`
+      for TLS 1.3 PSK ephemeral key exchange mode.
 
 * CMSIS-NN
 

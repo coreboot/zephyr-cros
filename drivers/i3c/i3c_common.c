@@ -10,6 +10,7 @@
 #include <zephyr/toolchain.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/slist.h>
+#include <zephyr/sys/byteorder.h>
 
 #include <zephyr/drivers/i3c.h>
 
@@ -516,6 +517,7 @@ int i3c_device_basic_info_get(struct i3c_device_desc *target)
 	struct i3c_ccc_mrl mrl = {0};
 	struct i3c_ccc_mwl mwl = {0};
 	union i3c_ccc_getcaps caps = {0};
+	union i3c_ccc_getmxds mxds = {0};
 
 	/*
 	 * Since some CCC functions requires BCR to function
@@ -566,6 +568,18 @@ int i3c_device_basic_info_get(struct i3c_device_desc *target)
 		goto out;
 	} else {
 		ret = 0;
+	}
+
+	/* GETMXDS */
+	if (target->bcr & I3C_BCR_MAX_DATA_SPEED_LIMIT) {
+		ret = i3c_ccc_do_getmxds_fmt2(target, &mxds);
+		if (ret != 0) {
+			goto out;
+		}
+
+		target->data_speed.maxrd = mxds.fmt2.maxrd;
+		target->data_speed.maxwr = mxds.fmt2.maxwr;
+		target->data_speed.max_read_turnaround = sys_get_le24(mxds.fmt2.maxrdturn);
 	}
 
 	target->dcr = dcr.dcr;
@@ -656,8 +670,7 @@ bool i3c_bus_has_sec_controller(const struct device *dev)
 	SYS_SLIST_FOR_EACH_NODE(&data->attached_dev.devices.i3c, node) {
 		struct i3c_device_desc *i3c_desc = CONTAINER_OF(node, struct i3c_device_desc, node);
 
-		if (I3C_BCR_DEVICE_ROLE(i3c_desc->bcr) ==
-		    I3C_BCR_DEVICE_ROLE_I3C_CONTROLLER_CAPABLE) {
+		if (i3c_device_is_controller_capable(i3c_desc)) {
 			return true;
 		}
 	}
@@ -705,7 +718,7 @@ int i3c_bus_deftgts(const struct device *dev)
 	deftgts->active_controller.addr = config_target.dynamic_addr << 1;
 	deftgts->active_controller.dcr = config_target.dcr;
 	deftgts->active_controller.bcr = config_target.bcr;
-	deftgts->active_controller.static_addr = config_target.static_addr << 1;
+	deftgts->active_controller.static_addr = I3C_BROADCAST_ADDR << 1;
 
 	/*
 	 * Loop through each attached I3C device and add it to the payload

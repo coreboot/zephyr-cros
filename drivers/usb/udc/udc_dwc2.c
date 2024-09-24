@@ -473,10 +473,13 @@ static int dwc2_tx_fifo_write(const struct device *dev,
 	}
 
 	if (is_iso) {
+		/* Queue transfer on next SOF. TODO: allow stack to explicitly
+		 * specify on which (micro-)frame the data should be sent.
+		 */
 		if (priv->sof_num & 1) {
-			diepctl |= USB_DWC2_DEPCTL_SETODDFR;
-		} else {
 			diepctl |= USB_DWC2_DEPCTL_SETEVENFR;
+		} else {
+			diepctl |= USB_DWC2_DEPCTL_SETODDFR;
 		}
 	}
 
@@ -1757,6 +1760,11 @@ static int dwc2_set_dedicated_fifo(const struct device *dev,
 		/* Make sure to not set TxFIFO greater than hardware allows */
 		txfdep = reqdep;
 		if (txfdep > priv->max_txfifo_depth[ep_idx]) {
+			return -ENOMEM;
+		}
+
+		/* Do not allocate TxFIFO outside the SPRAM */
+		if (txfaddr + txfdep > priv->dfifodepth) {
 			return -ENOMEM;
 		}
 

@@ -343,6 +343,7 @@ class CMake:
         cmake_args = [
             f'-B{self.build_dir}',
             f'-DTC_RUNID={self.instance.run_id}',
+            f'-DTC_NAME={self.instance.testsuite.name}',
             f'-D{warning_command}={warnings_as_errors}',
             f'-DEXTRA_GEN_DEFINES_ARGS={gen_defines_args}',
             f'-G{self.env.generator}'
@@ -614,6 +615,9 @@ class ProjectBuilder(FilterBuilder):
 
 
     def process(self, pipeline, done, message, lock, results):
+        next_op = None
+        additionals = {}
+
         op = message.get('op')
 
         self.instance.setup_handler(self.env)
@@ -771,8 +775,6 @@ class ProjectBuilder(FilterBuilder):
                     done.put(self.instance)
                     self.report_out(results)
 
-                next_op = None
-                additionals = {}
                 if not self.options.coverage:
                     if self.options.prep_artifacts_for_testing:
                         next_op = 'cleanup'
@@ -1108,6 +1110,13 @@ class ProjectBuilder(FilterBuilder):
             logger.info("{:>{}}/{} {:<25} {:<50} {} ({})".format(
                 results.done, total_tests_width, total_to_do , instance.platform.name,
                 instance.testsuite.name, status, more_info))
+
+            if self.options.verbose > 1:
+                for tc in self.instance.testcases:
+                    color = TwisterStatus.get_color(tc.status)
+                    logger.info(f'    {" ":<{total_tests_width+25+4}} {tc.name:<75} '
+                                f'{color}{str.upper(tc.status.value):<12}{Fore.RESET}'
+                                f'{" " + tc.reason if tc.reason else ""}')
 
             if instance.status in [TwisterStatus.ERROR, TwisterStatus.FAIL]:
                 self.log_info_file(self.options.inline_logs)

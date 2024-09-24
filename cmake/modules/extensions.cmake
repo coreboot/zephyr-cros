@@ -860,6 +860,39 @@ function(board_set_rimage_target target)
   zephyr_check_cache(RIMAGE_TARGET)
 endfunction()
 
+function(board_emu_args emu)
+  string(MAKE_C_IDENTIFIER ${emu} emu_id)
+  # Note the "_EXPLICIT_" here, and see below.
+  set_property(GLOBAL APPEND PROPERTY BOARD_EMU_ARGS_EXPLICIT_${emu_id} ${ARGN})
+endfunction()
+
+function(board_finalize_emu_args emu)
+  # If the application provided a macro to add additional emu
+  # arguments, handle them.
+  if(COMMAND app_set_emu_args)
+    app_set_emu_args()
+  endif()
+
+  # Retrieve the list of explicitly set arguments.
+  string(MAKE_C_IDENTIFIER ${emu} emu_id)
+  get_property(explicit GLOBAL PROPERTY "BOARD_EMU_ARGS_EXPLICIT_${emu_id}")
+
+  # Note no _EXPLICIT_ here. This property contains the final list.
+  set_property(GLOBAL APPEND PROPERTY BOARD_EMU_ARGS_${emu_id}
+    # Default arguments from the common emu file come first.
+    ${ARGN}
+    # Arguments explicitly given with board_emu_args() come
+    # next, so they take precedence over the common emu file.
+    ${explicit}
+    # Arguments given via the CMake cache come last of all. Users
+    # can provide variables in this way from the CMake command line.
+    ${BOARD_EMU_ARGS_${emu_id}}
+    )
+
+  # Add the finalized emu to the global property list.
+  set_property(GLOBAL APPEND PROPERTY ZEPHYR_EMUS ${emu})
+endfunction()
+
 # Zephyr board revision:
 #
 # This section provides a function for revision checking.
@@ -3603,9 +3636,11 @@ endfunction()
 #
 # <var>              : Return variable where the node path will be stored
 # NODELABEL <label>  : Node label
+# REQUIRED           : Generate a fatal error if the node-label is not found
 function(dt_nodelabel var)
+  set(options "REQUIRED")
   set(req_single_args "NODELABEL")
-  cmake_parse_arguments(DT_LABEL "" "${req_single_args}" "" ${ARGN})
+  cmake_parse_arguments(DT_LABEL "${options}" "${req_single_args}" "" ${ARGN})
 
   if(${ARGV0} IN_LIST req_single_args)
     message(FATAL_ERROR "dt_nodelabel(${ARGV0} ...) missing return parameter.")
@@ -3621,6 +3656,9 @@ function(dt_nodelabel var)
 
   get_target_property(${var} devicetree_target "DT_NODELABEL|${DT_LABEL_NODELABEL}")
   if(${${var}} STREQUAL ${var}-NOTFOUND)
+    if(DT_LABEL_REQUIRED)
+      message(FATAL_ERROR "required nodelabel not found: ${DT_LABEL_NODELABEL}")
+    endif()
     set(${var})
   endif()
 
@@ -3646,9 +3684,11 @@ endfunction()
 #
 # <var>           : Return variable where the node path will be stored
 # PROPERTY <prop> : The alias to check
+# REQUIRED        : Generate a fatal error if the alias is not found
 function(dt_alias var)
+  set(options "REQUIRED")
   set(req_single_args "PROPERTY")
-  cmake_parse_arguments(DT_ALIAS "" "${req_single_args}" "" ${ARGN})
+  cmake_parse_arguments(DT_ALIAS "${options}" "${req_single_args}" "" ${ARGN})
 
   if(${ARGV0} IN_LIST req_single_args)
     message(FATAL_ERROR "dt_alias(${ARGV0} ...) missing return parameter.")
@@ -3664,6 +3704,9 @@ function(dt_alias var)
 
   get_target_property(${var} devicetree_target "DT_ALIAS|${DT_ALIAS_PROPERTY}")
   if(${${var}} STREQUAL ${var}-NOTFOUND)
+    if(DT_ALIAS_REQUIRED)
+      message(FATAL_ERROR "required alias not found: ${DT_ALIAS_PROPERTY}")
+    endif()
     set(${var})
   endif()
 
@@ -3816,10 +3859,12 @@ endfunction()
 # PROPERTY <prop>: Property for which a value should be returned, as it
 #                  appears in the DTS source
 # INDEX <idx>    : Optional index when retrieving a value in an array property
+# REQUIRED       : Generate a fatal error if the property is not found
 function(dt_prop var)
+  set(options "REQUIRED")
   set(req_single_args "PATH;PROPERTY")
   set(single_args "INDEX")
-  cmake_parse_arguments(DT_PROP "" "${req_single_args};${single_args}" "" ${ARGN})
+  cmake_parse_arguments(DT_PROP "${options}" "${req_single_args};${single_args}" "" ${ARGN})
 
   if(${ARGV0} IN_LIST req_single_args)
     message(FATAL_ERROR "dt_prop(${ARGV0} ...) missing return parameter.")
@@ -3841,6 +3886,9 @@ function(dt_prop var)
 
   if(NOT exists)
     set(${var} PARENT_SCOPE)
+    if(DT_PROP_REQUIRED)
+      message(FATAL_ERROR "required property not found: ${canonical}/${DT_PROP_PROPERTY}")
+    endif()
     return()
   endif()
 
