@@ -454,6 +454,7 @@ static void adc_stm32_disable(ADC_TypeDef *adc)
 	!DT_HAS_COMPAT_STATUS_OKAY(st_stm32f4_adc) && \
 	!defined(CONFIG_SOC_SERIES_STM32G0X) && \
 	!defined(CONFIG_SOC_SERIES_STM32L0X) && \
+	!defined(CONFIG_SOC_SERIES_STM32U0X) && \
 	!defined(CONFIG_SOC_SERIES_STM32WBAX) && \
 	!defined(CONFIG_SOC_SERIES_STM32WLX)
 	if (LL_ADC_INJ_IsConversionOngoing(adc)) {
@@ -532,8 +533,10 @@ static void adc_stm32_calibration_start(const struct device *dev)
 	DT_HAS_COMPAT_STATUS_OKAY(st_stm32f1_adc) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32U0X) || \
 	defined(CONFIG_SOC_SERIES_STM32WLX) || \
 	defined(CONFIG_SOC_SERIES_STM32WBAX)
+
 	LL_ADC_StartCalibration(adc);
 #elif defined(CONFIG_SOC_SERIES_STM32U5X)
 	if (adc != ADC4) {
@@ -549,7 +552,9 @@ static void adc_stm32_calibration_start(const struct device *dev)
 		if ((dev_id != 0x482UL) && (rev_id != 0x2001UL)) {
 			adc_stm32_enable(adc);
 			MODIFY_REG(adc->CR, ADC_CR_CALINDEX, 0x9UL << ADC_CR_CALINDEX_Pos);
+			__DMB();
 			MODIFY_REG(adc->CALFACT2, 0xFFFFFF00UL, 0x03021100UL);
+			__DMB();
 			SET_BIT(adc->CALFACT, ADC_CALFACT_LATCH_COEF);
 			adc_stm32_disable(adc);
 		}
@@ -578,6 +583,7 @@ static int adc_stm32_calibrate(const struct device *dev)
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32H7RSX) || \
 	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32U0X) || \
 	defined(CONFIG_SOC_SERIES_STM32WBAX) || \
 	defined(CONFIG_SOC_SERIES_STM32WLX)
 	/* Make sure DMA is disabled before starting calibration */
@@ -1382,6 +1388,7 @@ static int adc_stm32_set_clock(const struct device *dev)
 #elif defined(CONFIG_SOC_SERIES_STM32C0X) || \
 	defined(CONFIG_SOC_SERIES_STM32G0X) || \
 	defined(CONFIG_SOC_SERIES_STM32L0X) || \
+	defined(CONFIG_SOC_SERIES_STM32U0X) || \
 	(defined(CONFIG_SOC_SERIES_STM32WBX) && defined(ADC_SUPPORT_2_5_MSPS)) || \
 	defined(CONFIG_SOC_SERIES_STM32WLX)
 	if ((config->clk_prescaler == LL_ADC_CLOCK_SYNC_PCLK_DIV1) ||

@@ -3326,14 +3326,14 @@ void notify_remote_cs_capabilities(struct bt_conn *conn, struct bt_conn_le_cs_ca
 	struct bt_conn_cb *callback;
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&conn_cbs, callback, _node) {
-		if (callback->remote_cs_capabilities_available) {
-			callback->remote_cs_capabilities_available(conn, &params);
+		if (callback->le_cs_remote_capabilities_available) {
+			callback->le_cs_remote_capabilities_available(conn, &params);
 		}
 	}
 
 	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
-		if (cb->remote_cs_capabilities_available) {
-			cb->remote_cs_capabilities_available(conn, &params);
+		if (cb->le_cs_remote_capabilities_available) {
+			cb->le_cs_remote_capabilities_available(conn, &params);
 		}
 	}
 }
@@ -3343,14 +3343,48 @@ void notify_remote_cs_fae_table(struct bt_conn *conn, struct bt_conn_le_cs_fae_t
 	struct bt_conn_cb *callback;
 
 	SYS_SLIST_FOR_EACH_CONTAINER(&conn_cbs, callback, _node) {
-		if (callback->remote_cs_fae_table_available) {
-			callback->remote_cs_fae_table_available(conn, &params);
+		if (callback->le_cs_remote_fae_table_available) {
+			callback->le_cs_remote_fae_table_available(conn, &params);
 		}
 	}
 
 	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
-		if (cb->remote_cs_fae_table_available) {
-			cb->remote_cs_fae_table_available(conn, &params);
+		if (cb->le_cs_remote_fae_table_available) {
+			cb->le_cs_remote_fae_table_available(conn, &params);
+		}
+	}
+}
+
+void notify_cs_config_created(struct bt_conn *conn, struct bt_conn_le_cs_config *params)
+{
+	struct bt_conn_cb *callback;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&conn_cbs, callback, _node) {
+		if (callback->le_cs_config_created) {
+			callback->le_cs_config_created(conn, params);
+		}
+	}
+
+	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
+		if (cb->le_cs_config_created) {
+			cb->le_cs_config_created(conn, params);
+		}
+	}
+}
+
+void notify_cs_config_removed(struct bt_conn *conn, uint8_t config_id)
+{
+	struct bt_conn_cb *callback;
+
+	SYS_SLIST_FOR_EACH_CONTAINER(&conn_cbs, callback, _node) {
+		if (callback->le_cs_config_removed) {
+			callback->le_cs_config_removed(conn, config_id);
+		}
+	}
+
+	STRUCT_SECTION_FOREACH(bt_conn_cb, cb) {
+		if (cb->le_cs_config_removed) {
+			cb->le_cs_config_removed(conn, config_id);
 		}
 	}
 }

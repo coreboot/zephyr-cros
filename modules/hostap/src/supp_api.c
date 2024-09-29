@@ -348,6 +348,10 @@ static inline int chan_to_freq(int chan)
 static inline enum wifi_frequency_bands wpas_band_to_zephyr(enum wpa_radio_work_band band)
 {
 	switch (band) {
+	case WPA_KEY_MGMT_IEEE8021X:
+	case WPA_KEY_MGMT_IEEE8021X_SUITE_B:
+	case WPA_KEY_MGMT_IEEE8021X_SUITE_B_192:
+		return WIFI_SECURITY_TYPE_EAP_TLS;
 	case BAND_2_4_GHZ:
 		return WIFI_FREQ_BAND_2_4_GHZ;
 	case BAND_5_GHZ:
@@ -1404,6 +1408,57 @@ int hapd_config_network(struct hostapd_iface *iface,
 		goto out;
 	}
 out:
+	return ret;
+}
+
+int supplicant_ap_config_params(const struct device *dev, struct wifi_ap_config_params *params)
+{
+	struct hostapd_iface *iface;
+	const struct wifi_mgmt_ops *const wifi_mgmt_api = get_wifi_mgmt_api(dev);
+	int ret = 0;
+
+	if (params->type & WIFI_AP_CONFIG_PARAM_MAX_INACTIVITY) {
+		if (!wifi_mgmt_api || !wifi_mgmt_api->ap_config_params) {
+			wpa_printf(MSG_ERROR, "ap_config_params not supported");
+			return -ENOTSUP;
+		}
+
+		ret = wifi_mgmt_api->ap_config_params(dev, params);
+		if (ret) {
+			wpa_printf(MSG_ERROR,
+				   "Failed to set maximum inactivity duration for stations");
+		} else {
+			wpa_printf(MSG_INFO, "Set maximum inactivity duration for stations: %d (s)",
+				   params->max_inactivity);
+		}
+	}
+	if (params->type & WIFI_AP_CONFIG_PARAM_MAX_NUM_STA) {
+		k_mutex_lock(&wpa_supplicant_mutex, K_FOREVER);
+
+		iface = get_hostapd_handle(dev);
+		if (!iface) {
+			ret = -ENOENT;
+			wpa_printf(MSG_ERROR, "Interface %s not found", dev->name);
+			goto out;
+		}
+
+		if (iface->state > HAPD_IFACE_DISABLED) {
+			ret = -EBUSY;
+			wpa_printf(MSG_ERROR, "Interface %s is not in disable state", dev->name);
+			goto out;
+		}
+
+		if (!hostapd_cli_cmd_v("set max_num_sta %d", params->max_num_sta)) {
+			ret = -EINVAL;
+			wpa_printf(MSG_ERROR, "Failed to set maximum number of stations");
+			goto out;
+		}
+		wpa_printf(MSG_INFO, "Set maximum number of stations: %d", params->max_num_sta);
+
+out:
+		k_mutex_unlock(&wpa_supplicant_mutex);
+	}
+
 	return ret;
 }
 #endif

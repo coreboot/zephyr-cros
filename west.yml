@@ -157,7 +157,7 @@ manifest:
       groups:
         - hal
     - name: hal_espressif
-      revision: 0bd00ce82fcf48281c9206fc28bd39785f059d64
+      revision: 1082a6923353c4a01aeb7acafd1b9a7866820f38
       path: modules/hal/espressif
       west-commands: west/west-commands.yml
       groups:
@@ -178,7 +178,7 @@ manifest:
       groups:
         - hal
     - name: hal_intel
-      revision: 0905a528623de56b1bedf817536321bcdbc0efae
+      revision: 8876a1815bc59e0464d285459b71e3d69872edfd
       path: modules/hal/intel
       groups:
         - hal
@@ -198,7 +198,7 @@ manifest:
       groups:
         - hal
     - name: hal_nxp
-      revision: f4e26fad2cfd8b8e8988e835a28667573ed072cf
+      revision: adfa0bbba6f5d36352d387527bdc486616c9f521
       path: modules/hal/nxp
       groups:
         - hal
@@ -223,7 +223,7 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: 4c813a1f6c0bba03dec45a3878ba06cfb385565d
+      revision: bb44c61d3f8b1e00d7b3d3804cfaf8df1e905d5d
       path: modules/hal/silabs
       groups:
         - hal
@@ -253,13 +253,13 @@ manifest:
       groups:
         - hal
     - name: hal_xtensa
-      revision: a2d658525b16c57bea8dd565f5bd5167e4b9f1ee
+      revision: baa56aa3e119b5aae43d16f9b2d2c8112e052871
       path: modules/hal/xtensa
       groups:
         - hal
     - name: hostap
       path: modules/lib/hostap
-      revision: cbae0170437dbe196d436b2b53d7aefb97044b0c
+      revision: f801840e246f47c9e895c540d0784f09726136c4
     - name: libmetal
       revision: a6851ba6dba8c9e87d00c42f171a822f7a29639b
       path: modules/hal/libmetal
@@ -300,7 +300,7 @@ manifest:
       groups:
         - tools
     - name: nrf_hw_models
-      revision: d2a119a9c7600ce06033a794de042e0ad9a38702
+      revision: 85944c64f224406e4d781aa382c5f1f71ed307fd
       path: modules/bsim_hw_models/nrf_hw_models
     - name: open-amp
       revision: 76d2168bcdfcd23a9a7dce8c21f2083b90a1e60a
