@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#line 9
 /**
  * @file
  * @brief Public PWM Driver APIs

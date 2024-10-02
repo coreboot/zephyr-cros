@@ -5,12 +5,6 @@
  */
 
 /*
- * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
- * #line marks the *next* line, so it is off by one.
- */
-#line 12
-
-/*
  * Copyright (c) 2015 Intel Corporation
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -34,8 +28,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/rtio/rtio.h>
-
-#line 39
 
 #ifdef __cplusplus
 extern "C" {
