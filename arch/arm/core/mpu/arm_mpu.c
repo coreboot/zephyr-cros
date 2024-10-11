@@ -67,6 +67,7 @@ static uint8_t static_regions_num;
 #error "Unsupported ARM CPU"
 #endif
 
+#line 71
 static int region_allocate_and_init(const uint8_t index,
 	const struct arm_mpu_region *region_conf)
 {
