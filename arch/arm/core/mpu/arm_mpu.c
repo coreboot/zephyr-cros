@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 #include <zephyr/device.h>
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
@@ -61,6 +67,7 @@ static uint8_t static_regions_num;
 #error "Unsupported ARM CPU"
 #endif
 
+#line 71
 static int region_allocate_and_init(const uint8_t index,
 	const struct arm_mpu_region *region_conf)
 {

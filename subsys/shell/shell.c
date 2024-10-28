@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/*
+ * TODO(b/272518464): Work around coreboot GCC preprocessor bug.
+ * #line marks the *next* line, so it is off by one.
+ */
+#line 12
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <zephyr/sys/atomic.h>
@@ -17,6 +23,7 @@
 #include "shell_vt100.h"
 #include "shell_wildcard.h"
 
+#line 27
 /* 2 == 1 char for cmd + 1 char for '\0' */
 #if (CONFIG_SHELL_CMD_BUFF_SIZE < 2)
 	#error too small CONFIG_SHELL_CMD_BUFF_SIZE
