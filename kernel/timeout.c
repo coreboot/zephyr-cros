@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#line 8
 #include <zephyr/kernel.h>
 #include <zephyr/spinlock.h>
 #include <ksched.h>
