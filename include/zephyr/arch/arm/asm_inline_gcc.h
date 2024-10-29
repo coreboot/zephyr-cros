@@ -27,7 +27,6 @@
 #include <zephyr/arch/arm/cortex_a_r/cpu.h>
 #endif
 
-#line 31
 #ifdef __cplusplus
 extern "C" {
 #endif

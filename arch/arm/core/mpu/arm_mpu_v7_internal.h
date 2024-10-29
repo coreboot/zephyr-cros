@@ -14,7 +14,7 @@
 
 #define LOG_LEVEL CONFIG_MPU_LOG_LEVEL
 #include <zephyr/logging/log.h>
-#line 18
+
 /* Global MPU configuration at system initialization. */
 static void mpu_init(void)
 {
