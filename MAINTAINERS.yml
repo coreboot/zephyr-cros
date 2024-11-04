@@ -1586,9 +1586,7 @@ Release Notes:
     - drivers.i3c
 
 "Drivers: IEEE 802.15.4":
-  status: maintained
-  maintainers:
-    - fgrandel
+  status: odd fixes
   collaborators:
     - rlubos
     - ankuns
@@ -2932,8 +2930,6 @@ Networking:
   status: maintained
   maintainers:
     - jukkar
-  collaborators:
-    - fgrandel
   files:
     - doc/connectivity/networking/api/gptp.rst
     - include/zephyr/net/gptp.h
@@ -3005,9 +3001,7 @@ Networking:
     - sample.net.ptp
 
 "Networking: Native IEEE 802.15.4":
-  status: maintained
-  maintainers:
-    - fgrandel
+  status: odd fixes
   collaborators:
     - rlubos
     - jukkar
