@@ -3142,6 +3142,7 @@ Power management:
   status: maintained
   maintainers:
     - ceolin
+    - bjarki-andreasen
   collaborators:
     - nashif
     - teburd
