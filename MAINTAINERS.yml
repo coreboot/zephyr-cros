@@ -3689,7 +3689,6 @@ NXP Drivers:
     - dleach02
     - mmahadevan108
   collaborators:
-    - danieldegrasse
     - decsny
     - manuargue
     - dbaluta
@@ -3739,7 +3738,6 @@ NXP Platforms (MCU):
     - dleach02
     - mmahadevan108
   collaborators:
-    - danieldegrasse
     - DerekSnell
     - yvanderv
     - EmilioCBen
@@ -3801,7 +3799,6 @@ NXP Platforms (MPU):
     - dleach02
     - dbaluta
     - iuliana-prodan
-    - danieldegrasse
     - yvanderv
   files:
     - dts/arm64/nxp/
@@ -4804,7 +4801,7 @@ West:
     - dleach02
     - mmahadevan108
   collaborators:
-    - danieldegrasse
+    - decsny
     - manuargue
     - PetervdPerk-NXP
     - bperseghetti
