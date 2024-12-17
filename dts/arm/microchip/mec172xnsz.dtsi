@@ -75,7 +75,3 @@
 &systick {
 	status = "disabled";
 };
-
-&adc0 {
-	channels = <8>;
-};
