@@ -194,7 +194,8 @@ bool pm_system_suspend(int32_t kernel_ticks)
 	}
 #endif
 
-	if (ticks != K_TICKS_FOREVER) {
+	if ((z_cpus_pm_state[id].exit_latency_us != 0) &&
+	    (ticks != K_TICKS_FOREVER)) {
 		/*
 		 * We need to set the timer to interrupt a little bit early to
 		 * accommodate the time required by the CPU to fully wake up.
